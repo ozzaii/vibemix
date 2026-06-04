@@ -1036,7 +1036,16 @@ def _course3_external_playback_action(
     if nowplaying_blocker:
         steps.append("Stop unrelated media or make Rekordbox the active playing source.")
     if current_route_aligned is False:
-        if current_route and route:
+        if _is_multi_output_route_name(device):
+            capture_route = route or "BlackHole 2ch @ 48000Hz"
+            steps.extend(
+                [
+                    "In Audio MIDI Setup, edit Multi-Output Device so it includes "
+                    f"{capture_route} and your speaker/headphones.",
+                    "Keep Rekordbox Audio output set to Multi-Output Device.",
+                ]
+            )
+        elif current_route and route:
             steps.append(
                 "In Rekordbox Audio preferences, set the audio output from "
                 f"{current_route} to {route}."
@@ -1055,10 +1064,16 @@ def _course3_external_playback_action(
     )
     prompt = f"Play a real Rekordbox library track through {route} with channel and master faders up."
     if current_route_aligned is False:
-        prompt = (
-            f"Set Rekordbox audio to {route}, then play a real library track "
-            "with channel and master faders up."
-        )
+        if _is_multi_output_route_name(device):
+            prompt = (
+                f"Make Multi-Output Device include {route}, then play a real "
+                "Rekordbox library track with channel and master faders up."
+            )
+        else:
+            prompt = (
+                f"Set Rekordbox audio to {route}, then play a real library track "
+                "with channel and master faders up."
+            )
     return {
         "prompt": prompt,
         "route": route,
@@ -1315,6 +1330,27 @@ def _is_rekordbox_capture_route_name(name: str) -> bool:
     )
 
 
+def _is_multi_output_route_name(name: str) -> bool:
+    return "multi-output" in name.strip().lower()
+
+
+def _preferred_loopback_route_name(rows: list[dict[str, Any]]) -> str:
+    if not rows:
+        return "BlackHole 2ch"
+    ordered = sorted(
+        rows,
+        key=lambda row: (
+            1 if _capture_row_name(row).strip().lower() == "blackhole 2ch" else 0,
+            1 if "blackhole" in _capture_row_name(row).lower() else 0,
+            1 if _info_int(row, "sample_rate") == EXPECTED_CAPTURE_SAMPLE_RATE else 0,
+            float(row.get("rms") or 0.0),
+            float(row.get("peak") or 0.0),
+        ),
+        reverse=True,
+    )
+    return _capture_row_name(ordered[0]).strip() or "BlackHole 2ch"
+
+
 def _trim_capture_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     trimmed: list[dict[str, Any]] = []
     for row in rows[:4]:
@@ -1382,10 +1418,12 @@ def _rekordbox_route_hint(
                     == EXPECTED_CAPTURE_SAMPLE_RATE
                     and saved_rate_mismatch is None
                 )
+    preferred_loopback = _preferred_loopback_route_name(loopback_rows)
     next_action = (
         "In Rekordbox Audio preferences, set the master/recording route to "
-        "BlackHole 16ch or to an aggregate that includes BlackHole, then play "
-        "a deck with the channel and master faders up."
+        f"{preferred_loopback} or to a Multi-Output Device that includes "
+        f"{preferred_loopback}, then play a deck with the channel and master "
+        "faders up."
     )
     if saved_rate_mismatch is not None:
         next_action = (
@@ -1403,12 +1441,22 @@ def _rekordbox_route_hint(
             "capture route is at 48000Hz; start real deck playback with "
             "channel and master faders up."
         )
+    elif current_settings and _is_multi_output_route_name(
+        str(current_settings.get("audio_output_device_name") or "")
+    ):
+        next_action = (
+            "Rekordbox settings currently name 'Multi-Output Device'. In Audio "
+            f"MIDI Setup, edit Multi-Output Device so it includes {preferred_loopback} "
+            "and your speaker/headphones, set the route to 48000Hz, then keep "
+            "Rekordbox Audio output on Multi-Output Device and play a deck with "
+            "channel and master faders up."
+        )
     elif current_settings and current_settings.get("audio_output_device_name"):
         next_action = (
             "Rekordbox settings currently name "
             f"{current_settings.get('audio_output_device_name')!r}; align "
             "Rekordbox Audio preferences with the vibemix capture input "
-            "(BlackHole 16ch or an aggregate that includes it), then play a "
+            f"({preferred_loopback} or a Multi-Output Device that includes it), then play a "
             "deck with channel and master faders up."
         )
     return {
@@ -2422,7 +2470,7 @@ def _course3_blocker_operator_steps(blockers: list[str]) -> list[str]:
         )
     if any("not a loopback capture device" in blocker for blocker in blockers):
         steps.append(
-            "Route macOS/Rekordbox output to BlackHole 16ch or the intended loopback route."
+            "Route macOS/Rekordbox output so the BlackHole capture input receives the master."
         )
     if any("direct loopback capture is silent" in blocker for blocker in blockers):
         steps.append(

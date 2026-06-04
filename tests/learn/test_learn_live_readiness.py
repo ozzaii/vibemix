@@ -691,7 +691,7 @@ def test_course3_route_doctor_turns_blockers_into_operator_steps() -> None:
 
     assert doctor["operator_steps"][:4] == [
         "Free 127.0.0.1:8765 so the Vibemix Learn sidecar owns the app socket.",
-        "Route macOS/Rekordbox output to BlackHole 16ch or the intended loopback route.",
+        "Route macOS/Rekordbox output so the BlackHole capture input receives the master.",
         "Play a real Rekordbox library track through the routed master output.",
         "Stop unrelated browser/system media so Now Playing can point at Rekordbox.",
     ]
@@ -1985,12 +1985,19 @@ def test_selected_loopback_silent_names_multi_output_capture_trap() -> None:
 
     assert diagnosis["code"] == "selected_loopback_silent"
     assert "Multi-Output Device" in diagnosis["next_action"]
-    assert "aggregate that includes" in diagnosis["next_action"]
+    assert "includes BlackHole 16ch" in diagnosis["next_action"]
+    assert "speaker/headphones" in diagnosis["next_action"]
+    assert "aggregate that includes" not in diagnosis["next_action"]
     assert diagnosis["rekordbox_route_hint"]["current_rekordbox_route_aligned"] is False
     assert diagnosis["operator_action"]["current_rekordbox_route"] == (
         "Multi-Output Device @ 48000Hz"
     )
     assert diagnosis["operator_action"]["target_capture_route"] == "BlackHole 16ch @ 48000Hz"
+    assert diagnosis["operator_action"]["steps"][:2] == [
+        "In Audio MIDI Setup, edit Multi-Output Device so it includes "
+        "BlackHole 16ch @ 48000Hz and your speaker/headphones.",
+        "Keep Rekordbox Audio output set to Multi-Output Device.",
+    ]
 
 
 def test_course3_operator_action_uses_auto_master_when_rekordbox_route_unknown() -> None:
