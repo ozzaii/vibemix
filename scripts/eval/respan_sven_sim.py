@@ -40,7 +40,7 @@ import httpx
 
 from vibemix.agent._streaming_pipe import last_balanced_position
 from vibemix.agent.dj_cohost import (
-    _grounded_receipt_fallback_line,
+    _grounded_voice_payload_fallback_line,
     _has_unclosed_bracket_tail,
     repair_finished_headphone_line,
 )
@@ -122,7 +122,11 @@ SCENARIOS = [
         "name": "heartbeat_with_grounded_payload", "event": "HEARTBEAT",
         "extra": {"next_suggestion_voice_line": "Forward read: a darker rolling 9A track pairs next - keeps the build."},
         "expect": "speak",
-        "evidence": f"{_HEAR} | track=unknown | deck=A | recent_moves[8s]: NONE | next_track_ready=true",
+        "evidence": (
+            f"{_HEAR} | track=unknown | deck=A | recent_moves[8s]: NONE | "
+            "next_track_ready=true camelot=9A | "
+            'next_suggestion_voice_line="Forward read: a darker rolling 9A track pairs next - keeps the build."'
+        ),
         "task": "You have a grounded next-track suggestion (see payload). Hand it to Kaan as one forward nudge.",
     },
     {
@@ -192,6 +196,7 @@ def _run_heartbeat_judge(
     out: str | None,
     dry_run: bool,
     no_log: bool,
+    require_quality: bool,
 ) -> int:
     judge_script = Path(__file__).with_name("respan_sven_heartbeat_judge.py")
     cmd = [
@@ -205,6 +210,8 @@ def _run_heartbeat_judge(
         "--concurrency",
         "4",
     ]
+    if require_quality:
+        cmd.extend(["--require-quality", "--min-judged", "1"])
     if dry_run:
         cmd.append("--dry-run")
     if no_log:
@@ -278,7 +285,7 @@ def _line_or_grounded_fallback(raw_line: str, *, gate_reason: str, ev_extra: dic
     if gate_reason == "grounded_voice_payload" and (
         not line or _has_unclosed_bracket_tail(model_line)
     ):
-        fallback_line = _grounded_receipt_fallback_line(ev_extra)
+        fallback_line = _grounded_voice_payload_fallback_line(ev_extra)
         if fallback_line:
             model_line = fallback_line
             line = _spoken_line_for_judge(model_line)
@@ -372,7 +379,6 @@ def _quality_failures(
             value = means.get(dim)
             if value is None or value < threshold:
                 failures.append(f"mean {dim} {value!r} below {threshold:g}")
-
     if target_rows is None:
         target_rows = {
             name: next((row for row in results if row.get("name") == name), None)
@@ -386,6 +392,8 @@ def _quality_failures(
         if not isinstance(scores, dict):
             failures.append(f"{name} has no judged scores")
             continue
+        if scores.get("should_speak") is False:
+            failures.append(f"{name} judge marked should_speak=false")
         for dim, threshold in QUALITY_TARGET_THRESHOLDS.items():
             value = _score_value(scores, dim)
             if value is None or value < threshold:
@@ -462,9 +470,10 @@ def main() -> int:
             gate_reason=gate.reason,
             ev_extra=ev_extra,
         )
+        suppressed_model_line = bool(raw_line and not model_line and not line)
         if line:
             scores = _judge(sc["evidence"], line, key)
-        elif raw_line or model_line:
+        elif raw_line and not suppressed_model_line:
             scores = {
                 **{dim: 0 for dim in DIMS},
                 "should_speak": False,
@@ -473,6 +482,8 @@ def main() -> int:
         else:
             scores = {}
         row.update({"line": line, "model_line": model_line, "raw_line": raw_line, "scores": scores})
+        if suppressed_model_line:
+            row["suppressed_model_line"] = True
         if fallback_line is not None:
             row["fallback_line"] = fallback_line
         sd = "/".join(str(scores.get(d, "-")) for d in DIMS)
@@ -532,6 +543,7 @@ def main() -> int:
             out=args.heartbeat_out,
             dry_run=args.gate_only,
             no_log=args.no_log,
+            require_quality=args.require_quality,
         )
     return 0
 

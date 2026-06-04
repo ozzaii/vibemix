@@ -81,6 +81,20 @@ def test_quality_summary_fails_target_cue_rows_below_friend_or_voice_floor() -> 
     assert "phase_with_cue_lookahead voice_no_slop 1.0 below 2" in failures
 
 
+def test_quality_summary_fails_target_cue_row_marked_should_not_speak() -> None:
+    rows = _passing_results()
+    for row in rows:
+        if row["name"] == "phase_with_cue_lookahead":
+            row["scores"] = {
+                **_scores(friend=2, voice=2),
+                "should_speak": False,
+            }
+
+    failures = sim._quality_summary(rows)["failures"]
+
+    assert "phase_with_cue_lookahead judge marked should_speak=false" in failures
+
+
 def test_quality_summary_fails_partial_or_misrouted_runs() -> None:
     rows = _passing_results()[:-1]
     rows[0]["gate"] = "speak"
@@ -153,3 +167,47 @@ def test_line_or_grounded_fallback_replaces_unclosed_citation_tail() -> None:
     assert fallback_line is not None
     assert model_line == fallback_line
     assert line == "Hold this for about 4 bars; make the move on the next phrase."
+
+
+def test_line_or_grounded_fallback_replaces_incomplete_next_track_tail() -> None:
+    line, model_line, fallback_line = sim._line_or_grounded_fallback(
+        "Let the sub ride, then pull back before you bring in that 1",
+        gate_reason="grounded_voice_payload",
+        ev_extra={
+            "next_suggestion_voice_line": (
+                "Forward read: a darker rolling 9A track pairs next - keeps the build. "
+                "Copy these citations exactly: [track:track-42] [mix:next_suggestion=track-42]."
+            )
+        },
+    )
+
+    assert fallback_line is not None
+    assert model_line == fallback_line
+    assert line == "Line up a darker rolling 9A track next to keep this build moving."
+
+
+def test_run_heartbeat_judge_propagates_required_quality_gate(monkeypatch) -> None:
+    calls: list[list[str]] = []
+
+    def fake_call(cmd: list[str]) -> int:
+        calls.append(cmd)
+        return 0
+
+    monkeypatch.setattr(sim.subprocess, "call", fake_call)
+
+    rc = sim._run_heartbeat_judge(
+        session="/tmp/session",
+        out="/tmp/out.json",
+        dry_run=False,
+        no_log=True,
+        require_quality=True,
+    )
+
+    assert rc == 0
+    assert len(calls) == 1
+    cmd = calls[0]
+    assert "--describe-bank-census" in cmd
+    assert "--require-quality" in cmd
+    assert cmd[cmd.index("--min-judged") + 1] == "1"
+    assert "--no-log" in cmd
+    assert cmd[cmd.index("--out") + 1] == "/tmp/out.json"

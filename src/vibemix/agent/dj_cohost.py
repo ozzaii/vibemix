@@ -146,6 +146,13 @@ _CUE_RECEIPT_FALLBACK_RE = re.compile(
     r"Copy\s+this\s+citation\s+exactly:\s*(?P<cite>\[cue:[^\]]+\])",
     re.IGNORECASE | re.DOTALL,
 )
+_FORWARD_READ_FALLBACK_RE = re.compile(
+    r"^\s*Forward\s+read:\s*(?P<body>.+?)(?:\.\s*(?:Section pairing:|Hand it|Copy these citations|Do not say)|$)",
+    re.IGNORECASE | re.DOTALL,
+)
+_FALLBACK_CITATION_RE = re.compile(
+    r"\[(?:ev|aud|midi|track|screen|mix|key|recall|exemplar|cue|judge):[^\]]+\]"
+)
 _BAND_INTENSITY_ALIAS_RE: dict[str, re.Pattern[str]] = {
     "sub": re.compile(r"\b(?:sub(?:\s*bass)?|sub-bass)\b", re.IGNORECASE),
     "low": re.compile(r"\b(?:low\s+end|lows?|bass)\b", re.IGNORECASE),
@@ -233,6 +240,7 @@ _DRAFTING_FINAL_RESPONSE_PREFIX_RE = re.compile(
     r"drafting\s+the\s+final\s+response(?:\s*\([^)]*\))?\s*(?:\*+\s*)?[:.)*-]*\s*",
     re.IGNORECASE,
 )
+_TEXT_PREFIX_RE = re.compile(r"^\s*(?:final\s+)?text\s*[:\n]\s*", re.IGNORECASE)
 _WORD_COUNT_PREFIX_RE = re.compile(
     r"^\s*(?:[-*]\s*)?(?:\*+\s*)?(?:"
     r"\d+\s*(?:and\s*)?(?:<=|<|>=|>)\s*\d+\s*words?\??|"
@@ -244,12 +252,27 @@ _WORD_COUNT_PREFIX_RE = re.compile(
 _SPEAKER_PREFIX_RE = re.compile(r"^\s*(?:sven|you)\s*[:.)-]\s*", re.IGNORECASE)
 _META_LINE_RESIDUE_RE = re.compile(
     r"(?:<=|>=|<\s*\d+\s*words|\b\d+\s*words?\b|\bconstraints?\b|\bdraft\b|"
-    r"\bformulate\b|\bfinal\s+polish\b|\bjson\b|\bshould_speak\b|\bfriend_not_narrator\b|"
+    r"\bformulate\b|\bfinal\s+polish\b|\brefine\b|\boption\s+[ab]\b|"
+    r"\bground\s+citation\b|\bgrounding\s+ref\b|\bexact\s+grounding\b|"
+    r"\bdj\s+terminology\b|\bdj-to-dj\b|\bor\s+similar\b|\bdo\s+i\s+have\b|"
+    r"\bomit\s+the\s+citation\b|\bjson\b|\bshould_speak\b|\bfriend_not_narrator\b|"
     r"\bgrounded_not_fabricated\b)",
     re.IGNORECASE,
 )
+_META_TAIL_RESIDUE_RE = re.compile(r"(?:^|[*.]\s*)\*?\s*check\b", re.IGNORECASE)
+_BROKEN_CITATION_TAIL_FRAGMENT_RE = re.compile(
+    r"^\s*(?:[.)]?\d+(?:\.\d+)?|[a-z_][a-z0-9_:@.-]*)\]\s*`?",
+    re.IGNORECASE,
+)
+_INCOMPLETE_HEADPHONE_TAIL_RE = re.compile(
+    r"\b(?:out\s+of|before\s+you\s+bring|before\s+you\s+layer|that\s+\d+|bring|start|with|into|from|to|for|and|then|the|that|new)$",
+    re.IGNORECASE,
+)
 _PACKET_FRAGMENT_PREFIX_RE = re.compile(
-    r"^\s*(?:`?[a-z_][a-z0-9_:-]*=\S+|[+-]?\d+(?:\.\d+)?`\s*,\s*`[a-z_][a-z0-9_:-]*=)",
+    r"^\s*(?:`?[a-z_][a-z0-9_:-]*=\S+|"
+    r"\[(?:ev|aud|midi|track|screen|mix|key|recall|exemplar|cue|judge):[^\]]*$|"
+    r"`?[a-z][a-z0-9_]*:[_a-z0-9:@.-]+`?|"
+    r"[+-]?\d+(?:\.\d+)?`\s*,\s*`[a-z_][a-z0-9_:-]*=)",
     re.IGNORECASE,
 )
 _PARTIAL_PACKET_FRAGMENT_PREFIX_RE = re.compile(r"^\s*(?:`|[+-]?\d+\.\d*)")
@@ -300,6 +323,37 @@ def _grounded_receipt_fallback_line(ev_extra: dict[str, Any]) -> str | None:
         timing = timing[: -len(" ahead")]
         return f"Hold this for {timing}; make the move on the next phrase. {cite}"
     return f"Hold this to the next phrase boundary; make the move on the phrase. {cite}"
+
+
+def _grounded_voice_payload_fallback_line(ev_extra: dict[str, Any]) -> str | None:
+    cue_line = _grounded_receipt_fallback_line(ev_extra)
+    if cue_line is not None:
+        return cue_line
+
+    raw_line = ev_extra.get("next_suggestion_voice_line")
+    if not isinstance(raw_line, str):
+        return None
+    match = _FORWARD_READ_FALLBACK_RE.search(raw_line)
+    if match is None:
+        return None
+    body = " ".join(match.group("body").split()).strip()
+    if not body:
+        return None
+    citations = _FALLBACK_CITATION_RE.findall(raw_line)
+    body = _FALLBACK_CITATION_RE.sub("", body)
+    body = re.sub(r"\bpairs\s+next\b", "next", body, flags=re.IGNORECASE)
+    body = body.replace(" - ", "; ")
+    body = re.sub(r"\s+", " ", body).strip(" .;:")
+    if not body or len(body.split()) < 3:
+        return None
+    build_match = re.match(r"(?P<subject>.+?)\s+next;\s*keeps\s+the\s+build\b", body, re.IGNORECASE)
+    if build_match is not None:
+        subject = build_match.group("subject").strip(" .;:")
+        if subject:
+            body = f"Line up {subject} next to keep this build moving"
+    body = body[0].upper() + body[1:]
+    citation_tail = " ".join(citations[:2])
+    return f"{body}.{f' {citation_tail}' if citation_tail else ''}"
 
 
 def _unsupported_band_intensity_reason(
@@ -424,6 +478,9 @@ def repair_finished_headphone_line(text: str) -> str | None:
     stripped = _strip_orphan_citation_tail(stripped).strip()
     if not stripped:
         return None
+    stripped = _TEXT_PREFIX_RE.sub("", stripped, count=1).strip()
+    if not stripped:
+        return None
     if _looks_like_broken_voice_fragment(stripped):
         return None
     if _starts_unspoken_packet_fragment(stripped):
@@ -431,7 +488,7 @@ def repair_finished_headphone_line(text: str) -> str | None:
     if _starts_option_scaffold(stripped):
         return _repair_option_scaffold_line(stripped)
     if not _starts_finished_line_meta_scaffold(stripped):
-        return stripped
+        return _strip_headphone_line_edge_quotes(stripped)
 
     joined = " ".join(part.strip() for part in stripped.splitlines() if part.strip())
     for match in _QUOTED_FINISHED_LINE_RE.finditer(joined):
@@ -467,6 +524,25 @@ def _looks_like_broken_voice_fragment(text: str) -> bool:
         _BROKEN_VOICE_FRAGMENT_PREFIX_RE.match(stripped)
         or _BROKEN_WORD_COUNT_TAIL_RE.search(stripped)
     )
+
+
+def _strip_headphone_line_edge_quotes(text: str) -> str | None:
+    candidate = (text or "").strip()
+    if (
+        _BROKEN_CITATION_TAIL_FRAGMENT_RE.match(candidate)
+        or _META_LINE_RESIDUE_RE.search(candidate)
+        or _META_TAIL_RESIDUE_RE.search(candidate)
+        or _INCOMPLETE_HEADPHONE_TAIL_RE.search(candidate)
+    ):
+        return None
+    for quote in ('"', "`"):
+        while candidate.startswith(quote):
+            candidate = candidate[1:].lstrip()
+        while candidate.endswith(quote):
+            candidate = candidate[:-1].rstrip()
+    if _INCOMPLETE_HEADPHONE_TAIL_RE.search(candidate):
+        return None
+    return candidate or None
 
 
 def _has_unclosed_bracket_tail(text: str) -> bool:
@@ -3363,7 +3439,7 @@ class DJCoHostAgent(Agent):
                 packet_fragment_suppressed = True
 
             grounded_fallback_text = (
-                _grounded_receipt_fallback_line(ev_extra) if not head_yielded else None
+                _grounded_voice_payload_fallback_line(ev_extra) if not head_yielded else None
             )
             if grounded_fallback_text:
                 if option_scaffold_suppressed:
