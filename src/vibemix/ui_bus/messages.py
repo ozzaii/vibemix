@@ -358,6 +358,19 @@ class SessionSetModePayload:
 
 
 @dataclass(frozen=True, slots=True)
+class SessionStartPayload:
+    """SHIP-WIRE START-gate. No params: the user pressed Start, the backend
+    BACKEND-BOOT handler does the rest (model load + silent pre-warm + capture).
+    Serializes to an empty ``payload: {}``."""
+
+
+@dataclass(frozen=True, slots=True)
+class SessionStopPayload:
+    """SHIP-WIRE START-gate. No params: the user pressed Stop; the backend ends
+    capture and parks/unloads the model. Serializes to an empty ``payload: {}``."""
+
+
+@dataclass(frozen=True, slots=True)
 class SettingsSetPayload:
     field: Literal[
         "voice",
@@ -994,6 +1007,53 @@ class SessionSetMode:
             type="ipc.session.set_mode",
             ts=_now_iso(),
             payload=SessionSetModePayload(mode=mode),
+        )
+
+    def to_json(self) -> str:
+        return _serialize(self)
+
+
+@dataclass(frozen=True, slots=True)
+class SessionStart:
+    """SHIP-WIRE START-gate. Shell -> sidecar: the user pressed Start. No ack;
+    the shell repaints data-runstate='running' optimistically and the backend
+    BACKEND-BOOT handler (``register_handler('ipc.session.start', _on_session_start)``
+    in runtime/session_loop.py wiring the live-session lifecycle in __main__.py)
+    owns the model load + silent pre-warm + capture start."""
+
+    type: Literal["ipc.session.start"]
+    ts: str
+    payload: SessionStartPayload
+
+    @classmethod
+    def make(cls) -> SessionStart:
+        return cls(
+            type="ipc.session.start",
+            ts=_now_iso(),
+            payload=SessionStartPayload(),
+        )
+
+    def to_json(self) -> str:
+        return _serialize(self)
+
+
+@dataclass(frozen=True, slots=True)
+class SessionStop:
+    """SHIP-WIRE START-gate. Shell -> sidecar: the user pressed Stop. No ack;
+    the shell repaints data-runstate='armed' optimistically and the backend
+    handler (``register_handler('ipc.session.stop', _on_session_stop)``) ends
+    capture and parks/unloads the model in __main__.py."""
+
+    type: Literal["ipc.session.stop"]
+    ts: str
+    payload: SessionStopPayload
+
+    @classmethod
+    def make(cls) -> SessionStop:
+        return cls(
+            type="ipc.session.stop",
+            ts=_now_iso(),
+            payload=SessionStopPayload(),
         )
 
     def to_json(self) -> str:

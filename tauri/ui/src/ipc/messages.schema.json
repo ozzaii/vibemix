@@ -77,6 +77,12 @@
       "$ref": "#/definitions/SessionSetMode"
     },
     {
+      "$ref": "#/definitions/SessionStart"
+    },
+    {
+      "$ref": "#/definitions/SessionStop"
+    },
+    {
       "$ref": "#/definitions/SettingsSet"
     },
     {
@@ -1417,6 +1423,52 @@
               ]
             }
           }
+        }
+      }
+    },
+    "SessionStart": {
+      "$comment": "SHIP-WIRE START-gate. Shell -> sidecar. The user pressed Start on the live-session deck; the co-host goes from armed (idle, no reactions) to running. The shell flips data-runstate='running' optimistically (CLAUDE.md repaint rule) BEFORE this envelope is sent; no ack, the backend reflects run-state on its next ipc.session.snapshot. BACKEND-BOOT lane implements the handler register_handler('ipc.session.start', _on_session_start) wiring the live-session lifecycle (model load + silent pre-warm + capture start) in __main__.py; that island is theirs, not the frontend lane's.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "ts",
+        "payload"
+      ],
+      "properties": {
+        "type": {
+          "const": "ipc.session.start"
+        },
+        "ts": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "payload": {
+          "type": "object",
+          "additionalProperties": false
+        }
+      }
+    },
+    "SessionStop": {
+      "$comment": "SHIP-WIRE START-gate. Shell -> sidecar. The user pressed Stop; the co-host returns to armed (idle). The shell flips data-runstate='armed' optimistically BEFORE this envelope; no ack. BACKEND-BOOT lane implements register_handler('ipc.session.stop', _on_session_stop) ending capture and parking/unloading the model in __main__.py; theirs, not the frontend lane's.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "ts",
+        "payload"
+      ],
+      "properties": {
+        "type": {
+          "const": "ipc.session.stop"
+        },
+        "ts": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "payload": {
+          "type": "object",
+          "additionalProperties": false
         }
       }
     },

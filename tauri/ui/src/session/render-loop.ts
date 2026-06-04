@@ -61,6 +61,37 @@ function cohostMuteHandler(): void {
   });
 }
 
+/** SHIP-WIRE START-gate — Start the live session. The user pressed Start on
+ *  the armed deck. Flip the run-state optimistically (the SessionLayout click
+ *  handler already flipped data-runstate locally for instant feedback; this
+ *  propagates it into the singleton so the next render frame stays running)
+ *  then fire ipc.session.start. No ack: the BACKEND-BOOT lane's
+ *  register_handler("ipc.session.start", _on_session_start) owns the model
+ *  load + silent pre-warm + capture lifecycle in __main__.py, and reflects the
+ *  authoritative run-state on its next ipc.session.snapshot. Fire-and-forget;
+ *  an emit failure logs only (the optimistic deck stays running). */
+function sessionStartHandler(): void {
+  if (getSessionState().runState === "running") return;
+  setSessionState({ runState: "running" });
+  void emitIpc("ipc.session.start", {}).catch((err: unknown) => {
+    // eslint-disable-next-line no-console
+    console.warn("[render-loop] session.start emitIpc failed:", err);
+  });
+}
+
+/** SHIP-WIRE START-gate — Stop the live session, returning to the armed (idle)
+ *  deck. Same optimistic-then-emit shape as start; the backend
+ *  register_handler("ipc.session.stop", _on_session_stop) ends capture and
+ *  parks/unloads the model. Fire-and-forget; failure logs only. */
+function sessionStopHandler(): void {
+  if (getSessionState().runState !== "running") return;
+  setSessionState({ runState: "armed" });
+  void emitIpc("ipc.session.stop", {}).catch((err: unknown) => {
+    // eslint-disable-next-line no-console
+    console.warn("[render-loop] session.stop emitIpc failed:", err);
+  });
+}
+
 /** Compact status-row recovery. The deck row stays presentational; this
  *  handler is the single bridge from a down input label to the sidecar probe
  *  that emits a fresh ipc.status.tick. */
@@ -398,6 +429,13 @@ function projectToLayoutState(s: BridgeSessionState): LayoutSessionState {
     // local setSessionState + emits ipc.session.set_mode.
     mode: s.mode ?? "cohost",
     onModeChange: modeChangeHandler,
+    // SHIP-WIRE START-gate — run-state + Start/Stop handlers. Projection
+    // defaults to "running" when the bridge omits runState so existing
+    // fixtures/snapshots keep the live deck; the real boot sets runState
+    // "armed" in makeDefault(), which drives the idle Start gate here.
+    runState: s.runState ?? "running",
+    onStart: sessionStartHandler,
+    onStop: sessionStopHandler,
   };
 }
 

@@ -189,6 +189,16 @@ export interface SessionState {
    *  / mock states that omit it still type-check; render-loop defaults to
    *  "cohost" when undefined. */
   mode?: SessionMode;
+  /** SHIP-WIRE START-gate — live-session run-state.
+   *   armed   — co-host loaded but NOT started: idle, no reactions, the deck
+   *             shows a single Start affordance (the real boot default).
+   *   running — the user pressed Start; the live session is active.
+   *  The deck flips this optimistically on Start/Stop (data-runstate) and
+   *  fires ipc.session.start / ipc.session.stop; the backend reflects the
+   *  authoritative run-state on its next snapshot once BACKEND-BOOT lands.
+   *  Optional so older snapshots / mock patches that omit it leave the field
+   *  untouched (render-loop defaults the projection to "running"). */
+  runState?: "armed" | "running";
 }
 
 export const TRANSCRIPT_RING_CAP = 200;
@@ -251,6 +261,10 @@ function makeDefault(): SessionState {
     elapsedText: "00:00:00",
     sessionStartMs: null,
     mode: "cohost",
+    // SHIP-WIRE START-gate — the app boots ARMED: the co-host is idle, no
+    // reactions, the deck shows a single Start control. Pressing Start flips
+    // to "running" (optimistic) and fires ipc.session.start.
+    runState: "armed",
   };
 }
 

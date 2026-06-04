@@ -107,6 +107,8 @@ from vibemix.ui_bus import (
     SessionOverlayHighlight,
     SessionSetMode,
     SessionSnapshot,
+    SessionStart,
+    SessionStop,
     SettingsBrainAck,
     SettingsGet,
     SettingsSet,
@@ -224,6 +226,8 @@ def _minimal_examples() -> list[tuple[str, object]]:
         ),
         ("SessionMute", SessionMute.make_toggle()),
         ("SessionSetMode", SessionSetMode.make(mode="build")),
+        ("SessionStart", SessionStart.make()),
+        ("SessionStop", SessionStop.make()),
         ("SettingsSet", SettingsSet.make(field="voice", value="kore")),
         (
             "SettingsSetBrain",

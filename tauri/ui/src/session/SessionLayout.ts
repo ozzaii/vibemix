@@ -148,6 +148,18 @@ export interface SessionState {
    *  + ipc.session.set_mode). Retained on the prop contract even though the
    *  deck no longer renders the picker that called it. */
   onModeChange?: (mode: SessionTopMode) => void;
+  /** SHIP-WIRE START-gate — live-session run-state. "armed" (the real-boot
+   *  default) shows the idle Start gate with no reactions; "running" shows the
+   *  live deck. defaultState() leaves it "running" so existing fixtures keep
+   *  the live deck; the render-loop projection drives the armed boot. */
+  runState?: "armed" | "running";
+  /** Start gate handlers — the render-loop wires onStart/onStop to
+   *  ipc.session.start / ipc.session.stop + optimistic setSessionState. The
+   *  deck also flips data-runstate locally on click (repaint convention).
+   *  Omitted (dev mock without a render-loop) → the buttons still flip the
+   *  deck locally, they're just a no-op on the wire. */
+  onStart?: () => void;
+  onStop?: () => void;
 }
 
 export interface Mounted {
@@ -407,6 +419,63 @@ const LAYOUT_CSS = `
   button.vmx-live__s { background: none; border: none; padding: 0; text-align: right; font: inherit; letter-spacing: inherit; text-transform: inherit; color: inherit; }
   .vmx-session[data-mode="fault"] .vmx-live__s--fault { pointer-events: auto; cursor: pointer; }
   .vmx-session[data-mode="fault"] .vmx-live__s--fault:hover { color: var(--amber); text-shadow: var(--glow-soft); }
+
+  /* --- SHIP-WIRE START-gate ------------------------------------------------
+     The deck is armed (idle, no reactions) until the user presses Start, then
+     running. Orthogonal to data-mode. Stop is a running-only control; mute is
+     meaningless before Start; the armed gate replaces the reaction zone. */
+  .vmx-deck__controls button[data-action="stop"] { display: none; }
+  .vmx-session[data-runstate="running"] .vmx-deck__controls button[data-action="stop"] { display: inline-flex; }
+  .vmx-session[data-runstate="armed"] .vmx-deck__controls button[data-action="mute"] { display: none; }
+  .vmx-armed { display: none; }
+  .vmx-session[data-runstate="armed"] .vmx-voice { display: none; }
+  .vmx-session[data-runstate="armed"] .vmx-live { visibility: hidden; }
+  .vmx-session[data-runstate="armed"] .vmx-armed {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: var(--sp-4); min-height: 0; text-align: center;
+    animation: vmxArmedIn 420ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .vmx-armed__kicker {
+    font-family: var(--type-mono); font-size: 10px; letter-spacing: 0.28em;
+    text-transform: uppercase; color: var(--silk-40);
+  }
+  .vmx-armed__note {
+    font-family: var(--type-mono); font-size: 11px; letter-spacing: 0.04em; color: var(--silk-22);
+  }
+  /* Start — THE primary ship action: larger + warmer than the rail controls.
+     Rose primary (gold stays quarantined to heat/Camelot numerics). */
+  .vmx-armed__start {
+    font-family: var(--type-display);
+    font-variation-settings: 'wdth' 88, 'wght' 600;
+    font-size: 15px; letter-spacing: 0.26em; text-transform: uppercase;
+    color: var(--amber-pale);
+    padding: 13px 38px;
+    border: 1px solid var(--amber-40); border-radius: var(--rad-sm);
+    background:
+      linear-gradient(180deg, rgba(255, 165, 223, 0.13), rgba(255, 165, 223, 0.03) 58%, rgba(0, 0, 0, 0.24)),
+      rgba(2, 3, 6, 0.62);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 251, 244, 0.05),
+      inset 0 -1px 0 var(--amber-22),
+      inset 0 0 20px rgba(255, 165, 223, 0.10),
+      0 8px 24px rgba(0, 0, 0, 0.5);
+    cursor: pointer;
+    transition: color var(--motion-step) ease-out, border-color var(--motion-step) ease-out, box-shadow var(--motion-step) ease-out, filter var(--motion-step) ease-out;
+  }
+  .vmx-armed__start:hover {
+    color: var(--amber); border-color: var(--amber); filter: brightness(1.08);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 251, 244, 0.06),
+      inset 0 -1px 0 var(--amber-40),
+      inset 0 0 26px rgba(255, 165, 223, 0.15),
+      0 8px 26px rgba(0, 0, 0, 0.55);
+  }
+  .vmx-armed__start:active { transform: translateY(1px); }
+  .vmx-armed__start:focus-visible { outline: 2px solid var(--amber); outline-offset: 3px; }
+  @keyframes vmxArmedIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+  @media (prefers-reduced-motion: reduce) {
+    .vmx-session[data-runstate="armed"] .vmx-armed { animation: none; }
+  }
 
   /* --- THE HERO: the co-host speaks, anchored low on void --- */
   .vmx-deck__speak {
@@ -839,6 +908,9 @@ export function mountSessionLayout(
   const root = document.createElement("div");
   root.className = "vmx-session";
   root.dataset.mode = "";
+  // SHIP-WIRE START-gate — seed run-state at creation so the armed gate paints
+  // on first frame (no flash before applyState's mount pass corrects it).
+  root.dataset.runstate = state.runState ?? "running";
   root.dataset.wire = "session.runtime";
 
   // Titlebar (reused) — gear opens the settings drawer.
@@ -896,7 +968,20 @@ export function mountSessionLayout(
   muteBtn.setAttribute("aria-label", "mute co-host");
   muteBtn.setAttribute("aria-pressed", "false");
   muteBtn.addEventListener("click", () => mountedHandle?.current.cohost.onMute?.());
-  controls.append(vibeEngineBtn, muteBtn);
+  // SHIP-WIRE START-gate — Stop returns the live co-host to idle. Shown only
+  // while running (CSS gates on data-runstate); hidden in the armed gate where
+  // Start is the only action. Optimistic repaint: flip the deck to armed
+  // locally on click, then onStop fires ipc.session.stop + setSessionState.
+  const stopBtn = document.createElement("button");
+  stopBtn.type = "button";
+  stopBtn.dataset.action = "stop";
+  stopBtn.textContent = "stop";
+  stopBtn.setAttribute("aria-label", "stop co-host");
+  stopBtn.addEventListener("click", () => {
+    root.dataset.runstate = "armed";
+    mountedHandle?.current.onStop?.();
+  });
+  controls.append(vibeEngineBtn, muteBtn, stopBtn);
 
   const live = document.createElement("div");
   live.className = "vmx-live";
@@ -948,7 +1033,35 @@ export function mountSessionLayout(
   claim.append(now, receipt, dropSlot);
   voice.append(ghost2, ghost1, claim);
 
-  speak.append(voice);
+  // --- armed gate (SHIP-WIRE START-gate) ---
+  // Shown only when data-runstate="armed": the co-host is loaded but idle, no
+  // reactions. A single Start affordance flips the deck live. CSS hides
+  // .vmx-voice while armed so the reaction zone reads as a calm, deliberate
+  // "ready" — never a fault (Invariant #5: idle is calm, not broken).
+  const armed = document.createElement("div");
+  armed.className = "vmx-armed";
+  const armedKicker = document.createElement("span");
+  armedKicker.className = "vmx-armed__kicker";
+  armedKicker.textContent = "co-host ready";
+  const startBtn = document.createElement("button");
+  startBtn.type = "button";
+  startBtn.dataset.action = "start";
+  startBtn.className = "vmx-armed__start";
+  startBtn.textContent = "start";
+  startBtn.setAttribute("aria-label", "start co-host");
+  // Optimistic repaint (CLAUDE.md rule): flip the deck to running locally so
+  // the live surface appears instantly; onStart fires ipc.session.start +
+  // setSessionState, and the next render frame confirms the run-state.
+  startBtn.addEventListener("click", () => {
+    root.dataset.runstate = "running";
+    mountedHandle?.current.onStart?.();
+  });
+  const armedNote = document.createElement("span");
+  armedNote.className = "vmx-armed__note";
+  armedNote.textContent = "press start to go live";
+  armed.append(armedKicker, startBtn, armedNote);
+
+  speak.append(voice, armed);
   deck.append(speak);
 
   // --- foot (bpm · key · live meter)
@@ -1133,6 +1246,16 @@ function applyState(mounted: Mounted, next: SessionState, isMount: boolean): voi
       ? "silent"
       : "";
   if (mounted.root.dataset.mode !== mode) mounted.root.dataset.mode = mode;
+
+  // --- SHIP-WIRE START-gate run-state ---
+  // Orthogonal to data-mode: armed = the idle Start gate (no reactions);
+  // running = the live deck. Authoritative from the projected state; the
+  // click handlers flip it optimistically for instant feedback and this
+  // confirms it on the next frame.
+  const runState: "armed" | "running" = next.runState ?? "running";
+  if (mounted.root.dataset.runstate !== runState) {
+    mounted.root.dataset.runstate = runState;
+  }
 
   // Fault label states the cause; refresh whenever the cause changes.
   if (downInput) {
@@ -1537,5 +1660,10 @@ export function defaultState(): SessionState {
     persona: { skill: "INT", interaction: "HYPE", mood: "HYPE", voice: "Adam", genre: "techno" },
     output: { device: "MacBook Pro Speakers", profile: "HP" },
     mode: "cohost",
+    // SHIP-WIRE START-gate — this fixture default is "running" (the live deck)
+    // so existing SessionLayout specs that construct defaultState() keep their
+    // behaviour. The real boot drives the armed gate through the render-loop
+    // projection of the bridge state's runState.
+    runState: "running",
   };
 }

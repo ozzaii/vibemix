@@ -1,0 +1,123 @@
+/* start-gate.spec.ts — SHIP-WIRE START-gate.
+ *
+ * The live deck is ARMED (idle, no reactions) until the user presses Start;
+ * Stop returns it to armed. This is the pre-ship "the only thing": the app
+ * must not react before the user explicitly goes live.
+ *
+ * Pins:
+ *   - boot armed → data-runstate="armed", the Start gate renders, no Stop.
+ *   - running deck → data-runstate="running", Stop renders; defaultState() is
+ *     "running" so every existing session fixture keeps the live deck.
+ *   - Start click flips the deck to running OPTIMISTICALLY (the repaint
+ *     convention) and fires the onStart handler exactly once.
+ *   - Stop click flips back to armed optimistically and fires onStop once.
+ *   - armed hides the reaction zone (the no-reactions contract) and the gate
+ *     CSS is on-brand (rose/var, zero raw hex).
+ *
+ * jsdom never applies stylesheet `display`, so the visual-hiding assertions
+ * read the data-runstate attribute (the contract the CSS keys off) and the
+ * injected component <style> rule, not computed visibility.
+ */
+
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+import {
+  defaultState,
+  mountSessionLayout,
+} from "../../src/session/SessionLayout.js";
+
+function host(): HTMLElement {
+  const div = document.createElement("div");
+  document.body.append(div);
+  return div;
+}
+
+function sessionRoot(h: HTMLElement): HTMLElement {
+  const root = h.querySelector<HTMLElement>(".vmx-session");
+  if (!root) throw new Error("no .vmx-session mounted");
+  return root;
+}
+
+function layoutStyle(): string {
+  const style = document.head.querySelector<HTMLStyleElement>(
+    'style[data-scope="vmx-session"]',
+  );
+  return style?.textContent ?? "";
+}
+
+afterEach(() => {
+  document.body.replaceChildren();
+});
+
+describe("SHIP-WIRE START-gate", () => {
+  it("boots armed: data-runstate=armed, the Start gate renders", () => {
+    const h = host();
+    mountSessionLayout(h, { ...defaultState(), runState: "armed" });
+    const root = sessionRoot(h);
+
+    expect(root.dataset.runstate).toBe("armed");
+    expect(root.querySelector(".vmx-armed")).toBeTruthy();
+    expect(root.querySelector('[data-action="start"]')).toBeTruthy();
+    expect(
+      root.querySelector<HTMLElement>('[data-action="start"]')?.textContent,
+    ).toBe("start");
+  });
+
+  it("running deck shows Stop; defaultState() is running (existing fixtures keep the live deck)", () => {
+    const h = host();
+    mountSessionLayout(h); // defaultState() → runState "running"
+    const root = sessionRoot(h);
+
+    expect(root.dataset.runstate).toBe("running");
+    expect(root.querySelector('[data-action="stop"]')).toBeTruthy();
+    // the armed gate node still exists in the DOM (CSS hides it when running),
+    // so the Stop→armed transition has a gate to reveal without a remount.
+    expect(root.querySelector(".vmx-armed")).toBeTruthy();
+  });
+
+  it("pressing Start flips the deck to running optimistically and fires onStart once", () => {
+    const onStart = vi.fn();
+    const h = host();
+    mountSessionLayout(h, { ...defaultState(), runState: "armed", onStart });
+    const root = sessionRoot(h);
+
+    root.querySelector<HTMLElement>('[data-action="start"]')?.click();
+
+    // Optimistic repaint: the deck reads running the instant Start is pressed,
+    // before any wire round-trip (the render-loop's onStart makes it
+    // authoritative via setSessionState + ipc.session.start).
+    expect(root.dataset.runstate).toBe("running");
+    expect(onStart).toHaveBeenCalledTimes(1);
+  });
+
+  it("pressing Stop flips the deck to armed optimistically and fires onStop once", () => {
+    const onStop = vi.fn();
+    const h = host();
+    mountSessionLayout(h, { ...defaultState(), runState: "running", onStop });
+    const root = sessionRoot(h);
+
+    root.querySelector<HTMLElement>('[data-action="stop"]')?.click();
+
+    expect(root.dataset.runstate).toBe("armed");
+    expect(onStop).toHaveBeenCalledTimes(1);
+  });
+
+  it("armed hides the reaction zone (the no-reactions contract lives in the gate CSS)", () => {
+    const css = layoutStyle();
+    expect(css).toContain('[data-runstate="armed"] .vmx-voice');
+    expect(css).toMatch(/\[data-runstate="armed"\]\s+\.vmx-voice\s*\{\s*display:\s*none/);
+    // Stop is a running-only control; the gate owns the armed deck.
+    expect(css).toContain('[data-runstate="running"] .vmx-deck__controls button[data-action="stop"]');
+  });
+
+  it("the Start gate is on-brand: zero raw hex in the gate CSS (rose rgba/var only)", () => {
+    const css = layoutStyle();
+    const gateLines = css
+      .split("\n")
+      .filter((l) => l.includes("vmx-armed") || l.includes("data-runstate"));
+    expect(gateLines.length).toBeGreaterThan(0);
+    for (const line of gateLines) {
+      expect(line).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
+    }
+  });
+});

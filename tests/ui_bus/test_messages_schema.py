@@ -109,6 +109,8 @@ from vibemix.ui_bus import (
     SessionOverlayHighlight,
     SessionSetMode,
     SessionSnapshot,
+    SessionStart,
+    SessionStop,
     SettingsBrainAck,
     SettingsGet,
     SettingsSet,
@@ -232,6 +234,8 @@ def _make_examples() -> list[tuple[str, object]]:
         ),
         ("SessionMute", SessionMute.make_toggle()),
         ("SessionSetMode", SessionSetMode.make(mode="build")),
+        ("SessionStart", SessionStart.make()),
+        ("SessionStop", SessionStop.make()),
         ("SettingsSet", SettingsSet.make(field="voice", value="Adam")),
         (
             "SettingsSetBrain",
@@ -681,7 +685,9 @@ def test_example_count_matches_schema_oneof() -> None:
     """
     # DEMOCRATIZATION-1 adds SettingsSetBrain + SettingsBrainAck (in-GUI
     # Gemini-key field + proxy/direct brain toggle) → 79.
-    assert len(_EXAMPLES) == len(_SCHEMA["oneOf"]) == 79
+    # SHIP-WIRE START-gate adds SessionStart + SessionStop (live-session
+    # arm/run control: idle until Start, Stop returns to idle) → 81.
+    assert len(_EXAMPLES) == len(_SCHEMA["oneOf"]) == 81
 
 
 @pytest.mark.parametrize(
@@ -786,8 +792,10 @@ def test_schema_oneof_count_is_72() -> None:
     """
     # DEMOCRATIZATION-1 adds SettingsSetBrain + SettingsBrainAck → 79 oneOf,
     # 82 definitions (both are top-level ipc.* messages; skew vs oneOf stays 3).
-    assert len(_SCHEMA["oneOf"]) == 79
-    assert len(_SCHEMA["definitions"]) == 82
+    # SHIP-WIRE START-gate adds SessionStart + SessionStop → 81 oneOf,
+    # 84 definitions (both top-level ipc.* messages; skew vs oneOf stays 3).
+    assert len(_SCHEMA["oneOf"]) == 81
+    assert len(_SCHEMA["definitions"]) == 84
 
 
 def test_no_pydantic_imports_in_ui_bus() -> None:

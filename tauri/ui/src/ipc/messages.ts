@@ -28,6 +28,8 @@ export type VibemixIPCMessages =
   | SessionMute
   | SessionCitation
   | SessionSetMode
+  | SessionStart
+  | SessionStop
   | SettingsSet
   | SettingsGet
   | SettingsState
@@ -318,6 +320,16 @@ export interface SessionSetMode {
   payload: {
     mode: "cohost" | "learn" | "build" | "debrief";
   };
+}
+export interface SessionStart {
+  type: "ipc.session.start";
+  ts: string;
+  payload: {};
+}
+export interface SessionStop {
+  type: "ipc.session.stop";
+  ts: string;
+  payload: {};
 }
 export interface SettingsSet {
   type: "ipc.settings.set";
