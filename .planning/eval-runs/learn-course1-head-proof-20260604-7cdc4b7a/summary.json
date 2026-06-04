@@ -1,0 +1,26 @@
+{
+  "capture_heads": {
+    "course1_part_a_bus.json": "ff5015e5b1668054355d30907cc2101821d90779",
+    "l113_waveform_bus.json": "0900fe69b0d49690a0d72b2b6bc3748fd0205dbd",
+    "l201_grade_auto_advance_bus.json": "7cdc4b7a442cac5468b4e1eb9856f10f4467e595"
+  },
+  "checks": {
+    "l103_eq_audio_bus": true,
+    "l113_waveform_breakdown": true,
+    "l114_three_exemplars": true,
+    "l201_auto_advance": true,
+    "learn_audio_unchanged_between_captures": true,
+    "learn_audio_unchanged_between_first_capture_and_staged_head": true
+  },
+  "current_head_when_staged": "6a43240cf6e10502468f040c4497384e5e268abf",
+  "latest_head": "7cdc4b7a442cac5468b4e1eb9856f10f4467e595",
+  "learn_audio_diff_between_first_and_latest_capture": [],
+  "learn_audio_diff_between_first_capture_and_staged_head": [],
+  "name": "learn-course1-head-proof-20260604-7cdc4b7a",
+  "notes": [
+    "Part A captured L1.03 EQ/playhead/advance and L1.14 low/mid/high exemplar-play envelopes.",
+    "L1.13 and L2.01 were captured in separate fresh sidecar runs to keep the one-socket bus healthy.",
+    "The launch logs routed djay passthrough and AI voice to MacBook Pro Speakers; this artifact is by-bus proof and does not claim human ear confirmation."
+  ],
+  "passed": true
+}
