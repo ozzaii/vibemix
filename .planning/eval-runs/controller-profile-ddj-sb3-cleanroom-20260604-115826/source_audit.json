@@ -1,0 +1,567 @@
+{
+  "profile_id": "pioneer_ddj_sb3",
+  "manufacturer_source": "https://downloads.support.alphatheta.com/software_info/dj-controllers/DDJ-SB3/ddj-sb3_midi_message_list_e2.pdf",
+  "mixxx_source": "https://raw.githubusercontent.com/mixxxdj/mixxx/main/res/controllers/Pioneer-DDJ-SB3.midi.xml",
+  "facts_total": 23,
+  "facts_cross_checked": 23,
+  "failed": [],
+  "schema_caveats": [
+    "14-bit LSB bytes are documented by the manufacturer but omitted because the current profile schema binds one CC per semantic control.",
+    "Performance pads are mode-dependent; they are omitted from this core candidate until runtime pad-bank state exists.",
+    "Candidate is source-verified only; hardware sniff still required before marking verified."
+  ],
+  "facts": {
+    "vol_a": {
+      "midi_kind": "cc",
+      "channel": 0,
+      "data1": 19,
+      "data1_hex": "0x13",
+      "manufacturer_pdf": {
+        "matched": true,
+        "anchor": "CH FADER",
+        "missing_terms": [],
+        "window_start": 6493
+      },
+      "mixxx_xml": {
+        "matched": true,
+        "row": {
+          "group": "[Channel1]",
+          "description": "Channel fader Deck 1 (MSB), Slider: left CHANNELFADER (Deck 1 active)",
+          "status": 176,
+          "data1": 19,
+          "status_hex": "0xB0",
+          "data1_hex": "0x13"
+        }
+      },
+      "cross_checked": true
+    },
+    "vol_b": {
+      "midi_kind": "cc",
+      "channel": 1,
+      "data1": 19,
+      "data1_hex": "0x13",
+      "manufacturer_pdf": {
+        "matched": true,
+        "anchor": "CH FADER",
+        "missing_terms": [],
+        "window_start": 6493
+      },
+      "mixxx_xml": {
+        "matched": true,
+        "row": {
+          "group": "[Channel2]",
+          "description": "Channel fader Deck 2 (MSB), Slider: right CHANNELFADER (Deck 2 active)",
+          "status": 177,
+          "data1": 19,
+          "status_hex": "0xB1",
+          "data1_hex": "0x13"
+        }
+      },
+      "cross_checked": true
+    },
+    "eq_hi_a": {
+      "midi_kind": "cc",
+      "channel": 0,
+      "data1": 7,
+      "data1_hex": "0x07",
+      "manufacturer_pdf": {
+        "matched": true,
+        "anchor": "EQ HIGH",
+        "missing_terms": [],
+        "window_start": 4568
+      },
+      "mixxx_xml": {
+        "matched": true,
+        "row": {
+          "group": "[Channel1]",
+          "description": "High level Deck 1 (MSB), Knob: left HI (Deck 1 active)",
+          "status": 176,
+          "data1": 7,
+          "status_hex": "0xB0",
+          "data1_hex": "0x07"
+        }
+      },
+      "cross_checked": true
+    },
+    "eq_hi_b": {
+      "midi_kind": "cc",
+      "channel": 1,
+      "data1": 7,
+      "data1_hex": "0x07",
+      "manufacturer_pdf": {
+        "matched": true,
+        "anchor": "EQ HIGH",
+        "missing_terms": [],
+        "window_start": 4568
+      },
+      "mixxx_xml": {
+        "matched": true,
+        "row": {
+          "group": "[Channel2]",
+          "description": "High level Deck 2 (MSB), Knob: right HI (Deck 2 active)",
+          "status": 177,
+          "data1": 7,
+          "status_hex": "0xB1",
+          "data1_hex": "0x07"
+        }
+      },
+      "cross_checked": true
+    },
+    "eq_mid_a": {
+      "midi_kind": "cc",
+      "channel": 0,
+      "data1": 11,
+      "data1_hex": "0x0B",
+      "manufacturer_pdf": {
+        "matched": true,
+        "anchor": "EQ MID",
+        "missing_terms": [],
+        "window_start": 4744
+      },
+      "mixxx_xml": {
+        "matched": true,
+        "row": {
+          "group": "[Channel1]",
+          "description": "Mid level Deck 1 (MSB), Knob: left MID (Deck 1 active)",
+          "status": 176,
+          "data1": 11,
+          "status_hex": "0xB0",
+          "data1_hex": "0x0B"
+        }
+      },
+      "cross_checked": true
+    },
+    "eq_mid_b": {
+      "midi_kind": "cc",
+      "channel": 1,
+      "data1": 11,
+      "data1_hex": "0x0B",
+      "manufacturer_pdf": {
+        "matched": true,
+        "anchor": "EQ MID",
+        "missing_terms": [],
+        "window_start": 4744
+      },
+      "mixxx_xml": {
+        "matched": true,
+        "row": {
+          "group": "[Channel2]",
+          "description": "Mid level Deck 2 (MSB), Knob: right HI (Deck 2 active)",
+          "status": 177,
+          "data1": 11,
+          "status_hex": "0xB1",
+          "data1_hex": "0x0B"
+        }
+      },
+      "cross_checked": true
+    },
+    "eq_low_a": {
+      "midi_kind": "cc",
+      "channel": 0,
+      "data1": 15,
+      "data1_hex": "0x0F",
+      "manufacturer_pdf": {
+        "matched": true,
+        "anchor": "EQ LOW",
+        "missing_terms": [],
+        "window_start": 4919
+      },
+      "mixxx_xml": {
+        "matched": true,
+        "row": {
+          "group": "[Channel1]",
+          "description": "Low level Deck 1 (MSB), Knob: left LOW (Deck 1 active)",
+          "status": 176,
+          "data1": 15,
+          "status_hex": "0xB0",
+          "data1_hex": "0x0F"
+        }
+      },
+      "cross_checked": true
+    },
+    "eq_low_b": {
+      "midi_kind": "cc",
+      "channel": 1,
+      "data1": 15,
+      "data1_hex": "0x0F",
+      "manufacturer_pdf": {
+        "matched": true,
+        "anchor": "EQ LOW",
+        "missing_terms": [],
+        "window_start": 4919
+      },
+      "mixxx_xml": {
+        "matched": true,
+        "row": {
+          "group": "[Channel2]",
+          "description": "Low level Deck 2 (MSB), Knob: right LOW (Deck 2 active)",
+          "status": 177,
+          "data1": 15,
+          "status_hex": "0xB1",
+          "data1_hex": "0x0F"
+        }
+      },
+      "cross_checked": true
+    },
+    "tempo_a": {
+      "midi_kind": "cc",
+      "channel": 0,
+      "data1": 0,
+      "data1_hex": "0x00",
+      "manufacturer_pdf": {
+        "matched": true,
+        "anchor": "TEMPO",
+        "missing_terms": [],
+        "window_start": 1954
+      },
+      "mixxx_xml": {
+        "matched": true,
+        "row": {
+          "group": "[Channel1]",
+          "description": "Tempo slider Deck 1 (MSB), Slider: left TEMPO (Deck 1 active)",
+          "status": 176,
+          "data1": 0,
+          "status_hex": "0xB0",
+          "data1_hex": "0x00"
+        }
+      },
+      "cross_checked": true
+    },
+    "tempo_b": {
+      "midi_kind": "cc",
+      "channel": 1,
+      "data1": 0,
+      "data1_hex": "0x00",
+      "manufacturer_pdf": {
+        "matched": true,
+        "anchor": "TEMPO",
+        "missing_terms": [],
+        "window_start": 1954
+      },
+      "mixxx_xml": {
+        "matched": true,
+        "row": {
+          "group": "[Channel2]",
+          "description": "Tempo slider Deck 2 (MSB), Slider: right TEMPO (Deck 2 active)",
+          "status": 177,
+          "data1": 0,
+          "status_hex": "0xB1",
+          "data1_hex": "0x00"
+        }
+      },
+      "cross_checked": true
+    },
+    "jog_move_a": {
+      "midi_kind": "cc",
+      "channel": 0,
+      "data1": 33,
+      "data1_hex": "0x21",
+      "manufacturer_pdf": {
+        "matched": true,
+        "anchor": "JOG DIAL",
+        "missing_terms": [],
+        "window_start": 1427
+      },
+      "mixxx_xml": {
+        "matched": true,
+        "row": {
+          "group": "[Channel1]",
+          "description": "Jog ring Deck 1, left JOGDIALSIDE (Deck 1 active)",
+          "status": 176,
+          "data1": 33,
+          "status_hex": "0xB0",
+          "data1_hex": "0x21"
+        }
+      },
+      "cross_checked": true
+    },
+    "jog_move_b": {
+      "midi_kind": "cc",
+      "channel": 1,
+      "data1": 33,
+      "data1_hex": "0x21",
+      "manufacturer_pdf": {
+        "matched": true,
+        "anchor": "JOG DIAL",
+        "missing_terms": [],
+        "window_start": 1427
+      },
+      "mixxx_xml": {
+        "matched": true,
+        "row": {
+          "group": "[Channel2]",
+          "description": "Jog ring Deck 2, right JOGDIALSIDE (Deck 2 active)",
+          "status": 177,
+          "data1": 33,
+          "status_hex": "0xB1",
+          "data1_hex": "0x21"
+        }
+      },
+      "cross_checked": true
+    },
+    "filter_a": {
+      "midi_kind": "cc",
+      "channel": 6,
+      "data1": 23,
+      "data1_hex": "0x17",
+      "manufacturer_pdf": {
+        "matched": true,
+        "anchor": "CH1 Filter",
+        "missing_terms": [],
+        "window_start": 5092
+      },
+      "mixxx_xml": {
+        "matched": true,
+        "row": {
+          "group": "[Channel1]",
+          "description": "Filter Deck 1 (MSB), Knob: left FILTER (Deck 1 active)",
+          "status": 182,
+          "data1": 23,
+          "status_hex": "0xB6",
+          "data1_hex": "0x17"
+        }
+      },
+      "cross_checked": true
+    },
+    "filter_b": {
+      "midi_kind": "cc",
+      "channel": 6,
+      "data1": 24,
+      "data1_hex": "0x18",
+      "manufacturer_pdf": {
+        "matched": true,
+        "anchor": "CH2 Filter",
+        "missing_terms": [],
+        "window_start": 5260
+      },
+      "mixxx_xml": {
+        "matched": true,
+        "row": {
+          "group": "[Channel2]",
+          "description": "Filter Deck 2 (MSB), Knob: right FILTER (Deck 2 active)",
+          "status": 182,
+          "data1": 24,
+          "status_hex": "0xB6",
+          "data1_hex": "0x18"
+        }
+      },
+      "cross_checked": true
+    },
+    "xfader": {
+      "midi_kind": "cc",
+      "channel": 6,
+      "data1": 31,
+      "data1_hex": "0x1F",
+      "manufacturer_pdf": {
+        "matched": true,
+        "anchor": "CROSSFADER",
+        "missing_terms": [],
+        "window_start": 6934
+      },
+      "mixxx_xml": {
+        "matched": true,
+        "row": {
+          "group": "[Master]",
+          "description": "Crossfader (MSB), Slider: FADE",
+          "status": 182,
+          "data1": 31,
+          "status_hex": "0xB6",
+          "data1_hex": "0x1F"
+        }
+      },
+      "cross_checked": true
+    },
+    "play_a": {
+      "midi_kind": "note",
+      "channel": 0,
+      "data1": 11,
+      "data1_hex": "0x0B",
+      "manufacturer_pdf": {
+        "matched": true,
+        "anchor": "PLAY/PAUSE",
+        "missing_terms": [],
+        "window_start": 865
+      },
+      "mixxx_xml": {
+        "matched": true,
+        "row": {
+          "group": "[Channel1]",
+          "description": "Toggles Play/Pause Deck 1, Button: left PLAY (Deck 1 active)",
+          "status": 144,
+          "data1": 11,
+          "status_hex": "0x90",
+          "data1_hex": "0x0B"
+        }
+      },
+      "cross_checked": true
+    },
+    "play_b": {
+      "midi_kind": "note",
+      "channel": 1,
+      "data1": 11,
+      "data1_hex": "0x0B",
+      "manufacturer_pdf": {
+        "matched": true,
+        "anchor": "PLAY/PAUSE",
+        "missing_terms": [],
+        "window_start": 865
+      },
+      "mixxx_xml": {
+        "matched": true,
+        "row": {
+          "group": "[Channel2]",
+          "description": "Toggles Play/Pause Deck 2, Button: right PLAY (Deck 2 active)",
+          "status": 145,
+          "data1": 11,
+          "status_hex": "0x91",
+          "data1_hex": "0x0B"
+        }
+      },
+      "cross_checked": true
+    },
+    "cue_a": {
+      "midi_kind": "note",
+      "channel": 0,
+      "data1": 12,
+      "data1_hex": "0x0C",
+      "manufacturer_pdf": {
+        "matched": true,
+        "anchor": "CUE",
+        "missing_terms": [],
+        "window_start": 1027
+      },
+      "mixxx_xml": {
+        "matched": true,
+        "row": {
+          "group": "[Channel1]",
+          "description": "Cue Deck 1, Button: left CUE (Deck 1 active)",
+          "status": 144,
+          "data1": 12,
+          "status_hex": "0x90",
+          "data1_hex": "0x0C"
+        }
+      },
+      "cross_checked": true
+    },
+    "cue_b": {
+      "midi_kind": "note",
+      "channel": 1,
+      "data1": 12,
+      "data1_hex": "0x0C",
+      "manufacturer_pdf": {
+        "matched": true,
+        "anchor": "CUE",
+        "missing_terms": [],
+        "window_start": 1027
+      },
+      "mixxx_xml": {
+        "matched": true,
+        "row": {
+          "group": "[Channel2]",
+          "description": "Cue Deck 2, Button: right CUE (Deck 2 active)",
+          "status": 145,
+          "data1": 12,
+          "status_hex": "0x91",
+          "data1_hex": "0x0C"
+        }
+      },
+      "cross_checked": true
+    },
+    "sync_a": {
+      "midi_kind": "note",
+      "channel": 0,
+      "data1": 88,
+      "data1_hex": "0x58",
+      "manufacturer_pdf": {
+        "matched": true,
+        "anchor": "SYNC",
+        "missing_terms": [],
+        "window_start": 1178
+      },
+      "mixxx_xml": {
+        "matched": true,
+        "row": {
+          "group": "[Channel1]",
+          "description": "Sync Deck 1, Button: left SYNC (Deck 1 active)",
+          "status": 144,
+          "data1": 88,
+          "status_hex": "0x90",
+          "data1_hex": "0x58"
+        }
+      },
+      "cross_checked": true
+    },
+    "sync_b": {
+      "midi_kind": "note",
+      "channel": 1,
+      "data1": 88,
+      "data1_hex": "0x58",
+      "manufacturer_pdf": {
+        "matched": true,
+        "anchor": "SYNC",
+        "missing_terms": [],
+        "window_start": 1178
+      },
+      "mixxx_xml": {
+        "matched": true,
+        "row": {
+          "group": "[Channel2]",
+          "description": "Sync Deck 2, Button: right SYNC (Deck 2 active)",
+          "status": 145,
+          "data1": 88,
+          "status_hex": "0x91",
+          "data1_hex": "0x58"
+        }
+      },
+      "cross_checked": true
+    },
+    "jog_a": {
+      "midi_kind": "note",
+      "channel": 0,
+      "data1": 54,
+      "data1_hex": "0x36",
+      "manufacturer_pdf": {
+        "matched": true,
+        "anchor": "touch",
+        "missing_terms": [],
+        "window_start": 1579
+      },
+      "mixxx_xml": {
+        "matched": true,
+        "row": {
+          "group": "[Channel1]",
+          "description": "Jog touch (Vinyl Mode) Deck 1, left JOGDIAL (Deck 1 active)",
+          "status": 144,
+          "data1": 54,
+          "status_hex": "0x90",
+          "data1_hex": "0x36"
+        }
+      },
+      "cross_checked": true
+    },
+    "jog_b": {
+      "midi_kind": "note",
+      "channel": 1,
+      "data1": 54,
+      "data1_hex": "0x36",
+      "manufacturer_pdf": {
+        "matched": true,
+        "anchor": "touch",
+        "missing_terms": [],
+        "window_start": 1579
+      },
+      "mixxx_xml": {
+        "matched": true,
+        "row": {
+          "group": "[Channel2]",
+          "description": "Jog touch (Vinyl Mode) Deck 2, right JOGDIAL (Deck 2 active)",
+          "status": 145,
+          "data1": 54,
+          "status_hex": "0x91",
+          "data1_hex": "0x36"
+        }
+      },
+      "cross_checked": true
+    }
+  }
+}

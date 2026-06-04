@@ -1,0 +1,82 @@
+{
+  "profile_id": "pioneer_ddj_sb3",
+  "controls": 15,
+  "buttons": 8,
+  "events": 23,
+  "first_events": [
+    {
+      "id": 0,
+      "at": 1780563527.32638,
+      "kind": "cc",
+      "deck": "A",
+      "field": "vol",
+      "value_raw": 80,
+      "magnitude": 0.6299212598425197
+    },
+    {
+      "id": 1,
+      "at": 1780563527.3263922,
+      "kind": "cc",
+      "deck": "B",
+      "field": "vol",
+      "value_raw": 80,
+      "magnitude": 0.6299212598425197
+    },
+    {
+      "id": 2,
+      "at": 1780563527.326399,
+      "kind": "cc",
+      "deck": "A",
+      "field": "eq_hi",
+      "value_raw": 80,
+      "magnitude": 0.12598425196850394
+    },
+    {
+      "id": 3,
+      "at": 1780563527.326405,
+      "kind": "cc",
+      "deck": "B",
+      "field": "eq_hi",
+      "value_raw": 80,
+      "magnitude": 0.12598425196850394
+    },
+    {
+      "id": 4,
+      "at": 1780563527.326408,
+      "kind": "cc",
+      "deck": "A",
+      "field": "eq_mid",
+      "value_raw": 80,
+      "magnitude": 0.12598425196850394
+    },
+    {
+      "id": 5,
+      "at": 1780563527.326411,
+      "kind": "cc",
+      "deck": "B",
+      "field": "eq_mid",
+      "value_raw": 80,
+      "magnitude": 0.12598425196850394
+    },
+    {
+      "id": 6,
+      "at": 1780563527.3264132,
+      "kind": "cc",
+      "deck": "A",
+      "field": "eq_low",
+      "value_raw": 80,
+      "magnitude": 0.12598425196850394
+    },
+    {
+      "id": 7,
+      "at": 1780563527.326415,
+      "kind": "cc",
+      "deck": "B",
+      "field": "eq_low",
+      "value_raw": 80,
+      "magnitude": 0.12598425196850394
+    }
+  ],
+  "parser_valid": true,
+  "synthetic_decode_events_present": true
+}
