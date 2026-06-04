@@ -1103,6 +1103,43 @@ def test_export_set_auto_cues_snap_to_exported_bpm_grid(toolset, tmp_path, monke
     assert float(marks["VM D DROP"].attrib["Start"]) == pytest.approx(64.5)
 
 
+def test_export_set_auto_cues_materialize_for_live_pill(toolset, tmp_path, monkeypatch):
+    """Viber-landed VM cues become visible to next_suggestion without re-import."""
+    from vibemix.library.section_builder import sections_for_entry as real_sections_for_entry
+
+    toolset.seen.add("t000")
+    toolset._library.tracks["t000"] = _track("t000", bpm=120.0)
+    monkeypatch.setattr(
+        tool_mod,
+        "sections_for_entry",
+        lambda entry: (
+            _section(f"{entry.track_id}#intro", "intro", 10.21, 32.0),
+            _section(f"{entry.track_id}#drop", "drop", 64.26, 128.0),
+        ),
+    )
+
+    out_xml = tmp_path / "pill-visible.xml"
+    out = toolset.export_set(
+        {"name": "Pill Visible", "track_ids": ["t000"], "out_path": str(out_xml)}
+    )
+
+    assert out.get("exported") is True
+    assert out["pill_cues_materialized"] == {"tracks": 1, "cues": 2}
+    materialized = toolset._library.tracks["t000"]
+    by_name = {cue.name: cue for cue in materialized.cues}
+    assert by_name["VM A IN"].start_s == pytest.approx(10.0)
+    assert by_name["VM A IN"].number == 0
+    assert by_name["VM A IN"].source == "anlz"
+    assert by_name["VM A IN"].confidence == pytest.approx(0.92)
+    assert by_name["VM D DROP"].start_s == pytest.approx(64.5)
+    assert by_name["VM D DROP"].number == 3
+
+    sections = {section.cue_slot: section for section in real_sections_for_entry(materialized)}
+    assert sections["A"].cue_source == "anlz"
+    assert sections["A"].cue_confidence == pytest.approx(0.92)
+    assert sections["D"].role == "drop"
+
+
 def test_export_set_auto_cues_snap_to_real_grid_inizio(toolset, tmp_path, monkeypatch):
     """Machine cue snap respects a persisted Rekordbox beatgrid phase."""
     toolset.seen.add("t000")
@@ -1217,6 +1254,10 @@ def test_export_set_auto_cues_fill_empty_slots_without_clobbering_dj(
     assert marks["MY A"].attrib["Num"] == "0"
     assert "VM MY A" not in marks
     assert marks["VM D DROP"].attrib["Num"] == "3"
+    materialized_names = {cue.name for cue in toolset._library.tracks["t000"].cues}
+    assert "MY A" in materialized_names
+    assert "VM MY A" not in materialized_names
+    assert "VM D DROP" in materialized_names
 
 
 def test_export_set_auto_cue_snap_preserves_dj_offgrid_cues(toolset, tmp_path, monkeypatch):

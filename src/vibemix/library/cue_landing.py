@@ -335,6 +335,7 @@ def _cue_to_mark(cue: LandedCue) -> dict[str, Any]:
         "num": SLOTS.index(cue.slot),
         "review_status": cue.review_status,
         "source": cue.source,
+        "confidence": cue.confidence,
     }
 
 

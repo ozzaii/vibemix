@@ -39,7 +39,7 @@ import pathlib
 import re
 import threading
 from collections.abc import Callable
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from typing import TYPE_CHECKING, Any, Literal, Protocol
 
 from vibemix.library.create_playlist import PlaylistResult, create_playlist
@@ -52,7 +52,7 @@ if TYPE_CHECKING:
     from vibemix.intel.transition_scorer import SectionRecord, TransitionCandidate
     from vibemix.library.export_rekordbox import ExportResult
     from vibemix.library.smart_cues import SmartCueProposal
-from vibemix.library.rekordbox import RekordboxLibrary
+from vibemix.library.rekordbox import CuePoint, RekordboxLibrary
 from vibemix.library.search import vibe_search
 from vibemix.library.section_builder import (
     best_source_section,
@@ -1005,7 +1005,9 @@ class LibraryToolset:
                             occupied_slots=_occupied_hotcue_slots(cue_payload.get("cues", ())),
                         )
                     except Exception as cue_exc:
-                        logger.warning("[viber] export_set auto-cue skipped for %s: %s", tid, cue_exc)
+                        logger.warning(
+                            "[viber] export_set auto-cue skipped for %s: %s", tid, cue_exc
+                        )
                         auto_cue_report["skipped_failed"] += 1
                     else:
                         _add_auto_cue_summary(auto_cue_report, proposal_summary, len(auto_marks))
@@ -1075,6 +1077,10 @@ class LibraryToolset:
                     referenced = int(tag_receipt["tagged"])
             if result is None and not outputs and not tag_receipts:
                 return {"error": f"export_set: unsupported target {target!r}"}
+            materialized_for_pill = _materialize_landed_machine_cues_for_pill(
+                self._library,
+                items,
+            )
         except Exception as e:
             logger.warning("[viber] export_set failed: %s", e)
             return {"error": f"export_set failed: {type(e).__name__}: {e}"}
@@ -1102,6 +1108,7 @@ class LibraryToolset:
             "referenced": referenced,
             "dropped": dropped,
             "auto_cues": auto_cue_report,
+            "pill_cues_materialized": materialized_for_pill,
         }
 
     def export_smart_cues(self, args: dict[str, Any]) -> dict[str, Any]:
@@ -1981,7 +1988,9 @@ def _write_export_set_markers2_tags(
     for item in items:
         filepath = str(item.get("filepath") or "")
         if not filepath:
-            skipped.append({"track_id": str(item.get("track_id") or ""), "reason": "missing filepath"})
+            skipped.append(
+                {"track_id": str(item.get("track_id") or ""), "reason": "missing filepath"}
+            )
             continue
         marks = [mark for mark in item.get("cues", ()) or () if isinstance(mark, dict)]
         if not marks:
@@ -2187,12 +2196,103 @@ def _add_auto_cue_snap_summary(report: dict[str, Any], stats: dict[str, float | 
     )
 
 
+def _materialize_landed_machine_cues_for_pill(
+    library: RekordboxLibrary,
+    items: list[dict[str, Any]],
+) -> dict[str, int]:
+    """Mirror successful export-time VM cue rows into the live library object.
+
+    ``export_set`` can fill empty A-H slots from smart cues even when the source
+    ``TrackEntry`` had no cue rows. Without this overlay the DJ software receives
+    the VM pads but the running next-suggestion pill still sees an uncued entry
+    until the user re-imports/re-ingests. This keeps the immediate runtime
+    honest: only machine cues that just went through a successful carrier write
+    become visible to the live pill, and DJ-authored slots remain untouched.
+    """
+    tracks_updated = 0
+    cues_materialized = 0
+    for item in items:
+        track_id = str(item.get("track_id") or "")
+        entry = library.lookup_by_id(track_id) if track_id else None
+        if entry is None:
+            continue
+        existing = list(getattr(entry, "cues", ()) or ())
+        occupied_slots = {
+            int(cue.number)
+            for cue in existing
+            if getattr(cue, "type", "") in {"cue", "loop"} and 0 <= int(cue.number) <= 7
+        }
+        additions: list[CuePoint] = []
+        for mark in item.get("cues", ()) or ():
+            cue = _live_pill_cue_from_export_mark(mark, occupied_slots)
+            if cue is None:
+                continue
+            additions.append(cue)
+            if 0 <= cue.number <= 7:
+                occupied_slots.add(cue.number)
+        if not additions:
+            continue
+        merged = tuple(
+            sorted(
+                [*existing, *additions],
+                key=lambda cue: (float(getattr(cue, "start_s", 0.0) or 0.0), int(cue.number)),
+            )
+        )
+        library.tracks[entry.track_id] = replace(entry, cues=merged)
+        tracks_updated += 1
+        cues_materialized += len(additions)
+    return {"tracks": tracks_updated, "cues": cues_materialized}
+
+
+def _live_pill_cue_from_export_mark(
+    mark: Any,
+    occupied_slots: set[int],
+) -> CuePoint | None:
+    if not isinstance(mark, dict) or not _is_machine_cue_mark(mark):
+        return None
+    slot = _mark_hotcue_slot(mark)
+    if slot is not None and slot in occupied_slots:
+        return None
+    try:
+        start_s = float(mark.get("start_s", 0.0) or 0.0)
+    except (TypeError, ValueError):
+        return None
+    if not math.isfinite(start_s) or start_s < 0:
+        return None
+    try:
+        end_raw = mark.get("end_s")
+        end_s = float(end_raw) if end_raw is not None else None
+    except (TypeError, ValueError):
+        end_s = None
+    if end_s is not None and (not math.isfinite(end_s) or end_s <= start_s):
+        end_s = None
+    confidence = _mark_confidence(mark)
+    return CuePoint(
+        name=str(mark.get("name") or ""),
+        type=str(mark.get("type") or "cue"),
+        start_s=start_s,
+        end_s=end_s,
+        number=slot if slot is not None else -1,
+        source=str(mark.get("source") or "auto").strip().lower(),
+        confidence=confidence,
+    )
+
+
+def _mark_confidence(mark: dict[str, Any]) -> float | None:
+    raw = mark.get("confidence")
+    if raw is None:
+        return None
+    try:
+        value = float(raw)
+    except (TypeError, ValueError):
+        return None
+    if not math.isfinite(value):
+        return None
+    return min(1.0, max(0.0, value))
+
+
 def _occupied_hotcue_slots(cues: Any) -> set[int]:
-    return {
-        slot
-        for cue in cues or ()
-        if (slot := _mark_hotcue_slot(cue)) is not None
-    }
+    return {slot for cue in cues or () if (slot := _mark_hotcue_slot(cue)) is not None}
 
 
 def _mark_hotcue_slot(mark: Any) -> int | None:

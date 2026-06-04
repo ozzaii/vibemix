@@ -282,6 +282,7 @@ def proposal_to_export_marks(
                 "num": SLOTS.index(cue.slot),
                 "review_status": cue.review_status,
                 "source": cue.source,
+                "confidence": cue.confidence,
             }
         )
     return marks

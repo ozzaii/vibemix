@@ -33,6 +33,18 @@ Each: ~10-11 parallel audit agents → synthesis that READS ALL PACKETS first �
 
 The builders wire from the exit-maps, prove by-ear/by-eye in the real app (test-green is not done), commit surgically, and land. The existing **monitor `bz70ahvzt`** (clean product tree + 10-min quiesce) trips when they are done and pings the organizer → fire `ship-final-wf.js` → `SHIP-FINAL-VERDICT.md` → route any residual fixes to 2 Codex. Kaan can compact and walk away; this file + SHIP-DRIVE.md hold the whole loop.
 
+## Gate resolved (Kaan-locked 2026-06-04)
+
+W1 + W2 landed (`FRONTEND-WIRING-EXIT-MAP.md`, `BACKEND-WIRING-EXIT-MAP.md`). The voice root-cause confirmed: engine is env-only and the GUI strips env, so MOSS always wins; fix = `config_store.tts_engine` + `os.environ.setdefault` at `__main__.py:1420` (no `tts_chain.py` edit). Three product calls answered before W3:
+
+1. **Live voice default = Chatterbox-Turbo** (ear-locked). MOSS = never-mute floor when Chatterbox deps/model absent. Packaging bundles mlx-audio + the Chatterbox model/ref + clears licensing; if any cannot ship, MOSS floors automatically.
+2. **Brain access default = hosted Bravoh proxy** (fresh user pastes nothing). Needs live proxy credits + per-client rate limit (external/Kaan dependency). In-GUI key field = advanced BYO-key. Wizard takes the proxy-default shape.
+3. **Streak voice = full Daft Punk Technologic in v1** — but re-bind the streak to a cited EXECUTED transition first (kill the self-applauding suggestion-grade count) so it is grounded before it speaks.
+
+Organizer-set smaller defaults (Kaan may override): cue-confidence = 3 buckets; runner-up reveal = debrief; cue-landing = consolidate via `cue_landing.land()`; learn tutor voice = co-host engine with persona warmth/pace.
+
+W3 (`wire-userready-wf.js`) is seeded with these and running. Its `USER-READY-WIRING-EXIT-MAP.md` carries the final per-session ship-wire `/goal` blocks.
+
 ## SHARED LAW (every session)
 
 One shared tree `ux-redesign-impeccable`: commits survive, uncommitted gets WIPED by a sibling git op. `git add <exact paths>` NEVER `-A`; verify `git diff --cached`. IPC schema = Frontend lane only; backend lanes request types. Sidecar `127.0.0.1:8765` = one socket (`pkill -f "python -m vibemix"` before any probe). `commit -s`, Kaan Özkan <rahipdotaci@gmail.com>. Do NOT rush to exit at test-green; prove the real app. Commit each piece the instant it is green + proven.
