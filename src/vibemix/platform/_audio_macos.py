@@ -428,21 +428,27 @@ def _probe_input_rms(
     }
 
 
-def _master_probe_score(row: dict) -> tuple[float, float, int, int]:
+def _master_probe_score(row: dict) -> tuple[int, int, int, int, float, float, int]:
     name = str(row.get("name") or "").lower()
     rms = float(row.get("rms") or 0.0)
+    peak = float(row.get("peak") or 0.0)
     sample_rate = int(row.get("sample_rate") or 0)
     live = 1 if rms >= _AUTO_MASTER_RMS_FLOOR else 0
     rate_match = 1 if sample_rate == _AUTO_MASTER_EXPECTED_SR else 0
     exact_2ch = 1 if name == "blackhole 2ch" else 0
     blackhole = 1 if "blackhole" in name else 0
-    # Live signal dominates; rate match beats exact 2ch when the signal is on
-    # another BlackHole variant. The small name bonus only breaks true ties.
+    # Live signal still dominates, and a correct 48 kHz route beats a wrong-rate
+    # exact match. When both BlackHole variants are live at 48 kHz, prefer the
+    # canonical 2ch route the installer/readiness path provisions; use RMS only
+    # as a final strength tiebreaker.
     return (
-        float(live * 1000) + min(rms * 1000.0, 100.0),
-        float(rate_match * 100 + exact_2ch * 5 + blackhole),
+        live,
+        rate_match,
+        exact_2ch,
+        blackhole,
+        rms,
+        peak,
         -int(row.get("index") or 0),
-        0,
     )
 
 

@@ -557,6 +557,8 @@ def preferred_loopback_device_for_readiness(
             output_name = str(current.get("audio_output_device_name") or "").strip()
             if output_name and matching_names([output_name], AUDIO_LOOPBACK_NEEDLES):
                 return output_name
+            if _is_multi_output_route_name(output_name):
+                return "BlackHole 2ch"
     if isinstance(audio_route_check, dict):
         return str(audio_route_check.get("output_device") or "")
     return ""
@@ -668,13 +670,14 @@ def select_loopback_signal_device(
         return None
     preferred = (preferred_device or "").strip().lower()
 
-    def score(row: dict[str, Any]) -> tuple[int, int, int, int]:
+    def score(row: dict[str, Any]) -> tuple[int, int, int, int, int]:
         name = str(row["name"]).lower()
         exact = 1 if preferred and name == preferred else 0
         contains = 1 if preferred and (preferred in name or name in preferred) else 0
         rate_match = 1 if int(row["sample_rate"]) == 48000 else 0
+        exact_2ch = 1 if name == "blackhole 2ch" else 0
         blackhole = 1 if "blackhole" in name else 0
-        return exact, contains, rate_match, blackhole
+        return exact, contains, rate_match, exact_2ch, blackhole
 
     return max(candidates, key=score)
 
@@ -690,13 +693,14 @@ def select_loopback_route_device(
         return None
     preferred = (preferred_device or "").strip().lower()
 
-    def score(row: dict[str, Any]) -> tuple[int, int, int, int]:
+    def score(row: dict[str, Any]) -> tuple[int, int, int, int, int]:
         name = str(row["name"]).lower()
         exact = 1 if preferred and name == preferred else 0
         contains = 1 if preferred and (preferred in name or name in preferred) else 0
         rate_match = 1 if int(row["sample_rate"]) == 48000 else 0
+        exact_2ch = 1 if name == "blackhole 2ch" else 0
         blackhole = 1 if "blackhole" in name else 0
-        return exact, contains, rate_match, blackhole
+        return exact, contains, rate_match, exact_2ch, blackhole
 
     return max(candidates, key=score)
 
@@ -1773,9 +1777,13 @@ def _auto_master_candidate_evidence(
             continue
         reasons = ["sampled_capture"]
         sources = ["capture_matrix"]
-        if top_name and name.lower() == top_name.lower() and row.get("signal") is True:
+        if row.get("signal") is True:
             reasons = ["live_signal"]
-            sources = ["capture_matrix_top_signal"]
+            sources = [
+                "capture_matrix_top_signal"
+                if top_name and name.lower() == top_name.lower()
+                else "capture_matrix_live_signal"
+            ]
         if rekordbox_output and _capture_row_matches_name(row, rekordbox_output):
             reasons.append("saved_rekordbox_route")
             sources.append("rekordbox_audio_settings")
@@ -1814,12 +1822,13 @@ def _auto_master_candidate_evidence(
             reasons=["macos_output_route", "unsampled_route"],
         )
 
-    def score(candidate: dict[str, Any]) -> tuple[int, int, int, int, int, int, float, float]:
+    def score(candidate: dict[str, Any]) -> tuple[int, int, int, int, int, int, int, float, float]:
         reasons = set(candidate.get("reasons") or [])
         name = str(candidate.get("name") or "").lower()
         return (
             1 if candidate.get("signal") else 0,
             1 if candidate.get("rate_ok") else 0,
+            1 if name == "blackhole 2ch" else 0,
             1 if "saved_rekordbox_route" in reasons else 0,
             1 if "macos_output_route" in reasons else 0,
             1 if candidate.get("loopback") else 0,
@@ -1886,6 +1895,25 @@ def recommend_auto_master_input(
         audio_route_check=audio_route_check,
     )
     rows = _capture_rows(capture_matrix_check)
+    live_candidates = [
+        candidate
+        for candidate in candidates
+        if candidate.get("signal") is True
+        and candidate.get("rate_ok") is True
+        and candidate.get("sampled") is True
+    ]
+    if live_candidates:
+        chosen = live_candidates[0]
+        return _auto_master_candidate(
+            status="ready",
+            source=str(chosen.get("source") or "capture_matrix_live_signal"),
+            reason="live_signal",
+            row=chosen,
+            live_signal=True,
+            next_action=f"Use {chosen.get('name')!r} as the master capture input.",
+            candidates=candidates,
+        )
+
     top_signal = (
         capture_matrix_check.get("top_signal")
         if isinstance(capture_matrix_check, dict)

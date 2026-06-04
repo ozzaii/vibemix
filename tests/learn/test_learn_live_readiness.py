@@ -232,12 +232,45 @@ def test_select_loopback_signal_device_prefers_current_output() -> None:
     assert selected["channels"] == 2
 
 
+def test_select_loopback_signal_device_prefers_blackhole_2ch_without_route_hint() -> None:
+    selected = readiness.select_loopback_signal_device(
+        [
+            {
+                "name": "BlackHole 16ch",
+                "max_input_channels": 16,
+                "default_samplerate": 48000,
+            },
+            {
+                "name": "BlackHole 2ch",
+                "max_input_channels": 2,
+                "default_samplerate": 48000,
+            },
+        ],
+        preferred_device=None,
+    )
+
+    assert selected is not None
+    assert selected["name"] == "BlackHole 2ch"
+
+
 def test_preferred_loopback_device_for_course3_uses_rekordbox_output() -> None:
     selected = readiness.preferred_loopback_device_for_readiness(
         requirement="course3",
         audio_route_check={"output_device": "BlackHole 16ch"},
         rekordbox_audio_settings_check={
             "current": {"audio_output_device_name": "BlackHole 2ch"}
+        },
+    )
+
+    assert selected == "BlackHole 2ch"
+
+
+def test_preferred_loopback_device_for_course3_maps_rekordbox_multi_output_to_2ch() -> None:
+    selected = readiness.preferred_loopback_device_for_readiness(
+        requirement="course3",
+        audio_route_check={"output_device": "MacBook Pro Speakers (eqMac)"},
+        rekordbox_audio_settings_check={
+            "current": {"audio_output_device_name": "Multi-Output Device"}
         },
     )
 
@@ -352,6 +385,29 @@ def test_select_loopback_route_device_requires_duplex_loopback() -> None:
     assert selected is not None
     assert selected["index"] == 1
     assert selected["name"] == "BlackHole 16ch"
+
+
+def test_select_loopback_route_device_prefers_blackhole_2ch_without_route_hint() -> None:
+    selected = readiness.select_loopback_route_device(
+        [
+            {
+                "name": "BlackHole 16ch",
+                "max_input_channels": 16,
+                "max_output_channels": 16,
+                "default_samplerate": 48000,
+            },
+            {
+                "name": "BlackHole 2ch",
+                "max_input_channels": 2,
+                "max_output_channels": 2,
+                "default_samplerate": 48000,
+            },
+        ],
+        preferred_device=None,
+    )
+
+    assert selected is not None
+    assert selected["name"] == "BlackHole 2ch"
 
 
 def test_check_loopback_signal_reports_direct_capture_signal(monkeypatch) -> None:
@@ -512,6 +568,45 @@ def test_auto_master_recommendation_prefers_live_48k_capture() -> None:
     assert recommendation["reason"] == "live_signal"
     assert recommendation["device_name"] == "BlackHole 16ch"
     assert recommendation["sample_rate"] == 48000
+    assert recommendation["live_signal"] is True
+
+
+def test_auto_master_recommendation_prefers_live_blackhole_2ch_over_louder_16ch() -> None:
+    recommendation = readiness.recommend_auto_master_input(
+        capture_matrix_check={
+            "enabled": True,
+            "ok": True,
+            "top_signal": {
+                "name": "BlackHole 16ch",
+                "rms": 0.032,
+                "peak": 0.18,
+                "sample_rate": 48000,
+                "signal": True,
+            },
+            "rows": [
+                {
+                    "name": "BlackHole 2ch",
+                    "rms": 0.018,
+                    "peak": 0.12,
+                    "sample_rate": 48000,
+                    "signal": True,
+                },
+                {
+                    "name": "BlackHole 16ch",
+                    "rms": 0.032,
+                    "peak": 0.18,
+                    "sample_rate": 48000,
+                    "signal": True,
+                },
+            ],
+        },
+    )
+
+    assert recommendation["ok"] is True
+    assert recommendation["status"] == "ready"
+    assert recommendation["reason"] == "live_signal"
+    assert recommendation["device_name"] == "BlackHole 2ch"
+    assert recommendation["source"] == "capture_matrix_live_signal"
     assert recommendation["live_signal"] is True
 
 

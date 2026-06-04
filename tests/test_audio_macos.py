@@ -317,6 +317,40 @@ def test_find_device_auto_master_input_chooses_live_48k_variant(
     assert backend.find_device("BlackHole 2ch", "input") == 1
 
 
+def test_find_device_auto_master_input_prefers_live_2ch_over_louder_live_16ch(
+    mocker: MockerFixture,
+    monkeypatch: pytest.MonkeyPatch,
+    make_backend,
+) -> None:
+    """When both provisioned loopbacks carry master audio, pick canonical 2ch."""
+    devices = [
+        {
+            "name": "BlackHole 2ch",
+            "max_input_channels": 2,
+            "max_output_channels": 2,
+            "default_samplerate": 48000.0,
+        },
+        {
+            "name": "BlackHole 16ch",
+            "max_input_channels": 16,
+            "max_output_channels": 16,
+            "default_samplerate": 48000.0,
+        },
+    ]
+    mocker.patch("vibemix.platform._audio_macos.sd.query_devices", return_value=devices)
+
+    def fake_rec(frames, *, samplerate, channels, dtype, device, blocking):
+        del samplerate, dtype, blocking
+        value = 0.02 if device == 0 else 0.06
+        return np.full((frames, channels), value, dtype=np.float32)
+
+    mocker.patch("vibemix.platform._audio_macos.sd.rec", side_effect=fake_rec)
+    monkeypatch.setenv("VIBEMIX_AUTO_MASTER_INPUT", "1")
+
+    backend = make_backend()
+    assert backend.find_device("BlackHole 2ch", "input") == 0
+
+
 def test_find_device_auto_master_input_falls_back_to_48k_variant_when_silent(
     mocker: MockerFixture,
     monkeypatch: pytest.MonkeyPatch,
