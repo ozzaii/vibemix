@@ -1,0 +1,634 @@
+{
+  "auto_master_recommendation": {
+    "candidates": [
+      {
+        "dj_capture": false,
+        "expected_sample_rate": 48000,
+        "live_signal": true,
+        "loopback": true,
+        "name": "BlackHole 16ch",
+        "peak": 0.152253,
+        "rank": 1,
+        "rate_ok": true,
+        "reasons": [
+          "live_signal"
+        ],
+        "rms": 0.03128,
+        "sample_rate": 48000,
+        "sampled": true,
+        "signal": true,
+        "source": "capture_matrix_top_signal",
+        "sources": [
+          "capture_matrix_top_signal"
+        ]
+      },
+      {
+        "dj_capture": false,
+        "expected_sample_rate": 48000,
+        "live_signal": false,
+        "loopback": true,
+        "name": "BlackHole 2ch",
+        "peak": 0.178527,
+        "rank": 2,
+        "rate_ok": true,
+        "reasons": [
+          "sampled_capture"
+        ],
+        "rms": 0.031258,
+        "sample_rate": 48000,
+        "sampled": true,
+        "signal": true,
+        "source": "capture_matrix",
+        "sources": [
+          "capture_matrix"
+        ]
+      },
+      {
+        "dj_capture": false,
+        "expected_sample_rate": 48000,
+        "live_signal": false,
+        "loopback": false,
+        "name": "Multi-Output Device",
+        "rank": 3,
+        "rate_ok": true,
+        "reasons": [
+          "saved_rekordbox_route",
+          "unsampled_route"
+        ],
+        "sample_rate": 48000,
+        "sampled": false,
+        "signal": false,
+        "source": "rekordbox_audio_settings",
+        "sources": [
+          "rekordbox_audio_settings"
+        ]
+      },
+      {
+        "dj_capture": true,
+        "expected_sample_rate": 48000,
+        "live_signal": false,
+        "loopback": false,
+        "name": "rekordbox Aggregate Device",
+        "peak": 0.000458,
+        "rank": 4,
+        "rate_ok": true,
+        "reasons": [
+          "sampled_capture"
+        ],
+        "rms": 0.00011,
+        "sample_rate": 48000,
+        "sampled": true,
+        "signal": false,
+        "source": "capture_matrix",
+        "sources": [
+          "capture_matrix"
+        ]
+      },
+      {
+        "dj_capture": true,
+        "expected_sample_rate": 48000,
+        "live_signal": false,
+        "loopback": false,
+        "name": "DDJ-FLX4",
+        "peak": 0.000549,
+        "rank": 5,
+        "rate_ok": true,
+        "reasons": [
+          "sampled_capture"
+        ],
+        "rms": 0.000108,
+        "sample_rate": 48000,
+        "sampled": true,
+        "signal": false,
+        "source": "capture_matrix",
+        "sources": [
+          "capture_matrix"
+        ]
+      },
+      {
+        "dj_capture": false,
+        "expected_sample_rate": 48000,
+        "live_signal": false,
+        "loopback": false,
+        "name": "MacBook Pro Speakers (eqMac)",
+        "rank": 6,
+        "rate_ok": false,
+        "reasons": [
+          "macos_output_route",
+          "unsampled_route"
+        ],
+        "sample_rate": null,
+        "sampled": false,
+        "signal": false,
+        "source": "macos_output_route",
+        "sources": [
+          "macos_output_route"
+        ]
+      }
+    ],
+    "device_name": "BlackHole 16ch",
+    "expected_sample_rate": 48000,
+    "live_signal": true,
+    "next_action": "Use 'BlackHole 16ch' as the master capture input.",
+    "ok": true,
+    "peak": 0.152253,
+    "reason": "live_signal",
+    "rms": 0.03128,
+    "sample_rate": 48000,
+    "source": "capture_matrix_top_signal",
+    "status": "ready"
+  },
+  "blockers": [
+    "sidecar socket is not listening on ws://127.0.0.1:8765",
+    "macOS now-playing is 'BENOFTHEWEEK - prank calling EVERY COUNTRY...' from com.apple.WebKit.GPU (not playing), not Rekordbox; deck_state needs a Rekordbox-published title that matches the imported library"
+  ],
+  "checks": {
+    "audio_devices": {
+      "controller_audio_present": true,
+      "dj_audio_present": true,
+      "loopback_present": true,
+      "ok": true,
+      "profiler_available": true,
+      "profiler_error": null,
+      "profiler_matches": [
+        "DDJ-FLX4:",
+        "Manufacturer: AlphaTheta Corporation",
+        "BlackHole 16ch:",
+        "BlackHole 2ch:",
+        "rekordbox Aggregate Device:"
+      ],
+      "rekordbox_aggregate_present": true,
+      "sounddevice_error": null,
+      "sounddevice_names": [
+        "DDJ-FLX4",
+        "BlackHole 16ch",
+        "BlackHole 2ch",
+        "MacBook Pro Microphone",
+        "MacBook Pro Speakers",
+        "MacBook Pro Speakers (eqMac)",
+        "eqMac Export ",
+        "rekordbox Aggregate Device",
+        "HEADPHONEMG",
+        "Aggregate Device",
+        "AIDJ",
+        "AIDJ",
+        "Multi-Output Device",
+        "AI Capture"
+      ]
+    },
+    "audio_route": {
+      "available": true,
+      "blockers": [
+        "current macOS output route is 'MacBook Pro Speakers (eqMac)', not a loopback capture device"
+      ],
+      "errors": {
+        "output": null,
+        "system": null
+      },
+      "loopback_matches": [],
+      "ok": false,
+      "output_device": "MacBook Pro Speakers (eqMac)",
+      "system_device": "MacBook Pro Speakers"
+    },
+    "capture_matrix": {
+      "blockers": [],
+      "enabled": true,
+      "error": null,
+      "ok": true,
+      "rms_floor": 0.003,
+      "rows": [
+        {
+          "channels": 2,
+          "error": null,
+          "index": 1,
+          "name": "BlackHole 16ch",
+          "peak": 0.152253,
+          "rms": 0.03128,
+          "sample_rate": 48000,
+          "signal": true
+        },
+        {
+          "channels": 2,
+          "error": null,
+          "index": 2,
+          "name": "BlackHole 2ch",
+          "peak": 0.178527,
+          "rms": 0.031258,
+          "sample_rate": 48000,
+          "signal": true
+        },
+        {
+          "channels": 2,
+          "error": null,
+          "index": 7,
+          "name": "rekordbox Aggregate Device",
+          "peak": 0.000458,
+          "rms": 0.00011,
+          "sample_rate": 48000,
+          "signal": false
+        },
+        {
+          "channels": 2,
+          "error": null,
+          "index": 0,
+          "name": "DDJ-FLX4",
+          "peak": 0.000549,
+          "rms": 0.000108,
+          "sample_rate": 48000,
+          "signal": false
+        }
+      ],
+      "seconds": 2.0,
+      "top_signal": {
+        "channels": 2,
+        "error": null,
+        "index": 1,
+        "name": "BlackHole 16ch",
+        "peak": 0.152253,
+        "rms": 0.03128,
+        "sample_rate": 48000,
+        "signal": true
+      }
+    },
+    "course3_live_context": null,
+    "loopback_self_test": null,
+    "loopback_signal": {
+      "blockers": [],
+      "device": {
+        "channels": 2,
+        "index": 1,
+        "name": "BlackHole 16ch",
+        "sample_rate": 48000
+      },
+      "enabled": true,
+      "error": null,
+      "ok": true,
+      "peak": 0.146909,
+      "rms": 0.031109,
+      "rms_floor": 0.003,
+      "seconds": 2.0
+    },
+    "midi_controller": {
+      "controller_matches": [
+        "DDJ-FLX4"
+      ],
+      "error": null,
+      "ok": true,
+      "ports": [
+        "DDJ-FLX4"
+      ]
+    },
+    "nowplaying": {
+      "artist": "BENOFTHEWEEK",
+      "available": true,
+      "bundle_identifier": "com.apple.WebKit.GPU",
+      "cli": "/opt/homebrew/bin/nowplaying-cli",
+      "error": null,
+      "full_title": "BENOFTHEWEEK - prank calling EVERY COUNTRY...",
+      "is_playing": false,
+      "looks_like_rekordbox": false,
+      "ok": true,
+      "playback_rate": 0.0,
+      "title": "prank calling EVERY COUNTRY..."
+    },
+    "rekordbox_audio_settings": {
+      "blockers": [],
+      "current": {
+        "audio_device_buffer_size": "1280",
+        "audio_device_rate": "48000.0",
+        "audio_input_device_name": null,
+        "audio_output_device_name": "Multi-Output Device",
+        "cue_l": null,
+        "cue_r": null,
+        "date": null,
+        "device_type": "CoreAudio",
+        "master_l": null,
+        "master_r": null,
+        "mixer_mode_internal": null,
+        "name": "audioDeviceManager"
+      },
+      "error": null,
+      "ok": true,
+      "path": "/Users/ozai/Library/Application Support/Pioneer/rekordbox6/rekordbox3.settings",
+      "recent": [
+        {
+          "audio_device_buffer_size": "1280",
+          "audio_device_rate": "48000.0",
+          "audio_input_device_name": null,
+          "audio_output_device_name": "Multi-Output Device",
+          "cue_l": null,
+          "cue_r": null,
+          "date": null,
+          "device_type": "CoreAudio",
+          "master_l": null,
+          "master_r": null,
+          "mixer_mode_internal": null,
+          "name": "audioDeviceManager"
+        },
+        {
+          "audio_device_buffer_size": "1280",
+          "audio_device_rate": "48000.0",
+          "audio_input_device_name": null,
+          "audio_output_device_name": "Multi-Output Device",
+          "cue_l": "1",
+          "cue_r": "1",
+          "date": "1.78056027452e12",
+          "device_type": "CoreAudio",
+          "master_l": "0",
+          "master_r": "0",
+          "mixer_mode_internal": "1",
+          "name": "audioDeviceManager_PerformanceMode_-504263519"
+        },
+        {
+          "audio_device_buffer_size": "1280",
+          "audio_device_rate": "48000.0",
+          "audio_input_device_name": "DDJ-FLX4",
+          "audio_output_device_name": "DDJ-FLX4",
+          "cue_l": "2",
+          "cue_r": "3",
+          "date": "1.780560272403e12",
+          "device_type": "CoreAudio",
+          "master_l": "0",
+          "master_r": "1",
+          "mixer_mode_internal": "1",
+          "name": "audioDeviceManager_PerformanceMode_635003461"
+        },
+        {
+          "audio_device_buffer_size": "1280",
+          "audio_device_rate": "48000.0",
+          "audio_input_device_name": null,
+          "audio_output_device_name": "Aggregate Device",
+          "cue_l": "2",
+          "cue_r": "3",
+          "date": "1.780519978425e12",
+          "device_type": "CoreAudio",
+          "master_l": "0",
+          "master_r": "1",
+          "mixer_mode_internal": "0",
+          "name": "audioDeviceManager_PerformanceMode_1178899479"
+        },
+        {
+          "audio_device_buffer_size": "1280",
+          "audio_device_rate": "48000.0",
+          "audio_input_device_name": "DDJ-FLX4",
+          "audio_output_device_name": "DDJ-FLX4",
+          "cue_l": "2",
+          "cue_r": "3",
+          "date": "1.78051452667e12",
+          "device_type": "CoreAudio",
+          "master_l": "0",
+          "master_r": "1",
+          "mixer_mode_internal": "1",
+          "name": "audioDeviceManager_PerformanceMode_0"
+        },
+        {
+          "audio_device_buffer_size": "1280",
+          "audio_device_rate": "44100.0",
+          "audio_input_device_name": null,
+          "audio_output_device_name": "Multi-Output Device",
+          "cue_l": "-1",
+          "cue_r": "-1",
+          "date": "1.780399862461e12",
+          "device_type": "CoreAudio",
+          "master_l": "0",
+          "master_r": "1",
+          "mixer_mode_internal": "1",
+          "name": "audioDeviceManager_ExportMode_-504263519"
+        },
+        {
+          "audio_device_buffer_size": "128",
+          "audio_device_rate": "48000.0",
+          "audio_input_device_name": "BlackHole 16ch",
+          "audio_output_device_name": "BlackHole 16ch",
+          "cue_l": "2",
+          "cue_r": "3",
+          "date": "1.780296538656e12",
+          "device_type": "CoreAudio",
+          "master_l": "0",
+          "master_r": "1",
+          "mixer_mode_internal": "1",
+          "name": "audioDeviceManager_PerformanceMode_824048523"
+        },
+        {
+          "audio_device_buffer_size": "128",
+          "audio_device_rate": "44100.0",
+          "audio_input_device_name": null,
+          "audio_output_device_name": "MacBook Pro Speakers",
+          "cue_l": "-1",
+          "cue_r": "-1",
+          "date": "1.780216606372e12",
+          "device_type": "CoreAudio",
+          "master_l": "0",
+          "master_r": "1",
+          "mixer_mode_internal": "0",
+          "name": "audioDeviceManager_PerformanceMode_340248335"
+        }
+      ]
+    },
+    "rekordbox_process": {
+      "error": null,
+      "matches": [
+        "671 /Applications/re /Applications/rekordbox 7/rekordbox.app/Contents/MacOS/rekordbox",
+        "1471 /Applications/re /Applications/rekordbox 7/rekordbox.app/Contents/MacOS/rekordboxAgent.app/Contents/MacOS/rekordboxAgent",
+        "1484 /Applications/re /Applications/rekordbox 7/rekordbox.app/Contents/MacOS/rekordboxAgent.app/Contents/Frameworks/rekordboxAgent Helper (GPU).app/Contents/MacOS/rekordboxAgent Helper (GPU) --type=gpu-process --user-data-dir=/Users/ozai...",
+        "1490 /Applications/re /Applications/rekordbox 7/rekordbox.app/Contents/MacOS/rekordboxAgent.app/Contents/Frameworks/rekordboxAgent Helper.app/Contents/MacOS/rekordboxAgent Helper --type=utility --utility-sub-type=network.mojom.NetworkSer...",
+        "1491 /Applications/re /Applications/rekordbox 7/rekordbox.app/Contents/MacOS/rekordboxAgent.app/Contents/Frameworks/rekordboxAgent Helper (Renderer).app/Contents/MacOS/rekordboxAgent Helper (Renderer) --type=renderer --user-data-dir=/Use..."
+      ],
+      "ok": true
+    },
+    "sidecar_socket": {
+      "error": "[Errno 61] Connection refused",
+      "host": "127.0.0.1",
+      "listener": null,
+      "ok": false,
+      "port": 8765,
+      "url": "ws://127.0.0.1:8765"
+    },
+    "usb_controller": {
+      "available": true,
+      "controller_matches": [
+        "DDJ-FLX4:",
+        "Manufacturer: AlphaTheta Corporation"
+      ],
+      "error": null,
+      "ok": true,
+      "source": "SPAudioDataType"
+    }
+  },
+  "course3_audio_diagnosis": {
+    "code": "course3_audio_context_incomplete",
+    "message": "Course 3 audio context is not proven yet.",
+    "next_action": "Run readiness with live context and audio diagnostics enabled.",
+    "severity": "unknown"
+  },
+  "course3_route_doctor": {
+    "auto_master_recommendation": {
+      "candidates": [
+        {
+          "dj_capture": false,
+          "expected_sample_rate": 48000,
+          "live_signal": true,
+          "loopback": true,
+          "name": "BlackHole 16ch",
+          "peak": 0.152253,
+          "rank": 1,
+          "rate_ok": true,
+          "reasons": [
+            "live_signal"
+          ],
+          "rms": 0.03128,
+          "sample_rate": 48000,
+          "sampled": true,
+          "signal": true,
+          "source": "capture_matrix_top_signal",
+          "sources": [
+            "capture_matrix_top_signal"
+          ]
+        },
+        {
+          "dj_capture": false,
+          "expected_sample_rate": 48000,
+          "live_signal": false,
+          "loopback": true,
+          "name": "BlackHole 2ch",
+          "peak": 0.178527,
+          "rank": 2,
+          "rate_ok": true,
+          "reasons": [
+            "sampled_capture"
+          ],
+          "rms": 0.031258,
+          "sample_rate": 48000,
+          "sampled": true,
+          "signal": true,
+          "source": "capture_matrix",
+          "sources": [
+            "capture_matrix"
+          ]
+        },
+        {
+          "dj_capture": false,
+          "expected_sample_rate": 48000,
+          "live_signal": false,
+          "loopback": false,
+          "name": "Multi-Output Device",
+          "rank": 3,
+          "rate_ok": true,
+          "reasons": [
+            "saved_rekordbox_route",
+            "unsampled_route"
+          ],
+          "sample_rate": 48000,
+          "sampled": false,
+          "signal": false,
+          "source": "rekordbox_audio_settings",
+          "sources": [
+            "rekordbox_audio_settings"
+          ]
+        },
+        {
+          "dj_capture": true,
+          "expected_sample_rate": 48000,
+          "live_signal": false,
+          "loopback": false,
+          "name": "rekordbox Aggregate Device",
+          "peak": 0.000458,
+          "rank": 4,
+          "rate_ok": true,
+          "reasons": [
+            "sampled_capture"
+          ],
+          "rms": 0.00011,
+          "sample_rate": 48000,
+          "sampled": true,
+          "signal": false,
+          "source": "capture_matrix",
+          "sources": [
+            "capture_matrix"
+          ]
+        },
+        {
+          "dj_capture": true,
+          "expected_sample_rate": 48000,
+          "live_signal": false,
+          "loopback": false,
+          "name": "DDJ-FLX4",
+          "peak": 0.000549,
+          "rank": 5,
+          "rate_ok": true,
+          "reasons": [
+            "sampled_capture"
+          ],
+          "rms": 0.000108,
+          "sample_rate": 48000,
+          "sampled": true,
+          "signal": false,
+          "source": "capture_matrix",
+          "sources": [
+            "capture_matrix"
+          ]
+        },
+        {
+          "dj_capture": false,
+          "expected_sample_rate": 48000,
+          "live_signal": false,
+          "loopback": false,
+          "name": "MacBook Pro Speakers (eqMac)",
+          "rank": 6,
+          "rate_ok": false,
+          "reasons": [
+            "macos_output_route",
+            "unsampled_route"
+          ],
+          "sample_rate": null,
+          "sampled": false,
+          "signal": false,
+          "source": "macos_output_route",
+          "sources": [
+            "macos_output_route"
+          ]
+        }
+      ],
+      "device_name": "BlackHole 16ch",
+      "expected_sample_rate": 48000,
+      "live_signal": true,
+      "next_action": "Use 'BlackHole 16ch' as the master capture input.",
+      "ok": true,
+      "peak": 0.152253,
+      "reason": "live_signal",
+      "rms": 0.03128,
+      "sample_rate": 48000,
+      "source": "capture_matrix_top_signal",
+      "status": "ready"
+    },
+    "diagnosis_code": "course3_audio_context_incomplete",
+    "next_step": "Stop unrelated browser/system media so Now Playing can point at Rekordbox.",
+    "ok": false,
+    "operator_steps": [
+      "Stop unrelated browser/system media so Now Playing can point at Rekordbox.",
+      "Run readiness with live context and audio diagnostics enabled."
+    ],
+    "proof_command": "uv run python scripts/run_learn_live_proof.py --start-app --no-screen --course3 --seed-course3-unlocked --auto-master-input --nudge-rekordbox-playback --require-count-in --say-course3-prompts --wait-loopback-signal-seconds 30 --wait-capture-signal-seconds 30 --wait-course3-seconds 120 --course3-context-seconds 5 --loopback-signal-seconds 2 --loopback-self-test-seconds 1 --capture-matrix-seconds 2 --out /tmp/vibemix-live-learn-proof/proof-course3-auto-master-current.json",
+    "readiness_command": "uv run python scripts/learn_live_readiness.py --require course3 --live-context-seconds 5 --loopback-signal-seconds 2 --loopback-self-test-seconds 1 --capture-matrix-seconds 2 --out /tmp/vibemix-live-learn-proof/learn-course3-readiness-current.json",
+    "route": null,
+    "status": "unknown",
+    "uses_spoken_prompt": true
+  },
+  "hardware_connection": {
+    "bluetooth_midi_matches": [],
+    "bluetooth_midi_only": false,
+    "controller_hardware_ready": true
+  },
+  "next_commands": [
+    "VIBEMIX_LEARN_PROGRESS_PATH=/tmp/vibemix-live-learn-proof/learn-progress.json uv run python -m vibemix",
+    "uv run python scripts/sniff_controller.py --list"
+  ],
+  "passed": false,
+  "physical_connection_doctor": null,
+  "readiness": {
+    "course3_audio": false,
+    "physical_learn": false,
+    "screen_learn": false
+  },
+  "requirement": "course3"
+}
