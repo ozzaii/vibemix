@@ -11,7 +11,7 @@ The whole-system fresh-eye map landed (`SHIP-MAP-MASTER.md`, committed `d1b925db
 1. **VOICE reachability** (the #1 blocker now) — keystone/backend-boot lane
 2. **START GATE backend handler** — keystone lane (touches `main()`, sequence behind/with #1)
 3. **CITATION ts-carry** — sven lane (`dj_cohost.py`)
-4. **PACKAGING (arm64-only)** — backend-boot + Kaan (Apple sign/notarize only; `VIBEMIX_PRETAG_MAC_ONLY=1`, NO SignPath/Windows on the v1 path)
+4. **PACKAGING (arm64-only)** — backend-boot + Kaan (Apple sign/notarize only; `VIBEMIX_PRETAG_MAC_ONLY=1`, NO SignPath/Windows on the v1 path). ⚠ **GA TAG LANDMINE:** the repo now lives at `Bravoh-ai/vibemix` (pushed `main` = `eec239ac`, 2026-06-04). `release.yml` AND `companion-sign.yml` fire on a **`v*` tag push** = the full signed matrix (macOS + **Windows** + SignPath + the now-BROKEN `--require-moss-source` gate). Do NOT push `v0.1.0` until: voice + start-gate land, the MOSS→chatterbox gate-swap is in, Windows is excluded from the v1 matrix, and the org repo has the signing secrets. The current **`0.1.0` source-snapshot pre-release** (non-`v` tag, fired only the benign SBOM job) is the interim marker, NOT the signed GA.
 5. **KEYSTONE capture** — Kaan-only (LIVE=0 today)
 6. **STREAK robot voice** — deferred, sequenced (not v1-launch-critical)
 7. **[v1.1] WINDOWS** — kicked off once macOS v1 ships: GPU-backend Chatterbox build + Windows spec + SignPath (its own milestone, not v1)
