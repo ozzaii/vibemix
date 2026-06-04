@@ -502,6 +502,8 @@ elif direct_midi_ran and direct_midi_motion and not checks.get("recent_moves_see
     action_hint = "restart_live_midi_listener"
 elif direct_midi_ran and not direct_midi_motion and not checks.get("recent_moves_seen"):
     action_hint = "prove_os_midi_motion"
+elif checks.get("deck_pair_capture_configured") and not checks.get("audio_observed"):
+    action_hint = "route_dj_audio_to_capture"
 elif not checks.get("recent_moves_seen") and not checks.get("audio_observed"):
     action_hint = "play_audible_deck_audio_and_move_a_fader_or_knob_within_the_proof_window"
 elif not checks.get("recent_moves_seen"):
@@ -537,6 +539,18 @@ port_arg = shlex.quote(port_re)
 direct_midi_diagnostic_commands = [
     f"uv run python scripts/sniff_controller.py --port {port_arg} --seconds 20 --mode callback",
     f"uv run python scripts/sniff_controller.py --port {port_arg} --seconds 20 --mode poll",
+]
+audio_route_diagnostic_commands = [
+    (
+        "system_profiler SPAudioDataType | "
+        "rg -i -C 4 'DDJ-FLX4|BlackHole|Aggregate|Multi-Output|rekordbox'"
+    ),
+    "uv run python -m vibemix library live-context --timeout 2 --frames 160 --json",
+    (
+        "COHOST_VIBER_FLX4_WAIT_READY_S=20 "
+        "COHOST_VIBER_FLX4_DIRECT_MIDI_PROBE_S=20 "
+        "bash scripts/release/check_flx4_live_context.sh"
+    ),
 ]
 
 
@@ -606,6 +620,18 @@ elif (
         "The direct OS MIDI probe saw no FLX4 frames; move a fader/knob during the probe window or fix USB/MIDI input before trusting live moves.",
         diagnostic_commands=direct_midi_diagnostic_commands,
     )
+elif (
+    needs_operator_action
+    and physical_diagnosis
+    and checks.get("deck_pair_capture_configured")
+    and not checks.get("audio_observed")
+):
+    add_action(
+        operator_actions,
+        "route_dj_audio_to_capture",
+        "Deck-pair capture is configured, but Vibemix is receiving silence. Route Rekordbox output into the BlackHole/Aggregate capture device before rerunning proof; if you hear the decks locally but this stays silent, the macOS Multi-Output or Rekordbox audio output is not feeding BlackHole. When using a speaker/Bluetooth output such as JBL, make the DJ app feed an Aggregate/Multi-Output device that includes BlackHole plus the speaker path; speaker sound alone is not capture proof.",
+        diagnostic_commands=audio_route_diagnostic_commands,
+    )
 copy_proof_actions(
     operator_actions,
     proof_operator_actions,
@@ -664,6 +690,7 @@ if (
     and not checks.get("recent_moves_seen")
     and not checks.get("audio_observed")
     and not (direct_midi_ran and direct_midi_motion)
+    and not any(action.get("code") == "route_dj_audio_to_capture" for action in operator_actions)
 ):
     add_action(
         operator_actions,
@@ -687,11 +714,12 @@ if needs_operator_action and physical_diagnosis and not checks.get("recent_moves
             "Move a fader, EQ, filter, or transport control during the proof window.",
         )
 if needs_operator_action and physical_diagnosis and not checks.get("audio_observed"):
-    add_action(
-        operator_actions,
-        "play_audible_audio",
-        "Play audible DJ app output into the configured capture route during the proof window.",
-    )
+    if not any(action.get("code") == "route_dj_audio_to_capture" for action in operator_actions):
+        add_action(
+            operator_actions,
+            "play_audible_audio",
+            "Play audible DJ app output into the configured capture route during the proof window.",
+        )
 if (
     needs_operator_action
     and physical_diagnosis
@@ -743,6 +771,14 @@ def _append_once(items: list[str], value: str | None) -> None:
 
 def _prioritized_physical_blockers(items: list, checks: dict) -> list[str]:
     out: list[str] = []
+    prioritize_audio_route = bool(
+        checks.get("deck_pair_capture_configured") and not checks.get("audio_observed")
+    )
+    if prioritize_audio_route:
+        _append_once(
+            out,
+            _first_matching(items, "live master audio", "bounded audio_delta"),
+        )
     if not checks.get("recent_moves_seen"):
         if direct_midi_ran and direct_midi_motion:
             _append_once(
@@ -755,7 +791,7 @@ def _prioritized_physical_blockers(items: list, checks: dict) -> list[str]:
                 "direct OS MIDI probe saw no controller frames during the probe window",
             )
         _append_once(out, _first_matching(items, "recent controller moves"))
-    if not checks.get("audio_observed"):
+    if not prioritize_audio_route and not checks.get("audio_observed"):
         _append_once(
             out,
             _first_matching(items, "live master audio", "bounded audio_delta"),

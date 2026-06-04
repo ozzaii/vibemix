@@ -22,6 +22,7 @@ def _fake_bin(
     physical_missing: bool = False,
     midi_present: bool = True,
     audio_present: bool = True,
+    deck_pair_configured: bool = False,
     direct_midi_frames: bool = False,
     accept_bad_audio_causality: bool = False,
     accept_bad_audio_source_detail: bool = False,
@@ -117,7 +118,7 @@ if [ "${{1:-}}" = "-m" ] && [ "${{2:-}}" = "vibemix" ] && [ "${{3:-}}" = "librar
     echo "missing --out" >&2
     exit 2
   fi
-  "{real_python}" - "$out" "{str(live_ready).lower()}" "{str(physical_missing).lower()}" <<'PY'
+  "{real_python}" - "$out" "{str(live_ready).lower()}" "{str(physical_missing).lower()}" "{str(deck_pair_configured).lower()}" <<'PY'
 import json
 import sys
 from pathlib import Path
@@ -125,7 +126,18 @@ from pathlib import Path
 out = Path(sys.argv[1])
 ready = sys.argv[2] == "true"
 physical_missing = sys.argv[3] == "true"
+deck_pair_configured = sys.argv[4] == "true"
 if physical_missing:
+    blockers = [
+        "deck_state had no resolved deck row",
+        "no recent controller moves were observed",
+        "live master audio was not observed above the audible floor",
+        "deck_state did not resolve both deck A and deck B",
+    ]
+    if deck_pair_configured:
+        blockers.append("deck_audio_capture did not show active audio on both deck lanes")
+    else:
+        blockers.append("deck-pair audio capture was not configured in the live packet")
     payload = {{
         "ok": True,
         "frames_seen": 80,
@@ -140,16 +152,10 @@ if physical_missing:
                 "deck_state_pair_resolved": False,
                 "recent_moves_seen": False,
                 "audio_observed": False,
-                "deck_pair_capture_configured": False,
+                "deck_pair_capture_configured": deck_pair_configured,
                 "deck_audio_capture_both_active": False,
             }},
-            "blockers": [
-                "deck_state had no resolved deck row",
-                "no recent controller moves were observed",
-                "live master audio was not observed above the audible floor",
-                "deck_state did not resolve both deck A and deck B",
-                "deck-pair audio capture was not configured in the live packet",
-            ],
+            "blockers": blockers,
             "next_action": "Collect the missing live proof legs.",
         }},
     }}
@@ -215,6 +221,7 @@ def _run_gate(
     physical_missing: bool = False,
     midi_present: bool = True,
     audio_present: bool = True,
+    deck_pair_configured: bool = False,
     direct_midi_frames: bool = False,
     accept_bad_audio_causality: bool = False,
     accept_bad_audio_source_detail: bool = False,
@@ -226,6 +233,7 @@ def _run_gate(
         physical_missing=physical_missing,
         midi_present=midi_present,
         audio_present=audio_present,
+        deck_pair_configured=deck_pair_configured,
         direct_midi_frames=direct_midi_frames,
         accept_bad_audio_causality=accept_bad_audio_causality,
         accept_bad_audio_source_detail=accept_bad_audio_source_detail,
@@ -370,6 +378,44 @@ def test_check_flx4_live_context_prioritizes_proof_window_when_audio_and_moves_m
     assert legs["recent_controller_move"] == "missing"
     assert legs["audible_audio"] == "missing"
     assert legs["reply_safety_canaries"] == "skipped"
+
+
+def test_check_flx4_live_context_prioritizes_silent_capture_route(
+    tmp_path: Path,
+) -> None:
+    proc = _run_gate(
+        tmp_path,
+        live_ready=False,
+        physical_missing=True,
+        deck_pair_configured=True,
+    )
+
+    assert proc.returncode == 1
+    assert "FAIL check_flx4_live_context" in proc.stderr
+    assert "action_hint=route_dj_audio_to_capture" in proc.stderr
+    assert (
+        "first_blocker='live master audio was not observed above the audible floor'"
+        in proc.stderr
+    )
+    summary = json.loads((tmp_path / "out" / "flx4_live_context_summary.json").read_text())
+    assert summary["action_hint"] == "route_dj_audio_to_capture"
+    assert summary["first_blocker"] == "live master audio was not observed above the audible floor"
+    assert summary["top_blockers"][:2] == [
+        "live master audio was not observed above the audible floor",
+        "no recent controller moves were observed",
+    ]
+    assert summary["operator_actions"][0]["code"] == "route_dj_audio_to_capture"
+    assert "perform_physical_proof_window" not in [
+        action["code"] for action in summary["operator_actions"]
+    ]
+    assert "play_audible_audio" not in [action["code"] for action in summary["operator_actions"]]
+    assert "receiving silence" in summary["operator_actions"][0]["detail"]
+    assert "speaker sound alone is not capture proof" in summary["operator_actions"][0]["detail"]
+    assert summary["next_operator_action"]["code"] == "route_dj_audio_to_capture"
+    assert summary["next_operator_action"]["source"] == "flx4"
+    assert summary["next_operator_action"]["diagnostic_commands"][0].startswith(
+        "system_profiler SPAudioDataType"
+    )
 
 
 def test_check_flx4_live_context_splits_direct_midi_from_live_ingest_gap(

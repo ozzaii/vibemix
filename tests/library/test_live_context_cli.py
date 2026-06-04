@@ -1704,6 +1704,40 @@ def test_viber_live_context_operator_actions_name_silent_blackhole_route():
     assert actions[1]["diagnostic_commands"] == actions[0]["diagnostic_commands"]
 
 
+def test_viber_live_context_operator_actions_prioritize_silent_capture_route():
+    actions = main_mod._viber_live_context_operator_actions(
+        {
+            "ready": False,
+            "diagnosis": "missing_physical_proof",
+            "next_action": "Collect the missing live proof legs shown in blockers.",
+            "checks": {
+                "frames_seen": True,
+                "flat_deck_frame_seen": True,
+                "controller_connected": True,
+                "recent_moves_seen": False,
+                "audio_observed": False,
+                "deck_state_resolved": False,
+                "deck_state_pair_resolved": False,
+                "deck_pair_capture_configured": True,
+                "deck_audio_capture_active": False,
+                "deck_audio_capture_both_active": False,
+            },
+            "blockers": [
+                "no recent controller moves were observed",
+                "live master audio was not observed above the audible floor",
+                "deck_audio_capture did not show active audio on both deck lanes",
+            ],
+        }
+    )
+
+    codes = [action["code"] for action in actions]
+    assert codes[0] == "route_dj_audio_to_capture"
+    assert "perform_physical_proof_window" not in codes
+    assert "move_controller" in codes
+    assert "resolve_deck_identity" in codes
+    assert "feed_both_deck_lanes" in codes
+
+
 def test_viber_live_context_operator_actions_include_library_index_setup():
     actions = main_mod._viber_live_context_operator_actions(
         {

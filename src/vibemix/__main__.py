@@ -6401,23 +6401,6 @@ def _viber_live_context_operator_actions(
             "Connect the DJ controller over USB, then restart the live session if it was already running.",
         )
 
-    if (
-        physical_diagnosis
-        and not actions
-        and not checks.get("recent_moves_seen")
-        and not checks.get("audio_observed")
-    ):
-        add(
-            "perform_physical_proof_window",
-            "During the proof window, play audible DJ app output and move a fader, EQ, filter, or transport control.",
-        )
-
-    if physical_diagnosis and not checks.get("recent_moves_seen"):
-        add(
-            "move_controller",
-            "Move a fader, EQ, filter, or transport control during the proof window.",
-        )
-
     if physical_diagnosis and not checks.get("audio_observed"):
         if checks.get("deck_pair_capture_configured"):
             add(
@@ -6441,6 +6424,23 @@ def _viber_live_context_operator_actions(
                 "play_audible_audio",
                 "Play audible DJ app output into the configured capture route during the proof window.",
             )
+
+    if (
+        physical_diagnosis
+        and not actions
+        and not checks.get("recent_moves_seen")
+        and not checks.get("audio_observed")
+    ):
+        add(
+            "perform_physical_proof_window",
+            "During the proof window, play audible DJ app output and move a fader, EQ, filter, or transport control.",
+        )
+
+    if physical_diagnosis and not checks.get("recent_moves_seen"):
+        add(
+            "move_controller",
+            "Move a fader, EQ, filter, or transport control during the proof window.",
+        )
 
     if physical_diagnosis and (
         not checks.get("deck_state_resolved") or not checks.get("deck_state_pair_resolved")
