@@ -26,6 +26,7 @@
  */
 
 import {
+  ACESFilmicToneMapping,
   AmbientLight,
   AnimationAction,
   AnimationMixer,
@@ -34,10 +35,18 @@ import {
   DirectionalLight,
   Object3D,
   PerspectiveCamera,
+  SRGBColorSpace,
   Scene,
+  ShaderMaterial,
   Vector3,
+  Vector2,
   WebGLRenderer,
 } from "three";
+import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer.js";
+import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
+import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
+import { ShaderPass } from "three/examples/jsm/postprocessing/ShaderPass.js";
+import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
 
 import type { LoadedAssets } from "./asset-loader.js";
 import type { MoodProfile } from "./mood.js";
@@ -71,6 +80,37 @@ const DIRECTIONAL_POSITION: [number, number, number] = [3, 5, 5];
 const BUST_FOCUS_Y_BIAS = 0.15;
 /** Bust-frame camera Z multiplier of character height (smaller = closer). */
 const BUST_CAMERA_Z_MULT = 2.5;
+/** Bloom params for the organism's emissive particle layer. */
+const ORGANISM_BLOOM_LAYER = 1;
+const BLOOM_THRESHOLD = 0.18;
+const BLOOM_STRENGTH = 0.58;
+const BLOOM_RADIUS = 0.36;
+
+const BLOOM_MERGE_VERTEX = `
+varying vec2 vUv;
+
+void main() {
+  vUv = uv;
+  gl_Position = vec4(position.xy, 0.0, 1.0);
+}
+`;
+
+const BLOOM_MERGE_FRAGMENT = `
+uniform sampler2D baseTexture;
+uniform sampler2D bloomTexture;
+
+varying vec2 vUv;
+
+void main() {
+  vec4 base = texture2D(baseTexture, vUv);
+  vec4 bloom = texture2D(bloomTexture, vUv);
+  vec3 color = base.rgb + bloom.rgb;
+  float bloomAlpha = max(bloom.r, max(bloom.g, bloom.b));
+  float alpha = max(base.a, bloomAlpha);
+  if (alpha <= 0.001) discard;
+  gl_FragColor = vec4(color, alpha);
+}
+`;
 
 // ── Internal helper: Meshy GLB material fixup ─────────────────────────────
 
@@ -118,6 +158,16 @@ function findSkinnedMesh(root: Object3D): Object3D | null {
   return found;
 }
 
+function prefersReducedMotion(): boolean {
+  return Boolean(window.matchMedia?.("(prefers-reduced-motion: reduce)").matches);
+}
+
+function supportsBloom(renderer: WebGLRenderer): boolean {
+  if (prefersReducedMotion()) return false;
+  if (!renderer.capabilities.isWebGL2) return false;
+  return Boolean(renderer.getContext().getExtension("EXT_color_buffer_float"));
+}
+
 // ── MascotRenderer ────────────────────────────────────────────────────────
 
 export class MascotRenderer {
@@ -143,6 +193,10 @@ export class MascotRenderer {
   private puffs: ParticlePuffController[] = [];
   /** The persistent mask organism: one Points cloud in the existing scene. */
   private readonly organism: ParticleOrganism;
+  /** Offscreen bloom composer; null when reduced motion or float RT support fails. */
+  private readonly bloomComposer: EffectComposer | null = null;
+  /** Final transparent merge composer; null falls back to direct renderer.render. */
+  private readonly finalComposer: EffectComposer | null = null;
 
   constructor(canvas: HTMLCanvasElement, assets: LoadedAssets) {
     this.assets = assets;
@@ -157,6 +211,9 @@ export class MascotRenderer {
       premultipliedAlpha: false,
     });
     this.renderer.setClearAlpha(0);
+    this.renderer.setClearColor(0x000000, 0);
+    this.renderer.toneMapping = ACESFilmicToneMapping;
+    this.renderer.outputColorSpace = SRGBColorSpace;
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, MAX_PIXEL_RATIO));
     const initWidth = canvas.clientWidth || 300;
     const initHeight = canvas.clientHeight || 400;
@@ -200,6 +257,38 @@ export class MascotRenderer {
     );
     this.frameCameraForBust(characterRoot);
     this.organism = new ParticleOrganism(this.scene);
+    this.organism.enableBloomLayer(ORGANISM_BLOOM_LAYER);
+    if (supportsBloom(this.renderer)) {
+      const bloomRenderPass = new RenderPass(this.scene, this.camera);
+      const bloomPass = new UnrealBloomPass(
+        new Vector2(initWidth, initHeight),
+        BLOOM_STRENGTH,
+        BLOOM_RADIUS,
+        BLOOM_THRESHOLD,
+      );
+      this.bloomComposer = new EffectComposer(this.renderer);
+      this.bloomComposer.renderToScreen = false;
+      this.bloomComposer.addPass(bloomRenderPass);
+      this.bloomComposer.addPass(bloomPass);
+
+      const finalRenderPass = new RenderPass(this.scene, this.camera);
+      const mergePass = new ShaderPass(
+        new ShaderMaterial({
+          uniforms: {
+            baseTexture: { value: null },
+            bloomTexture: { value: this.bloomComposer.renderTarget2.texture },
+          },
+          vertexShader: BLOOM_MERGE_VERTEX,
+          fragmentShader: BLOOM_MERGE_FRAGMENT,
+          transparent: true,
+        }),
+        "baseTexture",
+      );
+      this.finalComposer = new EffectComposer(this.renderer);
+      this.finalComposer.addPass(finalRenderPass);
+      this.finalComposer.addPass(mergePass);
+      this.finalComposer.addPass(new OutputPass());
+    }
   }
 
   /**
@@ -330,6 +419,15 @@ export class MascotRenderer {
     }
     this.organism.tick(deltaSeconds);
 
+    if (this.bloomComposer && this.finalComposer) {
+      this.renderer.setClearColor(0x000000, 0);
+      this.renderer.setClearAlpha(0);
+      this.camera.layers.set(ORGANISM_BLOOM_LAYER);
+      this.bloomComposer.render(deltaSeconds);
+      this.camera.layers.set(0);
+      this.finalComposer.render(deltaSeconds);
+      return;
+    }
     this.renderer.render(this.scene, this.camera);
   }
 
@@ -417,6 +515,8 @@ export class MascotRenderer {
   resize(width: number, height: number): void {
     if (this.disposed) return;
     this.renderer.setSize(width, height, false);
+    this.bloomComposer?.setSize(width, height);
+    this.finalComposer?.setSize(width, height);
     this.camera.aspect = width / height;
     this.camera.updateProjectionMatrix();
   }
@@ -461,6 +561,8 @@ export class MascotRenderer {
         (mat as { dispose: () => void }).dispose();
       }
     });
+    this.bloomComposer?.dispose();
+    this.finalComposer?.dispose();
     this.renderer.dispose();
   }
 }

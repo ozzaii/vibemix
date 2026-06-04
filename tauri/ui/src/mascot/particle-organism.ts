@@ -248,6 +248,10 @@ export class ParticleOrganism {
     this.scene.add(this.points);
   }
 
+  enableBloomLayer(layer: number): void {
+    this.points.layers.enable(layer);
+  }
+
   setSignals(signals: OrganismSignals): void {
     if (this.disposed) return;
     if (typeof signals.voice === "number") {
