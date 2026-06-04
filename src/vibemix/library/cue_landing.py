@@ -292,10 +292,8 @@ def land(cueset: CueSet, target: ExportTarget, *, granted: bool) -> LandReceipt:
     if target.requires_permission and not granted:
         raise PermissionError("cue landing requires per-call user permission")
 
-    marks = [_cue_to_mark(cue) for cue in cueset.cues if _known_source(cue.source)]
+    marks = export_marks_for_cueset(cueset)
     skipped = len(cueset.cues) - len(marks)
-    if len(marks) != len(cueset.cues):
-        raise ValueError("cue landing refuses cues with empty or unknown source")
 
     kept_dj = sum(1 for cue in cueset.cues if cue.source == "dj")
     if target.kind == "rekordbox_xml":
@@ -381,6 +379,22 @@ def _land_serato_tags(
             "reload/rescan the track in your DJ software."
         ),
     )
+
+
+def export_marks_for_cueset(cueset: CueSet) -> list[dict[str, Any]]:
+    """Project a ``CueSet`` to export-carrier cue marks.
+
+    This is the write-free half of ``land()``. Viber's live ``export_set`` path
+    needs the exact same provenance checks/slot labels as the permissioned Cue
+    Tray landing verb, but it must not call ``land()`` itself and write a second
+    carrier file while it is still assembling a multi-track set.
+    """
+    marks = []
+    for cue in cueset.cues:
+        if not _known_source(cue.source):
+            raise ValueError("cue landing refuses cues with empty or unknown source")
+        marks.append(_cue_to_mark(cue))
+    return marks
 
 
 def _landed_cue_from_smart(cue: SmartCue, policy: SmartCuePolicy) -> LandedCue:
@@ -615,17 +629,18 @@ def _bar_count(start_s: float, end_s: float, bpm: float | None) -> float | None:
 
 
 __all__ = [
-    "CueSet",
     "CuePolicyFloors",
+    "CueSet",
     "CueSetSummary",
     "ExportTarget",
     "LandReceipt",
     "LandedCue",
-    "cue_set_from_dict",
     "cue_set_from_anchors",
+    "cue_set_from_dict",
     "cue_set_from_proposal",
     "cue_set_from_smart_cues",
     "cue_set_to_dict",
+    "export_marks_for_cueset",
     "land",
     "sections_from_anchors",
 ]

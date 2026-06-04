@@ -12,6 +12,7 @@ from vibemix.library.cue_landing import (
     cue_set_from_anchors,
     cue_set_from_dict,
     cue_set_to_dict,
+    export_marks_for_cueset,
     land,
     sections_from_anchors,
 )
@@ -156,6 +157,22 @@ def test_land_refuses_dj_cue_spoofing_machine_prefix(tmp_path: Path) -> None:
 
     with pytest.raises(ValueError, match="reserved VM prefix"):
         land(cueset, ExportTarget.rekordbox_xml(tmp_path / "cues.xml"), granted=True)
+
+
+def test_export_marks_for_cueset_is_land_write_free_projection() -> None:
+    cueset = cue_set_from_anchors(
+        _track(cues=(_dj_cue(1, 12.0, "MY B"),)),
+        [_anchor("intro", 0.0), _anchor("drop", 64.0)],
+        include_preserved=True,
+    )
+
+    marks = export_marks_for_cueset(cueset)
+
+    by_name = {mark["name"]: mark for mark in marks}
+    assert by_name["MY B"]["source"] == "dj"
+    assert by_name["MY B"]["num"] == 1
+    assert by_name["VM A IN"]["source"] == "auto"
+    assert by_name["VM D DROP"]["num"] == 3
 
 
 def test_land_rekordbox_xml_stamps_machine_cues_and_preserves_dj(tmp_path: Path) -> None:

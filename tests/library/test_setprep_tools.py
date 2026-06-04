@@ -30,6 +30,7 @@ import numpy as np
 import pytest
 
 from vibemix.intel.transition_scorer import SectionRecord
+from vibemix.library import cue_landing as cue_landing_mod
 from vibemix.library import energy as energy_mod
 from vibemix.library import toolset as tool_mod
 from vibemix.library.cue_types import CueAnchor
@@ -1099,6 +1100,40 @@ def test_export_set_auto_cues_empty_slots_by_default(toolset, tmp_path, monkeypa
     marks = ET.parse(out_xml).getroot().findall(".//POSITION_MARK")
     names = {mark.attrib["Name"] for mark in marks}
     assert {"VM A IN", "VM D DROP", "VM F OUT"} <= names
+
+
+def test_export_set_auto_cues_route_through_cue_landing_spine(
+    toolset, tmp_path, monkeypatch
+):
+    """W13: live Viber auto-cues use the same mark projection as land()."""
+    toolset.seen.add("t000")
+    calls = []
+    real_projection = cue_landing_mod.export_marks_for_cueset
+
+    def spy_projection(cueset):
+        calls.append(cueset)
+        return real_projection(cueset)
+
+    monkeypatch.setattr(cue_landing_mod, "export_marks_for_cueset", spy_projection)
+    monkeypatch.setattr(
+        tool_mod,
+        "sections_for_entry",
+        lambda entry: (
+            _section(f"{entry.track_id}#intro", "intro", 0.0, 32.0),
+            _section(f"{entry.track_id}#drop", "drop", 64.0, 128.0),
+        ),
+    )
+
+    out_xml = tmp_path / "cue-landing-spine.xml"
+    out = toolset.export_set({"name": "Cue Landing Spine", "track_ids": ["t000"], "out_path": str(out_xml)})
+
+    assert out.get("exported") is True
+    assert calls, "export_set auto-cue bypassed cue_landing.export_marks_for_cueset"
+    assert calls[0].track_id == "t000"
+    assert calls[0].summary.machine_count == len(calls[0].cues)
+    marks = ET.parse(out_xml).getroot().findall(".//POSITION_MARK")
+    names = {mark.attrib["Name"] for mark in marks}
+    assert {"VM A IN", "VM D DROP"} <= names
 
 
 def test_export_set_auto_cues_snap_to_exported_bpm_grid(toolset, tmp_path, monkeypatch):

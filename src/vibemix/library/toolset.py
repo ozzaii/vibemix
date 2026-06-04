@@ -1175,13 +1175,18 @@ class LibraryToolset:
         include_preserved = bool(args.get("include_preserved", False))
         try:
             from vibemix.library import export_rekordbox
-            from vibemix.library.smart_cues import proposal_to_export_marks
+            from vibemix.library.cue_landing import (
+                cue_set_from_proposal,
+                export_marks_for_cueset,
+            )
 
-            marks = proposal_to_export_marks(
+            cueset = cue_set_from_proposal(
+                entry,
                 proposal,
                 include_review=include_review,
                 include_preserved=include_preserved,
             )
+            marks = export_marks_for_cueset(cueset)
             if selected_ids is not None:
                 marks = [mark for mark in marks if mark.get("cue_id") in selected_ids]
             if not marks:
@@ -2234,13 +2239,17 @@ def _auto_cue_marks_for_export(
     genre: str | None,
     occupied_slots: set[int],
 ) -> tuple[list[dict[str, Any]], Any]:
-    from vibemix.library.smart_cues import proposal_to_export_marks, propose_smart_cues
+    from vibemix.library.cue_landing import cue_set_from_proposal, export_marks_for_cueset
+    from vibemix.library.smart_cues import propose_smart_cues
 
     proposal = propose_smart_cues(entry, sections_for_entry(entry), genre=genre)
-    marks = proposal_to_export_marks(
-        proposal,
-        include_review=False,
-        include_preserved=False,
+    marks = export_marks_for_cueset(
+        cue_set_from_proposal(
+            entry,
+            proposal,
+            include_review=False,
+            include_preserved=False,
+        )
     )
     if not marks and getattr(entry, "filepath", None):
         try:
@@ -2256,10 +2265,13 @@ def _auto_cue_marks_for_export(
                 sections_from_anchors(entry, anchors),
                 genre=genre,
             )
-            marks = proposal_to_export_marks(
-                proposal,
-                include_review=False,
-                include_preserved=False,
+            marks = export_marks_for_cueset(
+                cue_set_from_proposal(
+                    entry,
+                    proposal,
+                    include_review=False,
+                    include_preserved=False,
+                )
             )
     fill_empty_only = [
         mark
