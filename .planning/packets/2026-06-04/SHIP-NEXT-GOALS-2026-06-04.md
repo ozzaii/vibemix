@@ -11,15 +11,16 @@ The whole-system fresh-eye map landed (`SHIP-MAP-MASTER.md`, committed `d1b925db
 1. **VOICE reachability** (the #1 blocker now) — keystone/backend-boot lane
 2. **START GATE backend handler** — keystone lane (touches `main()`, sequence behind/with #1)
 3. **CITATION ts-carry** — sven lane (`dj_cohost.py`)
-4. **PACKAGING** — backend-boot + Kaan (sign/SignPath)
+4. **PACKAGING (arm64-only)** — backend-boot + Kaan (Apple sign/notarize only; `VIBEMIX_PRETAG_MAC_ONLY=1`, NO SignPath/Windows on the v1 path)
 5. **KEYSTONE capture** — Kaan-only (LIVE=0 today)
 6. **STREAK robot voice** — deferred, sequenced (not v1-launch-critical)
+7. **[v1.1] WINDOWS** — kicked off once macOS v1 ships: GPU-backend Chatterbox build + Windows spec + SignPath (its own milestone, not v1)
 
 ## Owner decisions Kaan must make (gate the path)
 
 - **D1 — `mlx-audio` as a `pyproject.toml` extra. ✅ RESOLVED (Kaan 2026-06-04: "1 gb is cool"):** APPROVED. Ship the **8bit** model (`mlx-community/chatterbox-turbo-8bit`, 675MB) — no need to drop to 4bit. Total footprint ~1.0–1.1GB (403MB deps incl. transformers 5.x but NO torch + 675MB model + 720KB ref). Measured: deps `mlx` 189M / `scipy` 82M / `transformers` 49M / `numpy` 24M. ONNX path rejected (5.7GB AND benched-dead live on Mac: CPU 1.3–2.5s TTFT, CoreML vocoder fails). The backend-boot lane executes immediately, no further gate.
 - **D2 — the "no API-key surface" CI gate vs the BYO key field.** `tests/security/test_no_api_key_surface.py` fails on the in-GUI Gemini key field shipped under locked decision #2. The gate (Phase-33 "never ship a key surface") and the BYO field are in head-on conflict. Retire or scope-narrow the gate (1-test policy call). Blocks `full-test-matrix` CI → blocks a tag.
-- **D3 — Windows v1 scope.** macOS-arm64 is the only platform with a real PKG path; macOS-Intel + Windows are PKG=0 (placeholders, need an NVIDIA box + GPU backend + SignPath). Ship arm64-only, +Intel, or hold for Windows?
+- **D3 — Windows v1 scope. ✅ RESOLVED (Kaan 2026-06-04: "macos ship first"):** v1 = **macOS Apple-Silicon (arm64) ONLY**. Windows + macOS-Intel are post-v1 fast-follows. Note: `mlx-audio` is Apple-Silicon-only (Metal), so an Intel Mac would be voiceless anyway — arm64 IS the only platform that can run the locked voice; this is the correct and clean v1 target. **Consequences:** (a) SignPath OSS approval (Windows) drops OFF the v1 critical path — the tag no longer waits on that external clock; use `VIBEMIX_PRETAG_MAC_ONLY=1` for the arm64 tag. (b) The Windows GPU-backend BUILD is explicitly deferred (not a v1 goal). (c) Packaging implication for the backend-boot lane: the updater-manifest gate (`scripts/.../check_updater_manifest_ready.py:15`) hard-requires all 3 platform binaries → either relax it to arm64-only for a v1 `latest.json`, or ship v1 without auto-update (manual download) and add the updater when Windows/Intel land. Implementation choice, not a Kaan gate. **(d) Windows is the IMMEDIATE NEXT milestone (v1.1), kicked off the moment macOS v1 ships (Kaan: "as we finish macos we start shipping win") — NOT abandoned. The Windows GPU-backend Chatterbox build (ONNX-DirectML preferred, else torch+CUDA) + Windows PyInstaller spec + SignPath are the v1.1 spine. Sequence after the macOS keystone capture, do not parallelize into v1.**
 
 ## Re-rail — one bounded goal per session
 
