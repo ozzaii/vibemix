@@ -10,11 +10,14 @@ import pytest
 from vibemix.library.cue_landing import (
     ExportTarget,
     cue_set_from_anchors,
+    cue_set_from_dict,
+    cue_set_to_dict,
     land,
     sections_from_anchors,
 )
 from vibemix.library.cue_types import CueAnchor
 from vibemix.library.rekordbox import CuePoint, TrackEntry
+from vibemix.library.smart_cues import SmartCuePolicy
 
 
 def _track(*, cues=(), filepath: str = "/music/track.mp3") -> TrackEntry:
@@ -94,6 +97,40 @@ def test_cue_set_from_anchors_routes_through_smart_cues() -> None:
     assert by_slot["D"].review_status == "export_ready"
 
 
+def test_cue_set_review_packet_carries_policy_target_and_summary() -> None:
+    policy = SmartCuePolicy(export_ready_floor=0.9, review_floor=0.55, source_floor=0.45)
+    cueset = cue_set_from_anchors(
+        _track(cues=(_dj_cue(1, 12.0, "MY B"),)),
+        [
+            _anchor("intro", 0.0, source="auto"),
+            _anchor("drop", 64.0, source="anlz"),
+        ],
+        policy=policy,
+        include_review=True,
+        include_preserved=True,
+    )
+
+    assert cueset.detected_target == "rekordbox_xml"
+    assert cueset.policy_floors.export_ready_floor == pytest.approx(0.9)
+    assert cueset.policy_floors.review_floor == pytest.approx(0.55)
+    assert cueset.summary.total_count == len(cueset.cues)
+    assert cueset.summary.preserved_dj_count == 1
+    assert cueset.summary.machine_count == len(cueset.cues) - 1
+    assert cueset.summary.auto_count >= 1
+    assert cueset.summary.anlz_count >= 1
+
+    by_slot = {cue.slot: cue for cue in cueset.cues}
+    assert by_slot["B"].source == "dj"
+    assert by_slot["B"].confidence_band == "preserved_dj"
+    assert by_slot["A"].source == "auto"
+    assert by_slot["A"].confidence_band == "review"
+    assert by_slot["D"].source == "anlz"
+    assert by_slot["D"].confidence_band == "export_ready"
+
+    round_tripped = cue_set_from_dict(cue_set_to_dict(cueset))
+    assert round_tripped == cueset
+
+
 def test_land_requires_per_call_permission(tmp_path: Path) -> None:
     cueset = cue_set_from_anchors(_track(), [_anchor("intro", 0.0)])
 
@@ -108,6 +145,17 @@ def test_land_refuses_unknown_sources(tmp_path: Path) -> None:
 
     with pytest.raises(ValueError, match="unknown source"):
         land(bad_set, ExportTarget.rekordbox_xml(tmp_path / "cues.xml"), granted=True)
+
+
+def test_land_refuses_dj_cue_spoofing_machine_prefix(tmp_path: Path) -> None:
+    cueset = cue_set_from_anchors(
+        _track(cues=(_dj_cue(1, 12.0, "VM SPOOF"),)),
+        [],
+        include_preserved=True,
+    )
+
+    with pytest.raises(ValueError, match="reserved VM prefix"):
+        land(cueset, ExportTarget.rekordbox_xml(tmp_path / "cues.xml"), granted=True)
 
 
 def test_land_rekordbox_xml_stamps_machine_cues_and_preserves_dj(tmp_path: Path) -> None:

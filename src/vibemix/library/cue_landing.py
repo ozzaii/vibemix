@@ -10,8 +10,8 @@ Serato/Mixxx tag carriers.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
-from dataclasses import dataclass
+from collections.abc import Mapping, Sequence
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Literal
 
@@ -30,6 +30,13 @@ from vibemix.library.smart_cues import (
 from vibemix.state import harmonics
 
 TargetKind = Literal["rekordbox_xml", "m3u8", "serato_tags", "mixxx_tags"]
+ConfidenceBand = Literal[
+    "preserved_dj",
+    "export_ready",
+    "review",
+    "below_review",
+    "below_source_floor",
+]
 _KNOWN_SOURCES = frozenset({"dj", "anlz", "auto", "fallback"})
 
 
@@ -46,10 +53,32 @@ class LandedCue:
     source_detail: str
     source_section_id: str | None
     confidence: float
+    confidence_band: ConfidenceBand
     review_status: ReviewStatus
     export_label: str
     reason_codes: tuple[str, ...]
     provenance_ref: str
+
+
+@dataclass(frozen=True, slots=True)
+class CuePolicyFloors:
+    export_ready_floor: float
+    review_floor: float
+    source_floor: float
+
+
+@dataclass(frozen=True, slots=True)
+class CueSetSummary:
+    total_count: int
+    export_ready_count: int
+    review_count: int
+    preserved_dj_count: int
+    machine_count: int
+    anlz_count: int
+    auto_count: int
+    fallback_count: int
+    missing_required_count: int = 0
+    suppressed_count: int = 0
 
 
 @dataclass(frozen=True, slots=True)
@@ -64,6 +93,11 @@ class CueSet:
     cues: tuple[LandedCue, ...]
     proposal_id: str | None = None
     policy_version: str | None = None
+    detected_target: TargetKind = "rekordbox_xml"
+    policy_floors: CuePolicyFloors = field(
+        default_factory=lambda: _policy_floors(SmartCuePolicy())
+    )
+    summary: CueSetSummary = field(default_factory=lambda: _cue_set_summary(()))
 
 
 @dataclass(frozen=True, slots=True)
@@ -107,8 +141,13 @@ def cue_set_from_smart_cues(
     *,
     proposal_id: str | None = None,
     policy_version: str | None = None,
+    proposal_summary: Any = None,
+    policy: SmartCuePolicy | None = None,
+    detected_target: TargetKind = "rekordbox_xml",
 ) -> CueSet:
-    landed = tuple(_landed_cue_from_smart(cue) for cue in cues)
+    _require_target_kind(detected_target)
+    active_policy = policy or SmartCuePolicy()
+    landed = tuple(_landed_cue_from_smart(cue, active_policy) for cue in cues)
     return CueSet(
         track_id=track.track_id,
         title=track.title,
@@ -120,6 +159,9 @@ def cue_set_from_smart_cues(
         cues=landed,
         proposal_id=proposal_id,
         policy_version=policy_version,
+        detected_target=detected_target,
+        policy_floors=_policy_floors(active_policy),
+        summary=_cue_set_summary(landed, proposal_summary),
     )
 
 
@@ -129,6 +171,8 @@ def cue_set_from_proposal(
     *,
     include_review: bool = False,
     include_preserved: bool = True,
+    policy: SmartCuePolicy | None = None,
+    detected_target: TargetKind = "rekordbox_xml",
 ) -> CueSet:
     cues = []
     for cue in proposal.cues:
@@ -144,6 +188,9 @@ def cue_set_from_proposal(
         cues,
         proposal_id=getattr(proposal, "proposal_id", None),
         policy_version=getattr(proposal, "policy_version", None),
+        proposal_summary=getattr(proposal, "summary", None),
+        policy=policy,
+        detected_target=detected_target,
     )
 
 
@@ -168,6 +215,39 @@ def cue_set_from_anchors(
         proposal,
         include_review=include_review,
         include_preserved=include_preserved,
+        policy=policy,
+    )
+
+
+def cue_set_to_dict(cueset: CueSet) -> dict[str, Any]:
+    """Return the JSON review packet consumed by CLI/Tauri/CueTray surfaces."""
+    return asdict(cueset)
+
+
+def cue_set_from_dict(data: Mapping[str, Any]) -> CueSet:
+    """Rehydrate a reviewed cue packet from JSON before permissioned landing."""
+    target = str(data.get("detected_target") or "rekordbox_xml")
+    _require_target_kind(target)
+    policy = _policy_floors_from_mapping(data.get("policy_floors"))
+    cues = tuple(
+        _landed_cue_from_mapping(item, policy)
+        for item in _sequence_of_mappings(data.get("cues"), key="cues")
+    )
+    summary = _cue_set_summary_from_mapping(data.get("summary"), cues)
+    return CueSet(
+        track_id=_required_str(data, "track_id"),
+        title=str(data.get("title") or ""),
+        artist=str(data.get("artist") or ""),
+        filepath=_required_str(data, "filepath"),
+        bpm=_float_or_none(data.get("bpm")),
+        camelot=str(data.get("camelot") or "") or None,
+        duration_s=_float_or_none(data.get("duration_s")),
+        cues=cues,
+        proposal_id=str(data.get("proposal_id") or "") or None,
+        policy_version=str(data.get("policy_version") or "") or None,
+        detected_target=target,  # type: ignore[arg-type]
+        policy_floors=policy,
+        summary=summary,
     )
 
 
@@ -303,7 +383,7 @@ def _land_serato_tags(
     )
 
 
-def _landed_cue_from_smart(cue: SmartCue) -> LandedCue:
+def _landed_cue_from_smart(cue: SmartCue, policy: SmartCuePolicy) -> LandedCue:
     if not _known_source(cue.source):
         raise ValueError(f"unknown cue source: {cue.source!r}")
     return LandedCue(
@@ -318,6 +398,7 @@ def _landed_cue_from_smart(cue: SmartCue) -> LandedCue:
         source_detail=cue.source_detail,
         source_section_id=cue.source_section_id,
         confidence=cue.confidence,
+        confidence_band=_confidence_band(cue.source, cue.confidence, policy),
         review_status=cue.review_status,
         export_label=cue.export_label,
         reason_codes=cue.reason_codes,
@@ -326,6 +407,8 @@ def _landed_cue_from_smart(cue: SmartCue) -> LandedCue:
 
 
 def _cue_to_mark(cue: LandedCue) -> dict[str, Any]:
+    if cue.source == "dj" and cue.export_label.startswith("VM "):
+        raise ValueError("cue landing refuses DJ cues with reserved VM prefix")
     return {
         "cue_id": cue.cue_id,
         "name": cue.export_label,
@@ -356,6 +439,157 @@ def _known_source(source: str) -> bool:
     return bool(source) and source in _KNOWN_SOURCES
 
 
+def _policy_floors(policy: SmartCuePolicy) -> CuePolicyFloors:
+    return CuePolicyFloors(
+        export_ready_floor=float(policy.export_ready_floor),
+        review_floor=float(policy.review_floor),
+        source_floor=float(policy.source_floor),
+    )
+
+
+def _policy_from_floors(floors: CuePolicyFloors) -> SmartCuePolicy:
+    return SmartCuePolicy(
+        export_ready_floor=floors.export_ready_floor,
+        review_floor=floors.review_floor,
+        source_floor=floors.source_floor,
+    )
+
+
+def _cue_set_summary(cues: Sequence[LandedCue], proposal_summary: Any = None) -> CueSetSummary:
+    total = len(cues)
+    preserved_dj = sum(1 for cue in cues if cue.source == "dj")
+    return CueSetSummary(
+        total_count=total,
+        export_ready_count=sum(1 for cue in cues if cue.review_status == "export_ready"),
+        review_count=sum(1 for cue in cues if cue.review_status == "review"),
+        preserved_dj_count=preserved_dj,
+        machine_count=total - preserved_dj,
+        anlz_count=sum(1 for cue in cues if cue.source == "anlz"),
+        auto_count=sum(1 for cue in cues if cue.source == "auto"),
+        fallback_count=sum(1 for cue in cues if cue.source == "fallback"),
+        missing_required_count=int(getattr(proposal_summary, "missing_required_count", 0) or 0),
+        suppressed_count=int(getattr(proposal_summary, "suppressed_count", 0) or 0),
+    )
+
+
+def _confidence_band(source: str, confidence: float, policy: SmartCuePolicy) -> ConfidenceBand:
+    if source == "dj":
+        return "preserved_dj"
+    value = max(0.0, min(1.0, float(confidence)))
+    if value >= policy.export_ready_floor:
+        return "export_ready"
+    if value >= policy.review_floor:
+        return "review"
+    if value >= policy.source_floor:
+        return "below_review"
+    return "below_source_floor"
+
+
+def _require_target_kind(value: str) -> None:
+    if value not in {"rekordbox_xml", "m3u8", "serato_tags", "mixxx_tags"}:
+        raise ValueError(f"unknown cue landing target: {value!r}")
+
+
+def _policy_floors_from_mapping(value: Any) -> CuePolicyFloors:
+    if isinstance(value, Mapping):
+        return CuePolicyFloors(
+            export_ready_floor=float(value.get("export_ready_floor", 0.78)),
+            review_floor=float(value.get("review_floor", 0.55)),
+            source_floor=float(value.get("source_floor", 0.45)),
+        )
+    return _policy_floors(SmartCuePolicy())
+
+
+def _cue_set_summary_from_mapping(value: Any, cues: Sequence[LandedCue]) -> CueSetSummary:
+    if not isinstance(value, Mapping):
+        return _cue_set_summary(cues)
+    computed = _cue_set_summary(cues)
+    return CueSetSummary(
+        total_count=int(value.get("total_count", computed.total_count) or 0),
+        export_ready_count=int(
+            value.get("export_ready_count", computed.export_ready_count) or 0
+        ),
+        review_count=int(value.get("review_count", computed.review_count) or 0),
+        preserved_dj_count=int(
+            value.get("preserved_dj_count", computed.preserved_dj_count) or 0
+        ),
+        machine_count=int(value.get("machine_count", computed.machine_count) or 0),
+        anlz_count=int(value.get("anlz_count", computed.anlz_count) or 0),
+        auto_count=int(value.get("auto_count", computed.auto_count) or 0),
+        fallback_count=int(value.get("fallback_count", computed.fallback_count) or 0),
+        missing_required_count=int(
+            value.get("missing_required_count", computed.missing_required_count) or 0
+        ),
+        suppressed_count=int(value.get("suppressed_count", computed.suppressed_count) or 0),
+    )
+
+
+def _sequence_of_mappings(value: Any, *, key: str) -> tuple[Mapping[str, Any], ...]:
+    if not isinstance(value, Sequence) or isinstance(value, (str, bytes)):
+        raise ValueError(f"cue set {key!r} must be a list")
+    out: list[Mapping[str, Any]] = []
+    for item in value:
+        if not isinstance(item, Mapping):
+            raise ValueError(f"cue set {key!r} entries must be objects")
+        out.append(item)
+    return tuple(out)
+
+
+def _landed_cue_from_mapping(data: Mapping[str, Any], floors: CuePolicyFloors) -> LandedCue:
+    source = str(data.get("source") or "")
+    if not _known_source(source):
+        raise ValueError(f"unknown cue source: {source!r}")
+    export_label = _required_str(data, "export_label")
+    if source == "dj" and export_label.startswith("VM "):
+        raise ValueError("cue landing refuses DJ cues with reserved VM prefix")
+    policy = _policy_from_floors(floors)
+    confidence = float(data.get("confidence", 0.0) or 0.0)
+    raw_band = str(data.get("confidence_band") or "")
+    band = (
+        raw_band
+        if raw_band
+        in {"preserved_dj", "export_ready", "review", "below_review", "below_source_floor"}
+        else _confidence_band(source, confidence, policy)
+    )
+    return LandedCue(
+        cue_id=_required_str(data, "cue_id"),
+        track_id=_required_str(data, "track_id"),
+        slot=_required_str(data, "slot"),  # type: ignore[arg-type]
+        role=_required_str(data, "role"),  # type: ignore[arg-type]
+        start_s=float(data.get("start_s", 0.0) or 0.0),
+        start_beat=_int_or_none(data.get("start_beat")),
+        end_s=_float_or_none(data.get("end_s")),
+        source=source,  # type: ignore[arg-type]
+        source_detail=str(data.get("source_detail") or ""),
+        source_section_id=str(data.get("source_section_id") or "") or None,
+        confidence=confidence,
+        confidence_band=band,  # type: ignore[arg-type]
+        review_status=str(data.get("review_status") or "review"),  # type: ignore[arg-type]
+        export_label=export_label,
+        reason_codes=tuple(str(item) for item in (data.get("reason_codes") or ())),
+        provenance_ref=_required_str(data, "provenance_ref"),
+    )
+
+
+def _required_str(data: Mapping[str, Any], key: str) -> str:
+    value = str(data.get(key) or "").strip()
+    if not value:
+        raise ValueError(f"cue set missing required {key!r}")
+    return value
+
+
+def _float_or_none(value: Any) -> float | None:
+    if value is None or value == "":
+        return None
+    return float(value)
+
+
+def _int_or_none(value: Any) -> int | None:
+    if value is None or value == "":
+        return None
+    return int(value)
+
+
 def _role_for_anchor(anchor: CueAnchor) -> str:
     if anchor.label == "intro":
         return "intro"
@@ -382,12 +616,16 @@ def _bar_count(start_s: float, end_s: float, bpm: float | None) -> float | None:
 
 __all__ = [
     "CueSet",
+    "CuePolicyFloors",
+    "CueSetSummary",
     "ExportTarget",
     "LandReceipt",
     "LandedCue",
+    "cue_set_from_dict",
     "cue_set_from_anchors",
     "cue_set_from_proposal",
     "cue_set_from_smart_cues",
+    "cue_set_to_dict",
     "land",
     "sections_from_anchors",
 ]
