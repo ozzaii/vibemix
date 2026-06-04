@@ -51,6 +51,10 @@
 //! to `false` / corpus size when absent — forward-compatible by construction.
 
 use serde_json::{json, Value};
+use std::{
+    fs,
+    time::{SystemTime, UNIX_EPOCH},
+};
 use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
 use tauri_plugin_shell::process::CommandEvent;
 use tauri_plugin_shell::ShellExt;
@@ -249,6 +253,72 @@ fn cue_library_args(path: &str, out: &str, export: &str, name: &str, max_cues: u
         max_cues.to_string(),
         "--json".to_string(),
     ]
+}
+
+fn normalize_cue_landing_target(raw: &str) -> Result<&'static str, String> {
+    match raw.trim().to_ascii_lowercase().as_str() {
+        "rekordbox" | "rekordbox_xml" => Ok("rekordbox_xml"),
+        "m3u8" => Ok("m3u8"),
+        "serato" | "serato_tags" => Ok("serato_tags"),
+        "mixxx" | "mixxx_tags" => Ok("mixxx_tags"),
+        other => Err(format!(
+            "invalid cue landing target {other:?} (expected rekordbox_xml | m3u8 | serato_tags | mixxx_tags)"
+        )),
+    }
+}
+
+fn cue_land_library_args(
+    cueset_path: &str,
+    target: Option<&str>,
+    out: Option<&str>,
+    name: Option<&str>,
+    granted: bool,
+) -> Result<Vec<String>, String> {
+    let mut args = vec![
+        "library".to_string(),
+        "land-cues".to_string(),
+        cueset_path.to_string(),
+        "--json".to_string(),
+    ];
+    if let Some(raw) = target {
+        args.push("--target".to_string());
+        args.push(normalize_cue_landing_target(raw)?.to_string());
+    }
+    if let Some(value) = out.map(str::trim).filter(|s| !s.is_empty()) {
+        args.push("--out".to_string());
+        args.push(value.to_string());
+    }
+    if let Some(value) = name.map(str::trim).filter(|s| !s.is_empty()) {
+        args.push("--name".to_string());
+        args.push(value.to_string());
+    }
+    if granted {
+        args.push("--granted".to_string());
+    }
+    Ok(args)
+}
+
+fn write_land_cues_packet(app: &AppHandle, cueset: &Value) -> Result<String, String> {
+    if !cueset.is_object() {
+        return Err("cue landing needs a CueSet object".to_string());
+    }
+    let dir = crate::recordings::app_data_dir_matching_sidecar()?
+        .join("exports")
+        .join("cue-landing");
+    fs::create_dir_all(&dir).map_err(|e| format!("failed to create cue landing dir: {e}"))?;
+    let stamp = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_err(|e| format!("system clock before epoch: {e}"))?
+        .as_millis();
+    let path = dir.join(format!("cue-set-{stamp}.json"));
+    let bytes = serde_json::to_vec_pretty(cueset)
+        .map_err(|e| format!("failed to encode CueSet packet: {e}"))?;
+    fs::write(&path, bytes).map_err(|e| format!("failed to write CueSet packet: {e}"))?;
+    let _ = app.emit(
+        "library://cue-land-packet",
+        json!({ "path": path.to_string_lossy().to_string() }),
+    );
+    Ok(path.to_string_lossy().to_string())
 }
 
 fn normalize_model_install_target(raw: Option<String>) -> Result<Option<String>, String> {
@@ -959,6 +1029,38 @@ pub async fn library_cue_folder(
     let (stdout, stderr, code) = run_library_to_completion(&app, &arg_refs).await?;
     let raw = parse_cli_json(&stdout, &stderr, code)?;
     Ok(map_cue_result(&raw))
+}
+
+/// `library_land_cues` — reviewed CueSet packet -> one permissioned landing.
+///
+/// The frontend owns review/consent. The bridge persists the reviewed packet to
+/// a local temp JSON file, then calls the Python `library land-cues` verb so the
+/// actual landing still goes through `cue_landing.land()` and the existing
+/// Rekordbox XML / M3U8 / Markers2 carriers. No private Rekordbox DB writes.
+#[tauri::command]
+pub async fn library_land_cues(
+    app: AppHandle,
+    cueset: Value,
+    target: Option<String>,
+    out: Option<String>,
+    name: Option<String>,
+    granted: Option<bool>,
+) -> Result<Value, String> {
+    let granted = granted.unwrap_or(false);
+    if !granted {
+        return Err("cue landing requires per-call user permission".to_string());
+    }
+    let packet_path = write_land_cues_packet(&app, &cueset)?;
+    let args = cue_land_library_args(
+        &packet_path,
+        target.as_deref(),
+        out.as_deref(),
+        name.as_deref(),
+        granted,
+    )?;
+    let arg_refs: Vec<&str> = args.iter().map(String::as_str).collect();
+    let (stdout, stderr, code) = run_library_to_completion(&app, &arg_refs).await?;
+    parse_cli_json(&stdout, &stderr, code)
 }
 
 /// `library_chat` — one conversational, tool-using Viber turn.
@@ -2146,6 +2248,56 @@ mod tests {
             ]
         );
         assert!(!args.iter().any(|arg| arg == "--write-tags"));
+    }
+
+    #[test]
+    fn cue_landing_target_normalizes_and_rejects_unknown() {
+        assert_eq!(
+            normalize_cue_landing_target("rekordbox").unwrap(),
+            "rekordbox_xml"
+        );
+        assert_eq!(
+            normalize_cue_landing_target(" SERATO ").unwrap(),
+            "serato_tags"
+        );
+        assert_eq!(
+            normalize_cue_landing_target("mixxx_tags").unwrap(),
+            "mixxx_tags"
+        );
+        let err = normalize_cue_landing_target("direct_db").expect_err("no private DB writes");
+        assert!(err.contains("rekordbox_xml | m3u8 | serato_tags | mixxx_tags"));
+    }
+
+    #[test]
+    fn cue_land_library_args_are_permissioned_and_packet_driven() {
+        let args = cue_land_library_args(
+            "/tmp/cueset.json",
+            Some("rekordbox"),
+            Some("/tmp/landed.xml"),
+            Some("Viber Landed Cues"),
+            true,
+        )
+        .unwrap();
+        assert_eq!(
+            args,
+            vec![
+                "library",
+                "land-cues",
+                "/tmp/cueset.json",
+                "--json",
+                "--target",
+                "rekordbox_xml",
+                "--out",
+                "/tmp/landed.xml",
+                "--name",
+                "Viber Landed Cues",
+                "--granted",
+            ]
+        );
+
+        let no_grant = cue_land_library_args("/tmp/cueset.json", None, None, None, false).unwrap();
+        assert!(!no_grant.iter().any(|arg| arg == "--granted"));
+        assert!(!no_grant.iter().any(|arg| arg == "--target"));
     }
 
     #[test]
