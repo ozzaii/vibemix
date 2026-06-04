@@ -1,0 +1,97 @@
+# SHIP-NEXT-GOALS — post-map re-rail (2026-06-04)
+
+The whole-system fresh-eye map landed (`SHIP-MAP-MASTER.md`, committed `d1b925db`, synth HEAD `7ac35a84`). It confirms the previous re-rail goals (`SHIP-WIRE-GOALS-RERAIL.md`) are now LARGELY DONE in source: MOSS nuked, Chatterbox-only `tts_chain`, proxy default, `set_brain` handler, the fresh-user crash fixed, learn live-grade loop closed, cue provenance leak closed. The loops need NEW bounded targets or they will rabbit-hole. These goals are the map's critical path, one bounded piece per lane, each ending at a by-ear/by-eye DoD.
+
+## ⛔ STOP PROTOCOL — carried forward (paste into every looping session, overrides any "keep goal active" text)
+
+> STOP CONDITION: do exactly ONE bounded piece, commit it surgically when it is green + grounding-review-clean, then HALT and report — end the loop. Do NOT keep the goal active waiting for a live / by-ear / driven-set / DMG proof: that gate is KAAN's, not yours. If a sibling's uncommitted file blocks you, STOP and report the blocker — do not spin or clobber. The LIVE/ear/DMG proof is owned by Kaan + the organizer, never self-certified by a loop.
+
+## The critical path (map §"Critical path to v1") — ordered
+
+1. **VOICE reachability** (the #1 blocker now) — keystone/backend-boot lane
+2. **START GATE backend handler** — keystone lane (touches `main()`, sequence behind/with #1)
+3. **CITATION ts-carry** — sven lane (`dj_cohost.py`)
+4. **PACKAGING** — backend-boot + Kaan (sign/SignPath)
+5. **KEYSTONE capture** — Kaan-only (LIVE=0 today)
+6. **STREAK robot voice** — deferred, sequenced (not v1-launch-critical)
+
+## Owner decisions Kaan must make (gate the path)
+
+- **D1 — `mlx-audio` as a `pyproject.toml` extra.** Required by locked decision #1 (Chatterbox is the only voice). It is Apple-only and reintroduces transformers 5.x to the deliberately torch-free/transformers-free project. This is the direct consequence of the voice you already locked; confirm and the backend-boot lane executes it. WITHOUT it `chatterbox_available()=False` forever and no human hears the voice.
+- **D2 — the "no API-key surface" CI gate vs the BYO key field.** `tests/security/test_no_api_key_surface.py` fails on the in-GUI Gemini key field shipped under locked decision #2. The gate (Phase-33 "never ship a key surface") and the BYO field are in head-on conflict. Retire or scope-narrow the gate (1-test policy call). Blocks `full-test-matrix` CI → blocks a tag.
+- **D3 — Windows v1 scope.** macOS-arm64 is the only platform with a real PKG path; macOS-Intel + Windows are PKG=0 (placeholders, need an NVIDIA box + GPU backend + SignPath). Ship arm64-only, +Intel, or hold for Windows?
+
+## Re-rail — one bounded goal per session
+
+### BACKEND-BOOT / KEYSTONE lane (owns `main()` + `config_store` + voice) → VOICE REACHABILITY (#1)
+```
+/goal SHIP-WIRE — make the locked Chatterbox voice REACHABLE on a packaged launch. The source-side
+MOSS-nuke + Chatterbox-only tts_chain already landed; the voice is still voiceless because mlx_audio is
+not installed and not a dependency, and the ref clip is unbundled. Bounded piece:
+(1) Add `mlx-audio` as a `pyproject.toml` extra (Apple-only; gated import, no hard dep on non-Apple).
+(2) Bundle `cohost_voice_ref.wav` as a PyInstaller `datas` asset in vibemix-core.macos.spec; point
+    agent/chatterbox_tts.py resolve_ref_path() at the bundled path (fallback to the dev-cache path).
+(3) Env-seed os.environ.setdefault("VIBEMIX_TTS_ENGINE", cfg.tts_engine) at __main__.py:~1420 +
+    in the packaged-defaults path (launchd/Dock strip VIBEMIX_*; this is the "always silent" root cause).
+(4) Swap the release gate --require-moss-source -> --require-chatterbox-source across
+    scripts/dist/pretag_check.sh + .github/workflows/release.yml (every site).
+PROOF (by-ear, not test-green): on a packaged-style launch reading config.json (NOT env),
+chatterbox_available() is True and the cohost speaks in the pranker voice; grep shows no MOSS gate left.
+ISLAND: pyproject.toml + vibemix-core.macos.spec + agent/chatterbox_tts.py + __main__.py(env-seed only)
++ the dist scripts. STOP PROTOCOL applies. git add <exact paths> NEVER -A; socket 8765 one (pkill before
+probe); commit -s Kaan Özkan <rahipdotaci@gmail.com>.
+```
+
+### KEYSTONE lane (owns `main()`) → START GATE backend handler (#2, sequence behind/with #1)
+```
+/goal SHIP-WIRE — wire the START GATE backend (Kaan: "when we pre-ship this is the only thing"). The
+frontend half + IPC schema (ipc.session.start/stop) already landed; the backend handler is absent and
+heavy models sit resident at idle. Bounded piece:
+(1) register_handler("ipc.session.start", _on_session_start) + "ipc.session.stop" in session_loop.py.
+(2) Split main() into a light idle boot + an _activate_session() that starts capture + reactions; idle =
+    cold, Start activates, Stop/idle releases the heavy models. v1 scope = Start + Stop-releases + the
+    silent background pre-warm hook, NOT a full eager->lazy refactor.
+PROOF (by-eye/by-bus): app idle = no Start = no reactions/no resident model; Start flips to active;
+Stop releases. ISLAND: __main__.py + runtime/session_loop.py. Do NOT edit the IPC schema (frontend owns
+it; the types already exist). STOP PROTOCOL applies. SHARED LAW as above.
+```
+
+### SVEN lane (owns `dj_cohost.py`) → CITATION ts-carry (#3)
+```
+/goal SHIP-WIRE — make the deck "underline its own citation" gesture fire LIVE. Today _push_transcript
+(dj_cohost.py:1880) emits no ts and ws_bus.py:783 stamps a separate _now_iso(), so SessionLayout.ts:1171
+joins on a ts that never byte-matches the reaction ts -> the gesture fires only in unit tests, silently
+dark live (Seam D). Bounded piece: thread ONE reaction_ts from the reaction through _push_transcript so
+the transcript event and the citation event carry the SAME ts the frontend joins on.
+PROOF (by-bus): a live reaction's transcript_delta and its [ev:...] citation share a ts; the FE join
+resolves. ISLAND: agent/dj_cohost.py (+ the ws field if needed, NOT the schema shape). STOP PROTOCOL
+applies. SHARED LAW as above.
+```
+
+### LIBRARY lane → CI RED-gate + cue-landing consolidation (unblocks the tag)
+```
+/goal SHIP-WIRE — clear the stale CI RED gates that block a tag, then resolve W13. Bounded pieces (commit
+each separately): (1) re-pin tests/repo/test_readme_shape.py + test_readme_feature_matrix_sync.py to the
+deliberate bravoh.ai README swap (commit 5a1e3533). (2) Per Kaan's D2 decision, retire/scope-narrow
+tests/security/test_no_api_key_surface.py so the BYO key field passes. (3) W13: route the live Viber
+auto-cue (toolset.py:2231 _auto_cue_marks_for_export) through the reusable cue_landing.land() so the two
+cue spines cannot diverge — OR, if Kaan defers, leave a one-line note and STOP.
+PROOF: full default suite + the named gates green at HEAD. ISLAND: tests/** + library/**. Do NOT edit
+product behavior to satisfy a test — fix the test policy. STOP PROTOCOL applies. SHARED LAW as above.
+```
+
+### LEARN lane → already ~90% closed; bound the remaining wire
+```
+/goal SHIP-WIRE — wire [ev:BEATMATCH_GRADED] into the LIVE credit path (W12). The learn live-grade loop
+closes (OBSERVE->GRADE->IPC->credit->unlock) but runtime/coach.py has 0 references to BEATMATCH_GRADED,
+so on a real driven set the highest-value DJ skill can only be credited from practice, never a live
+demonstration. Bounded piece: consume [ev:BEATMATCH_GRADED@t] in runtime/coach.py's credit path
+(_credit_live_skill_demo) honoring Invariant #3 (practice audio never over a live set) + Invariant #2
+(cited demonstration only). PROOF (by-bus): a cited live beatmatch demonstration credits the skill.
+ISLAND: src/vibemix/learn/** + runtime/coach.py (credit path only). STOP PROTOCOL applies. SHARED LAW.
+```
+
+### ORGANIZER (me) → packaging coordination + verify
+Verify each lane's commit against the 3 proof tiers (SRC ≠ PKG ≠ LIVE), enforce grounding-review on any
+new co-host utterance + Invariant #3 on learn audio, and coordinate the fresh signed arm64 DMG once the
+voice + Start-gate land + the dirty seam files commit. The keystone LIVE capture stays Kaan's hand on the rig.
