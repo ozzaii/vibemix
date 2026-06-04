@@ -1,0 +1,281 @@
+{
+  "generated_at": "2026-06-04T09:50:30+00:00",
+  "git_head": "826fddc98d6c6a4416f8115b88cfa708778cf376",
+  "label_count": 8,
+  "label_proxy": {
+    "candidate_label_sources": {
+      "folder_parent": {
+        "label_count": 8,
+        "label_counts": {
+          "ALL OF IT": 5,
+          "ETERNAL CHANGE": 7,
+          "GALACTIX": 50,
+          "GROOVEY140": 4,
+          "HARDMFCORE": 3,
+          "PSYMIND": 6,
+          "TEK": 7,
+          "Unknown Album": 2
+        },
+        "track_count": 84
+      },
+      "rekordbox_genre": {
+        "label_count": 0,
+        "label_counts": {},
+        "track_count": 0
+      }
+    },
+    "dropped_too_small": 2,
+    "dropped_unknown": 187,
+    "label_counts_kept": {
+      "ALL OF IT": 5,
+      "ETERNAL CHANGE": 7,
+      "GALACTIX": 50,
+      "GROOVEY140": 4,
+      "HARDMFCORE": 3,
+      "PSYMIND": 6,
+      "TEK": 7,
+      "Unknown Album": 2
+    },
+    "label_counts_raw": {
+      "ALL OF IT": 5,
+      "ETERNAL CHANGE": 7,
+      "GALACTIX": 50,
+      "GROOVEY140": 4,
+      "HACK IT UP": 1,
+      "HARDMFCORE": 3,
+      "PSYMIND": 6,
+      "TEK": 7,
+      "Unknown Album": 2,
+      "mastered": 1
+    },
+    "label_source_counts": {
+      "folder_parent": 86,
+      "missing_label": 187
+    },
+    "method": "auto_select_folder_parent_or_rekordbox_genre",
+    "min_label_size": 2,
+    "selected_label_source": "folder_parent",
+    "top_labels": [
+      {
+        "count": 50,
+        "label": "GALACTIX"
+      },
+      {
+        "count": 7,
+        "label": "ETERNAL CHANGE"
+      },
+      {
+        "count": 7,
+        "label": "TEK"
+      },
+      {
+        "count": 6,
+        "label": "PSYMIND"
+      },
+      {
+        "count": 5,
+        "label": "ALL OF IT"
+      },
+      {
+        "count": 4,
+        "label": "GROOVEY140"
+      },
+      {
+        "count": 3,
+        "label": "HARDMFCORE"
+      },
+      {
+        "count": 2,
+        "label": "Unknown Album"
+      }
+    ]
+  },
+  "library_cache": {
+    "cached_tracks": 1547,
+    "candidate_audit": [
+      {
+        "cache_file": "library.pkl",
+        "cached_tracks": 187,
+        "candidate_label_sources": {
+          "folder_parent": {
+            "label_count": 1,
+            "label_counts": {
+              "Music": 187
+            },
+            "track_count": 187
+          },
+          "rekordbox_genre": {
+            "label_count": 0,
+            "label_counts": {},
+            "track_count": 0
+          }
+        },
+        "label_count": 1,
+        "loaded": true,
+        "selected_label_source": "folder_parent",
+        "source_summary": {
+          "kind": "directory",
+          "name": "Music"
+        },
+        "status": "insufficient_labeled_subset",
+        "track_count": 187
+      },
+      {
+        "cache_file": "library.pkl.v1bak",
+        "cached_tracks": 1547,
+        "candidate_label_sources": {
+          "folder_parent": {
+            "label_count": 8,
+            "label_counts": {
+              "ALL OF IT": 5,
+              "ETERNAL CHANGE": 7,
+              "GALACTIX": 50,
+              "GROOVEY140": 4,
+              "HARDMFCORE": 3,
+              "PSYMIND": 6,
+              "TEK": 7,
+              "Unknown Album": 2
+            },
+            "track_count": 84
+          },
+          "rekordbox_genre": {
+            "label_count": 0,
+            "label_counts": {},
+            "track_count": 0
+          }
+        },
+        "label_count": 8,
+        "loaded": true,
+        "selected_label_source": "folder_parent",
+        "source_summary": {
+          "kind": "directory",
+          "name": "Music"
+        },
+        "status": "ok",
+        "track_count": 84
+      }
+    ],
+    "loaded": true,
+    "selected_cache_file": "library.pkl.v1bak",
+    "source_summary": {
+      "kind": "directory",
+      "name": "Music"
+    }
+  },
+  "metrics": {
+    "centered": {
+      "clusters": {
+        "ALL OF IT": {
+          "ALL OF IT": 4,
+          "GALACTIX": 2
+        },
+        "ETERNAL CHANGE": {
+          "ETERNAL CHANGE": 7,
+          "GALACTIX": 1,
+          "TEK": 1
+        },
+        "GALACTIX": {
+          "GALACTIX": 29
+        },
+        "GROOVEY140": {
+          "ALL OF IT": 1,
+          "GALACTIX": 4,
+          "GROOVEY140": 4
+        },
+        "HARDMFCORE": {
+          "GALACTIX": 2,
+          "HARDMFCORE": 3
+        },
+        "PSYMIND": {
+          "GALACTIX": 6,
+          "PSYMIND": 6
+        },
+        "TEK": {
+          "TEK": 5
+        },
+        "Unknown Album": {
+          "GALACTIX": 6,
+          "TEK": 1,
+          "Unknown Album": 2
+        }
+      },
+      "loo_scored_tracks": 84,
+      "precision_at_k": {
+        "1": 0.77381,
+        "3": 0.753968,
+        "5": 0.711905
+      },
+      "prototype_accuracy": 0.714286,
+      "prototype_accuracy_leave_one_out": 0.583333,
+      "prototype_cluster_purity": 0.761905,
+      "triplets": {
+        "agreement": null,
+        "count": 0,
+        "missing": 0,
+        "path": null,
+        "scored": 0
+      }
+    },
+    "raw": {
+      "clusters": {
+        "ALL OF IT": {
+          "ALL OF IT": 5
+        },
+        "ETERNAL CHANGE": {
+          "ETERNAL CHANGE": 6
+        },
+        "GALACTIX": {
+          "GALACTIX": 49,
+          "TEK": 1
+        },
+        "GROOVEY140": {
+          "GROOVEY140": 4
+        },
+        "HARDMFCORE": {
+          "HARDMFCORE": 3
+        },
+        "PSYMIND": {
+          "PSYMIND": 6
+        },
+        "TEK": {
+          "ETERNAL CHANGE": 1,
+          "GALACTIX": 1,
+          "TEK": 6
+        },
+        "Unknown Album": {
+          "Unknown Album": 2
+        }
+      },
+      "loo_scored_tracks": 84,
+      "precision_at_k": {
+        "1": 0.797619,
+        "3": 0.761905,
+        "5": 0.735714
+      },
+      "prototype_accuracy": 0.964286,
+      "prototype_accuracy_leave_one_out": 0.821429,
+      "prototype_cluster_purity": 0.964286,
+      "triplets": {
+        "agreement": null,
+        "count": 0,
+        "missing": 0,
+        "path": null,
+        "scored": 0
+      }
+    }
+  },
+  "notes": {
+    "no_model_calls": true,
+    "no_owner_input": true,
+    "proxy_caveat": "folder/genre labels are bootstrap labels, not human truth; use the triplet hook for small owner-labeled truth later",
+    "triplet_hook": "pass --triplets triplets.jsonl with anchor/positive/negative track_ids"
+  },
+  "schema": "library_similarity_tagging_bench_v1",
+  "status": "ok",
+  "store": {
+    "backend": "SqliteVecStore",
+    "embedded_tracks": 273,
+    "snapshot_hash": "361bbfa12fab41de2743fca9cfbdb2148aad6db31b9e012e8374e2aa75f37e90"
+  },
+  "track_count": 84
+}
