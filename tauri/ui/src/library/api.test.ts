@@ -162,6 +162,9 @@ describe("dev fallback (no Tauri bridge)", () => {
     expect(r.count).toBe(6);
     expect(r.stop_reason).toBe("exported");
     expect(r.export_path).toMatch(/\.xml$/);
+    expect(r.export_outputs?.rekordbox).toMatch(/\.xml$/);
+    expect(r.export_outputs?.m3u8).toMatch(/\.m3u8$/);
+    expect(r.export_auto_cues?.cues_added).toBeGreaterThan(0);
     // honest meta — no fabricated human title/artist on the flat-id rows.
     expect(r.tracks[0]?.meta).toMatch(/^track /);
   });
@@ -1272,8 +1275,61 @@ describe("runtime response normalizers", () => {
         tracks: [],
         count: 0,
         export_path: "/tmp/warehouse.xml",
+        export_outputs: {
+          rekordbox: "/tmp/warehouse.xml",
+          m3u8: "/tmp/warehouse.m3u8",
+        },
+        export_tag_receipts: [
+          {
+            carrier: "markers2_tags",
+            compatible_apps: ["Serato", "Mixxx"],
+            tagged: 2,
+            cues_total: 6,
+            skipped: 0,
+            files: ["/tmp/a.mp3", "/tmp/b.mp3"],
+          },
+        ],
+        export_auto_cues: {
+          enabled: true,
+          tracks_cued: 2,
+          cues_added: 6,
+        },
       }).export_path,
     ).toBe("/tmp/warehouse.xml");
+
+    const allCarrier = normalizeBuildSetResult({
+      name: "Warehouse",
+      rationale: "grounded",
+      stop_reason: "exported",
+      tracks: [],
+      count: 0,
+      export_path: "/tmp/warehouse.xml",
+      export_outputs: {
+        rekordbox: "/tmp/warehouse.xml",
+        m3u8: "/tmp/warehouse.m3u8",
+      },
+      export_tag_receipts: [
+        {
+          carrier: "markers2_tags",
+          compatible_apps: ["Serato", "Mixxx"],
+          tagged: 2,
+          cues_total: 6,
+          skipped: 0,
+          files: ["/tmp/a.mp3", "/tmp/b.mp3"],
+        },
+      ],
+      export_auto_cues: {
+        enabled: true,
+        tracks_cued: 2,
+        cues_added: 6,
+      },
+    });
+    expect(allCarrier.export_outputs?.m3u8).toBe("/tmp/warehouse.m3u8");
+    expect(allCarrier.export_tag_receipts?.[0]?.compatible_apps).toEqual([
+      "Serato",
+      "Mixxx",
+    ]);
+    expect(allCarrier.export_auto_cues?.cues_added).toBe(6);
 
     expect(() =>
       normalizeBuildSetResult({
@@ -1337,8 +1393,35 @@ describe("runtime response normalizers", () => {
       query: "warehouse opener",
       curve: "peak_time",
       nSlots: 4,
+      exportTarget: "both",
+      tagWriteGranted: false,
     });
     expect(result.export_path).toBe("/tmp/warehouse.xml");
+  });
+
+  it("libraryBuildSet asks AutoCrate for all carriers only after per-run consent", async () => {
+    const invoke = vi.fn(async () => ({
+      name: "Warehouse",
+      rationale: "AutoCrate picked a grounded arc.",
+      stop_reason: "exported",
+      tracks: [],
+      count: 0,
+      export_path: "/tmp/warehouse.xml",
+    }));
+    vi.doMock("@tauri-apps/api/core", () => ({ invoke }));
+    vi.stubGlobal("window", { __TAURI_INTERNALS__: {} });
+    vi.resetModules();
+
+    const { libraryBuildSet: freshLibraryBuildSet } = await import("./api.js");
+    await freshLibraryBuildSet("warehouse opener", "peak_time", true);
+
+    expect(invoke).toHaveBeenCalledWith("library_auto_crate", {
+      query: "warehouse opener",
+      curve: "peak_time",
+      nSlots: 6,
+      exportTarget: "all",
+      tagWriteGranted: true,
+    });
   });
 
   it("normalizes stats and models, including install result files", () => {

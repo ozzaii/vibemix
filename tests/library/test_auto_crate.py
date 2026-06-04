@@ -55,9 +55,7 @@ class _FakeStore:
 def library() -> RekordboxLibrary:
     lib = RekordboxLibrary()
     keys = ["8A", "9A", "8B", "7A", "8A", "9B"]
-    lib.tracks = {
-        f"t{i:03d}": _track(f"t{i:03d}", bpm=124.0 + i, key=keys[i]) for i in range(6)
-    }
+    lib.tracks = {f"t{i:03d}": _track(f"t{i:03d}", bpm=124.0 + i, key=keys[i]) for i in range(6)}
     return lib
 
 
@@ -118,6 +116,61 @@ def test_auto_crate_builds_grounded_playlist_and_export(toolset, tmp_path):
     assert "min_dur=120.0s" in result.tool_trace[0]["summary"]
     assert any("O7:" in gate for gate in result.owner_gates)
     assert any("O10:" in gate for gate in result.owner_gates)
+
+
+def test_auto_crate_preserves_all_carrier_export_receipt(toolset, tmp_path, monkeypatch):
+    original_dispatch = toolset.dispatch
+
+    def dispatch(name, args):
+        if name != "export_set":
+            return original_dispatch(name, args)
+        assert args["target"] == "all"
+        assert args["tag_write_granted"] is True
+        out_xml = tmp_path / "all.xml"
+        out_m3u8 = tmp_path / "all.m3u8"
+        out_xml.write_text("<DJ_PLAYLISTS/>", encoding="utf-8")
+        out_m3u8.write_text("#EXTM3U\n", encoding="utf-8")
+        return {
+            "exported": True,
+            "target": "all",
+            "path": str(out_xml),
+            "outputs": {"rekordbox": str(out_xml), "m3u8": str(out_m3u8)},
+            "tag_receipts": [
+                {
+                    "carrier": "markers2_tags",
+                    "compatible_apps": ["Serato", "Mixxx"],
+                    "tagged": 2,
+                    "cues_total": 6,
+                    "skipped": 0,
+                    "files": ["/tmp/a.mp3", "/tmp/b.mp3"],
+                    "skipped_tracks": [],
+                }
+            ],
+            "auto_cues": {"enabled": True, "tracks_cued": 2, "cues_added": 6},
+        }
+
+    monkeypatch.setattr(toolset, "dispatch", dispatch)
+
+    result = build_auto_crate(
+        ref_track_ids=["t000"],
+        curve="opener",
+        n_slots=3,
+        k=6,
+        name="All Carriers",
+        export="all",
+        tag_write_granted=True,
+        out_path=str(tmp_path / "all.xml"),
+        toolset=toolset,
+    )
+
+    assert result.stop_reason == "exported"
+    assert result.export_outputs == {
+        "rekordbox": str(tmp_path / "all.xml"),
+        "m3u8": str(tmp_path / "all.m3u8"),
+    }
+    assert result.export_tag_receipts[0]["carrier"] == "markers2_tags"
+    assert result.export_tag_receipts[0]["compatible_apps"] == ["Serato", "Mixxx"]
+    assert result.export_auto_cues == {"enabled": True, "tracks_cued": 2, "cues_added": 6}
 
 
 def test_auto_crate_allows_explicit_short_tool_override(toolset):

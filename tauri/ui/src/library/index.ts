@@ -76,6 +76,7 @@ import {
   meterOn,
   METER_SEGMENTS,
   runLabel,
+  setBuildTagWriteGranted,
   setBrief,
   setChatMessage,
   setCueExport,
@@ -616,6 +617,50 @@ function renderCurate(result: CurateResult): void {
   $("vmx-lib-rcount").textContent = `${result.tracks.length} in set`;
 }
 
+function buildTagReceiptLine(result: BuildSetResult): string | null {
+  const receipt = (result.export_tag_receipts ?? []).find(
+    (row) => row.carrier === "markers2_tags" && row.tagged > 0,
+  );
+  if (!receipt) return null;
+  const apps =
+    receipt.compatible_apps.length > 0
+      ? receipt.compatible_apps.join("/")
+      : "DJ app";
+  return `${apps} tags: ${receipt.tagged} files, ${receipt.cues_total} VM cues`;
+}
+
+function buildExportLines(result: BuildSetResult): string[] {
+  const lines: string[] = [];
+  const outputs = result.export_outputs ?? {};
+  if (outputs.rekordbox) lines.push(`rekordbox: ${outputs.rekordbox}`);
+  else if (result.export_path) lines.push(`rekordbox: ${result.export_path}`);
+  if (outputs.m3u8) lines.push(`m3u8: ${outputs.m3u8}`);
+  const tagLine = buildTagReceiptLine(result);
+  if (tagLine) lines.push(tagLine);
+  return lines;
+}
+
+function buildExportHint(result: BuildSetResult): string {
+  if (buildTagReceiptLine(result)) {
+    return "Import the XML in Rekordbox. Serato and Mixxx read the VM tags after reload.";
+  }
+  if (result.export_outputs?.m3u8) {
+    return "Import the XML in Rekordbox. Use the M3U8 for other crates.";
+  }
+  return "File → Import Collection in Rekordbox, then drag the set into a playlist.";
+}
+
+function buildAutoCueMeta(result: BuildSetResult): string | null {
+  const cues = result.export_auto_cues;
+  if (!cues || cues.enabled === false) return null;
+  const added = typeof cues.cues_added === "number" ? cues.cues_added : null;
+  const tracks = typeof cues.tracks_cued === "number" ? cues.tracks_cued : null;
+  if (added !== null && tracks !== null) return `${added} VM cues · ${tracks} cued`;
+  if (added !== null) return `${added} VM cues`;
+  if (tracks !== null) return `${tracks} cued`;
+  return null;
+}
+
 /** Clear the curate set-notes block so a stale rationale never lingers under a
  *  fresh error, or after switching away from curate mode (the block is only
  *  hidden by `body[data-mode]`, not emptied — without this it leaks the prior
@@ -630,6 +675,8 @@ function clearRationale(): void {
     exportEl.style.display = "none";
     const p = $maybe("vmx-lib-export-path");
     if (p) p.textContent = "";
+    const hint = $maybe("vmx-lib-export-hint");
+    if (hint) hint.textContent = "";
   }
 }
 
@@ -666,19 +713,25 @@ function renderBuildSet(result: BuildSetResult): void {
   } else {
     const bodyEl = $("vmx-lib-rationale-body");
     bodyEl.textContent = result.rationale || "No set notes returned.";
+    const cueMeta = buildAutoCueMeta(result);
     $("vmx-lib-rationale-meta").textContent =
-      `${result.count} tracks · ${result.stop_reason}`;
+      `${result.count} tracks · ${result.stop_reason}${cueMeta ? ` · ${cueMeta}` : ""}`;
   }
 
-  // Export line — the build flow auto-exports to Rekordbox XML. Shown only when
-  // the agent actually wrote a file (anti-slop: no path, no claim of an export).
+  // Export line — shown only when the agent actually wrote a file/carrier
+  // receipt. Anti-slop: no artifact, no claim of an export.
   const exportEl = $("vmx-lib-export");
-  if (result.export_path) {
+  const exportLines = buildExportLines(result);
+  if (exportLines.length > 0) {
     exportEl.style.display = "";
-    $("vmx-lib-export-path").textContent = result.export_path;
+    $("vmx-lib-export-path").textContent = exportLines.join("\n");
+    const hint = $maybe("vmx-lib-export-hint");
+    if (hint) hint.textContent = buildExportHint(result);
   } else {
     exportEl.style.display = "none";
     $("vmx-lib-export-path").textContent = "";
+    const hint = $maybe("vmx-lib-export-hint");
+    if (hint) hint.textContent = "";
   }
 
   const el = $("vmx-lib-results");
@@ -719,6 +772,9 @@ function renderBuildSetLoading(brief: string): void {
   $("vmx-lib-rationale-body").textContent = `Building a set for "${brief}"…`;
   $("vmx-lib-rationale-meta").textContent = "autocrate · working";
   $("vmx-lib-export").style.display = "none";
+  $("vmx-lib-export-path").textContent = "";
+  const hint = $maybe("vmx-lib-export-hint");
+  if (hint) hint.textContent = "";
   const el = $("vmx-lib-results");
   el.innerHTML = "";
   for (let i = 0; i < 4; i++) {
@@ -751,9 +807,13 @@ function renderCueExport(result: LibraryCueResult): void {
   if (path) {
     exportEl.style.display = "";
     $("vmx-lib-export-path").textContent = path;
+    const hint = $maybe("vmx-lib-export-hint");
+    if (hint) hint.textContent = "Import the XML in Rekordbox, or load the M3U8 in your crate.";
   } else {
     exportEl.style.display = "none";
     $("vmx-lib-export-path").textContent = "";
+    const hint = $maybe("vmx-lib-export-hint");
+    if (hint) hint.textContent = "";
   }
 
   const rows = $("vmx-lib-results");
@@ -782,6 +842,9 @@ function renderCueLoading(folder: string): void {
   $("vmx-lib-rationale-body").textContent = `Auto-cueing "${folder}"…`;
   $("vmx-lib-rationale-meta").textContent = "cue export · working";
   $("vmx-lib-export").style.display = "none";
+  $("vmx-lib-export-path").textContent = "";
+  const hint = $maybe("vmx-lib-export-hint");
+  if (hint) hint.textContent = "";
   const rows = $("vmx-lib-results");
   rows.innerHTML = "";
   for (let i = 0; i < 3; i++) {
@@ -2055,6 +2118,7 @@ export function mountLibrary(root: ParentNode = document): void {
   const chatInput = $("vmx-lib-chat") as HTMLTextAreaElement;
   const runBtn = $("vmx-lib-runbtn") as HTMLButtonElement;
   const installModelsBtn = $("vmx-lib-install-models") as HTMLButtonElement;
+  const buildTagsToggle = $maybe("vmx-lib-build-tags") as HTMLButtonElement | null;
   const echoEl = $("vmx-lib-echo");
   const qlabelEl = $("vmx-lib-qlabel");
   const seedNameEl = $("vmx-lib-seed-name");
@@ -2202,7 +2266,11 @@ export function mountLibrary(root: ParentNode = document): void {
     state = setBrief(state, briefInput.value.trim() || state.brief);
     echoEl.textContent = state.brief;
     renderBuildSetLoading(state.brief); // working state before the (slow) agent call
-    const result = await libraryBuildSet(state.brief, state.curve);
+    const result = await libraryBuildSet(
+      state.brief,
+      state.curve,
+      state.buildTagWriteGranted,
+    );
     if (!isCurrentRun(runId, "build")) return;
     renderBuildSet(result);
   }
@@ -2283,6 +2351,16 @@ export function mountLibrary(root: ParentNode = document): void {
     $all("[data-curve]").forEach((c) => {
       c.setAttribute("aria-pressed", String(c.dataset.curve === state.curve));
     });
+  }
+
+  function syncBuildTagToggle(): void {
+    if (!buildTagsToggle) return;
+    buildTagsToggle.setAttribute(
+      "aria-checked",
+      String(state.buildTagWriteGranted),
+    );
+    const valueEl = buildTagsToggle.querySelector("b");
+    if (valueEl) valueEl.textContent = state.buildTagWriteGranted ? "ON" : "OFF";
   }
 
   /** Drive the ingest progress bar + log. If the bridge accepts the job, the
@@ -2380,6 +2458,13 @@ export function mountLibrary(root: ParentNode = document): void {
 
   runBtn.addEventListener("click", () => void run());
   installModelsBtn.addEventListener("click", () => void installLocalModels());
+  buildTagsToggle?.addEventListener("click", () => {
+    state = setBuildTagWriteGranted(
+      state,
+      !state.buildTagWriteGranted,
+    );
+    syncBuildTagToggle();
+  });
 
   qInput.addEventListener("keydown", (e) => {
     if (e.key === "Enter" && state.mode === "search") void run();
@@ -2426,7 +2511,10 @@ export function mountLibrary(root: ParentNode = document): void {
       ) {
         renderAgentIdle(mode);
       }
-      if (mode === "build") syncCurvePicker();
+      if (mode === "build") {
+        syncCurvePicker();
+        syncBuildTagToggle();
+      }
       if (mode === "ingest") {
         // idle ingest view: show the ready state, don't auto-run
         $("vmx-lib-loglist").innerHTML = "";
@@ -2590,6 +2678,7 @@ export function mountLibrary(root: ParentNode = document): void {
   // initial paint
   applyModeVisibility();
   syncCurvePicker();
+  syncBuildTagToggle();
   void refreshStats();
   void refreshModels();
   void run();

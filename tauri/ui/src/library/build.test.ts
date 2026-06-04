@@ -98,7 +98,10 @@ describe("build — api dev fallback (no Tauri bridge)", () => {
 // We mock ./api.js so libraryBuildSet returns a controlled AutoCrate payload; the other
 // api fns are stubbed inert so mount/status work stays offline and deterministic.
 
-const buildMock = vi.fn<(brief: string, curve: string) => Promise<BuildSetResult>>();
+const buildMock =
+  vi.fn<
+    (brief: string, curve: string, landDjTags?: boolean) => Promise<BuildSetResult>
+  >();
 const cueMock =
   vi.fn<
     (
@@ -313,7 +316,11 @@ const CHAT_CODEX_MISSING: LibraryChatResult = {
 
 function doMockApi(): void {
   vi.doMock("./api.js", () => ({
-    libraryBuildSet: (brief: string, curve: string) => buildMock(brief, curve),
+    libraryBuildSet: (
+      brief: string,
+      curve: string,
+      landDjTags?: boolean,
+    ) => buildMock(brief, curve, landDjTags),
     libraryCueFolder: (path: string, exportFormat: CueExportFormat) =>
       cueMock(path, exportFormat),
     // inert stubs — mountLibrary does a state-dependent boot run + status refresh.
@@ -373,6 +380,7 @@ function mountSkeleton(): void {
       <button class="vmx-lib-curveseg" data-curve="after_hours" aria-pressed="false">After hours</button>
       <button class="vmx-lib-curveseg" data-curve="festival" aria-pressed="false">Festival</button>
     </div>
+    <button id="vmx-lib-build-tags" role="switch" aria-checked="false"><span class="dot"></span><span>Serato/Mixxx tags</span><b>OFF</b></button>
     <button data-cue-export="rekordbox" aria-pressed="true">Rekordbox XML</button>
     <button data-cue-export="m3u8" aria-pressed="false">M3U8</button>
     <button data-cue-export="both" aria-pressed="false">Both</button>
@@ -391,6 +399,7 @@ function mountSkeleton(): void {
     <div id="vmx-lib-rationale-meta"></div>
     <div id="vmx-lib-export" style="display: none">
       <div id="vmx-lib-export-path"></div>
+      <div id="vmx-lib-export-hint"></div>
     </div>
     <div id="vmx-lib-results"></div>
     <div id="vmx-lib-chat-thread"></div>
@@ -411,6 +420,7 @@ function mountSkeleton(): void {
 async function runRealBuild(
   payload: BuildSetResult,
   clickCurve?: string,
+  clickTags = false,
 ): Promise<void> {
   buildMock.mockResolvedValue(payload);
   vi.resetModules();
@@ -427,6 +437,9 @@ async function runRealBuild(
     document
       .querySelector<HTMLElement>(`[data-curve="${clickCurve}"]`)
       ?.click();
+  }
+  if (clickTags) {
+    document.getElementById("vmx-lib-build-tags")?.click();
   }
   (document.getElementById("vmx-lib-runbtn") as HTMLButtonElement).click();
   for (let i = 0; i < 6; i++) await Promise.resolve();
@@ -488,10 +501,62 @@ describe("build — real renderBuildSet path (jsdom, via mountLibrary)", () => {
     // export receipt is shown + carries the path.
     const exportEl = document.getElementById("vmx-lib-export") as HTMLElement;
     expect(exportEl.style.display).not.toBe("none");
-    expect(document.getElementById("vmx-lib-export-path")?.textContent).toMatch(
-      /\.xml$/,
+    expect(document.getElementById("vmx-lib-export-path")?.textContent).toContain(
+      "rekordbox:",
+    );
+    expect(document.getElementById("vmx-lib-export-path")?.textContent).toContain(
+      ".xml",
     );
     expect(document.getElementById("vmx-lib-rcount")?.textContent).toBe("6 in set");
+  });
+
+  it("renders all-carrier cue landing receipts from AutoCrate", async () => {
+    const payload: BuildSetResult = {
+      ...DEV_FALLBACK.build,
+      export_path: "/tmp/warehouse.xml",
+      export_outputs: {
+        rekordbox: "/tmp/warehouse.xml",
+        m3u8: "/tmp/warehouse.m3u8",
+      },
+      export_tag_receipts: [
+        {
+          carrier: "markers2_tags",
+          compatible_apps: ["Serato", "Mixxx"],
+          tagged: 2,
+          cues_total: 6,
+          skipped: 0,
+          files: ["/tmp/a.mp3", "/tmp/b.mp3"],
+        },
+      ],
+      export_auto_cues: { enabled: true, tracks_cued: 2, cues_added: 6 },
+    };
+
+    await runRealBuild(payload);
+
+    const exportText =
+      document.getElementById("vmx-lib-export-path")?.textContent ?? "";
+    expect(exportText).toContain("rekordbox: /tmp/warehouse.xml");
+    expect(exportText).toContain("m3u8: /tmp/warehouse.m3u8");
+    expect(exportText).toContain("Serato/Mixxx tags: 2 files, 6 VM cues");
+    expect(document.getElementById("vmx-lib-export-hint")?.textContent).toContain(
+      "Serato and Mixxx read the VM tags",
+    );
+    expect(document.getElementById("vmx-lib-rationale-meta")?.textContent).toContain(
+      "6 VM cues",
+    );
+  });
+
+  it("sends per-run tag permission only when the build switch is on", async () => {
+    await runRealBuild(DEV_FALLBACK.build, undefined, true);
+
+    const toggle = document.getElementById("vmx-lib-build-tags") as HTMLElement;
+    expect(toggle.getAttribute("aria-checked")).toBe("true");
+    expect(toggle.textContent).toContain("ON");
+    expect(buildMock).toHaveBeenLastCalledWith(
+      expect.any(String),
+      "peak_time",
+      true,
+    );
   });
 
   it("selecting a curve segment updates the picker pressed state", async () => {
@@ -502,7 +567,11 @@ describe("build — real renderBuildSet path (jsdom, via mountLibrary)", () => {
     expect(pressed).toHaveLength(1);
     expect(pressed[0]?.dataset.curve).toBe("after_hours");
     // and the run after the curve was picked passed the chosen curve.
-    expect(buildMock).toHaveBeenLastCalledWith(expect.any(String), "after_hours");
+    expect(buildMock).toHaveBeenLastCalledWith(
+      expect.any(String),
+      "after_hours",
+      false,
+    );
   });
 
   it("does not auto-run AutoCrate just by opening build mode", async () => {

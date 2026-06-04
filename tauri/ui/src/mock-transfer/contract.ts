@@ -89,6 +89,7 @@ export const MOCK_TRANSFER_CONTRACT: readonly MockTransferSurface[] = [
       { wire: "library.cue-field", purpose: "auto-cue export folder controls" },
       { wire: "library.curate-field", purpose: "Viber curate theme input" },
       { wire: "library.build-field", purpose: "Viber build-set brief and curve controls" },
+      { wire: "library.build-tags", purpose: "per-run Serato/Mixxx tag-write consent" },
       { wire: "library.chat-field", purpose: "Viber chat prompt" },
       { wire: "library.run", purpose: "active mode command button" },
       { wire: "library.stats", purpose: "corpus/model/backend stats" },

@@ -208,6 +208,24 @@ fn normalize_cue_export_format(raw: Option<&str>) -> Result<&'static str, String
     }
 }
 
+fn normalize_set_export_target(raw: Option<&str>) -> Result<&'static str, String> {
+    match raw.unwrap_or("both").trim().to_ascii_lowercase().as_str() {
+        "" | "both" => Ok("both"),
+        "rekordbox" => Ok("rekordbox"),
+        "m3u8" => Ok("m3u8"),
+        "serato_tags" | "serato" => Ok("serato_tags"),
+        "mixxx_tags" | "mixxx" => Ok("mixxx_tags"),
+        "all" | "all_dj" => Ok("all"),
+        other => Err(format!(
+            "invalid set export target {other:?} (expected rekordbox | m3u8 | both | serato_tags | mixxx_tags | all)"
+        )),
+    }
+}
+
+fn set_export_target_writes_tags(target: &str) -> bool {
+    matches!(target, "serato_tags" | "mixxx_tags" | "all")
+}
+
 fn default_cue_export_path(export: &str) -> Result<String, String> {
     let suffix = if export == "m3u8" { "m3u8" } else { "xml" };
     let path = crate::recordings::app_data_dir_matching_sidecar()?
@@ -711,6 +729,29 @@ fn map_curate_result(raw: &Value) -> Value {
     // build-set UI can show the "Exported → <path>" line + import hint. Curate
     // never exports, so this is simply absent/null on the curate path.
     let export_path = raw.get("export_path").cloned().unwrap_or(Value::Null);
+    let export_outputs = raw
+        .get("export_outputs")
+        .and_then(|v| v.as_object())
+        .map(|obj| {
+            let mut mapped = serde_json::Map::new();
+            for key in ["rekordbox", "m3u8"] {
+                if let Some(path) = obj
+                    .get(key)
+                    .and_then(|v| v.as_str())
+                    .filter(|s| !s.is_empty())
+                {
+                    mapped.insert(key.to_string(), Value::String(path.to_string()));
+                }
+            }
+            Value::Object(mapped)
+        })
+        .unwrap_or_else(|| Value::Object(serde_json::Map::new()));
+    let export_tag_receipts = raw
+        .get("export_tag_receipts")
+        .and_then(|v| v.as_array())
+        .map(|rows| Value::Array(rows.clone()))
+        .unwrap_or_else(|| Value::Array(Vec::new()));
+    let export_auto_cues = raw.get("export_auto_cues").cloned().unwrap_or(Value::Null);
     let question = raw.get("question").cloned().unwrap_or(Value::Null);
     let choices = raw
         .get("choices")
@@ -730,6 +771,9 @@ fn map_curate_result(raw: &Value) -> Value {
         "tracks": tracks,
         "count": count,
         "export_path": export_path,
+        "export_outputs": export_outputs,
+        "export_tag_receipts": export_tag_receipts,
+        "export_auto_cues": export_auto_cues,
         "question": question,
         "choices": choices,
     })
@@ -813,15 +857,18 @@ pub async fn library_build_set(
 ///
 /// Mirrors `library_build_set` (one-shot CLI subprocess -> JSON -> mapped UI
 /// shape), running `library auto-crate [<query>] --curve <curve> --n-slots <n>
-/// --export rekordbox --json`. It deliberately passes no `--backend`: the
+/// --export <target> --json`. It deliberately passes no `--backend`: the
 /// engine is deterministic Python, not Codex, so this path has no Codex login
-/// or shell gate.
+/// or shell gate. Serato/Mixxx Markers2 tags are passed only with the explicit
+/// per-run `tag_write_granted` switch.
 #[tauri::command]
 pub async fn library_auto_crate(
     app: AppHandle,
     query: Option<String>,
     curve: String,
     n_slots: Option<u32>,
+    export_target: Option<String>,
+    tag_write_granted: Option<bool>,
 ) -> Result<Value, String> {
     const CURVES: [&str; 4] = ["opener", "peak_time", "after_hours", "festival"];
     if !CURVES.contains(&curve.as_str()) {
@@ -836,6 +883,13 @@ pub async fn library_auto_crate(
         .filter(|s| !s.is_empty())
         .map(str::to_string);
     let slots = n_slots.unwrap_or(6).clamp(2, 24).to_string();
+    let export_target = normalize_set_export_target(export_target.as_deref())?;
+    let tag_write_granted = tag_write_granted.unwrap_or(false);
+    if set_export_target_writes_tags(export_target) && !tag_write_granted {
+        return Err(
+            "Serato/Mixxx tag writes need explicit permission for this export run".to_string(),
+        );
+    }
     let mut args = vec!["library".to_string(), "auto-crate".to_string()];
     if let Some(q) = clean_query {
         args.push(q);
@@ -846,9 +900,12 @@ pub async fn library_auto_crate(
         "--n-slots".to_string(),
         slots,
         "--export".to_string(),
-        "rekordbox".to_string(),
+        export_target.to_string(),
         "--json".to_string(),
     ]);
+    if tag_write_granted {
+        args.push("--write-tags".to_string());
+    }
     let arg_refs: Vec<&str> = args.iter().map(String::as_str).collect();
     let (stdout, stderr, code) = run_library_to_completion(&app, &arg_refs).await?;
     let raw = parse_cli_json(&stdout, &stderr, code)?;
@@ -1630,15 +1687,54 @@ mod tests {
                 "track_ids": ["t1", "t2"]
             },
             "export_path": "/Users/x/Music/vibemix-set.xml",
+            "export_outputs": {
+                "rekordbox": "/Users/x/Music/vibemix-set.xml",
+                "m3u8": "/Users/x/Music/vibemix-set.m3u8",
+                "ignored": 42
+            },
+            "export_tag_receipts": [
+                {
+                    "carrier": "markers2_tags",
+                    "compatible_apps": ["Serato", "Mixxx"],
+                    "tagged": 2,
+                    "cues_total": 6
+                }
+            ],
+            "export_auto_cues": {"enabled": true, "tracks_cued": 2, "cues_added": 6},
             "transition_receipts": []
         });
         let m = map_curate_result(&raw);
         assert_eq!(m["name"], "Warehouse Opener");
         assert_eq!(m["stop_reason"], "exported");
         assert_eq!(m["export_path"], "/Users/x/Music/vibemix-set.xml");
+        assert_eq!(
+            m["export_outputs"]["rekordbox"],
+            "/Users/x/Music/vibemix-set.xml"
+        );
+        assert_eq!(
+            m["export_outputs"]["m3u8"],
+            "/Users/x/Music/vibemix-set.m3u8"
+        );
+        assert!(m["export_outputs"].get("ignored").is_none());
+        assert_eq!(m["export_tag_receipts"][0]["carrier"], "markers2_tags");
+        assert_eq!(m["export_auto_cues"]["cues_added"], 6);
         assert_eq!(m["count"], 2);
         assert_eq!(m["tracks"][0]["track_id"], "t1");
         assert_eq!(m["tracks"][1]["track_id"], "t2");
+    }
+
+    #[test]
+    fn normalizes_set_export_targets_and_tag_permission_kind() {
+        assert_eq!(normalize_set_export_target(None).unwrap(), "both");
+        assert_eq!(normalize_set_export_target(Some("all_dj")).unwrap(), "all");
+        assert_eq!(
+            normalize_set_export_target(Some("serato")).unwrap(),
+            "serato_tags"
+        );
+        assert!(set_export_target_writes_tags("all"));
+        assert!(set_export_target_writes_tags("mixxx_tags"));
+        assert!(!set_export_target_writes_tags("both"));
+        assert!(normalize_set_export_target(Some("direct_db")).is_err());
     }
 
     #[test]

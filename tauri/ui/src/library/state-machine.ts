@@ -15,7 +15,7 @@
  *   - cue      ← folder path + export format → auto-cued XML/M3U8 receipt
  *   - curate   ← theme → AI-curated playlist (numbered set + rationale)
  *   - build    ← brief + energy curve → set-prep co-host: discovered + sequenced
- *               set, auto-exported to Rekordbox XML (v8.2 Vibe Mix surface)
+ *               set, exported to files, optional per-run DJ app tag landing
  *   - chat     ← conversational Viber, grounded tool trace + artifacts
  */
 
@@ -55,6 +55,8 @@ export interface LibraryState {
   brief: string;
   /** Chosen energy curve preset (build mode). */
   curve: EnergyCurve;
+  /** Per-run consent to write VM cue tags into DJ app carriers during build export. */
+  buildTagWriteGranted: boolean;
   /** Current chat draft for conversational Viber mode. */
   chatMessage: string;
 }
@@ -70,6 +72,7 @@ export const initialLibraryState: LibraryState = {
   theme: "warm sunset rooftop, dusk to dark",
   brief: "warehouse opener, melodic into rolling, 90 min",
   curve: "peak_time",
+  buildTagWriteGranted: false,
   chatMessage: "",
 };
 
@@ -176,6 +179,13 @@ export function setChatMessage(state: LibraryState, chatMessage: string): Librar
 
 export function setCurve(state: LibraryState, curve: EnergyCurve): LibraryState {
   return { ...state, curve };
+}
+
+export function setBuildTagWriteGranted(
+  state: LibraryState,
+  buildTagWriteGranted: boolean,
+): LibraryState {
+  return { ...state, buildTagWriteGranted };
 }
 
 export function setStrategy(

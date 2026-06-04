@@ -8,7 +8,7 @@
  *   invoke("library_search",  { query, k })       -> SearchResult
  *   invoke("library_similar", { seed,  k })       -> SearchResult   (same shape)
  *   invoke("library_chat", { message, history, liveContext }) -> LibraryChatResult
- *   invoke("library_auto_crate", { query, curve, nSlots }) -> BuildSetResult
+ *   invoke("library_auto_crate", { query, curve, nSlots, exportTarget, tagWriteGranted }) -> BuildSetResult
  *   invoke("library_cue_folder", { path, exportFormat, out, name, maxCues })
  *        -> LibraryCueResult
  *   invoke("library_stats")                        -> LibraryStats
@@ -207,14 +207,45 @@ export interface CurateResult {
  *  wire values the agent's CLI accepts; mirrors EnergyCurve in state-machine. */
 export type EnergyCurve = "opener" | "peak_time" | "after_hours" | "festival";
 
+export type BuildExportTarget =
+  | "rekordbox"
+  | "m3u8"
+  | "both"
+  | "serato_tags"
+  | "mixxx_tags"
+  | "all";
+
+export interface BuildSetOptions {
+  exportTarget?: BuildExportTarget;
+  tagWriteGranted?: boolean;
+}
+
+export interface BuildTagReceipt {
+  carrier: string;
+  compatible_apps: string[];
+  tagged: number;
+  cues_total: number;
+  skipped: number;
+  files: string[];
+}
+
+export interface BuildAutoCueSummary {
+  enabled?: boolean;
+  tracks_cued?: number;
+  cues_added?: number;
+}
+
 /** Result of a set-prep run (`library auto-crate <query> --curve <c> --export
- *  rekordbox --json`, mapped by the Rust bridge). Same shape as CurateResult
- *  plus `export_path` — the Rekordbox XML the agent wrote when it exported
- *  (`null` when it never did, e.g. an empty/failed run). `stop_reason` may be
+ *  <target> --json`, mapped by the Rust bridge). Same shape as CurateResult
+ *  plus export receipts: Rekordbox XML/M3U8 files and, when the user grants it
+ *  for this run, Serato/Mixxx Markers2 tag receipts. `stop_reason` may be
  *  "exported" here (the set-prep terminal that curation never reaches). */
 export interface BuildSetResult extends CurateResult {
   /** Absolute path to the exported Rekordbox XML, or `null` if none. */
   export_path: string | null;
+  export_outputs?: Partial<Record<"rekordbox" | "m3u8", string>>;
+  export_tag_receipts?: BuildTagReceipt[];
+  export_auto_cues?: BuildAutoCueSummary | null;
 }
 
 /** Portable cue export format for the GUI-safe folder cue bridge. The app
@@ -1768,7 +1799,94 @@ export function normalizeBuildSetResult(
       root.export_path,
       `${label}.export_path`,
     ),
+    export_outputs: normalizeBuildExportOutputs(
+      root.export_outputs,
+      `${label}.export_outputs`,
+    ),
+    export_tag_receipts: normalizeBuildTagReceipts(
+      root.export_tag_receipts,
+      `${label}.export_tag_receipts`,
+    ),
+    export_auto_cues: normalizeBuildAutoCues(
+      root.export_auto_cues,
+      `${label}.export_auto_cues`,
+    ),
   };
+}
+
+function normalizeBuildExportOutputs(
+  value: unknown,
+  label: string,
+): Partial<Record<"rekordbox" | "m3u8", string>> {
+  if (value === undefined || value === null) return {};
+  const root = asRecord(value, label);
+  const outputs: Partial<Record<"rekordbox" | "m3u8", string>> = {};
+  for (const key of ["rekordbox", "m3u8"] as const) {
+    const path = root[key];
+    if (path !== undefined && path !== null) {
+      outputs[key] = asString(path, `${label}.${key}`);
+    }
+  }
+  return outputs;
+}
+
+function normalizeBuildTagReceipt(
+  value: unknown,
+  label: string,
+): BuildTagReceipt {
+  const row = asRecord(value, label);
+  return {
+    carrier: asString(row.carrier, `${label}.carrier`),
+    compatible_apps:
+      row.compatible_apps === undefined || row.compatible_apps === null
+        ? []
+        : asStringArray(row.compatible_apps, `${label}.compatible_apps`),
+    tagged:
+      row.tagged === undefined || row.tagged === null
+        ? 0
+        : asFiniteNumber(row.tagged, `${label}.tagged`),
+    cues_total:
+      row.cues_total === undefined || row.cues_total === null
+        ? 0
+        : asFiniteNumber(row.cues_total, `${label}.cues_total`),
+    skipped:
+      row.skipped === undefined || row.skipped === null
+        ? 0
+        : asFiniteNumber(row.skipped, `${label}.skipped`),
+    files:
+      row.files === undefined || row.files === null
+        ? []
+        : asStringArray(row.files, `${label}.files`),
+  };
+}
+
+function normalizeBuildTagReceipts(
+  value: unknown,
+  label: string,
+): BuildTagReceipt[] {
+  if (value === undefined || value === null) return [];
+  return asArray(value, label).map((row, index) =>
+    normalizeBuildTagReceipt(row, `${label}[${index}]`),
+  );
+}
+
+function normalizeBuildAutoCues(
+  value: unknown,
+  label: string,
+): BuildAutoCueSummary | null {
+  if (value === undefined || value === null) return null;
+  const row = asRecord(value, label);
+  const summary: BuildAutoCueSummary = {};
+  if (row.enabled !== undefined && row.enabled !== null) {
+    summary.enabled = asBoolean(row.enabled, `${label}.enabled`);
+  }
+  if (row.tracks_cued !== undefined && row.tracks_cued !== null) {
+    summary.tracks_cued = asFiniteNumber(row.tracks_cued, `${label}.tracks_cued`);
+  }
+  if (row.cues_added !== undefined && row.cues_added !== null) {
+    summary.cues_added = asFiniteNumber(row.cues_added, `${label}.cues_added`);
+  }
+  return summary;
 }
 
 export function normalizeCueResult(
@@ -2459,10 +2577,10 @@ const DEV_CURATE: CurateResult = {
 
 // A representative set-prep (build-set) run over the same 2026-05-25 subset —
 // the agent discovered + sequenced a set for a peak-time curve and EXPORTED it
-// to Rekordbox XML (the v8.2 set-prep terminal). Rows mirror the real bridge
+// to Rekordbox XML/M3U8 and, when granted, DJ app tag carriers. Rows mirror the real bridge
 // contract exactly (title = track_id, meta = "track <id>" — the flat-id branch
-// of map_curate_result), and `export_path` is the headline artefact the build
-// surface reports. Dev-only: fires solely when getInvoke() is falsy (no Tauri),
+// of map_curate_result), and the export receipts are the headline artefacts the
+// build surface reports. Dev-only: fires solely when getInvoke() is falsy (no Tauri),
 // so it can never reach the packaged app — but it reads exactly like prod.
 const DEV_BUILD: BuildSetResult = {
   name: "Warehouse Opener",
@@ -2474,6 +2592,12 @@ const DEV_BUILD: BuildSetResult = {
     "nearest grounded neighbour in vibe space, not a guess.",
   count: 6,
   export_path: "~/Music/vibemix/Warehouse Opener.xml",
+  export_outputs: {
+    rekordbox: "~/Music/vibemix/Warehouse Opener.xml",
+    m3u8: "~/Music/vibemix/Warehouse Opener.m3u8",
+  },
+  export_tag_receipts: [],
+  export_auto_cues: { enabled: true, tracks_cued: 6, cues_added: 18 },
   tracks: [
     { track_id: "7f9f9052", title: "7f9f9052", meta: "track 7f9f9052" },
     { track_id: "b8d4da96", title: "b8d4da96", meta: "track b8d4da96" },
@@ -2595,19 +2719,27 @@ export async function libraryCurate(theme: string): Promise<CurateResult> {
 }
 
 /** Query + energy curve → AutoCrate deterministic set prep: a discovered +
- *  sequenced set, auto-exported to Rekordbox XML (`export_path` on the result).
- *  Keyless by design: this GUI frontdoor does not require Codex login or a
- *  shell bridge. Same propagate-don't-mask discipline as curate. */
+ *  sequenced set, exported to files by default. With explicit per-run consent it
+ *  also writes VM cue tags for Serato/Mixxx. Keyless by design: this GUI
+ *  frontdoor does not require Codex login or a shell bridge. Same
+ *  propagate-don't-mask discipline as curate. */
 export async function libraryAutoCrate(
   query: string,
   curve: EnergyCurve,
   nSlots = 6,
+  options: BuildSetOptions = {},
 ): Promise<BuildSetResult> {
   const invoke = await getInvoke();
   if (!invoke) return DEV_BUILD; // no Tauri (plain vite / jsdom) → demo data
   // Real bridge: let a backend error PROPAGATE — never mask it with fake data.
   return normalizeBuildSetResult(
-    await invoke<unknown>("library_auto_crate", { query, curve, nSlots }),
+    await invoke<unknown>("library_auto_crate", {
+      query,
+      curve,
+      nSlots,
+      exportTarget: options.exportTarget ?? "both",
+      tagWriteGranted: options.tagWriteGranted ?? false,
+    }),
     "library_auto_crate",
   );
 }
@@ -2618,12 +2750,16 @@ export async function libraryAutoCrate(
 export async function libraryBuildSet(
   brief: string,
   curve: EnergyCurve,
+  landDjTags = false,
 ): Promise<BuildSetResult> {
-  return libraryAutoCrate(brief, curve);
+  return libraryAutoCrate(brief, curve, 6, {
+    exportTarget: landDjTags ? "all" : "both",
+    tagWriteGranted: landDjTags,
+  });
 }
 
-/** Folder → auto-cued Rekordbox XML/M3U8. GUI-safe export path only: this never
- *  invokes Serato tag writes, which remain an explicit CLI-only mutation. */
+/** Folder → auto-cued Rekordbox XML/M3U8. GUI-safe export path only. The Build
+ *  tab owns per-run DJ app tag permission because it exports a chosen set. */
 export async function libraryCueFolder(
   path: string,
   exportFormat: CueExportFormat = "rekordbox",

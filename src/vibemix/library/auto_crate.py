@@ -38,6 +38,8 @@ class AutoCrateResult:
     playlist: dict[str, Any] | None = None
     export_path: str | None = None
     export_outputs: dict[str, str] = field(default_factory=dict)
+    export_tag_receipts: list[dict[str, Any]] = field(default_factory=list)
+    export_auto_cues: dict[str, Any] | None = None
     sequence: dict[str, Any] | None = None
     transition_receipts: list[dict[str, Any]] = field(default_factory=list)
     metadata_warnings: list[dict[str, Any]] = field(default_factory=list)
@@ -146,9 +148,15 @@ def build_auto_crate(
 
         discovered = _call_tool(toolset, "discover_pool", discover_args, trace)
         if error := discovered.get("error"):
-            return _failed("no_pool", str(error), result_name, curve, slots, clean_query, refs, trace)
+            return _failed(
+                "no_pool", str(error), result_name, curve, slots, clean_query, refs, trace
+            )
         pool = discovered.get("pool")
-        pool_ids = [row.get("track_id") for row in pool if isinstance(row, dict)] if isinstance(pool, list) else []
+        pool_ids = (
+            [row.get("track_id") for row in pool if isinstance(row, dict)]
+            if isinstance(pool, list)
+            else []
+        )
         pool_ids = [tid for tid in pool_ids if isinstance(tid, str)]
         if not pool_ids:
             return _failed(
@@ -197,7 +205,9 @@ def build_auto_crate(
             )
 
         receipts = _transition_receipts(toolset, track_ids, trace)
-        playlist = _call_tool(toolset, "create_playlist", {"name": result_name, "track_ids": track_ids}, trace)
+        playlist = _call_tool(
+            toolset, "create_playlist", {"name": result_name, "track_ids": track_ids}, trace
+        )
         if error := playlist.get("error"):
             return _failed(
                 "no_playlist", str(error), result_name, curve, slots, clean_query, refs, trace
@@ -205,6 +215,8 @@ def build_auto_crate(
 
         export_path = None
         export_outputs: dict[str, str] = {}
+        export_tag_receipts: list[dict[str, Any]] = []
+        export_auto_cues: dict[str, Any] | None = None
         stop_reason = "created"
         if export in {"rekordbox", "m3u8", "both", "serato_tags", "mixxx_tags", "all"}:
             export_args: dict[str, Any] = {
@@ -226,6 +238,14 @@ def build_auto_crate(
                 for key, value in (exported.get("outputs") or {}).items()
                 if isinstance(key, str) and isinstance(value, str)
             }
+            raw_tag_receipts = exported.get("tag_receipts")
+            if isinstance(raw_tag_receipts, list):
+                export_tag_receipts = [
+                    receipt for receipt in raw_tag_receipts if isinstance(receipt, dict)
+                ]
+            raw_auto_cues = exported.get("auto_cues")
+            if isinstance(raw_auto_cues, dict):
+                export_auto_cues = dict(raw_auto_cues)
             stop_reason = "exported" if export_path else "created"
 
         warnings = discovered.get("metadata_warnings")
@@ -248,6 +268,8 @@ def build_auto_crate(
             playlist={k: playlist[k] for k in playlist if k != "created"},
             export_path=export_path,
             export_outputs=export_outputs,
+            export_tag_receipts=export_tag_receipts,
+            export_auto_cues=export_auto_cues,
             sequence=candidate,
             transition_receipts=receipts,
             metadata_warnings=metadata_warnings,
@@ -260,7 +282,9 @@ def build_auto_crate(
                 close()
 
 
-def _call_tool(toolset: Any, name: str, args: dict[str, Any], trace: list[dict[str, Any]]) -> dict[str, Any]:
+def _call_tool(
+    toolset: Any, name: str, args: dict[str, Any], trace: list[dict[str, Any]]
+) -> dict[str, Any]:
     dispatch = getattr(toolset, "dispatch", None)
     if callable(dispatch):
         out = dispatch(name, args)
@@ -325,7 +349,9 @@ def _grounded_rationale(
 ) -> str:
     track_ids = candidate.get("track_ids") if isinstance(candidate, dict) else []
     selected = len(track_ids) if isinstance(track_ids, list) else 0
-    parts = [f"{selected} tracks selected from {pool_count} discovered candidates on curve {curve}."]
+    parts = [
+        f"{selected} tracks selected from {pool_count} discovered candidates on curve {curve}."
+    ]
     if (energy_fit := _finite_float(candidate.get("energy_fit"))) is not None:
         parts.append(f"Energy fit error {energy_fit:.1f} (lower is better).")
     if (coherence := _finite_float(candidate.get("avg_coherence"))) is not None:

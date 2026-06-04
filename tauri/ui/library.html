@@ -95,8 +95,8 @@
               </div>
 
               <!-- cue export field — local auto-cue engine → portable files.
-                   The GUI intentionally exposes export-only modes. Direct
-                   Serato tag writes mutate audio files and stay CLI-only. -->
+                   The Build tab owns per-run DJ app tag permission when exporting
+                   a chosen set; this folder tool stays file-export only. -->
               <div class="vmx-lib-field" data-for="cue" data-wire="library.cue-field" style="display: none">
                 <span class="vmx-lib-label">Folder to cue</span>
                 <div class="vmx-lib-qbox">
@@ -150,6 +150,15 @@
                   <button type="button" class="vmx-lib-curveseg" data-curve="peak_time" aria-pressed="true">Peak time</button>
                   <button type="button" class="vmx-lib-curveseg" data-curve="after_hours" aria-pressed="false">After hours</button>
                   <button type="button" class="vmx-lib-curveseg" data-curve="festival" aria-pressed="false">Festival</button>
+                </div>
+
+                <div class="vmx-lib-build-permission" data-wire="library.build-tags">
+                  <button type="button" class="vmx-lib-tag-toggle" id="vmx-lib-build-tags" role="switch" aria-checked="false">
+                    <span class="dot"></span>
+                    <span>Serato/Mixxx tags</span>
+                    <b>OFF</b>
+                  </button>
+                  <p class="vmx-lib-seg-note">Writes VM cue tags into audio files for this export only.</p>
                 </div>
 
                 <div class="vmx-lib-chips">
@@ -222,7 +231,7 @@
                   <span class="vmx-lib-label">Exported</span>
                 </div>
                 <div class="path vmx-lib-mono" id="vmx-lib-export-path">·</div>
-                <div class="hint">File → Import Collection in Rekordbox, then drag the set into a playlist.</div>
+                <div class="hint" id="vmx-lib-export-hint">File → Import Collection in Rekordbox, then drag the set into a playlist.</div>
               </div>
 
               <div class="vmx-lib-results" id="vmx-lib-results" data-wire="library.results"></div>
