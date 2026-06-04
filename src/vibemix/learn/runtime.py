@@ -2422,7 +2422,7 @@ class LessonRuntime(StateMachine):
 
         verdict = result.grade.verdict
         text_by_verdict = {
-            "locked": "nice — that's matched.",
+            "locked": "tempo and phase are matched.",
             "drifting": "close, you're sliding behind — nudge the jog.",
             "tempo_off": "tempos are off — ease the pitch back.",
             "trainwreck": "that's drifted off — pull it back and re-find the 1.",
@@ -2527,9 +2527,9 @@ class LessonRuntime(StateMachine):
             f"[{CUE_PLACEMENT_EVIDENCE_SOURCE}:"
             f"{CUE_PLACEMENT_GRADED_EVENT}@{result.t_session:.3f}]"
         )
-        text = "nice - that hot cue landed on the drop."
+        text = "hot cue landed on the drop."
         if result.grade.verdict == "beat_locked":
-            text = "nice - that hot cue landed on the beat."
+            text = "hot cue landed on the beat."
         lesson_id = self._learn.current_lesson_id or "learn"
         try:
             speak = LearnTutorSpeak.make(

@@ -2,6 +2,7 @@
 """Learn runtime evidence grounding regression tests."""
 from __future__ import annotations
 
+import inspect
 from unittest.mock import MagicMock
 
 from vibemix.audio.grid import BeatGrid
@@ -162,6 +163,17 @@ def _live_grade_payloads(ipc: MagicMock) -> list[dict]:
         for call in ipc.emit.call_args_list
         if call.args and call.args[0].get("type") == "ipc.learn.live_grade"
     ]
+
+
+def test_runtime_grade_feedback_avoids_empty_compliments() -> None:
+    """Runtime-authored grade lines must describe the measured result."""
+
+    source = (
+        inspect.getsource(LessonRuntime._emit_live_beatmatch_grade)
+        + inspect.getsource(LessonRuntime._emit_live_cue_placement_grade)
+    ).lower()
+    for token in ("nice", "great job", "awesome", "amazing", "congrats", "you got this"):
+        assert token not in source
 
 
 def test_adaptive_midi_hint_writes_registry_and_time_keyed_citation() -> None:
@@ -510,7 +522,7 @@ def test_live_beatmatch_grade_voices_locked_with_resolving_citation(monkeypatch)
 
     payload = _tutor_speak_payloads(ipc)[-1]
     live_grade = _live_grade_payloads(ipc)[-1]
-    assert payload["text"] == "nice — that's matched."
+    assert payload["text"] == "tempo and phase are matched."
     assert payload["tts_marker"] == "L2.01.grade"
     assert payload["data_state"] == "hint"
     assert payload["citations"] == ["[ev:BEATMATCH_GRADED@42.400]"]
@@ -617,7 +629,7 @@ def test_live_beatmatch_grade_cites_locked_event_before_mastery_credit() -> None
 
     payload = _tutor_speak_payloads(ipc)[-1]
     live_grade = _live_grade_payloads(ipc)[-1]
-    assert payload["text"] == "nice — that's matched."
+    assert payload["text"] == "tempo and phase are matched."
     assert payload["citations"] == ["[ev:BEATMATCH_GRADED@43.200]"]
     assert live_grade["citation"] == "[ev:BEATMATCH_GRADED@43.200]"
     assert registry.has("ev", "BEATMATCH_GRADED", 43.2, tol=1.0)
@@ -1011,7 +1023,7 @@ def test_matched_beatmatch_action_records_and_grades_immediately(monkeypatch) ->
     assert progress in saved
     assert any(kind == "learn_beatmatch_practice_graded" for kind, _fields in events)
     tutor_payload = _tutor_speak_payloads(runtime._ipc)[-1]
-    assert tutor_payload["text"] == "nice — that's matched."
+    assert tutor_payload["text"] == "tempo and phase are matched."
     assert tutor_payload["citations"] == ["[ev:BEATMATCH_GRADED@91.200]"]
 
 
@@ -1307,7 +1319,7 @@ def test_matched_cue_action_records_and_grades_immediately(monkeypatch) -> None:
     ]
     assert len(cue_grade_speaks) == 1
     cue_grade_payload = cue_grade_speaks[0]["payload"]
-    assert cue_grade_payload["text"] == "nice - that hot cue landed on the drop."
+    assert cue_grade_payload["text"] == "hot cue landed on the drop."
     assert cue_grade_payload["citations"] == ["[ev:CUE_PLACEMENT_GRADED@73.500]"]
 
 
