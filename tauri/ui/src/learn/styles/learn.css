@@ -227,6 +227,26 @@
   transition: none;
 }
 
+/* EQ / filter knob pointer. The index marker reads as a machined pointer
+ * (bolder stroke + round cap) against the thin dial circle, so the rotation
+ * the runtime writes onto the parent <g> is legible as a pointer sweeping a
+ * fixed dial. It stays currentColor — it only lights rose when the lesson
+ * highlights that knob (the data-cue-color path above), never an always-on
+ * rose splatter across every knob (the 20/80 / one-highlight rule). */
+.learn-stage svg [data-control-id] .knob-indicator {
+  stroke-width: 2.5;
+  stroke-linecap: round;
+}
+/* Ease the rotate() the runtime sets on the knob group (attribute transform,
+ * like the fader thumb above) so the pointer sweeps instead of snapping; no
+ * bounce. Suppressed mid-drag so the pointer tracks the finger 1:1. */
+.learn-stage svg [data-control-id]:has(.knob-indicator) {
+  transition: transform 120ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.learn-stage svg [data-control-id][data-dragging="true"]:has(.knob-indicator) {
+  transition: none;
+}
+
 .learn-waveform-host {
   position: absolute;
   left: clamp(22px, 4vw, 64px);
@@ -259,6 +279,9 @@
 
 @media (prefers-reduced-motion: reduce) {
   .learn-stage svg [data-control-id][data-value] rect[data-fader-thumb="true"] {
+    transition: none;
+  }
+  .learn-stage svg [data-control-id]:has(.knob-indicator) {
     transition: none;
   }
 }

@@ -151,7 +151,7 @@ export const PIONEER_DDJ_FLX4_SVG = `<svg xmlns="http://www.w3.org/2000/svg" vie
      data-cx="500" data-cy="200">
     <circle cx="500" cy="200" r="22" stroke="currentColor" stroke-width="1.5" fill="none"/>
     <!-- Index marker (rotates at runtime via transform on the parent <g>) -->
-    <line x1="500" y1="183" x2="500" y2="197" stroke="currentColor" stroke-width="1.5"/>
+    <line class="knob-indicator" x1="500" y1="183" x2="500" y2="197" stroke="currentColor" stroke-width="1.5"/>
     <text x="500" y="248" font-family="'JetBrains Mono', monospace" font-size="9"
           letter-spacing="0.18em" text-anchor="middle" fill="currentColor" opacity="0.55">HI</text>
     <g class="cue-color"></g>
@@ -162,7 +162,7 @@ export const PIONEER_DDJ_FLX4_SVG = `<svg xmlns="http://www.w3.org/2000/svg" vie
   <g data-control-id="eq_hi:B" role="button" aria-label="EQ-HI knob, deck B" tabindex="0"
      data-cx="780" data-cy="200">
     <circle cx="780" cy="200" r="22" stroke="currentColor" stroke-width="1.5" fill="none"/>
-    <line x1="780" y1="183" x2="780" y2="197" stroke="currentColor" stroke-width="1.5"/>
+    <line class="knob-indicator" x1="780" y1="183" x2="780" y2="197" stroke="currentColor" stroke-width="1.5"/>
     <text x="780" y="248" font-family="'JetBrains Mono', monospace" font-size="9"
           letter-spacing="0.18em" text-anchor="middle" fill="currentColor" opacity="0.55">HI</text>
     <g class="cue-color"></g>
@@ -173,7 +173,7 @@ export const PIONEER_DDJ_FLX4_SVG = `<svg xmlns="http://www.w3.org/2000/svg" vie
   <g data-control-id="eq_mid:A" role="button" aria-label="EQ-MID knob, deck A" tabindex="0"
      data-cx="500" data-cy="280">
     <circle cx="500" cy="280" r="22" stroke="currentColor" stroke-width="1.5" fill="none"/>
-    <line x1="500" y1="263" x2="500" y2="277" stroke="currentColor" stroke-width="1.5"/>
+    <line class="knob-indicator" x1="500" y1="263" x2="500" y2="277" stroke="currentColor" stroke-width="1.5"/>
     <text x="500" y="328" font-family="'JetBrains Mono', monospace" font-size="9"
           letter-spacing="0.18em" text-anchor="middle" fill="currentColor" opacity="0.55">MID</text>
     <g class="cue-color"></g>
@@ -184,7 +184,7 @@ export const PIONEER_DDJ_FLX4_SVG = `<svg xmlns="http://www.w3.org/2000/svg" vie
   <g data-control-id="eq_mid:B" role="button" aria-label="EQ-MID knob, deck B" tabindex="0"
      data-cx="780" data-cy="280">
     <circle cx="780" cy="280" r="22" stroke="currentColor" stroke-width="1.5" fill="none"/>
-    <line x1="780" y1="263" x2="780" y2="277" stroke="currentColor" stroke-width="1.5"/>
+    <line class="knob-indicator" x1="780" y1="263" x2="780" y2="277" stroke="currentColor" stroke-width="1.5"/>
     <text x="780" y="328" font-family="'JetBrains Mono', monospace" font-size="9"
           letter-spacing="0.18em" text-anchor="middle" fill="currentColor" opacity="0.55">MID</text>
     <g class="cue-color"></g>
@@ -195,7 +195,7 @@ export const PIONEER_DDJ_FLX4_SVG = `<svg xmlns="http://www.w3.org/2000/svg" vie
   <g data-control-id="eq_low:A" role="button" aria-label="EQ-LOW knob, deck A" tabindex="0"
      data-cx="500" data-cy="360">
     <circle cx="500" cy="360" r="22" stroke="currentColor" stroke-width="1.5" fill="none"/>
-    <line x1="500" y1="343" x2="500" y2="357" stroke="currentColor" stroke-width="1.5"/>
+    <line class="knob-indicator" x1="500" y1="343" x2="500" y2="357" stroke="currentColor" stroke-width="1.5"/>
     <text x="500" y="408" font-family="'JetBrains Mono', monospace" font-size="9"
           letter-spacing="0.18em" text-anchor="middle" fill="currentColor" opacity="0.55">LOW</text>
     <g class="cue-color"></g>
@@ -206,7 +206,7 @@ export const PIONEER_DDJ_FLX4_SVG = `<svg xmlns="http://www.w3.org/2000/svg" vie
   <g data-control-id="eq_low:B" role="button" aria-label="EQ-LOW knob, deck B" tabindex="0"
      data-cx="780" data-cy="360">
     <circle cx="780" cy="360" r="22" stroke="currentColor" stroke-width="1.5" fill="none"/>
-    <line x1="780" y1="343" x2="780" y2="357" stroke="currentColor" stroke-width="1.5"/>
+    <line class="knob-indicator" x1="780" y1="343" x2="780" y2="357" stroke="currentColor" stroke-width="1.5"/>
     <text x="780" y="408" font-family="'JetBrains Mono', monospace" font-size="9"
           letter-spacing="0.18em" text-anchor="middle" fill="currentColor" opacity="0.55">LOW</text>
     <g class="cue-color"></g>
@@ -217,7 +217,7 @@ export const PIONEER_DDJ_FLX4_SVG = `<svg xmlns="http://www.w3.org/2000/svg" vie
   <g data-control-id="filter:A" role="button" aria-label="filter knob, deck A" tabindex="0"
      data-cx="500" data-cy="448">
     <circle cx="500" cy="448" r="20" stroke="currentColor" stroke-width="1.5" fill="none"/>
-    <line x1="500" y1="433" x2="500" y2="445" stroke="currentColor" stroke-width="1.5"/>
+    <line class="knob-indicator" x1="500" y1="433" x2="500" y2="445" stroke="currentColor" stroke-width="1.5"/>
     <text x="500" y="492" font-family="'JetBrains Mono', monospace" font-size="8"
           letter-spacing="0.16em" text-anchor="middle" fill="currentColor" opacity="0.55">FILTER</text>
     <g class="cue-color"></g>
@@ -228,7 +228,7 @@ export const PIONEER_DDJ_FLX4_SVG = `<svg xmlns="http://www.w3.org/2000/svg" vie
   <g data-control-id="filter:B" role="button" aria-label="filter knob, deck B" tabindex="0"
      data-cx="780" data-cy="448">
     <circle cx="780" cy="448" r="20" stroke="currentColor" stroke-width="1.5" fill="none"/>
-    <line x1="780" y1="433" x2="780" y2="445" stroke="currentColor" stroke-width="1.5"/>
+    <line class="knob-indicator" x1="780" y1="433" x2="780" y2="445" stroke="currentColor" stroke-width="1.5"/>
     <text x="780" y="492" font-family="'JetBrains Mono', monospace" font-size="8"
           letter-spacing="0.16em" text-anchor="middle" fill="currentColor" opacity="0.55">FILTER</text>
     <g class="cue-color"></g>

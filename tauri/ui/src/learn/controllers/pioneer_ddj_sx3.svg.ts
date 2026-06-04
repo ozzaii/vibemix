@@ -201,28 +201,28 @@ export const PIONEER_DDJ_SX3_SVG = `<svg xmlns="http://www.w3.org/2000/svg" view
   <g data-control-id="eq_hi:A" role="button" aria-label="EQ-HI knob, deck A" tabindex="0"
      data-cx="525" data-cy="170">
     <circle cx="525" cy="170" r="16" stroke="currentColor" stroke-width="1.3" fill="none"/>
-    <line x1="525" y1="158" x2="525" y2="168" stroke="currentColor" stroke-width="1.3"/>
+    <line class="knob-indicator" x1="525" y1="158" x2="525" y2="168" stroke="currentColor" stroke-width="1.3"/>
     <g class="cue-color"></g>
     <g class="cue-shape"></g>
   </g>
   <g data-control-id="eq_hi:B" role="button" aria-label="EQ-HI knob, deck B" tabindex="0"
      data-cx="585" data-cy="170">
     <circle cx="585" cy="170" r="16" stroke="currentColor" stroke-width="1.3" fill="none"/>
-    <line x1="585" y1="158" x2="585" y2="168" stroke="currentColor" stroke-width="1.3"/>
+    <line class="knob-indicator" x1="585" y1="158" x2="585" y2="168" stroke="currentColor" stroke-width="1.3"/>
     <g class="cue-color"></g>
     <g class="cue-shape"></g>
   </g>
   <g data-control-id="eq_hi:C" role="button" aria-label="EQ-HI knob, deck C" tabindex="0"
      data-cx="695" data-cy="170">
     <circle cx="695" cy="170" r="16" stroke="currentColor" stroke-width="1.3" fill="none"/>
-    <line x1="695" y1="158" x2="695" y2="168" stroke="currentColor" stroke-width="1.3"/>
+    <line class="knob-indicator" x1="695" y1="158" x2="695" y2="168" stroke="currentColor" stroke-width="1.3"/>
     <g class="cue-color"></g>
     <g class="cue-shape"></g>
   </g>
   <g data-control-id="eq_hi:D" role="button" aria-label="EQ-HI knob, deck D" tabindex="0"
      data-cx="755" data-cy="170">
     <circle cx="755" cy="170" r="16" stroke="currentColor" stroke-width="1.3" fill="none"/>
-    <line x1="755" y1="158" x2="755" y2="168" stroke="currentColor" stroke-width="1.3"/>
+    <line class="knob-indicator" x1="755" y1="158" x2="755" y2="168" stroke="currentColor" stroke-width="1.3"/>
     <g class="cue-color"></g>
     <g class="cue-shape"></g>
   </g>
@@ -232,28 +232,28 @@ export const PIONEER_DDJ_SX3_SVG = `<svg xmlns="http://www.w3.org/2000/svg" view
   <g data-control-id="eq_mid:A" role="button" aria-label="EQ-MID knob, deck A" tabindex="0"
      data-cx="525" data-cy="225">
     <circle cx="525" cy="225" r="16" stroke="currentColor" stroke-width="1.3" fill="none"/>
-    <line x1="525" y1="213" x2="525" y2="223" stroke="currentColor" stroke-width="1.3"/>
+    <line class="knob-indicator" x1="525" y1="213" x2="525" y2="223" stroke="currentColor" stroke-width="1.3"/>
     <g class="cue-color"></g>
     <g class="cue-shape"></g>
   </g>
   <g data-control-id="eq_mid:B" role="button" aria-label="EQ-MID knob, deck B" tabindex="0"
      data-cx="585" data-cy="225">
     <circle cx="585" cy="225" r="16" stroke="currentColor" stroke-width="1.3" fill="none"/>
-    <line x1="585" y1="213" x2="585" y2="223" stroke="currentColor" stroke-width="1.3"/>
+    <line class="knob-indicator" x1="585" y1="213" x2="585" y2="223" stroke="currentColor" stroke-width="1.3"/>
     <g class="cue-color"></g>
     <g class="cue-shape"></g>
   </g>
   <g data-control-id="eq_mid:C" role="button" aria-label="EQ-MID knob, deck C" tabindex="0"
      data-cx="695" data-cy="225">
     <circle cx="695" cy="225" r="16" stroke="currentColor" stroke-width="1.3" fill="none"/>
-    <line x1="695" y1="213" x2="695" y2="223" stroke="currentColor" stroke-width="1.3"/>
+    <line class="knob-indicator" x1="695" y1="213" x2="695" y2="223" stroke="currentColor" stroke-width="1.3"/>
     <g class="cue-color"></g>
     <g class="cue-shape"></g>
   </g>
   <g data-control-id="eq_mid:D" role="button" aria-label="EQ-MID knob, deck D" tabindex="0"
      data-cx="755" data-cy="225">
     <circle cx="755" cy="225" r="16" stroke="currentColor" stroke-width="1.3" fill="none"/>
-    <line x1="755" y1="213" x2="755" y2="223" stroke="currentColor" stroke-width="1.3"/>
+    <line class="knob-indicator" x1="755" y1="213" x2="755" y2="223" stroke="currentColor" stroke-width="1.3"/>
     <g class="cue-color"></g>
     <g class="cue-shape"></g>
   </g>
@@ -263,28 +263,28 @@ export const PIONEER_DDJ_SX3_SVG = `<svg xmlns="http://www.w3.org/2000/svg" view
   <g data-control-id="eq_low:A" role="button" aria-label="EQ-LOW knob, deck A" tabindex="0"
      data-cx="525" data-cy="280">
     <circle cx="525" cy="280" r="16" stroke="currentColor" stroke-width="1.3" fill="none"/>
-    <line x1="525" y1="268" x2="525" y2="278" stroke="currentColor" stroke-width="1.3"/>
+    <line class="knob-indicator" x1="525" y1="268" x2="525" y2="278" stroke="currentColor" stroke-width="1.3"/>
     <g class="cue-color"></g>
     <g class="cue-shape"></g>
   </g>
   <g data-control-id="eq_low:B" role="button" aria-label="EQ-LOW knob, deck B" tabindex="0"
      data-cx="585" data-cy="280">
     <circle cx="585" cy="280" r="16" stroke="currentColor" stroke-width="1.3" fill="none"/>
-    <line x1="585" y1="268" x2="585" y2="278" stroke="currentColor" stroke-width="1.3"/>
+    <line class="knob-indicator" x1="585" y1="268" x2="585" y2="278" stroke="currentColor" stroke-width="1.3"/>
     <g class="cue-color"></g>
     <g class="cue-shape"></g>
   </g>
   <g data-control-id="eq_low:C" role="button" aria-label="EQ-LOW knob, deck C" tabindex="0"
      data-cx="695" data-cy="280">
     <circle cx="695" cy="280" r="16" stroke="currentColor" stroke-width="1.3" fill="none"/>
-    <line x1="695" y1="268" x2="695" y2="278" stroke="currentColor" stroke-width="1.3"/>
+    <line class="knob-indicator" x1="695" y1="268" x2="695" y2="278" stroke="currentColor" stroke-width="1.3"/>
     <g class="cue-color"></g>
     <g class="cue-shape"></g>
   </g>
   <g data-control-id="eq_low:D" role="button" aria-label="EQ-LOW knob, deck D" tabindex="0"
      data-cx="755" data-cy="280">
     <circle cx="755" cy="280" r="16" stroke="currentColor" stroke-width="1.3" fill="none"/>
-    <line x1="755" y1="268" x2="755" y2="278" stroke="currentColor" stroke-width="1.3"/>
+    <line class="knob-indicator" x1="755" y1="268" x2="755" y2="278" stroke="currentColor" stroke-width="1.3"/>
     <g class="cue-color"></g>
     <g class="cue-shape"></g>
   </g>
@@ -295,28 +295,28 @@ export const PIONEER_DDJ_SX3_SVG = `<svg xmlns="http://www.w3.org/2000/svg" view
   <g data-control-id="filter:A" role="button" aria-label="filter knob, deck A" tabindex="0"
      data-cx="525" data-cy="340">
     <circle cx="525" cy="340" r="14" stroke="currentColor" stroke-width="1.3" fill="none"/>
-    <line x1="525" y1="330" x2="525" y2="338" stroke="currentColor" stroke-width="1.3"/>
+    <line class="knob-indicator" x1="525" y1="330" x2="525" y2="338" stroke="currentColor" stroke-width="1.3"/>
     <g class="cue-color"></g>
     <g class="cue-shape"></g>
   </g>
   <g data-control-id="filter:B" role="button" aria-label="filter knob, deck B" tabindex="0"
      data-cx="585" data-cy="340">
     <circle cx="585" cy="340" r="14" stroke="currentColor" stroke-width="1.3" fill="none"/>
-    <line x1="585" y1="330" x2="585" y2="338" stroke="currentColor" stroke-width="1.3"/>
+    <line class="knob-indicator" x1="585" y1="330" x2="585" y2="338" stroke="currentColor" stroke-width="1.3"/>
     <g class="cue-color"></g>
     <g class="cue-shape"></g>
   </g>
   <g data-control-id="filter:C" role="button" aria-label="filter knob, deck C" tabindex="0"
      data-cx="695" data-cy="340">
     <circle cx="695" cy="340" r="14" stroke="currentColor" stroke-width="1.3" fill="none"/>
-    <line x1="695" y1="330" x2="695" y2="338" stroke="currentColor" stroke-width="1.3"/>
+    <line class="knob-indicator" x1="695" y1="330" x2="695" y2="338" stroke="currentColor" stroke-width="1.3"/>
     <g class="cue-color"></g>
     <g class="cue-shape"></g>
   </g>
   <g data-control-id="filter:D" role="button" aria-label="filter knob, deck D" tabindex="0"
      data-cx="755" data-cy="340">
     <circle cx="755" cy="340" r="14" stroke="currentColor" stroke-width="1.3" fill="none"/>
-    <line x1="755" y1="330" x2="755" y2="338" stroke="currentColor" stroke-width="1.3"/>
+    <line class="knob-indicator" x1="755" y1="330" x2="755" y2="338" stroke="currentColor" stroke-width="1.3"/>
     <g class="cue-color"></g>
     <g class="cue-shape"></g>
   </g>

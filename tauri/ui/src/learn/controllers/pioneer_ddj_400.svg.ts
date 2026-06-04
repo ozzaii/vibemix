@@ -130,7 +130,7 @@ export const PIONEER_DDJ_400_SVG = `<svg xmlns="http://www.w3.org/2000/svg" view
   <g data-control-id="eq_hi:A" role="button" aria-label="EQ-HI knob, deck A" tabindex="0"
      data-cx="500" data-cy="220">
     <circle cx="500" cy="220" r="24" stroke="currentColor" stroke-width="1.5" fill="none"/>
-    <line x1="500" y1="201" x2="500" y2="217" stroke="currentColor" stroke-width="1.5"/>
+    <line class="knob-indicator" x1="500" y1="201" x2="500" y2="217" stroke="currentColor" stroke-width="1.5"/>
     <text x="500" y="270" font-family="'JetBrains Mono', monospace" font-size="9"
           letter-spacing="0.18em" text-anchor="middle" fill="currentColor" opacity="0.55">HI</text>
     <g class="cue-color"></g>
@@ -141,7 +141,7 @@ export const PIONEER_DDJ_400_SVG = `<svg xmlns="http://www.w3.org/2000/svg" view
   <g data-control-id="eq_hi:B" role="button" aria-label="EQ-HI knob, deck B" tabindex="0"
      data-cx="780" data-cy="220">
     <circle cx="780" cy="220" r="24" stroke="currentColor" stroke-width="1.5" fill="none"/>
-    <line x1="780" y1="201" x2="780" y2="217" stroke="currentColor" stroke-width="1.5"/>
+    <line class="knob-indicator" x1="780" y1="201" x2="780" y2="217" stroke="currentColor" stroke-width="1.5"/>
     <text x="780" y="270" font-family="'JetBrains Mono', monospace" font-size="9"
           letter-spacing="0.18em" text-anchor="middle" fill="currentColor" opacity="0.55">HI</text>
     <g class="cue-color"></g>
@@ -152,7 +152,7 @@ export const PIONEER_DDJ_400_SVG = `<svg xmlns="http://www.w3.org/2000/svg" view
   <g data-control-id="eq_mid:A" role="button" aria-label="EQ-MID knob, deck A" tabindex="0"
      data-cx="500" data-cy="305">
     <circle cx="500" cy="305" r="24" stroke="currentColor" stroke-width="1.5" fill="none"/>
-    <line x1="500" y1="286" x2="500" y2="302" stroke="currentColor" stroke-width="1.5"/>
+    <line class="knob-indicator" x1="500" y1="286" x2="500" y2="302" stroke="currentColor" stroke-width="1.5"/>
     <text x="500" y="355" font-family="'JetBrains Mono', monospace" font-size="9"
           letter-spacing="0.18em" text-anchor="middle" fill="currentColor" opacity="0.55">MID</text>
     <g class="cue-color"></g>
@@ -163,7 +163,7 @@ export const PIONEER_DDJ_400_SVG = `<svg xmlns="http://www.w3.org/2000/svg" view
   <g data-control-id="eq_mid:B" role="button" aria-label="EQ-MID knob, deck B" tabindex="0"
      data-cx="780" data-cy="305">
     <circle cx="780" cy="305" r="24" stroke="currentColor" stroke-width="1.5" fill="none"/>
-    <line x1="780" y1="286" x2="780" y2="302" stroke="currentColor" stroke-width="1.5"/>
+    <line class="knob-indicator" x1="780" y1="286" x2="780" y2="302" stroke="currentColor" stroke-width="1.5"/>
     <text x="780" y="355" font-family="'JetBrains Mono', monospace" font-size="9"
           letter-spacing="0.18em" text-anchor="middle" fill="currentColor" opacity="0.55">MID</text>
     <g class="cue-color"></g>
@@ -174,7 +174,7 @@ export const PIONEER_DDJ_400_SVG = `<svg xmlns="http://www.w3.org/2000/svg" view
   <g data-control-id="eq_low:A" role="button" aria-label="EQ-LOW knob, deck A" tabindex="0"
      data-cx="500" data-cy="395">
     <circle cx="500" cy="395" r="24" stroke="currentColor" stroke-width="1.5" fill="none"/>
-    <line x1="500" y1="376" x2="500" y2="392" stroke="currentColor" stroke-width="1.5"/>
+    <line class="knob-indicator" x1="500" y1="376" x2="500" y2="392" stroke="currentColor" stroke-width="1.5"/>
     <text x="500" y="445" font-family="'JetBrains Mono', monospace" font-size="9"
           letter-spacing="0.18em" text-anchor="middle" fill="currentColor" opacity="0.55">LOW</text>
     <g class="cue-color"></g>
@@ -185,7 +185,7 @@ export const PIONEER_DDJ_400_SVG = `<svg xmlns="http://www.w3.org/2000/svg" view
   <g data-control-id="eq_low:B" role="button" aria-label="EQ-LOW knob, deck B" tabindex="0"
      data-cx="780" data-cy="395">
     <circle cx="780" cy="395" r="24" stroke="currentColor" stroke-width="1.5" fill="none"/>
-    <line x1="780" y1="376" x2="780" y2="392" stroke="currentColor" stroke-width="1.5"/>
+    <line class="knob-indicator" x1="780" y1="376" x2="780" y2="392" stroke="currentColor" stroke-width="1.5"/>
     <text x="780" y="445" font-family="'JetBrains Mono', monospace" font-size="9"
           letter-spacing="0.18em" text-anchor="middle" fill="currentColor" opacity="0.55">LOW</text>
     <g class="cue-color"></g>
