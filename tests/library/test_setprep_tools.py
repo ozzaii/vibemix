@@ -945,6 +945,71 @@ def test_export_set_auto_cues_empty_slots_by_default(toolset, tmp_path, monkeypa
     assert {"VM A IN", "VM D DROP", "VM F OUT"} <= names
 
 
+def test_export_set_auto_cues_snap_to_exported_bpm_grid(toolset, tmp_path, monkeypatch):
+    """Machine-authored pads land on the TEMPO grid exported to Rekordbox."""
+    toolset.seen.add("t000")
+    toolset._library.tracks["t000"] = _track("t000", bpm=120.0)
+    monkeypatch.setattr(
+        tool_mod,
+        "sections_for_entry",
+        lambda entry: (
+            _section(f"{entry.track_id}#intro", "intro", 10.21, 32.0),
+            _section(f"{entry.track_id}#drop", "drop", 64.26, 128.0),
+        ),
+    )
+
+    out_xml = tmp_path / "snap-bpm-grid.xml"
+    out = toolset.export_set({"name": "Snap Grid", "track_ids": ["t000"], "out_path": str(out_xml)})
+
+    assert out.get("exported") is True
+    assert out["auto_cues"]["snap_adjusted_count"] >= 2
+    assert out["auto_cues"]["snap_max_adjustment_ms"] == pytest.approx(240.0)
+    track = ET.parse(out_xml).getroot().find("COLLECTION/TRACK")
+    assert track is not None
+    tempo = track.find("TEMPO")
+    assert tempo is not None
+    assert float(tempo.attrib["Bpm"]) == pytest.approx(120.0)
+    marks = {m.attrib["Name"]: m for m in track.findall("POSITION_MARK")}
+    assert float(marks["VM A IN"].attrib["Start"]) == pytest.approx(10.0)
+    assert float(marks["VM D DROP"].attrib["Start"]) == pytest.approx(64.5)
+
+
+def test_export_set_auto_cues_snap_to_real_grid_inizio(toolset, tmp_path, monkeypatch):
+    """Machine cue snap respects a persisted Rekordbox beatgrid phase."""
+    toolset.seen.add("t000")
+    toolset._library.tracks["t000"] = TrackEntry(
+        track_id="t000",
+        title="Gridded Track",
+        artist="Artist",
+        album="A",
+        bpm=120.0,
+        key="8A",
+        duration_s=300.0,
+        cues=(),
+        filepath="/tmp/t000.mp3",
+        beatgrid=(TempoNode(inizio_s=0.125, bpm=120.0, metro="4/4", battito=1),),
+    )
+    monkeypatch.setattr(
+        tool_mod,
+        "sections_for_entry",
+        lambda entry: (_section(f"{entry.track_id}#intro", "intro", 10.21, 32.0),),
+    )
+
+    out_xml = tmp_path / "snap-real-grid.xml"
+    out = toolset.export_set({"name": "Snap Real Grid", "track_ids": ["t000"], "out_path": str(out_xml)})
+
+    assert out.get("exported") is True
+    track = ET.parse(out_xml).getroot().find("COLLECTION/TRACK")
+    assert track is not None
+    tempo = track.find("TEMPO")
+    assert tempo is not None
+    assert float(tempo.attrib["Inizio"]) == pytest.approx(0.125)
+    mark = track.find("POSITION_MARK")
+    assert mark is not None
+    assert mark.attrib["Name"] == "VM A IN"
+    assert float(mark.attrib["Start"]) == pytest.approx(10.125)
+
+
 def test_export_set_auto_cues_from_producer_when_cache_sections_are_not_ready(
     toolset, tmp_path, monkeypatch
 ):
@@ -1023,6 +1088,37 @@ def test_export_set_auto_cues_fill_empty_slots_without_clobbering_dj(
     assert marks["MY A"].attrib["Num"] == "0"
     assert "VM MY A" not in marks
     assert marks["VM D DROP"].attrib["Num"] == "3"
+
+
+def test_export_set_auto_cue_snap_preserves_dj_offgrid_cues(toolset, tmp_path, monkeypatch):
+    """DJ-authored pads may be intentionally off-grid; never quantize them."""
+    toolset.seen.add("t000")
+    toolset._library.tracks["t000"] = TrackEntry(
+        track_id="t000",
+        title="Human Cued Track",
+        artist="Artist",
+        album="A",
+        bpm=120.0,
+        key="8A",
+        duration_s=300.0,
+        cues=(CuePoint(name="MY A", type="cue", start_s=4.21, end_s=None, number=0),),
+        filepath="/tmp/t000.mp3",
+    )
+    monkeypatch.setattr(
+        tool_mod,
+        "sections_for_entry",
+        lambda entry: (_section(f"{entry.track_id}#drop", "drop", 64.26, 128.0),),
+    )
+
+    out_xml = tmp_path / "preserve-dj-offgrid.xml"
+    out = toolset.export_set(
+        {"name": "Preserve DJ Offgrid", "track_ids": ["t000"], "out_path": str(out_xml)}
+    )
+
+    assert out.get("exported") is True
+    marks = {m.attrib["Name"]: m for m in ET.parse(out_xml).getroot().findall(".//POSITION_MARK")}
+    assert float(marks["MY A"].attrib["Start"]) == pytest.approx(4.21)
+    assert float(marks["VM D DROP"].attrib["Start"]) == pytest.approx(64.5)
 
 
 def test_export_set_records_exported_on_toolset(toolset, tmp_path):

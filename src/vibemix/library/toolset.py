@@ -996,6 +996,10 @@ class LibraryToolset:
                         _add_auto_cue_summary(auto_cue_report, proposal_summary, len(auto_marks))
                         if auto_marks:
                             cue_payload["cues"] = [*cue_payload.get("cues", []), *auto_marks]
+                _add_auto_cue_snap_summary(
+                    auto_cue_report,
+                    _snap_machine_cues_to_export_grid(cue_payload),
+                )
                 items.append(
                     {
                         "track_id": tid,
@@ -1856,12 +1860,87 @@ def _export_cues_and_grid(entry: Any) -> dict[str, Any]:
     return out
 
 
+_MACHINE_CUE_SOURCES = {"auto", "anlz", "fallback"}
+
+
+def _snap_machine_cues_to_export_grid(cue_payload: dict[str, Any]) -> dict[str, float | int]:
+    """Quantize machine-authored cue marks to the beatgrid this XML exports.
+
+    Rekordbox imports the cue timestamp and the TEMPO grid independently. When a
+    track has no persisted Rekordbox grid, ``_export_cues_and_grid`` emits a
+    constant-BPM grid starting at 0.0; auto/anlz/fallback cue marks must land on
+    that same grid or the pad appears off-beat after import. DJ-authored cue
+    marks are preserved exactly.
+    """
+    grid = _export_grid_params(cue_payload)
+    if grid is None:
+        return {"adjusted_count": 0, "max_adjustment_ms": 0.0}
+    inizio_s, bpm = grid
+    beat_s = 60.0 / bpm
+    adjusted_count = 0
+    max_adjustment_ms = 0.0
+    for mark in cue_payload.get("cues", ()) or ():
+        if not isinstance(mark, dict) or not _is_machine_cue_mark(mark):
+            continue
+        try:
+            start_s = float(mark.get("start_s", 0.0))
+        except (TypeError, ValueError):
+            continue
+        snapped_s = max(0.0, inizio_s + round((start_s - inizio_s) / beat_s) * beat_s)
+        delta_s = snapped_s - start_s
+        if abs(delta_s) <= 1e-9:
+            continue
+        mark["start_s"] = round(snapped_s, 6)
+        if mark.get("end_s") is not None:
+            try:
+                mark["end_s"] = round(max(0.0, float(mark["end_s"]) + delta_s), 6)
+            except (TypeError, ValueError):
+                pass
+        adjusted_count += 1
+        max_adjustment_ms = max(max_adjustment_ms, abs(delta_s) * 1000.0)
+    return {
+        "adjusted_count": adjusted_count,
+        "max_adjustment_ms": round(max_adjustment_ms, 3),
+    }
+
+
+def _export_grid_params(cue_payload: dict[str, Any]) -> tuple[float, float] | None:
+    raw_grid = cue_payload.get("beatgrid")
+    if not isinstance(raw_grid, dict):
+        return None
+    try:
+        bpm = float(raw_grid.get("bpm", 0.0) or 0.0)
+    except (TypeError, ValueError):
+        return None
+    if not math.isfinite(bpm) or bpm <= 0:
+        return None
+    try:
+        inizio_s = float(raw_grid.get("inizio", 0.0) or 0.0)
+    except (TypeError, ValueError):
+        inizio_s = 0.0
+    if not math.isfinite(inizio_s):
+        inizio_s = 0.0
+    return inizio_s, bpm
+
+
+def _is_machine_cue_mark(mark: dict[str, Any]) -> bool:
+    source = str(mark.get("source", "") or "").strip().lower()
+    if source == "dj":
+        return False
+    if source in _MACHINE_CUE_SOURCES:
+        return True
+    name = str(mark.get("name", "") or "")
+    return name.startswith("VM ")
+
+
 def _auto_cue_report(*, enabled: bool) -> dict[str, Any]:
     return {
         "enabled": enabled,
         "tracks_attempted": 0,
         "tracks_cued": 0,
         "cues_added": 0,
+        "snap_adjusted_count": 0,
+        "snap_max_adjustment_ms": 0.0,
         "skipped_tracks": 0,
         "skipped_failed": 0,
         "proposal_export_ready_count": 0,
@@ -1924,6 +2003,17 @@ def _add_auto_cue_summary(report: dict[str, Any], summary: Any, cue_count: int) 
         report["cues_added"] += cue_count
     else:
         report["skipped_tracks"] += 1
+
+
+def _add_auto_cue_snap_summary(report: dict[str, Any], stats: dict[str, float | int]) -> None:
+    adjusted = int(stats.get("adjusted_count", 0) or 0)
+    if adjusted <= 0:
+        return
+    report["snap_adjusted_count"] += adjusted
+    report["snap_max_adjustment_ms"] = max(
+        float(report.get("snap_max_adjustment_ms", 0.0) or 0.0),
+        float(stats.get("max_adjustment_ms", 0.0) or 0.0),
+    )
 
 
 def _occupied_hotcue_slots(cues: Any) -> set[int]:
