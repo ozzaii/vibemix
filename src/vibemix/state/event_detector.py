@@ -261,9 +261,21 @@ class EventDetector:
             self._fire("KAAN_SPOKE", now, state, cooldown_key="MIC")
             return Event("KAAN_SPOKE", state)
 
-        if manual and self._cooldown_ok("MANUAL", now):
-            self._fire("MANUAL", now, state)
-            return Event("MANUAL", state)
+        if manual:
+            if self._cooldown_ok("MANUAL", now):
+                self._fire("MANUAL", now, state)
+                return Event("MANUAL", state)
+            if self._music_truly_playing(state, now):
+                self.last_phase = state.phase
+                self.last_audible_track = state.audible_track
+                self.last_band_signature = (
+                    round(state.bands["mid"], 2),
+                    round(state.bands["high"], 2),
+                )
+                self.last_mix_moves_seen = [m for _, m in state.recent_moves][-12:]
+            else:
+                self._reset_change_refs(state)
+            return None
 
         # MUSIC-TRULY-PLAYING GATE — the cardinal rule. No auto-events
         # while mic ambient is fluttering RMS, while a stale nowplaying-cli

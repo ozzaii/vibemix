@@ -153,6 +153,41 @@ def test_manual_respects_MANUAL_cooldown(mocker):
     assert ev4.type == "MANUAL"
 
 
+def test_pending_manual_blocks_auto_events_and_keeps_refs_fresh(mocker):
+    """A requested MANUAL inside global cooldown waits instead of becoming auto chatter."""
+    d = EventDetector()
+    ms = _state(
+        audible_track="Incoming Track",
+        audible_track_confidence=0.9,
+        phase="drop",
+        recent_moves=[(0.5, "A_low: flat→killed (big twist)")],
+    )
+    d._audible_since = 990.0
+    d.last_event_at = 1000.0
+    d.last_per_type_at["PHASE"] = 1000.0
+    d.last_phase = "build"
+    d.last_audible_track = "Previous Track"
+    d.last_band_signature = (0.1, 0.1)
+
+    t = _patch_time(mocker, 1005.0)
+    ev = d.detect(ms, kaan_just_spoke=False, manual=True)
+
+    assert ev is None
+    assert "MANUAL" not in d.last_per_type_at
+    assert d.last_event_at == 1000.0
+    assert d.last_phase == "drop"
+    assert d.last_audible_track == "Incoming Track"
+    assert d.last_band_signature == (0.3, 0.2)
+    assert d.last_mix_moves_seen == ["A_low: flat→killed (big twist)"]
+
+    t.return_value = 1000.0 + EVENT_GLOBAL_MIN_GAP + 1.0
+    accepted = d.detect(ms, kaan_just_spoke=False, manual=True)
+
+    assert accepted is not None
+    assert accepted.type == "MANUAL"
+    assert d.last_per_type_at["MANUAL"] == t.return_value
+
+
 # ---------- Cardinal rule 2: Music-presence gate ----------
 
 

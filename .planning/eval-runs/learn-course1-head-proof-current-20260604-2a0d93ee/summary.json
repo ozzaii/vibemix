@@ -1,0 +1,35 @@
+{
+  "artifacts": [
+    "l103_eq_current_bus.json",
+    "l114_eq_exemplars_current_bus.json",
+    "l113_waveform_current_bus.json",
+    "l201_grade_auto_advance_current_bus.json"
+  ],
+  "capture_heads": {
+    "l103_eq_current_bus.json": "a3e7dc0b45efea7ff640be78ddc0847f9a852b0c",
+    "l113_waveform_current_bus.json": "a3e7dc0b45efea7ff640be78ddc0847f9a852b0c",
+    "l114_eq_exemplars_current_bus.json": "a3e7dc0b45efea7ff640be78ddc0847f9a852b0c",
+    "l201_grade_auto_advance_current_bus.json": "2a0d93eebb314e3227bcc4995b1b9d4e19930709"
+  },
+  "checks": {
+    "l103_eq_audio_bus": true,
+    "l113_waveform_breakdown": true,
+    "l114_three_exemplars": true,
+    "l201_auto_advance": true
+  },
+  "current_head_when_consolidated": "2a0d93eebb314e3227bcc4995b1b9d4e19930709",
+  "learn_audio_diff_between_first_capture_and_current_head": [],
+  "name": "learn-course1-head-proof-current-20260604-2a0d93ee",
+  "notes": [
+    "L1.03, L1.14, and L1.13 were captured at a3e7dc0b; L2.01 was recaptured at the current consolidated head.",
+    "git diff over Learn/audio/runtime/test paths from a3e7dc0b to the consolidated head is empty, so the first three bus captures still apply to current Learn source.",
+    "This is by-bus proof only; it records websocket envelopes and does not claim human ear confirmation."
+  ],
+  "passed": true,
+  "sidecar_logs": [
+    "l103_eq_current_bus-sidecar.log",
+    "l114_eq_exemplars_current_bus-sidecar.log",
+    "l113_waveform_current_bus-sidecar.log",
+    "l201_grade_auto_advance_current_bus-sidecar.log"
+  ]
+}

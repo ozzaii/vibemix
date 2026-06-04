@@ -580,11 +580,15 @@ async def coach_loop(
             mic_active_frames = 0
             mic_silence_since = 0.0
 
-        manual = manual_trigger.is_set()
+        manual_requested = manual_trigger.is_set()
+        ev = event_detector.detect(
+            state,
+            kaan_just_spoke=kaan_just_spoke,
+            manual=manual_requested,
+        )
+        manual = manual_requested and ev is not None and ev.type == "MANUAL"
         if manual:
             manual_trigger.clear()
-
-        ev = event_detector.detect(state, kaan_just_spoke=kaan_just_spoke, manual=manual)
 
         # STATE delta trace — debounced, only logs when a tracked field changes
         # (note_change is a no-op on unchanged values, so the 10Hz tick stays cheap).

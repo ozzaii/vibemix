@@ -829,8 +829,8 @@ def test_coach_10_manual_trigger(
     fake_event_detector,
     music_state,
 ):
-    """COACH-10: manual_trigger.set() then run one tick → manual=True is
-    passed to detect AND manual_trigger is cleared after."""
+    """COACH-10: manual_trigger clears only after the detector accepts MANUAL."""
+    fake_event_detector.detect.return_value = Event("MANUAL", music_state, extra={})
     mocker.patch("vibemix.runtime.coach.time.time", side_effect=_auto_time())
 
     stop_event = asyncio.Event()
@@ -859,6 +859,45 @@ def test_coach_10_manual_trigger(
     assert fake_event_detector.detect.call_count == 1
     assert fake_event_detector.detect.call_args.kwargs.get("manual") is True
     assert not manual_trigger.is_set()
+
+
+def test_coach_10_manual_trigger_stays_pending_when_detector_defers(
+    mocker,
+    fake_session,
+    fake_agent,
+    fake_levels,
+    fake_recorder,
+    fake_event_detector,
+    music_state,
+):
+    """A websocket trigger survives cooldown/no-event ticks until MANUAL fires."""
+    fake_event_detector.detect.return_value = None
+    mocker.patch("vibemix.runtime.coach.time.time", side_effect=_auto_time())
+
+    stop_event = asyncio.Event()
+    fake_sleep, _ = _make_stop_after(2, stop_event)  # 1 warmup + 1 tick
+    mocker.patch("vibemix.runtime.coach.asyncio.sleep", side_effect=fake_sleep)
+
+    manual_trigger = asyncio.Event()
+    manual_trigger.set()
+
+    asyncio.run(
+        coach_loop(
+            fake_session,
+            fake_agent,
+            music_state,
+            fake_levels,
+            fake_event_detector,
+            fake_recorder,
+            manual_trigger,
+            {"in_flight": False},
+            stop_event,
+        )
+    )
+
+    assert fake_event_detector.detect.call_count == 1
+    assert fake_event_detector.detect.call_args.kwargs.get("manual") is True
+    assert manual_trigger.is_set()
 
 
 # ---------------------------------------------------------------------------
@@ -1176,7 +1215,7 @@ def test_coach_14_repeat_phase_stays_silent(
     )
 
 
-def test_coach_15_manual_heartbeat_reaches_model(
+def test_coach_15_manual_event_reaches_model(
     mocker,
     fake_session,
     fake_agent,
@@ -1185,8 +1224,8 @@ def test_coach_15_manual_heartbeat_reaches_model(
     fake_event_detector,
     music_state,
 ):
-    """Manual trigger stays high priority even if the detector returns HEARTBEAT."""
-    ev = Event("HEARTBEAT", music_state, extra={})
+    """Accepted MANUAL events stay high priority and reach Sven."""
+    ev = Event("MANUAL", music_state, extra={})
     fake_event_detector.detect.return_value = ev
     mocker.patch("vibemix.runtime.coach.time.time", side_effect=_auto_time())
 
