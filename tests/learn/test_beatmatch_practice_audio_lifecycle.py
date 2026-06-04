@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
+from vibemix.learn.curriculum import course_lesson_ids
 from vibemix.learn.progress import LearnProgress
 from vibemix.learn.runtime import LessonRuntime
 from vibemix.learn.state import LearnState
@@ -149,6 +150,25 @@ def test_course_two_conceptual_demo_lessons_start_practice_player() -> None:
     _load_begin(runtime, lesson_id="L2.13")
 
     assert player.starts == 2
+
+
+def test_beginner_practice_courses_keep_all_non_dialog_lessons_audible() -> None:
+    """Course 1/2 practice lessons keep the owned demo loop available."""
+
+    audible: dict[str, bool] = {}
+    for course_id in ("course_1_anatomy", "course_2_transitions"):
+        for lesson_id in course_lesson_ids(course_id):
+            runtime = _runtime()
+            player = _FakePracticePlayer()
+            runtime.set_beatmatch_practice_player(player)
+
+            _load_begin(runtime, lesson_id=lesson_id, course_id=course_id)
+
+            audible[lesson_id] = player.starts > 0
+
+    silent = {lesson_id for lesson_id, started in audible.items() if not started}
+    assert silent == {"L1.01"}
+    assert all(audible[lesson_id] for lesson_id in course_lesson_ids("course_2_transitions"))
 
 
 def test_loop_and_hotcue_lessons_start_practice_player() -> None:
