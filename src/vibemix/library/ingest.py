@@ -57,13 +57,11 @@ from vibemix.library.excerpt import MAX_CUES_PER_TRACK, anchors_for_track, cut_w
 from vibemix.library.folder_ingest import IngestReport, _write_library_cache
 from vibemix.library.key_estimator import estimate_key
 from vibemix.library.rekordbox import CuePoint, TrackEntry
-from vibemix.library.section_builder import sections_for_entry
 from vibemix.library.section_vectors import (
-    SECTION_VECTOR_CACHE_VERSION,
     init_section_vector_schema,
     open_default_section_vector_db,
-    put_section_vector,
-    section_vector_cached,
+    persist_section_vectors_for_track,
+    section_source_hash,
 )
 from vibemix.library.tempo_estimator import estimate_bpm
 
@@ -690,64 +688,22 @@ def _ensure_section_vectors_for_track(
     backend_tag: str,
     slicer: Callable[[str, float, float], bytes] | None = None,
 ) -> int:
-    """Populate per-section CLAP vectors for transition scoring.
-
-    This is additive to the track vector: failures are logged and skipped so a
-    bad section window never invalidates a successfully ingested track.
-    """
-    from vibemix.library._cosine import l2_normalize
-
-    if slicer is None:
-        slicer = _default_slicer
-
-    written = 0
-    for section in sections_for_entry(track):
-        start_s = max(0.0, float(section.start_s))
-        end_s = float(section.end_s)
-        if track.duration_s and track.duration_s > 0:
-            end_s = min(end_s, float(track.duration_s))
-        end_s = min(max(end_s, start_s), start_s + 80.0)
-        length_s = end_s - start_s
-        if length_s < 1.0:
-            continue
-
-        source_hash = _section_source_hash(track_cache_key, section.section_id, start_s, end_s)
-        if section_vector_cached(cache, section.section_id, source_hash=source_hash):
-            continue
-
-        try:
-            clip = slicer(str(local), start_s, length_s)
-            vector = l2_normalize(np.asarray(embedder.embed_audio_bytes(clip, "audio/mpeg")))
-            put_section_vector(
-                cache,
-                section_id=section.section_id,
-                source_hash=source_hash,
-                vector=vector.astype(np.float32),
-                model_tag=backend_tag,
-                strategy_tag=SECTION_VECTOR_CACHE_VERSION,
-                start_s=start_s,
-                end_s=end_s,
-            )
-            written += 1
-        except Exception as e:
-            logger.warning(
-                "[ingest] section-vector embed failed for %s (%s); skipping section.",
-                section.section_id,
-                e,
-            )
-    return written
+    """Compatibility wrapper around the public section-vector writer."""
+    return persist_section_vectors_for_track(
+        track,
+        local,
+        embedder,
+        cache,
+        track_cache_key=track_cache_key,
+        backend_tag=backend_tag,
+        slicer=slicer or _default_slicer,
+    )
 
 
 def _section_source_hash(
     track_cache_key: str, section_id: str, start_s: float, end_s: float
 ) -> str:
-    h = hashlib.sha256()
-    h.update(track_cache_key.encode("utf-8"))
-    h.update(b"||")
-    h.update(section_id.encode("utf-8"))
-    h.update(b"||")
-    h.update(f"{start_s:.3f}:{end_s:.3f}".encode())
-    return h.hexdigest()
+    return section_source_hash(track_cache_key, section_id, start_s, end_s)
 
 
 # --------------------------------------------------------------------------- #

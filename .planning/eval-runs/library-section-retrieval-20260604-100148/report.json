@@ -1,0 +1,176 @@
+{
+  "errors": [
+    "folder:617602a985c9fbeb:unprobeable_or_short_duration",
+    "folder:8d74772eef7ed616:unprobeable_or_short_duration"
+  ],
+  "generated_at": "2026-06-04T10:01:49+00:00",
+  "git_head": "e4fff670fb51d9788b0abbaec2fec60ae83986c8",
+  "metrics": {
+    "centered": {
+      "section_minus_whole_precision_at_1": 0.026315,
+      "section_minus_whole_precision_at_5": -0.136842,
+      "section_outro_to_intro": {
+        "hit_at_k": {
+          "1": 0.578947,
+          "3": 0.710526,
+          "5": 0.868421
+        },
+        "mrr": 0.677673,
+        "precision_at_k": {
+          "1": 0.578947,
+          "3": 0.403509,
+          "5": 0.363158
+        },
+        "queries": 38
+      },
+      "whole_track_baseline": {
+        "hit_at_k": {
+          "1": 0.552632,
+          "3": 0.789474,
+          "5": 0.868421
+        },
+        "mrr": 0.694936,
+        "precision_at_k": {
+          "1": 0.552632,
+          "3": 0.54386,
+          "5": 0.5
+        },
+        "queries": 38
+      }
+    },
+    "primary_delta": 0.026315,
+    "primary_metric": "centered_precision_at_1",
+    "primary_section_value": 0.578947,
+    "primary_whole_value": 0.552632,
+    "raw": {
+      "section_minus_whole_precision_at_5": -0.11579,
+      "section_outro_to_intro": {
+        "hit_at_k": {
+          "1": 0.447368,
+          "3": 0.763158,
+          "5": 0.868421
+        },
+        "mrr": 0.619819,
+        "precision_at_k": {
+          "1": 0.447368,
+          "3": 0.377193,
+          "5": 0.347368
+        },
+        "queries": 38
+      },
+      "whole_track_baseline": {
+        "hit_at_k": {
+          "1": 0.605263,
+          "3": 0.736842,
+          "5": 0.894737
+        },
+        "mrr": 0.709292,
+        "precision_at_k": {
+          "1": 0.605263,
+          "3": 0.517544,
+          "5": 0.463158
+        },
+        "queries": 38
+      }
+    },
+    "section_beats_whole": true
+  },
+  "notes": {
+    "no_owner_input": true,
+    "primary_metric": "mean-centered precision@1 because the product chooses one next intro candidate; raw and p@3/p@5 remain in the artifact as caveats",
+    "relevance": "same bootstrap folder/genre label, excluding the source track",
+    "section_mode": "query=outro section vector, candidates=intro section vectors",
+    "whole_baseline": "query=whole-track vector, candidates=whole-track vectors"
+  },
+  "schema": "library_section_retrieval_bench_v1",
+  "section_cache": {
+    "duration_probed_tracks": 38,
+    "scored_tracks": 38,
+    "skip_backfill": true,
+    "written": 0
+  },
+  "selection": {
+    "cache_audit": [
+      {
+        "cache_file": "library.pkl",
+        "cached_tracks": 187,
+        "candidate_label_sources": {
+          "folder_parent": {
+            "label_count": 1,
+            "label_counts": {
+              "Music": 187
+            },
+            "track_count": 187
+          },
+          "rekordbox_genre": {
+            "label_count": 0,
+            "label_counts": {},
+            "track_count": 0
+          }
+        },
+        "label_count": 1,
+        "loaded": true,
+        "selected_label_source": "folder_parent",
+        "source_summary": {
+          "kind": "directory",
+          "name": "Music"
+        },
+        "status": "insufficient_labeled_subset",
+        "track_count": 187
+      },
+      {
+        "cache_file": "library.pkl.v1bak",
+        "cached_tracks": 1547,
+        "candidate_label_sources": {
+          "folder_parent": {
+            "label_count": 8,
+            "label_counts": {
+              "ALL OF IT": 5,
+              "ETERNAL CHANGE": 7,
+              "GALACTIX": 50,
+              "GROOVEY140": 4,
+              "HARDMFCORE": 3,
+              "PSYMIND": 6,
+              "TEK": 7,
+              "Unknown Album": 2
+            },
+            "track_count": 84
+          },
+          "rekordbox_genre": {
+            "label_count": 0,
+            "label_counts": {},
+            "track_count": 0
+          }
+        },
+        "label_count": 8,
+        "loaded": true,
+        "selected_label_source": "folder_parent",
+        "source_summary": {
+          "kind": "directory",
+          "name": "Music"
+        },
+        "status": "ok",
+        "track_count": 84
+      }
+    ],
+    "label_counts": {
+      "ALL OF IT": 5,
+      "ETERNAL CHANGE": 7,
+      "GALACTIX": 7,
+      "GROOVEY140": 4,
+      "HARDMFCORE": 3,
+      "PSYMIND": 6,
+      "TEK": 6,
+      "Unknown Album": 2
+    },
+    "max_per_label": 12,
+    "requested_max_tracks": 40,
+    "selected_cache_file": "library.pkl.v1bak"
+  },
+  "status": "ok",
+  "store": {
+    "backend": "SqliteVecStore",
+    "embedded_tracks": 273,
+    "snapshot_hash": "361bbfa12fab41de2743fca9cfbdb2148aad6db31b9e012e8374e2aa75f37e90"
+  }
+}

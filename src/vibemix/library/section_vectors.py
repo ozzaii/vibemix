@@ -17,11 +17,17 @@ not accidentally claim section-level audio evidence.
 
 from __future__ import annotations
 
+import hashlib
+import logging
+import shutil
 import sqlite3
+import subprocess
+import tempfile
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Literal, Protocol
 
 import numpy as np
 
@@ -30,6 +36,17 @@ from vibemix.library.cache_paths import SECTION_VECTOR_CACHE_DB_PATH
 SectionVectorBasis = Literal["section_vector", "track_vector_fallback", "semantic_unknown"]
 
 SECTION_VECTOR_CACHE_VERSION = "v1-clap-section-window"
+SECTION_VECTOR_WINDOW_MAX_SECONDS = 80.0
+SECTION_VECTOR_MIN_SECONDS = 1.0
+_FFMPEG_TIMEOUT_SECONDS = 60.0
+
+logger = logging.getLogger(__name__)
+
+
+class SectionVectorEmbedder(Protocol):  # pragma: no cover - protocol
+    backend: str
+
+    def embed_audio_bytes(self, data: bytes, mime: str) -> np.ndarray: ...
 
 
 @dataclass(frozen=True, slots=True)
@@ -154,6 +171,133 @@ def put_section_vector(
     conn.commit()
 
 
+def section_window_for_record(section: Any, duration_s: float | None = None) -> tuple[float, float] | None:
+    """Return the bounded audio window for one grounded section.
+
+    Section vectors intentionally embed the section window itself, not a
+    whole-track mean. Windows are clamped to ``<=80s`` so they mirror the
+    existing cue-window budget and never ask CLAP to summarize a whole song.
+    """
+    start_s = max(0.0, float(getattr(section, "start_s", 0.0) or 0.0))
+    end_s = float(getattr(section, "end_s", 0.0) or 0.0)
+    if duration_s is not None and duration_s > 0:
+        end_s = min(end_s, float(duration_s))
+    end_s = min(max(end_s, start_s), start_s + SECTION_VECTOR_WINDOW_MAX_SECONDS)
+    if end_s - start_s < SECTION_VECTOR_MIN_SECONDS:
+        return None
+    return start_s, end_s
+
+
+def section_source_hash(
+    track_cache_key: str, section_id: str, start_s: float, end_s: float
+) -> str:
+    """Stable section cache key from track content key + section bounds."""
+    h = hashlib.sha256()
+    h.update(track_cache_key.encode("utf-8"))
+    h.update(b"||")
+    h.update(section_id.encode("utf-8"))
+    h.update(b"||")
+    h.update(f"{start_s:.3f}:{end_s:.3f}".encode())
+    return h.hexdigest()
+
+
+def default_section_slicer(path: str, start_s: float, length_s: float) -> bytes:
+    """ffmpeg-slice ``[start_s, start_s + length_s)`` to an MP3 byte window."""
+    ffmpeg = shutil.which("ffmpeg")
+    if ffmpeg is None:
+        raise RuntimeError("ffmpeg not found on PATH")
+    with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as tmp:
+        tmp_path = Path(tmp.name)
+    try:
+        cmd = [
+            ffmpeg,
+            "-y",
+            "-loglevel",
+            "error",
+            "-ss",
+            f"{start_s:.3f}",
+            "-i",
+            str(path),
+            "-t",
+            f"{length_s:.3f}",
+            "-acodec",
+            "libmp3lame",
+            "-b:a",
+            "128k",
+            str(tmp_path),
+        ]
+        subprocess.run(cmd, check=True, timeout=_FFMPEG_TIMEOUT_SECONDS, capture_output=True)
+        return tmp_path.read_bytes()
+    finally:
+        try:
+            tmp_path.unlink()
+        except FileNotFoundError:
+            pass
+
+
+def persist_section_vectors_for_track(
+    track: Any,
+    local: Path,
+    embedder: SectionVectorEmbedder,
+    conn: sqlite3.Connection,
+    *,
+    track_cache_key: str,
+    backend_tag: str | None = None,
+    slicer: Callable[[str, float, float], bytes] | None = None,
+) -> int:
+    """Populate per-section CLAP vectors for one local audio track.
+
+    This is additive and honest: a bad section window is logged and skipped,
+    while already-cached matching rows are left alone. The caller supplies a
+    ``track_cache_key`` derived from the audio/strategy so section rows invalidate
+    when the underlying audio embedding strategy changes.
+    """
+    from vibemix.library._cosine import l2_normalize
+    from vibemix.library.section_builder import sections_for_entry
+
+    if slicer is None:
+        slicer = default_section_slicer
+    model_tag = backend_tag or str(getattr(embedder, "backend", "clap"))
+
+    written = 0
+    duration_s = float(getattr(track, "duration_s", 0.0) or 0.0)
+    for section in sections_for_entry(track):
+        window = section_window_for_record(section, duration_s)
+        if window is None:
+            continue
+        start_s, end_s = window
+        source_hash = section_source_hash(
+            track_cache_key,
+            str(section.section_id),
+            start_s,
+            end_s,
+        )
+        if section_vector_cached(conn, section.section_id, source_hash=source_hash):
+            continue
+
+        try:
+            clip = slicer(str(local), start_s, end_s - start_s)
+            vector = l2_normalize(np.asarray(embedder.embed_audio_bytes(clip, "audio/mpeg")))
+            put_section_vector(
+                conn,
+                section_id=section.section_id,
+                source_hash=source_hash,
+                vector=vector.astype(np.float32),
+                model_tag=model_tag,
+                strategy_tag=SECTION_VECTOR_CACHE_VERSION,
+                start_s=start_s,
+                end_s=end_s,
+            )
+            written += 1
+        except Exception as e:
+            logger.warning(
+                "section-vector embed failed for %s (%s); skipping section.",
+                section.section_id,
+                e,
+            )
+    return written
+
+
 def resolve_section_vector(
     provider: Any,
     section_id: str,
@@ -258,14 +402,21 @@ def _coerce_vector(raw: Any) -> np.ndarray | None:
 
 __all__ = [
     "SECTION_VECTOR_CACHE_VERSION",
+    "SECTION_VECTOR_MIN_SECONDS",
+    "SECTION_VECTOR_WINDOW_MAX_SECONDS",
     "SectionVectorBasis",
+    "SectionVectorEmbedder",
     "SectionVectorResult",
+    "default_section_slicer",
     "get_cached_section_vector",
     "init_section_vector_schema",
     "open_default_section_vector_db",
     "open_section_vector_db",
+    "persist_section_vectors_for_track",
     "put_section_vector",
     "resolve_section_vector",
+    "section_source_hash",
     "section_vector_cached",
+    "section_window_for_record",
     "semantic_basis_for_pair",
 ]

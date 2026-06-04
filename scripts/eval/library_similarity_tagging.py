@@ -511,6 +511,7 @@ def _select_labeled_cache(
                 "cache_file": path.name,
                 "loaded": loaded,
                 "cached_tracks": len(tracks),
+                "tracks": tracks,
                 "source_path": source_path,
                 "source_summary": _summarize_source_path(source_path),
                 "subset": subset,
