@@ -1,0 +1,38 @@
+{
+  "abstained": 348,
+  "annotations_total": 604,
+  "attempted": 604,
+  "audio_found": 604,
+  "audio_missing": 0,
+  "counts": {
+    "abstained": 348,
+    "exact": 75,
+    "fifth": 52,
+    "other": 66,
+    "parallel": 44,
+    "relative": 19
+  },
+  "coverage": 1.0,
+  "dataset": "GiantSteps-604",
+  "emission_rate": 0.423841,
+  "emitted": 256,
+  "exact_accuracy": 0.124172,
+  "exact_accuracy_emitted": 0.292969,
+  "mirex_weighted": 0.191225,
+  "mirex_weighted_emitted": 0.451172,
+  "notes": {
+    "missing_audio_not_scored": true,
+    "parallel_credit": 0.2,
+    "source_path_redacted": true
+  },
+  "schema": "key_estimator_bench_v1",
+  "status": "ok",
+  "weights": {
+    "abstained": 0.0,
+    "exact": 1.0,
+    "fifth": 0.5,
+    "other": 0.0,
+    "parallel": 0.2,
+    "relative": 0.3
+  }
+}
