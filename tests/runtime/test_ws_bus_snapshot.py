@@ -21,6 +21,7 @@ from vibemix.runtime.ws_bus import (
     _build_session_snapshot,
     _trusted_bpm_for_display,
     _trusted_flat_bpm,
+    _trusted_grounded_for_snapshot,
 )
 from vibemix.ui_bus.validator import validate_message
 
@@ -196,6 +197,35 @@ def test_snapshot_does_not_ground_stale_audible_state_on_silent_meters():
     assert p["bpm"] is None
     assert p["drop_pred_bars"] is None
     assert p["track"] is None
+
+
+def test_snapshot_holds_debounced_audible_state_when_fast_meter_dips():
+    msg = _build_session_snapshot(
+        _FakeLevels(0.008, 0.0, 0.0, music_peak=0.026),
+        _fake_state(
+            audible=True,
+            rms=0.008,
+            bpm=176.5,
+            audible_track="Sköne - Fruit des pluies, en couleur",
+            audible_deck="A",
+        ),
+    )
+    validate_message(msg)
+    p = msg["payload"]
+    assert p["cohost_status"] == "LISTENING"
+    assert p["grounded"] is True
+    assert p["bpm"] == 176.5
+    assert p["track"] == {
+        "title": "Sköne - Fruit des pluies, en couleur",
+        "artist": None,
+        "deck": "A",
+    }
+
+
+def test_snapshot_grounding_still_rejects_stale_audible_when_all_audio_is_silent():
+    state = _fake_state(audible=True, rms=0.0)
+
+    assert _trusted_grounded_for_snapshot(state, music_rms=0.0, music_peak=0.0) is False
 
 
 def test_levels_clamped_to_unit_interval():

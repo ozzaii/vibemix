@@ -635,6 +635,55 @@ def test_tick_bpm_gate_skips_when_silent():
     assert last_bpm_at == 0.0
 
 
+def test_tick_peak_present_capture_counts_as_music_after_debounce(mocker):
+    """Low-RMS capture with clear peaks is still real deck audio.
+
+    FLX4/BlackHole routes can sit around the historical RMS silence floor while
+    the DJ is visibly near red. A clear music peak should feed the same debounce
+    and BPM path instead of blinking the deck idle.
+    """
+    state = MusicState()
+    estimate = mocker.patch("vibemix.state.refresh.estimate_bpm", return_value=171.4)
+    mocker.patch(
+        "vibemix.state.refresh.snapshot_features",
+        return_value={
+            "silent": True,
+            "rms": 0.008,
+            "onsets_per_sec": 2.0,
+            "sub_share": 0.2,
+            "low_share": 0.3,
+            "mid_share": 0.4,
+            "high_share": 0.1,
+        },
+    )
+    mocker.patch("vibemix.state.refresh.energy_curve", return_value=[0.008, 0.01])
+    mocker.patch("vibemix.state.refresh.short_term_lufs", return_value=None)
+    mocker.patch("vibemix.state.refresh.crest_factor", return_value=2.0)
+    mocker.patch("vibemix.state.refresh.compute_downbeat_phase", return_value=(0.0, 0.0))
+
+    out = _tick_once(
+        state,
+        _silent_buf(),
+        _ctrl_mock(),
+        _track_mock("Yung Lean & Bladee - Enemy"),
+        now=1000.0,
+        last_audible_high=999.0,
+        last_audible_low=0.0,
+        bpm_cache=0.0,
+        last_bpm_at=0.0,
+        levels=SimpleNamespace(voice=0.0, music_peak=0.03),
+    )
+
+    _last_high, _last_low, bpm_cache, last_bpm_at = out
+    estimate.assert_called_once()
+    assert state.audible is True
+    assert state.rms == 0.008
+    assert state.audible_track == "Yung Lean & Bladee - Enemy"
+    assert state.bpm == 171.4
+    assert bpm_cache == 171.4
+    assert last_bpm_at == 1000.0
+
+
 def test_tick_bpm_and_audible_gate_skip_voice_dominant_capture(mocker):
     """Sven-only loopback must not become music, audible state, or BPM."""
     state = MusicState()
@@ -651,7 +700,7 @@ def test_tick_bpm_and_audible_gate_skip_voice_dominant_capture(mocker):
         last_audible_low=0.0,
         bpm_cache=42.0,
         last_bpm_at=0.0,
-        levels=SimpleNamespace(voice=0.5),
+        levels=SimpleNamespace(voice=0.5, music_peak=0.5),
     )
 
     last_high, last_low, bpm_cache, last_bpm_at = out

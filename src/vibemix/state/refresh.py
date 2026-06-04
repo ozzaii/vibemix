@@ -132,6 +132,7 @@ _BAND_ENV_TREND_FLOOR = 0.04
 _BAND_ENV_LEVEL_LOW = 0.14
 _BAND_ENV_LEVEL_HIGH = 0.32
 _VOICE_CAPTURE_DOMINANCE_RATIO = 1.25
+_MUSIC_PEAK_PRESENCE_FLOOR = SILENT_RMS
 
 
 # Phase 52 (GENRE-01): cache the loaded GenreProfile library once — the profile
@@ -205,6 +206,15 @@ def _levels_voice(levels: object | None) -> float:
         return 0.0
     try:
         return max(0.0, float(getattr(levels, "voice", 0.0)))
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _levels_music_peak(levels: object | None) -> float:
+    if levels is None:
+        return 0.0
+    try:
+        return max(0.0, float(getattr(levels, "music_peak", 0.0)))
     except (TypeError, ValueError):
         return 0.0
 
@@ -992,6 +1002,7 @@ def _tick_once(
     feats = snapshot_features(audio_buf, seconds=4.0)
     raw_rms = feats.get("rms", 0.0)
     voice_level = _levels_voice(levels)
+    music_peak = _levels_music_peak(levels)
     voice_dominant_capture = _voice_dominates_capture(
         rms=raw_rms,
         voice_level=voice_level,
@@ -999,7 +1010,8 @@ def _tick_once(
     if voice_dominant_capture:
         feats = _silence_trusted_features(feats)
     rms = feats.get("rms", 0.0)
-    currently_loud = rms > SILENT_RMS
+    peak_present = (not voice_dominant_capture) and music_peak > _MUSIC_PEAK_PRESENCE_FLOOR
+    currently_loud = rms > SILENT_RMS or peak_present
     needs_audio_dsp = currently_loud or was_audible
     if needs_audio_dsp:
         curve = energy_curve(audio_buf, seconds=12.0, hop=1.0)

@@ -741,7 +741,11 @@ def _build_session_snapshot(
         mic=LevelPair(rms=mic_rms, peak=mic_peak),
     )
 
-    grounded = bool(getattr(state, "audible", False)) and music_rms > SILENT_RMS
+    grounded = _trusted_grounded_for_snapshot(
+        state,
+        music_rms=music_rms,
+        music_peak=music_peak,
+    )
     if voice_rms > 0.05:
         cohost_status = "TALKING"
     elif grounded:
@@ -864,6 +868,30 @@ def _trusted_bpm_for_display(
     if not (bpm > 0.0):
         return 0.0
     return bpm
+
+
+def _trusted_grounded_for_snapshot(
+    state: MusicState,
+    *,
+    music_rms: float,
+    music_peak: float = 0.0,
+) -> bool:
+    """Stable live grounding for the rich session snapshot.
+
+    ``MusicState.audible`` is already the debounced, single-writer answer to
+    "is music actually playing?". The fast UI level RMS can still dip around
+    ``SILENT_RMS`` between beats or on a quiet/filtered FLX4 route, while the
+    peak and refresh loop know audio is present. Keep the stale-silence guard,
+    but accept the same peak witness that the refresh loop uses for low-RMS
+    capture before dropping the deck readout.
+    """
+    if not bool(getattr(state, "audible", False)):
+        return False
+    try:
+        state_rms = float(getattr(state, "rms", 0.0) or 0.0)
+    except (TypeError, ValueError):
+        state_rms = 0.0
+    return max(float(music_rms), float(music_peak), state_rms) > SILENT_RMS
 
 
 def _trusted_flat_bpm(
