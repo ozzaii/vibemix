@@ -5,6 +5,7 @@ import numpy as np
 from scripts.eval.library_section_retrieval import (
     _balanced_ids,
     _blend_metrics,
+    _compare_modes,
     _query_split,
     _rank_same_label,
 )
@@ -101,8 +102,20 @@ def test_section_aware_blend_can_choose_nonzero_alpha_on_holdout() -> None:
     )
 
     assert out["calibration"]["best_alpha"] > 0.0
-    assert out["holdout"]["section_aware_beats_whole"] is True
     assert (
         out["holdout"]["section_aware_blend"]["precision_at_k"]["1"]
         > out["holdout"]["whole_baseline"]["precision_at_k"]["1"]
+    )
+
+    metrics = _compare_modes(
+        outro_vectors=section,
+        intro_vectors=section,
+        whole_vectors=whole,
+        labels=labels,
+        k_values=(1,),
+    )
+    assert metrics["primary_delta"] > 0.0
+    assert metrics["section_beats_whole"] is False
+    assert metrics["interpretation"] == (
+        "comparable_to_whole_track_explainability_not_raw_accuracy"
     )

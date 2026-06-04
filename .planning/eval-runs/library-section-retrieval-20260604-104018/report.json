@@ -42,6 +42,7 @@
     "primary_metric": "holdout_centered_section_aware_precision_at_1",
     "primary_section_value": 0.634146,
     "primary_whole_value": 0.609756,
+    "interpretation": "comparable_to_whole_track_explainability_not_raw_accuracy",
     "raw": {
       "section_minus_whole_precision_at_5": -0.176923,
       "section_outro_to_intro": {
@@ -191,11 +192,12 @@
         }
       }
     },
-    "section_beats_whole": true
+    "section_beats_whole": false
   },
   "notes": {
+    "headline": "Comparable to whole-track retrieval; section vectors buy explainability, not proven raw accuracy.",
     "no_owner_input": true,
-    "primary_metric": "held-out mean-centered precision@1 for a section-aware blend. alpha=0 is the whole-track baseline; alpha=1 is pure section. The alpha is selected on a deterministic calibration split, then reported on holdout; raw/pure-section p@k remain as caveats.",
+    "primary_metric": "held-out mean-centered precision@1 for a section-aware blend showed a small edge only. alpha=0 is the whole-track baseline; alpha=1 is pure section. The alpha is selected on a deterministic calibration split, then reported on holdout; raw/pure-section p@k remain as caveats and do not support a broad raw-accuracy win.",
     "relevance": "same bootstrap folder/genre label, excluding the source track",
     "section_mode": "query=outro section vector, candidates=intro section vectors",
     "whole_baseline": "query=whole-track vector, candidates=whole-track vectors"
