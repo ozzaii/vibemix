@@ -3663,7 +3663,10 @@ def _build_library_subparsers(parser: argparse.ArgumentParser) -> None:
     sp_build_set.add_argument(
         "--write-tags",
         action="store_true",
-        help="grant Serato/Mixxx Markers2 tag writes into audio files for tag targets",
+        help=(
+            "grant Serato/Mixxx Markers2 tag writes into audio files; "
+            "with no --export, selects --export all"
+        ),
     )
     sp_build_set.add_argument("--out", dest="out_path", default=None, help="export path")
     sp_build_set.add_argument(
@@ -3729,7 +3732,10 @@ def _build_library_subparsers(parser: argparse.ArgumentParser) -> None:
     sp_auto_crate.add_argument(
         "--write-tags",
         action="store_true",
-        help="grant Serato/Mixxx Markers2 tag writes into audio files for tag targets",
+        help=(
+            "grant Serato/Mixxx Markers2 tag writes into audio files; "
+            "with no --export, selects --export all"
+        ),
     )
     sp_auto_crate.add_argument("--out", dest="out_path", default=None, help="export path")
     sp_auto_crate.add_argument("--bpm-min", type=float, default=None)
@@ -7238,7 +7244,7 @@ def _cmd_library_build_set_codex(args: argparse.Namespace, lib) -> int:
 
     from vibemix.library.codex_curate import build_set_with_codex
 
-    export_target = getattr(args, "export", None)
+    export_target = _set_prep_export_target(args)
     tag_write_granted = bool(getattr(args, "write_tags", False))
     if export_target in {"serato_tags", "mixxx_tags", "all"} and not tag_write_granted:
         print(
@@ -7386,7 +7392,7 @@ def _cmd_library_auto_crate(args: argparse.Namespace) -> int:
         n_slots=getattr(args, "n_slots", 6),
         k=getattr(args, "k", 40),
         name=getattr(args, "name", None),
-        export=getattr(args, "export", None),
+        export=_set_prep_export_target(args),
         out_path=getattr(args, "out_path", None),
         bpm_min=getattr(args, "bpm_min", None),
         bpm_max=getattr(args, "bpm_max", None),
@@ -7414,6 +7420,20 @@ def _cmd_library_auto_crate(args: argparse.Namespace) -> int:
         file=sys.stderr,
     )
     return 0
+
+
+def _set_prep_export_target(args: argparse.Namespace) -> str | None:
+    """Normalize set-prep export intent from CLI args.
+
+    ``--write-tags`` is explicit permission to touch Serato/Mixxx Markers2
+    tags. If the DJ grants that permission but omits ``--export``, choose the
+    all-carrier path (Rekordbox XML + M3U8 + Markers2) instead of silently
+    doing no export at all.
+    """
+    target = getattr(args, "export", None)
+    if target is None and bool(getattr(args, "write_tags", False)):
+        return "all"
+    return target
 
 
 def _validate_export_tracks_against_library(tracks: list, library) -> tuple[list, list[dict]]:

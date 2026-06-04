@@ -308,3 +308,63 @@ def test_cli_auto_crate_passes_refs_and_args(monkeypatch, capsys):
     assert seen["novelty"] == 0.25
     assert json.loads(captured.out)["stop_reason"] == "exported"
     assert "auto-crate 'CLI Fast'" in captured.err
+
+
+def test_cli_auto_crate_write_tags_defaults_to_all_carriers(monkeypatch, capsys):
+    import vibemix.__main__ as main_mod
+    import vibemix.library.auto_crate as auto_mod
+
+    seen: dict[str, object] = {}
+
+    def fake_build_auto_crate(**kwargs):
+        seen.update(kwargs)
+        return AutoCrateResult(
+            name="CLI All",
+            stop_reason="exported",
+            curve=kwargs["curve"],
+            n_slots=kwargs["n_slots"],
+            ref_track_ids=kwargs["ref_track_ids"],
+            track_ids=["t001"],
+            playlist={"m3u_path": "/tmp/all.m3u8", "json_path": "/tmp/all.json"},
+            export_path="/tmp/all.xml",
+            export_outputs={"rekordbox": "/tmp/all.xml", "m3u8": "/tmp/all.m3u8"},
+            export_import_instructions=[
+                {"carrier": "rekordbox_xml", "path": "/tmp/all.xml"},
+                {"carrier": "m3u8", "path": "/tmp/all.m3u8"},
+                {"carrier": "markers2_tags", "files": ["/tmp/a.mp3"]},
+            ],
+        )
+
+    monkeypatch.setattr(auto_mod, "build_auto_crate", fake_build_auto_crate)
+
+    rc = main_mod._cmd_library_auto_crate(
+        argparse.Namespace(
+            query="fast export",
+            ref_track_ids=[],
+            ref_track_ids_csv=None,
+            curve="opener",
+            n_slots=3,
+            k=12,
+            name="CLI All",
+            export=None,
+            out_path=None,
+            bpm_min=None,
+            bpm_max=None,
+            min_duration_s=None,
+            max_duration_s=None,
+            novelty=None,
+            write_tags=True,
+            json=True,
+        )
+    )
+
+    captured = capsys.readouterr()
+    assert rc == 0
+    assert seen["export"] == "all"
+    assert seen["tag_write_granted"] is True
+    payload = json.loads(captured.out)
+    assert [row["carrier"] for row in payload["export_import_instructions"]] == [
+        "rekordbox_xml",
+        "m3u8",
+        "markers2_tags",
+    ]

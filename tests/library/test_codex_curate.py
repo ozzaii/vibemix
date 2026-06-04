@@ -3742,6 +3742,62 @@ def test_build_set_cli_requires_permission_for_all_tag_carriers(library, monkeyp
     assert "--write-tags" in captured.err
 
 
+def test_build_set_cli_write_tags_defaults_to_all_carriers(
+    library, monkeypatch, capsys, tmp_path
+):
+    import argparse
+
+    import vibemix.__main__ as main_mod
+    import vibemix.library.codex_curate as codex_mod
+
+    export_xml = tmp_path / "all.xml"
+    export_xml.write_text("<DJ_PLAYLISTS/>", encoding="utf-8")
+
+    def fake_build_set_with_codex(*args, **kwargs):
+        assert kwargs["export"] is True
+        assert kwargs["export_target"] == "all"
+        assert kwargs["tag_write_granted"] is True
+        return codex_mod.CodexCurateResult(
+            theme="dark warehouse",
+            stop_reason="exported",
+            playlist_name="All Carriers",
+            track_ids=["t002", "t003"],
+            rationale="all carriers",
+            export_path=str(export_xml),
+            export_outputs={"rekordbox": str(export_xml), "m3u8": str(tmp_path / "all.m3u8")},
+            export_import_instructions=[
+                {"carrier": "rekordbox_xml", "path": str(export_xml)},
+                {"carrier": "m3u8", "path": str(tmp_path / "all.m3u8")},
+                {"carrier": "markers2_tags", "files": ["/tmp/a.mp3"]},
+            ],
+        )
+
+    monkeypatch.setattr(codex_mod, "build_set_with_codex", fake_build_set_with_codex)
+    rc = main_mod._cmd_library_build_set_codex(
+        argparse.Namespace(
+            brief="dark warehouse",
+            curve="peak_time",
+            name=None,
+            n_slots=3,
+            export=None,
+            out_path=None,
+            write_tags=True,
+            cue=True,
+        ),
+        library,
+    )
+
+    assert rc == 0
+    captured = capsys.readouterr()
+    payload = json.loads(captured.out)
+    assert payload["stop_reason"] == "exported"
+    assert [row["carrier"] for row in payload["export_import_instructions"]] == [
+        "rekordbox_xml",
+        "m3u8",
+        "markers2_tags",
+    ]
+
+
 def test_build_set_codex_export_path_nulled_when_missing(library, monkeypatch, tmp_path):
     """A returned export_path that does NOT exist on disk is treated as no export
     (never trust the model's claim of a file that isn't there)."""
