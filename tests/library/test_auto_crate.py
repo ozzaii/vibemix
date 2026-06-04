@@ -110,8 +110,24 @@ def test_auto_crate_builds_grounded_playlist_and_export(toolset, tmp_path):
         "create_playlist",
         "export_set",
     ]
+    assert "min_dur=120.0s" in result.tool_trace[0]["summary"]
     assert any("O7:" in gate for gate in result.owner_gates)
     assert any("O10:" in gate for gate in result.owner_gates)
+
+
+def test_auto_crate_allows_explicit_short_tool_override(toolset):
+    result = build_auto_crate(
+        ref_track_ids=["t000"],
+        curve="opener",
+        n_slots=3,
+        k=6,
+        name="Short Tools",
+        min_duration_s=0.0,
+        toolset=toolset,
+    )
+
+    assert result.stop_reason == "created"
+    assert "min_dur=0.0s" in result.tool_trace[0]["summary"]
 
 
 def test_auto_crate_requires_query_or_refs(toolset):

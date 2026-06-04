@@ -20,6 +20,8 @@ OWNER_GATES = (
     "O10: Free/Pro/Studio tier placement for keyless gig-prep",
 )
 
+DEFAULT_SET_MIN_DURATION_S = 120.0
+
 
 @dataclass(slots=True)
 class AutoCrateResult:
@@ -122,6 +124,10 @@ def build_auto_crate(
             )
 
     try:
+        effective_min_duration_s = _default_set_min_duration(
+            min_duration_s,
+            max_duration_s=max_duration_s,
+        )
         discover_args: dict[str, Any] = {"k": pool_limit}
         if clean_query is not None:
             discover_args["query"] = clean_query
@@ -130,7 +136,7 @@ def build_auto_crate(
         for key, value in (
             ("bpm_min", bpm_min),
             ("bpm_max", bpm_max),
-            ("min_duration_s", min_duration_s),
+            ("min_duration_s", effective_min_duration_s),
             ("max_duration_s", max_duration_s),
         ):
             if value is not None:
@@ -353,7 +359,12 @@ def _summary(name: str, args: dict[str, Any], out: dict[str, Any]) -> str:
         return str(out["error"])[:180]
     if name == "discover_pool":
         pool = out.get("pool")
-        return f"{len(pool) if isinstance(pool, list) else 0} candidates"
+        parts = [f"{len(pool) if isinstance(pool, list) else 0} candidates"]
+        if args.get("min_duration_s") is not None:
+            parts.append(f"min_dur={args['min_duration_s']}s")
+        if args.get("max_duration_s") is not None:
+            parts.append(f"max_dur={args['max_duration_s']}s")
+        return "; ".join(parts)
     if name == "sequence_set":
         candidates = out.get("candidates")
         return f"{len(candidates) if isinstance(candidates, list) else 0} sequences"
@@ -388,6 +399,23 @@ def _positive_int(value: Any, *, default: int) -> int:
     except (TypeError, ValueError):
         return default
     return max(1, out)
+
+
+def _default_set_min_duration(
+    min_duration_s: float | None,
+    *,
+    max_duration_s: float | None,
+) -> float | None:
+    """Default deterministic set prep to playable-length tracks.
+
+    Explicit user filters win. If max duration is below the default floor, treat
+    that as an intentional short-tool crate and avoid a conflicting minimum.
+    """
+    if min_duration_s is not None:
+        return min_duration_s
+    if max_duration_s is not None and max_duration_s < DEFAULT_SET_MIN_DURATION_S:
+        return None
+    return DEFAULT_SET_MIN_DURATION_S
 
 
 def _build_embedder() -> Any:
