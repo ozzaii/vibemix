@@ -106,6 +106,16 @@ def test_course_one_deck_control_lesson_starts_practice_player() -> None:
     assert player.starts == 1
 
 
+def test_course_one_master_volume_lesson_starts_practice_player() -> None:
+    runtime = _runtime()
+    player = _FakePracticePlayer()
+
+    runtime.set_beatmatch_practice_player(player)
+    _load_begin(runtime, lesson_id="L1.09", course_id="course_1_anatomy")
+
+    assert player.starts == 1
+
+
 def test_course_one_waveform_demo_lesson_starts_practice_player() -> None:
     runtime = _runtime()
     player = _FakePracticePlayer()

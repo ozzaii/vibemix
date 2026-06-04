@@ -1,0 +1,60 @@
+{
+  "advance_count": 1,
+  "complete_count": 1,
+  "first_playhead": {
+    "monotonic": 26698.252921083,
+    "payload": {
+      "decks": {
+        "A": {
+          "bpm": 128.0,
+          "frame": 350.0,
+          "position_s": 0.007936507936507936
+        },
+        "B": {
+          "bpm": 124.16,
+          "frame": 339.5,
+          "position_s": 0.007698412698412698
+        }
+      },
+      "sample_rate": 44100
+    },
+    "ts": "2026-06-04T11:39:43.275087+00:00",
+    "type": "ipc.learn.playhead_tick"
+  },
+  "first_waveform_summary": {
+    "beat_interval_s": 0.46875,
+    "decks": [
+      "A",
+      "B"
+    ]
+  },
+  "head": "9a52eb03",
+  "learn_frame_types": [
+    "ipc.learn.lesson_loaded",
+    "ipc.learn.progress_state",
+    "ipc.learn.highlight",
+    "ipc.learn.teaching_focus",
+    "ipc.learn.tutor_speak",
+    "ipc.learn.tutor_speak",
+    "ipc.learn.tutor_speak",
+    "ipc.learn.waveform_ready",
+    "ipc.learn.controller_detected",
+    "ipc.learn.midi_position",
+    "ipc.learn.playhead_tick",
+    "ipc.learn.advance",
+    "ipc.learn.teaching_focus",
+    "ipc.learn.playhead_tick",
+    "ipc.learn.playhead_tick",
+    "ipc.learn.playhead_tick",
+    "ipc.learn.playhead_tick",
+    "ipc.learn.playhead_tick",
+    "ipc.learn.complete_lesson"
+  ],
+  "loaded_l109": true,
+  "master_vol_ack_sent": true,
+  "playhead_tick_count": 6,
+  "run_dir": ".planning/eval-runs/learn-l109-master-vol-audio-proof-20260604-9a52eb03",
+  "source_note": "Captured from HEAD plus the L1.09 audio-gate diff committed with this artifact.",
+  "started_lesson": "L1.09",
+  "waveform_ready_count": 1
+}

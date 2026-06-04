@@ -178,6 +178,7 @@ _PRACTICE_AUDIO_CONTROLS = frozenset(
 )
 _PRACTICE_AUDIO_DEMO_LESSONS = frozenset(
     {
+        "L1.09",
         "L1.10",
         "L1.11",
         "L1.12",
