@@ -84,6 +84,7 @@ class HandLabelRow:
     track_id: str
     split: str
     labels: dict[AutoTagCategory, set[str]]
+    split_explicit: bool = False
 
 
 def _as_tag_set(raw: Any) -> set[str]:
@@ -139,6 +140,7 @@ def load_hand_labels(path: Path) -> dict[str, Any]:
         if label_status in TODO_LABEL_STATUSES:
             pending_rows += 1
             continue
+        split_explicit = "split" in raw
         split = str(raw.get("split", "") or "eval").strip().lower()
         tags_obj = raw.get("tags") if isinstance(raw.get("tags"), Mapping) else raw
         labels: dict[AutoTagCategory, set[str]] = {}
@@ -151,7 +153,14 @@ def load_hand_labels(path: Path) -> dict[str, Any]:
             if tags or category in tags_obj:  # type: ignore[operator]
                 labels[category] = accepted
         if labels:
-            rows.append(HandLabelRow(track_id=track_id, split=split, labels=labels))
+            rows.append(
+                HandLabelRow(
+                    track_id=track_id,
+                    split=split,
+                    labels=labels,
+                    split_explicit=split_explicit,
+                )
+            )
 
     return {
         "status": "ok" if rows else "empty",
@@ -226,7 +235,28 @@ def _rows_by_split(rows: Sequence[HandLabelRow]) -> tuple[list[HandLabelRow], li
     holdout = [r for r in rows if r.split in {"holdout", "eval", "test"}]
     if calibration and holdout:
         return calibration, holdout, "split_calibration_holdout"
-    return list(rows), list(rows), "in_sample_threshold_grid"
+    explicit = any(row.split_explicit for row in rows)
+    if explicit:
+        if holdout:
+            return [], holdout, "explicit_holdout_default_thresholds"
+        return calibration, [], "explicit_calibration_no_holdout"
+    if len(rows) < 2:
+        return [], list(rows), "default_threshold_single_eval"
+
+    ordered = sorted(rows, key=lambda row: row.track_id)
+    deterministic_calibration = [
+        row for index, row in enumerate(ordered) if index % 5 == 0
+    ]
+    deterministic_holdout = [
+        row for index, row in enumerate(ordered) if index % 5 != 0
+    ]
+    if not deterministic_holdout:
+        return [], ordered, "default_threshold_single_eval"
+    return (
+        deterministic_calibration,
+        deterministic_holdout,
+        "deterministic_calibration_holdout",
+    )
 
 
 def _complete_rows(rows: Sequence[HandLabelRow]) -> list[HandLabelRow]:
@@ -570,7 +600,7 @@ def build_report(
 
     mode_reports: dict[str, Any] = {}
     for mode in ("bare", "template"):
-        if rows:
+        if calibration_rows:
             thresholds = calibrate_thresholds(
                 ids,
                 vectors,

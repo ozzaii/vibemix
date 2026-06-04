@@ -165,8 +165,68 @@ def test_build_report_with_labels_scores_template_and_bare(tmp_path: Path, monke
     assert report["label_set"]["complete_rows"] == 1
     assert report["label_set"]["evaluation_complete_rows"] == 1
     assert report["label_set"]["min_required_rows"] == 50
+    assert report["label_set"]["calibration_strategy"] == "explicit_holdout_default_thresholds"
     assert report["modes"]["template"]["metrics"]["micro"]["precision"] >= 0.0
     assert report["comparison"]["primary_metric"] == "micro_f1"
+
+
+def test_build_report_does_not_calibrate_on_explicit_holdout(
+    tmp_path: Path, monkeypatch
+) -> None:
+    labels = tmp_path / "labels.jsonl"
+    labels.write_text(
+        json.dumps(
+            {
+                "track_id": "t1",
+                "split": "holdout",
+                "mood": ["dark"],
+                "texture": ["raw"],
+                "instrument": ["vocal"],
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        lat,
+        "_load_store",
+        lambda: (
+            ["t1"],
+            np.asarray([[1.0, 0.0, 0.0]], dtype=np.float32),
+            "FakeStore",
+            "snap",
+        ),
+    )
+    monkeypatch.setattr(lat, "ClapEngine", lambda: _FakeEngine())
+
+    def fail_if_called(*args, **kwargs):
+        raise AssertionError("holdout labels must not tune thresholds")
+
+    monkeypatch.setattr(lat, "calibrate_thresholds", fail_if_called)
+
+    report = lat.build_report(labels_path=labels, max_examples=2)
+
+    assert report["label_set"]["calibration_rows"] == 0
+    assert report["label_set"]["evaluation_rows"] == 1
+    assert report["modes"]["template"]["thresholds"] == {
+        "instrument": 0.18,
+        "mood": 0.18,
+        "texture": 0.18,
+    }
+
+
+def test_rows_without_explicit_split_get_deterministic_calibration_holdout() -> None:
+    rows = [
+        lat.HandLabelRow(f"t{i}", "eval", {"mood": {"dark"}})
+        for i in range(10)
+    ]
+
+    calibration, holdout, strategy = lat._rows_by_split(rows)
+
+    assert strategy == "deterministic_calibration_holdout"
+    assert [row.track_id for row in calibration] == ["t0", "t5"]
+    assert len(holdout) == 8
+    assert not ({row.track_id for row in calibration} & {row.track_id for row in holdout})
 
 
 def test_partial_label_rows_do_not_satisfy_complete_row_gate(
@@ -234,6 +294,7 @@ def test_label_audit_reports_missing_partial_and_complete_rows(tmp_path: Path) -
     assert audit["pending_rows"] == 1
     assert audit["usable_rows"] == 2
     assert audit["complete_rows"] == 1
+    assert audit["calibration_strategy"] == "explicit_holdout_default_thresholds"
     assert audit["evaluation_rows"] == 2
     assert audit["evaluation_complete_rows"] == 1
     assert audit["enough_complete_eval_rows"] is False
