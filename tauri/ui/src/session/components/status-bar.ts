@@ -435,12 +435,6 @@ export function renderStatusBar(props: StatusBarProps): HTMLElement {
   muted.append(mled, mlbl);
   root.append(muted);
 
-  const sig = document.createElement("span");
-  sig.className = "vmx-statusbar__sig";
-  if (props.muted) sig.classList.add("has-muted");
-  sig.textContent = "made by bravoh";
-  root.append(sig);
-
   return root;
 }
 

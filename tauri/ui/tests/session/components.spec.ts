@@ -436,7 +436,7 @@ describe("renderCohostPanel", () => {
 // === StatusBar tooltip =======================================================
 
 describe("renderStatusBar", () => {
-  it("renders 4 badges + signature", () => {
+  it("renders 4 badges with no brand signature on the live screen", () => {
     const sb = renderStatusBar({
       livekit: "ok",
       gemini: "ok",
@@ -447,9 +447,8 @@ describe("renderStatusBar", () => {
     });
     host().append(sb);
     expect(sb.querySelectorAll(".vmx-statusbar__badge")).toHaveLength(4);
-    expect(sb.querySelector(".vmx-statusbar__sig")?.textContent).toBe(
-      "made by bravoh",
-    );
+    // "made by bravoh" brand vanity stripped from the live performance screen.
+    expect(sb.querySelector(".vmx-statusbar__sig")).toBeNull();
   });
 
   it("adds a voice-muted badge only when the voice engine is muted", () => {
