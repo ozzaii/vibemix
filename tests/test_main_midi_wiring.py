@@ -49,10 +49,15 @@ def test_main_cleans_up_watcher_in_finally():
     assert "midi_watcher_stop.set()" in src, "finally must set midi_watcher_stop"
     # The watcher task name must appear in the cleanup_tasks list.
     assert "midi_watcher_task" in src, "__main__ must capture the watcher task"
-    cleanup_match = re.search(r"cleanup_tasks[^=]*=\s*\[(.*?)\]", src, re.DOTALL)
-    assert cleanup_match, "cleanup_tasks list not found"
-    assert "midi_watcher_task" in cleanup_match.group(1), (
-        "midi_watcher_task must be in the cleanup_tasks list"
+    in_literal_cleanup_list = any(
+        "midi_watcher_task" in match.group(1)
+        for match in re.finditer(r"cleanup_tasks[^=]*=\s*\[(.*?)\]", src, re.DOTALL)
+    )
+    appended_to_cleanup_list = re.search(
+        r"cleanup_tasks\.append\(\s*midi_watcher_task\s*\)", src
+    )
+    assert in_literal_cleanup_list or appended_to_cleanup_list, (
+        "midi_watcher_task must be registered with cleanup_tasks"
     )
 
 
