@@ -139,6 +139,12 @@ _GROUNDED_RECEIPT_EXTRA_KEYS = (
     "set_progress_voice_line",
     "judge_evidence_line",
 )
+_CUE_RECEIPT_FALLBACK_RE = re.compile(
+    r"Forward\s+cue\s+receipt:\s*the\s+next\s+citable\s+phrase\s+boundary\s+is\s+"
+    r"(?P<timing>[^.]+)\.\s*Use\s+it\s+as\s+one\s+forward\s+timing\s+nudge\b.*?"
+    r"Copy\s+this\s+citation\s+exactly:\s*(?P<cite>\[cue:[^\]]+\])",
+    re.IGNORECASE | re.DOTALL,
+)
 _OPTION_SCAFFOLD_PREFIX_RE = re.compile(
     r"^\s*(?:[-*]\s*)?(?:option(?:\s+[ab])?\b|[ab][).:])",
     re.IGNORECASE,
@@ -176,6 +182,8 @@ _ORPHAN_CITATION_TAIL_PREFIX_RE = re.compile(
     r"^\s*(?:[a-z]+:[^\s\]]+|\d+(?:\.\d+)?)\]\s*",
     re.IGNORECASE,
 )
+_BROKEN_VOICE_FRAGMENT_PREFIX_RE = re.compile(r"^\s*(?:\]|:\*)")
+_BROKEN_WORD_COUNT_TAIL_RE = re.compile(r"\(\s*\d+\s+words?\s*$", re.IGNORECASE)
 _CHECK_CONSTRAINTS_PREFIX_RE = re.compile(
     r"^\s*(?:[-*]\s*)?(?:\*+\s*)?check\s+constraints\s*[:.)*-]*\s*",
     re.IGNORECASE,
@@ -248,6 +256,25 @@ def _should_guard_option_scaffold(ev_tag: str, ev_extra: dict[str, Any]) -> bool
     return ev_tag == "TRACK_CHANGE" and _has_grounded_receipt_extra(ev_extra)
 
 
+def _grounded_receipt_fallback_line(ev_extra: dict[str, Any]) -> str | None:
+    """Return a citable fallback when a grounded receipt already exists."""
+
+    raw_line = ev_extra.get("next_suggestion_voice_line")
+    if not isinstance(raw_line, str):
+        return None
+    match = _CUE_RECEIPT_FALLBACK_RE.search(raw_line)
+    if match is None:
+        return None
+    timing = " ".join(match.group("timing").split()).strip()
+    cite = match.group("cite").strip()
+    if not timing or not cite:
+        return None
+    if timing.startswith("about ") and timing.endswith(" ahead"):
+        timing = timing[: -len(" ahead")]
+        return f"Hold this for {timing}; make the move on the next phrase. {cite}"
+    return f"Hold this to the next phrase boundary; make the move on the phrase. {cite}"
+
+
 def _starts_option_scaffold(text: str) -> bool:
     return bool(_OPTION_SCAFFOLD_PREFIX_RE.match(text or ""))
 
@@ -275,6 +302,8 @@ def _starts_finished_line_meta_scaffold(text: str) -> bool:
     stripped = (text or "").strip()
     if not stripped:
         return False
+    if _looks_like_broken_voice_fragment(stripped):
+        return True
     without_tail = _strip_orphan_citation_tail(stripped)
     if without_tail != stripped:
         return True
@@ -287,6 +316,8 @@ def _could_be_finished_line_meta_scaffold(text: str) -> bool:
     stripped = (text or "").strip()
     if not stripped:
         return False
+    if _looks_like_broken_voice_fragment(stripped):
+        return True
     without_tail = _strip_orphan_citation_tail(stripped)
     if without_tail != stripped:
         return True
@@ -316,6 +347,8 @@ def repair_finished_headphone_line(text: str) -> str | None:
         return None
     stripped = _strip_orphan_citation_tail(stripped).strip()
     if not stripped:
+        return None
+    if _looks_like_broken_voice_fragment(stripped):
         return None
     if _starts_unspoken_packet_fragment(stripped):
         return None
@@ -348,6 +381,21 @@ def _strip_orphan_citation_tail(text: str) -> str:
     """Remove a leading half-citation tail such as ``108.0]``."""
 
     return _ORPHAN_CITATION_TAIL_PREFIX_RE.sub("", text or "", count=1)
+
+
+def _looks_like_broken_voice_fragment(text: str) -> bool:
+    """Return True for clipped model fragments that should not be repaired."""
+
+    stripped = (text or "").strip()
+    return bool(
+        _BROKEN_VOICE_FRAGMENT_PREFIX_RE.match(stripped)
+        or _BROKEN_WORD_COUNT_TAIL_RE.search(stripped)
+    )
+
+
+def _has_unclosed_bracket_tail(text: str) -> bool:
+    stripped = (text or "").strip()
+    return "[" in stripped and last_balanced_position(stripped) < len(stripped)
 
 
 def _clean_finished_line_candidate(text: str) -> str | None:
@@ -3182,6 +3230,7 @@ class DJCoHostAgent(Agent):
             option_scaffold_suppressed = False
             line_scaffold_suppressed = False
             packet_fragment_suppressed = False
+            grounded_fallback_reason: str | None = None
             if guard_option_scaffold and _starts_option_scaffold(full_text):
                 repaired = _repair_option_scaffold_line(full_text)
                 if repaired:
@@ -3222,6 +3271,42 @@ class DJCoHostAgent(Agent):
                     line_scaffold_suppressed = True
             elif _starts_unspoken_packet_fragment(full_text):
                 packet_fragment_suppressed = True
+
+            grounded_fallback_text = (
+                _grounded_receipt_fallback_line(ev_extra) if not head_yielded else None
+            )
+            if grounded_fallback_text:
+                if option_scaffold_suppressed:
+                    grounded_fallback_reason = "option_scaffold"
+                elif line_scaffold_suppressed:
+                    grounded_fallback_reason = "line_scaffold"
+                elif packet_fragment_suppressed:
+                    grounded_fallback_reason = "packet_fragment"
+                elif _has_unclosed_bracket_tail(stripped):
+                    grounded_fallback_reason = "unclosed_citation_tail"
+                elif _looks_like_broken_voice_fragment(stripped):
+                    grounded_fallback_reason = "broken_model_fragment"
+                elif not stripped:
+                    grounded_fallback_reason = "empty_model_line"
+                if grounded_fallback_reason is not None:
+                    raw_fallback_text = full_text
+                    full_text = grounded_fallback_text
+                    buffered_chunks = [full_text]
+                    stripped = full_text.strip()
+                    option_scaffold_suppressed = False
+                    line_scaffold_suppressed = False
+                    packet_fragment_suppressed = False
+                    try:
+                        self._recorder.log_event(
+                            "grounded_voice_fallback",
+                            event=ev_tag,
+                            reason=grounded_fallback_reason,
+                            raw_text=raw_fallback_text,
+                            fallback_text=full_text,
+                            latency_s=round(elapsed, 2),
+                        )
+                    except Exception:
+                        pass
 
             # ---- Plan 18-04: citation-count telemetry ----
             # Count citations in the FULL response text BEFORE the suppression

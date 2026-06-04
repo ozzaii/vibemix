@@ -1,0 +1,206 @@
+{
+  "config": {
+    "model": "gemini/gemini-3.5-flash",
+    "match_live_persona": true,
+    "include_citation_grammar": true
+  },
+  "results": [
+    {
+      "name": "idle_heartbeat",
+      "event": "HEARTBEAT",
+      "gate": "silent",
+      "gate_reason": "describe_bank_only",
+      "expect": "silent",
+      "gate_ok": true
+    },
+    {
+      "name": "phase_with_cue_lookahead",
+      "event": "PHASE",
+      "gate": "speak",
+      "gate_reason": "grounded_voice_payload",
+      "expect": "speak",
+      "gate_ok": true,
+      "line": "Hold this build until that phrase boundary at 108, then let the high end breathe.",
+      "model_line": "Hold this build until that phrase boundary at 108 [cue:phrase_boundary@108.0], then let the high end breathe.",
+      "raw_line": "Hold this build until that phrase boundary at 108 [cue:phrase_boundary@108.0], then let the high end breathe.",
+      "scores": {
+        "friend_not_narrator": 3,
+        "grounded_not_fabricated": 3,
+        "earned_not_constant": 2,
+        "move_specific_not_spectrum": 2,
+        "voice_no_slop": 3,
+        "should_speak": true,
+        "why": "Clean coaching on the upcoming phrase boundary at 108."
+      }
+    },
+    {
+      "name": "heartbeat_with_grounded_payload",
+      "event": "HEARTBEAT",
+      "gate": "speak",
+      "gate_reason": "grounded_voice_payload",
+      "expect": "speak",
+      "gate_ok": true,
+      "line": "This sub's heavy — hold it four bars",
+      "model_line": "This sub's heavy [aud:sub@0.0] — hold it four bars",
+      "raw_line": "This sub's heavy [aud:sub@0.0] — hold it four bars",
+      "scores": {
+        "friend_not_narrator": 2,
+        "grounded_not_fabricated": 3,
+        "earned_not_constant": 2,
+        "move_specific_not_spectrum": 3,
+        "voice_no_slop": 3,
+        "should_speak": true,
+        "why": "Good actionable timing nudge based on the heavy sub."
+      }
+    },
+    {
+      "name": "filter_cut_move",
+      "event": "MIX_MOVE",
+      "gate": "speak",
+      "gate_reason": "event_priority",
+      "expect": "speak",
+      "gate_ok": true,
+      "line": "That hard filter cut snatched the energy—hold it right there before you slowly bleed the highs back",
+      "model_line": "That hard filter cut snatched the energy—hold it right there before you slowly bleed the highs back",
+      "raw_line": "That hard filter cut snatched the energy—hold it right there before you slowly bleed the highs back",
+      "scores": {
+        "friend_not_narrator": 2,
+        "grounded_not_fabricated": 3,
+        "earned_not_constant": 2,
+        "move_specific_not_spectrum": 3,
+        "voice_no_slop": 3,
+        "should_speak": true,
+        "why": "Good coaching instruction following a real filter cut, slight narration opening."
+      }
+    },
+    {
+      "name": "low_kill_move",
+      "event": "MIX_MOVE",
+      "gate": "speak",
+      "gate_reason": "event_priority",
+      "expect": "speak",
+      "gate_ok": true,
+      "line": "Killing that low end let the acid breathe; hold it here before dropping the weight back.",
+      "model_line": "Killing that low end [midi:A_low:_flat_to_kill_big_twist@880.1] let the acid breathe; hold it here before dropping the weight back.",
+      "raw_line": "Killing that low end [midi:A_low:_flat_to_kill_big_twist@880.1] let the acid breathe; hold it here before dropping the weight back.",
+      "scores": {
+        "friend_not_narrator": 2,
+        "grounded_not_fabricated": 3,
+        "earned_not_constant": 2,
+        "move_specific_not_spectrum": 2,
+        "voice_no_slop": 3,
+        "should_speak": true,
+        "why": "Grounded in the acid track and low kill; gives a clear hold-and-drop instruction."
+      }
+    },
+    {
+      "name": "drop_hit",
+      "event": "DROP",
+      "gate": "speak",
+      "gate_reason": "event_priority",
+      "expect": "speak",
+      "gate_ok": true,
+      "line": "Let this drop ride for eight bars; that sub is carrying plenty of weight right now.",
+      "model_line": "Let this drop ride for eight bars; that sub is carrying plenty of weight right now.",
+      "raw_line": "Let this drop ride for eight bars; that sub is carrying plenty of weight right now.",
+      "scores": {
+        "friend_not_narrator": 3,
+        "grounded_not_fabricated": 3,
+        "earned_not_constant": 2,
+        "move_specific_not_spectrum": 3,
+        "voice_no_slop": 3,
+        "should_speak": true,
+        "why": "Excellent coaching, telling the DJ exactly how long to ride the drop."
+      }
+    },
+    {
+      "name": "layer_arrival_idle",
+      "event": "LAYER_ARRIVAL",
+      "gate": "silent",
+      "gate_reason": "describe_bank_only",
+      "expect": "silent",
+      "gate_ok": true
+    },
+    {
+      "name": "track_change_with_cue_lookahead",
+      "event": "TRACK_CHANGE",
+      "gate": "speak",
+      "gate_reason": "grounded_voice_payload",
+      "expect": "speak",
+      "gate_ok": true,
+      "line": "Hold this for about 4 bars; make the move on the next phrase.",
+      "model_line": "Hold this for about 4 bars; make the move on the next phrase. [cue:phrase_boundary@108.0]",
+      "raw_line": "Hold this heavy sub until the next phrase [cue:phrase_boundary@108",
+      "scores": {
+        "friend_not_narrator": 3,
+        "grounded_not_fabricated": 3,
+        "earned_not_constant": 3,
+        "move_specific_not_spectrum": 3,
+        "voice_no_slop": 3,
+        "should_speak": true,
+        "why": "Clean, actionable timing advice grounded in the upcoming phrase boundary."
+      },
+      "fallback_line": "Hold this for about 4 bars; make the move on the next phrase. [cue:phrase_boundary@108.0]"
+    },
+    {
+      "name": "track_change_with_next",
+      "event": "TRACK_CHANGE",
+      "gate": "speak",
+      "gate_reason": "grounded_voice_payload",
+      "expect": "speak",
+      "gate_ok": true,
+      "line": "That next 9A track is sitting at 128",
+      "model_line": "That next 9A track is sitting at 128 [key:A:9A",
+      "raw_line": "That next 9A track is sitting at 128 [key:A:9A",
+      "scores": {
+        "friend_not_narrator": 3,
+        "grounded_not_fabricated": 3,
+        "earned_not_constant": 2,
+        "move_specific_not_spectrum": 2,
+        "voice_no_slop": 2,
+        "should_speak": true,
+        "why": "Good heads-up on the 22 BPM drop for the next track."
+      }
+    }
+  ],
+  "quality": {
+    "gate_ok": 9,
+    "gate_total": 9,
+    "means": {
+      "friend_not_narrator": 2.57,
+      "grounded_not_fabricated": 3.0,
+      "earned_not_constant": 2.14,
+      "move_specific_not_spectrum": 2.57,
+      "voice_no_slop": 2.86
+    },
+    "target_scenarios": {
+      "phase_with_cue_lookahead": {
+        "gate": "speak",
+        "scores": {
+          "friend_not_narrator": 3,
+          "grounded_not_fabricated": 3,
+          "earned_not_constant": 2,
+          "move_specific_not_spectrum": 2,
+          "voice_no_slop": 3,
+          "should_speak": true,
+          "why": "Clean coaching on the upcoming phrase boundary at 108."
+        },
+        "line": "Hold this build until that phrase boundary at 108, then let the high end breathe."
+      },
+      "track_change_with_cue_lookahead": {
+        "gate": "speak",
+        "scores": {
+          "friend_not_narrator": 3,
+          "grounded_not_fabricated": 3,
+          "earned_not_constant": 3,
+          "move_specific_not_spectrum": 3,
+          "voice_no_slop": 3,
+          "should_speak": true,
+          "why": "Clean, actionable timing advice grounded in the upcoming phrase boundary."
+        },
+        "line": "Hold this for about 4 bars; make the move on the next phrase."
+      }
+    },
+    "failures": []
+  }
+}

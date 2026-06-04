@@ -39,7 +39,11 @@ from pathlib import Path
 import httpx
 
 from vibemix.agent._streaming_pipe import last_balanced_position
-from vibemix.agent.dj_cohost import repair_finished_headphone_line
+from vibemix.agent.dj_cohost import (
+    _grounded_receipt_fallback_line,
+    _has_unclosed_bracket_tail,
+    repair_finished_headphone_line,
+)
 from vibemix.agent.tts_sanitizer import model_text_for_tts
 from vibemix.bench.fixtures import fixture_state_for
 from vibemix.llm.model_router import resolve_model
@@ -267,6 +271,20 @@ def _spoken_line_for_judge(model_line: str) -> str:
     return model_text_for_tts(clipped, normalize=True)
 
 
+def _line_or_grounded_fallback(raw_line: str, *, gate_reason: str, ev_extra: dict) -> tuple[str, str, str | None]:
+    model_line = repair_finished_headphone_line(raw_line) or ""
+    line = _spoken_line_for_judge(model_line)
+    fallback_line = None
+    if gate_reason == "grounded_voice_payload" and (
+        not line or _has_unclosed_bracket_tail(model_line)
+    ):
+        fallback_line = _grounded_receipt_fallback_line(ev_extra)
+        if fallback_line:
+            model_line = fallback_line
+            line = _spoken_line_for_judge(model_line)
+    return line, model_line, fallback_line
+
+
 def _score_value(scores: dict, dim: str) -> float | None:
     value = scores.get(dim)
     if isinstance(value, bool):
@@ -426,7 +444,8 @@ def main() -> int:
     print(f"{'scenario':<32} {'event':<16} {'gate':<8} {'ok?':<4} friend/grnd/earn/move/voice")
     for sc in SCENARIOS:
         state = _state_for_scenario(sc)
-        ev = Event(type=sc["event"], state=state, extra=_extra_for_scenario(sc, state))
+        ev_extra = _extra_for_scenario(sc, state)
+        ev = Event(type=sc["event"], state=state, extra=ev_extra)
         gate = decide_speak_gate(ev)
         ok = "ok" if gate.verdict == sc["expect"] else "!!"
         row = {"name": sc["name"], "event": sc["event"], "gate": gate.verdict,
@@ -438,8 +457,11 @@ def main() -> int:
         user = f"{sc['evidence']}\n\n{sc['task']}"
         _st, line = _chat(persona, user, key)
         raw_line = (line or "").strip()
-        model_line = repair_finished_headphone_line(raw_line) or ""
-        line = _spoken_line_for_judge(model_line)
+        line, model_line, fallback_line = _line_or_grounded_fallback(
+            raw_line,
+            gate_reason=gate.reason,
+            ev_extra=ev_extra,
+        )
         if line:
             scores = _judge(sc["evidence"], line, key)
         elif raw_line or model_line:
@@ -451,6 +473,8 @@ def main() -> int:
         else:
             scores = {}
         row.update({"line": line, "model_line": model_line, "raw_line": raw_line, "scores": scores})
+        if fallback_line is not None:
+            row["fallback_line"] = fallback_line
         sd = "/".join(str(scores.get(d, "-")) for d in DIMS)
         print(f"{sc['name']:<32} {sc['event']:<16} {gate.verdict:<8} {ok:<4} {sd}")
         print(f"    -> {line[:140]}")

@@ -90,3 +90,66 @@ def test_quality_summary_fails_partial_or_misrouted_runs() -> None:
 
     assert "expected 9 scenarios, got 8" in failures
     assert "gate routing mismatch: idle_heartbeat expected silent got speak" in failures
+
+
+def test_line_or_grounded_fallback_uses_cue_receipt_when_model_is_empty() -> None:
+    ev_extra = {
+        "next_suggestion_voice_line": (
+            "Forward cue receipt: the next citable phrase boundary is about 4 bars ahead. "
+            "Use it as one forward timing nudge for what comes next if the live sound "
+            "supports it. Copy this citation exactly: [cue:phrase_boundary@108.0]."
+        )
+    }
+
+    line, model_line, fallback_line = sim._line_or_grounded_fallback(
+        "",
+        gate_reason="grounded_voice_payload",
+        ev_extra=ev_extra,
+    )
+
+    assert fallback_line == (
+        "Hold this for about 4 bars; make the move on the next phrase. "
+        "[cue:phrase_boundary@108.0]"
+    )
+    assert model_line == fallback_line
+    assert line == "Hold this for about 4 bars; make the move on the next phrase."
+
+
+def test_line_or_grounded_fallback_replaces_broken_model_fragment() -> None:
+    ev_extra = {
+        "next_suggestion_voice_line": (
+            "Forward cue receipt: the next citable phrase boundary is about 4 bars ahead. "
+            "Use it as one forward timing nudge for what comes next if the live sound "
+            "supports it. Copy this citation exactly: [cue:phrase_boundary@108.0]."
+        )
+    }
+
+    line, model_line, fallback_line = sim._line_or_grounded_fallback(
+        ':* "This sub is heavy--hold this groove until the phrase breaks at 10',
+        gate_reason="grounded_voice_payload",
+        ev_extra=ev_extra,
+    )
+
+    assert fallback_line is not None
+    assert model_line == fallback_line
+    assert line == "Hold this for about 4 bars; make the move on the next phrase."
+
+
+def test_line_or_grounded_fallback_replaces_unclosed_citation_tail() -> None:
+    ev_extra = {
+        "next_suggestion_voice_line": (
+            "Forward cue receipt: the next citable phrase boundary is about 4 bars ahead. "
+            "Use it as one forward timing nudge for what comes next if the live sound "
+            "supports it. Copy this citation exactly: [cue:phrase_boundary@108.0]."
+        )
+    }
+
+    line, model_line, fallback_line = sim._line_or_grounded_fallback(
+        "Hold this heavy sub until the next phrase boundary [cue:phrase_boundary@10",
+        gate_reason="grounded_voice_payload",
+        ev_extra=ev_extra,
+    )
+
+    assert fallback_line is not None
+    assert model_line == fallback_line
+    assert line == "Hold this for about 4 bars; make the move on the next phrase."
