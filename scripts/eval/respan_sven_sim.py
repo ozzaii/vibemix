@@ -27,6 +27,7 @@ Usage:
     uv run python scripts/eval/respan_sven_sim.py --no-log    # don't log to Respan
     uv run python scripts/eval/respan_sven_sim.py --include-kick-density-target
     uv run python scripts/eval/respan_sven_sim.py --match-live-persona --match-live-linter
+    uv run python scripts/eval/respan_sven_sim.py --strict-sven-gate
 """
 from __future__ import annotations
 
@@ -530,6 +531,17 @@ def _quality_failures(
     return failures
 
 
+def _apply_strict_sven_gate_flags(args: argparse.Namespace) -> argparse.Namespace:
+    if not bool(getattr(args, "strict_sven_gate", False)):
+        return args
+    args.match_live_persona = True
+    args.match_live_linter = True
+    args.include_kick_density_target = True
+    if not bool(getattr(args, "gate_only", False)):
+        args.require_quality = True
+    return args
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--gate-only", action="store_true", help="deterministic gate routing, no model")
@@ -559,12 +571,20 @@ def main() -> int:
         help="append the recorded-set KICK_DENSITY_SHIFT weak spot as a quality target",
     )
     ap.add_argument(
+        "--strict-sven-gate",
+        action="store_true",
+        help=(
+            "standing Sven regression gate: enable live persona, live linter, "
+            "KICK target, and --require-quality together"
+        ),
+    )
+    ap.add_argument(
         "--heartbeat-session",
         default=None,
         help="also run respan_sven_heartbeat_judge.py --describe-bank-census on this recording",
     )
     ap.add_argument("--heartbeat-out", default=None)
-    args = ap.parse_args()
+    args = _apply_strict_sven_gate_flags(ap.parse_args())
 
     # The live coach persona (the current build): intermediate/hype cell = SVEN_COACH_IDENTITY.
     include_citation_grammar = bool(args.match_live_persona)
@@ -576,6 +596,7 @@ def main() -> int:
     )
     print(
         "persona: "
+        f"strict_sven_gate={args.strict_sven_gate} "
         f"match_live_persona={args.match_live_persona} "
         f"include_citation_grammar={include_citation_grammar} "
         f"match_live_linter={args.match_live_linter}",
@@ -658,6 +679,7 @@ def main() -> int:
                 "metadata": {
                     "event": sc["event"],
                     "gate": gate.verdict,
+                    "strict_sven_gate": args.strict_sven_gate,
                     "match_live_persona": args.match_live_persona,
                     "include_citation_grammar": include_citation_grammar,
                     "match_live_linter": args.match_live_linter,
@@ -683,6 +705,7 @@ def main() -> int:
                 {
                     "config": {
                         "model": MODEL,
+                        "strict_sven_gate": args.strict_sven_gate,
                         "match_live_persona": args.match_live_persona,
                         "include_citation_grammar": include_citation_grammar,
                         "match_live_linter": args.match_live_linter,

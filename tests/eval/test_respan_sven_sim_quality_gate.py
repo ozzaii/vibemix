@@ -1,6 +1,8 @@
 # SPDX-License-Identifier: Apache-2.0
 from __future__ import annotations
 
+import argparse
+
 from scripts.eval import respan_sven_sim as sim
 
 
@@ -146,6 +148,60 @@ def test_quality_summary_fails_partial_or_misrouted_runs() -> None:
 
     assert "expected 9 scenarios, got 8" in failures
     assert "gate routing mismatch: idle_heartbeat expected silent got speak" in failures
+
+
+def test_strict_sven_gate_enables_live_parity_quality_flags() -> None:
+    args = argparse.Namespace(
+        strict_sven_gate=True,
+        match_live_persona=False,
+        match_live_linter=False,
+        include_kick_density_target=False,
+        require_quality=False,
+        gate_only=False,
+    )
+
+    out = sim._apply_strict_sven_gate_flags(args)
+
+    assert out.match_live_persona is True
+    assert out.match_live_linter is True
+    assert out.include_kick_density_target is True
+    assert out.require_quality is True
+
+
+def test_strict_sven_gate_opt_out_preserves_manual_flags() -> None:
+    args = argparse.Namespace(
+        strict_sven_gate=False,
+        match_live_persona=False,
+        match_live_linter=True,
+        include_kick_density_target=False,
+        require_quality=False,
+        gate_only=False,
+    )
+
+    out = sim._apply_strict_sven_gate_flags(args)
+
+    assert out.match_live_persona is False
+    assert out.match_live_linter is True
+    assert out.include_kick_density_target is False
+    assert out.require_quality is False
+
+
+def test_strict_sven_gate_allows_gate_only_routing_smoke() -> None:
+    args = argparse.Namespace(
+        strict_sven_gate=True,
+        match_live_persona=False,
+        match_live_linter=False,
+        include_kick_density_target=False,
+        require_quality=False,
+        gate_only=True,
+    )
+
+    out = sim._apply_strict_sven_gate_flags(args)
+
+    assert out.match_live_persona is True
+    assert out.match_live_linter is True
+    assert out.include_kick_density_target is True
+    assert out.require_quality is False
 
 
 def test_kick_density_target_seeds_live_linter_event_ref() -> None:
