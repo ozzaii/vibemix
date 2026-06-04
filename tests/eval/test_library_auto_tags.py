@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 
 import numpy as np
+import pytest
 from scripts.eval import library_auto_tags as lat
 
 from vibemix.library.auto_tags import AutoTagDecision
@@ -205,6 +206,80 @@ def test_partial_label_rows_do_not_satisfy_complete_row_gate(
     assert report["label_set"]["evaluation_rows"] == 2
     assert report["label_set"]["evaluation_complete_rows"] == 1
     assert report["status"] == "measured_small_hand_label_subset"
+
+
+def test_label_audit_reports_missing_partial_and_complete_rows(tmp_path: Path) -> None:
+    labels = tmp_path / "labels.jsonl"
+    labels.write_text(
+        json.dumps({"track_id": "todo", "label_status": "todo", "tags": {}})
+        + "\n"
+        + json.dumps({"track_id": "partial", "split": "holdout", "mood": ["dark"]})
+        + "\n"
+        + json.dumps(
+            {
+                "track_id": "complete",
+                "split": "holdout",
+                "mood": ["dark"],
+                "texture": ["raw"],
+                "instrument": [],
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    audit = lat.build_label_audit(labels_path=labels, min_hand_labels=2)
+
+    assert audit["label_status"] == "ok"
+    assert audit["pending_rows"] == 1
+    assert audit["usable_rows"] == 2
+    assert audit["complete_rows"] == 1
+    assert audit["evaluation_rows"] == 2
+    assert audit["evaluation_complete_rows"] == 1
+    assert audit["enough_complete_eval_rows"] is False
+    assert audit["missing_category_counts"] == {
+        "mood": 0,
+        "texture": 1,
+        "instrument": 1,
+    }
+
+
+def test_label_audit_can_pass_when_enough_complete_eval_rows(tmp_path: Path) -> None:
+    labels = tmp_path / "labels.jsonl"
+    labels.write_text(
+        json.dumps(
+            {
+                "track_id": "complete",
+                "split": "holdout",
+                "mood": ["dark"],
+                "texture": ["raw"],
+                "instrument": [],
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    audit = lat.build_label_audit(labels_path=labels, min_hand_labels=1)
+
+    assert audit["evaluation_complete_rows"] == 1
+    assert audit["enough_complete_eval_rows"] is True
+    assert audit["next_action"] == "run the full auto-tag bench with --require-labels"
+
+
+def test_audit_labels_cli_exits_nonzero_until_enough_complete_rows(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    labels = tmp_path / "labels.jsonl"
+    labels.write_text(
+        json.dumps({"track_id": "partial", "split": "holdout", "mood": ["dark"]}) + "\n",
+        encoding="utf-8",
+    )
+
+    rc = lat.main(["--audit-labels", "--labels", str(labels), "--min-hand-labels", "1"])
+
+    assert rc == 2
+    assert "complete_eval=0/1" in capsys.readouterr().out
 
 
 def test_build_label_template_rows_balances_buckets_and_excludes_labeled_ids() -> None:

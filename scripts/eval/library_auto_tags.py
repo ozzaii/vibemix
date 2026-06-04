@@ -233,6 +233,56 @@ def _complete_rows(rows: Sequence[HandLabelRow]) -> list[HandLabelRow]:
     return [row for row in rows if all(category in row.labels for category in CATEGORIES)]
 
 
+def _missing_category_counts(rows: Sequence[HandLabelRow]) -> dict[str, int]:
+    counts: Counter[str] = Counter()
+    for row in rows:
+        for category in CATEGORIES:
+            if category not in row.labels:
+                counts[category] += 1
+    return {category: counts[category] for category in CATEGORIES}
+
+
+def build_label_audit(
+    *,
+    labels_path: Path = DEFAULT_LABELS_PATH,
+    min_hand_labels: int = DEFAULT_MIN_HAND_LABELS,
+) -> dict[str, Any]:
+    """Fast audit for the private hand-label file, no CLAP/store work."""
+    labels = load_hand_labels(labels_path)
+    rows: list[HandLabelRow] = labels["rows"]
+    calibration_rows, eval_rows, calibration_strategy = _rows_by_split(rows)
+    complete_rows = _complete_rows(rows)
+    complete_eval_rows = _complete_rows(eval_rows)
+    enough = len(complete_eval_rows) >= min_hand_labels
+    return {
+        "schema": f"{SCHEMA}_label_audit_v1",
+        "generated_at": datetime.now(UTC).isoformat(timespec="seconds"),
+        "git_head": _git_head(),
+        "path": labels["path"],
+        "label_status": labels["status"],
+        "pending_rows": labels["pending_rows"],
+        "usable_rows": labels["usable_rows"],
+        "complete_rows": len(complete_rows),
+        "calibration_rows": len(calibration_rows),
+        "evaluation_rows": len(eval_rows),
+        "evaluation_complete_rows": len(complete_eval_rows),
+        "min_required_rows": min_hand_labels,
+        "enough_complete_eval_rows": enough,
+        "calibration_strategy": calibration_strategy if rows else None,
+        "missing_category_counts": _missing_category_counts(rows),
+        "unknown_tags": labels["unknown_tags"],
+        "required_categories": list(CATEGORIES),
+        "next_action": (
+            "run the full auto-tag bench with --require-labels"
+            if enough
+            else (
+                "complete eval/private/library/auto_tag_labels.jsonl rows for "
+                "mood, texture, and instrument"
+            )
+        ),
+    }
+
+
 def _metric_counts(
     rows: Sequence[HandLabelRow],
     predictions: Mapping[str, Sequence[AutoTagDecision]],
@@ -645,6 +695,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--min-hand-labels", type=int, default=DEFAULT_MIN_HAND_LABELS)
     parser.add_argument("--no-label-template", action="store_true")
     parser.add_argument(
+        "--audit-labels",
+        action="store_true",
+        help="fast label-file audit only; no CLAP/model/vector-store work",
+    )
+    parser.add_argument(
         "--private-label-template-out",
         type=Path,
         default=None,
@@ -660,6 +715,26 @@ def main(argv: list[str] | None = None) -> int:
         help="exit nonzero when the hand-label file is missing/empty",
     )
     args = parser.parse_args(argv)
+
+    if args.audit_labels:
+        audit = build_label_audit(
+            labels_path=args.labels,
+            min_hand_labels=args.min_hand_labels,
+        )
+        if args.json:
+            print(json.dumps(audit, indent=2, sort_keys=True))
+        else:
+            print(
+                "auto-tag labels: "
+                f"status={audit['label_status']} "
+                f"usable={audit['usable_rows']} "
+                f"complete_eval={audit['evaluation_complete_rows']}/"
+                f"{audit['min_required_rows']} "
+                f"pending={audit['pending_rows']}"
+            )
+            if audit["missing_category_counts"]:
+                print(f"missing_categories={audit['missing_category_counts']}")
+        return 0 if audit["enough_complete_eval_rows"] else 2
 
     report = build_report(
         labels_path=args.labels,
