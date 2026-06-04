@@ -872,6 +872,27 @@ def test_task_kick_density_shift_grounds_on_density_delta():
     assert "0.4" in out
     assert "0.75" in out
     assert "0.35" in out
+    assert "Hand the DJ one forward nudge" in out
+    assert "hold the extra drive" in out
+    assert "React to what" not in out
+    assert "output a single space to stay silent" in out
+
+
+def test_task_kick_density_shift_sparser_density_points_to_space_move():
+    out = AICoach.task_for_event(
+        _ev(
+            "KICK_DENSITY_SHIFT",
+            {"prev_density": 5.0, "new_density": 2.0, "delta": -3.0},
+        )
+    )
+
+    assert "5.0" in out
+    assert "2.0" in out
+    assert "-3.0" in out
+    assert "the pattern got sparser" in out
+    assert "use the added space" in out
+    assert "Hand the DJ one forward nudge" in out
+    assert "React to what" not in out
     assert "output a single space to stay silent" in out
 
 

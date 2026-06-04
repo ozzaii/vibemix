@@ -170,6 +170,20 @@ def test_refine_option_meta_fragment_is_suppressed() -> None:
     assert repair_finished_headphone_line(raw) is None
 
 
+def test_word_count_meta_fragment_is_suppressed() -> None:
+    raw = 'print word count check: "Next time, ease that filter cut over four bars'
+
+    assert _could_be_finished_line_meta_scaffold(raw) is True
+    assert repair_finished_headphone_line(raw) is None
+
+
+def test_grounding_refs_meta_fragment_is_suppressed() -> None:
+    raw = "880.1]` is in grounding refs.\n    *   *Draft 2"
+
+    assert _could_be_finished_line_meta_scaffold(raw) is True
+    assert repair_finished_headphone_line(raw) is None
+
+
 def test_grounded_cue_receipt_fallback_line_is_citable_and_spoken() -> None:
     fallback = _grounded_receipt_fallback_line(
         {

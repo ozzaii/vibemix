@@ -57,6 +57,37 @@ def test_quality_summary_passes_gate_and_cue_lookahead_targets() -> None:
     assert summary["failures"] == []
 
 
+def test_quality_summary_can_target_optional_kick_density_scenario() -> None:
+    rows = _passing_results()
+    rows.append(
+        {
+            "name": "kick_density_shift_sparser",
+            "event": "KICK_DENSITY_SHIFT",
+            "gate": "speak",
+            "gate_reason": "event_priority",
+            "expect": "speak",
+            "gate_ok": True,
+            "line": "Use the added space for the next layer.",
+            "model_line": "Use the added space for the next layer.",
+            "raw_line": "Use the added space for the next layer.",
+            "scores": _scores(friend=2, voice=2),
+        }
+    )
+
+    summary = sim._quality_summary(
+        rows,
+        target_scenarios=sim.QUALITY_TARGET_SCENARIOS + sim.KICK_DENSITY_TARGET_SCENARIOS,
+        expected_total=len(sim.SCENARIOS) + 1,
+    )
+
+    assert summary["gate_ok"] == 10
+    assert summary["gate_total"] == 10
+    assert summary["target_scenarios"]["kick_density_shift_sparser"]["scores"][
+        "friend_not_narrator"
+    ] == 2
+    assert summary["failures"] == []
+
+
 def test_quality_summary_fails_gate_only_no_score_runs() -> None:
     rows = _passing_results()
     for row in rows:
@@ -79,6 +110,17 @@ def test_quality_summary_fails_target_cue_rows_below_friend_or_voice_floor() -> 
 
     assert "phase_with_cue_lookahead friend_not_narrator 1.0 below 2" in failures
     assert "phase_with_cue_lookahead voice_no_slop 1.0 below 2" in failures
+
+
+def test_quality_summary_fails_when_earned_mean_stays_below_floor() -> None:
+    rows = _passing_results()
+    for row in rows:
+        if isinstance(row.get("scores"), dict):
+            row["scores"] = _scores(earned=1)
+
+    failures = sim._quality_summary(rows)["failures"]
+
+    assert "mean earned_not_constant 1.0 below 2" in failures
 
 
 def test_quality_summary_fails_target_cue_row_marked_should_not_speak() -> None:

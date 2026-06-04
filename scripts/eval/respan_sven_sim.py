@@ -25,6 +25,7 @@ Usage:
     uv run python scripts/eval/respan_sven_sim.py            # gate + generate + judge
     uv run python scripts/eval/respan_sven_sim.py --gate-only # deterministic, no model
     uv run python scripts/eval/respan_sven_sim.py --no-log    # don't log to Respan
+    uv run python scripts/eval/respan_sven_sim.py --include-kick-density-target
 """
 from __future__ import annotations
 
@@ -84,9 +85,11 @@ DIMS = [
     "move_specific_not_spectrum", "voice_no_slop",
 ]
 QUALITY_TARGET_SCENARIOS = ("phase_with_cue_lookahead", "track_change_with_cue_lookahead")
+KICK_DENSITY_TARGET_SCENARIOS = ("kick_density_shift_sparser",)
 QUALITY_MEAN_THRESHOLDS = {
     "friend_not_narrator": 2.0,
     "grounded_not_fabricated": 2.4,
+    "earned_not_constant": 2.0,
     "voice_no_slop": 2.0,
 }
 QUALITY_TARGET_THRESHOLDS = {
@@ -163,6 +166,21 @@ SCENARIOS = [
         "task": "The track just changed and the packet carries a grounded next-track receipt. Hand one forward nudge.",
     },
 ]
+
+KICK_DENSITY_TARGET = {
+    "name": "kick_density_shift_sparser",
+    "event": "KICK_DENSITY_SHIFT",
+    "extra": {"prev_density": 6.0, "new_density": 4.5, "delta": -1.5},
+    "expect": "speak",
+    "evidence": (
+        f"{_HEAR} | track=unknown | deck=A | recent_moves[8s]: NONE | "
+        "kick_density=6.0->4.5 delta=-1.5 | onset density fell 13% (slight)"
+    ),
+    "task": (
+        "The measured kick density got sparser with no controller move. Hand one forward "
+        "DJ nudge for how to use the added space, or stay silent if it is not worth a call."
+    ),
+}
 
 
 def _state_for_scenario(sc: dict) -> object:
@@ -327,14 +345,25 @@ def _dim_means(results: list[dict]) -> dict[str, float]:
     }
 
 
-def _quality_summary(results: list[dict]) -> dict:
+def _quality_summary(
+    results: list[dict],
+    *,
+    target_scenarios: tuple[str, ...] = QUALITY_TARGET_SCENARIOS,
+    expected_total: int | None = None,
+) -> dict:
     gate_ok = sum(1 for row in results if row.get("gate_ok") is True)
     target_rows = {
         name: next((row for row in results if row.get("name") == name), None)
-        for name in QUALITY_TARGET_SCENARIOS
+        for name in target_scenarios
     }
+    expected_total = len(SCENARIOS) if expected_total is None else expected_total
     means = _dim_means(results)
-    failures = _quality_failures(results, means=means, target_rows=target_rows)
+    failures = _quality_failures(
+        results,
+        means=means,
+        target_rows=target_rows,
+        expected_total=expected_total,
+    )
     return {
         "gate_ok": gate_ok,
         "gate_total": len(results),
@@ -356,12 +385,14 @@ def _quality_failures(
     *,
     means: dict[str, float] | None = None,
     target_rows: dict[str, dict | None] | None = None,
+    expected_total: int | None = None,
 ) -> list[str]:
     failures: list[str] = []
     if not results:
         return ["no scenario rows were produced"]
-    if len(results) != len(SCENARIOS):
-        failures.append(f"expected {len(SCENARIOS)} scenarios, got {len(results)}")
+    expected_total = len(SCENARIOS) if expected_total is None else expected_total
+    if len(results) != expected_total:
+        failures.append(f"expected {expected_total} scenarios, got {len(results)}")
 
     gate_misses = [
         f"{row.get('name', '<unknown>')} expected {row.get('expect')} got {row.get('gate')}"
@@ -420,6 +451,11 @@ def main() -> int:
         help="include the citation grammar block so the sim matches DJCoHostAgent's live prompt",
     )
     ap.add_argument(
+        "--include-kick-density-target",
+        action="store_true",
+        help="append the recorded-set KICK_DENSITY_SHIFT weak spot as a quality target",
+    )
+    ap.add_argument(
         "--heartbeat-session",
         default=None,
         help="also run respan_sven_heartbeat_judge.py --describe-bank-census on this recording",
@@ -448,9 +484,15 @@ def main() -> int:
             print("RESPAN_API_KEY not set (env only); use --gate-only for the deterministic pass", file=sys.stderr)
             return 2
 
+    scenarios = list(SCENARIOS)
+    target_scenarios = QUALITY_TARGET_SCENARIOS
+    if args.include_kick_density_target:
+        scenarios.append(KICK_DENSITY_TARGET)
+        target_scenarios = QUALITY_TARGET_SCENARIOS + KICK_DENSITY_TARGET_SCENARIOS
+
     results = []
     print(f"{'scenario':<32} {'event':<16} {'gate':<8} {'ok?':<4} friend/grnd/earn/move/voice")
-    for sc in SCENARIOS:
+    for sc in scenarios:
         state = _state_for_scenario(sc)
         ev_extra = _extra_for_scenario(sc, state)
         ev = Event(type=sc["event"], state=state, extra=ev_extra)
@@ -509,7 +551,11 @@ def main() -> int:
     means = _dim_means(results)
     if scored:
         print(f"\nGENERATED-line dim means (n={len(scored)}):", json.dumps(means))
-    quality = _quality_summary(results)
+    quality = _quality_summary(
+        results,
+        target_scenarios=target_scenarios,
+        expected_total=len(scenarios),
+    )
     gate_ok = int(quality["gate_ok"])
     print(f"gate routing: {gate_ok}/{len(results)} matched expectation")
     if args.out:
@@ -520,6 +566,8 @@ def main() -> int:
                         "model": MODEL,
                         "match_live_persona": args.match_live_persona,
                         "include_citation_grammar": include_citation_grammar,
+                        "include_kick_density_target": args.include_kick_density_target,
+                        "quality_target_scenarios": list(target_scenarios),
                     },
                     "results": results,
                     "quality": quality,

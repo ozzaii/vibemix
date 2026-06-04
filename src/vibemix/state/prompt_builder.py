@@ -1011,22 +1011,27 @@ class AICoach:
             prev = ev.extra.get("prev_density")
             new = ev.extra.get("new_density")
             delta = ev.extra.get("delta")
-            direction = "denser" if isinstance(delta, (int, float)) and delta > 0 else "sparser"
+            denser = isinstance(delta, (int, float)) and delta > 0
+            direction = "denser" if denser else "sparser"
+            move_target = (
+                "hold the extra drive, trim a competing layer, or set up the next phrase"
+                if denser
+                else "use the added space, place the next layer, or wait for the next phrase"
+            )
             return (
                 (
-                    f"The KICK PATTERN density just changed — the system measured it "
-                    f"move from {prev} to {new} ({delta:+}), the pattern got {direction}. "
-                    f"React to what that does to the drive — busier, more rolling, "
-                    f"stripped-back, more space — grounded only in that measured density "
-                    f"shift. If it's not worth a call, output a single space to stay "
-                    f"silent."
+                    f"The KICK PATTERN density shifted — the system measured it move "
+                    f"from {prev} to {new} ({delta:+}); the pattern got {direction}. "
+                    "Hand the DJ one forward nudge from that change: "
+                    f"{move_target}. Ground it only in the measured density shift. If "
+                    "it's not worth a call, output a single space to stay silent."
                 )
                 if isinstance(delta, (int, float))
                 else (
-                    f"The KICK PATTERN density just changed — the system measured it "
-                    f"move from {prev} to {new}. React to what that does to the drive, "
-                    f"grounded only in that measured shift. If it's not worth a call, "
-                    f"output a single space to stay silent."
+                    f"The KICK PATTERN density shifted — the system measured it move "
+                    f"from {prev} to {new}. Hand the DJ one forward nudge from that "
+                    "measured shift. If it's not worth a call, output a single space "
+                    "to stay silent."
                 )
             )
         if t == "DISTORTION_CLIMB":

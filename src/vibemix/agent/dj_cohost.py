@@ -252,8 +252,9 @@ _WORD_COUNT_PREFIX_RE = re.compile(
 _SPEAKER_PREFIX_RE = re.compile(r"^\s*(?:sven|you)\s*[:.)-]\s*", re.IGNORECASE)
 _META_LINE_RESIDUE_RE = re.compile(
     r"(?:<=|>=|<\s*\d+\s*words|\b\d+\s*words?\b|\bconstraints?\b|\bdraft\b|"
-    r"\bformulate\b|\bfinal\s+polish\b|\brefine\b|\boption\s+[ab]\b|"
-    r"\bground\s+citation\b|\bgrounding\s+ref\b|\bexact\s+grounding\b|"
+    r"\bword\s+count\b|\bformulate\b|\bfinal\s+polish\b|\brefine\b|"
+    r"\boption\s+[ab]\b|\bground\s+citation\b|\bgrounding\s+refs?\b|"
+    r"\bexact\s+grounding\b|"
     r"\bdj\s+terminology\b|\bdj-to-dj\b|\bor\s+similar\b|\bdo\s+i\s+have\b|"
     r"\bomit\s+the\s+citation\b|\bprompt\s+mentions\b|\bjson\b|\bshould_speak\b|"
     r"\bfriend_not_narrator\b|"
@@ -500,6 +501,8 @@ def repair_finished_headphone_line(text: str) -> str | None:
 
     joined = " ".join(part.strip() for part in stripped.splitlines() if part.strip())
     for match in _QUOTED_FINISHED_LINE_RE.finditer(joined):
+        if not match.group(0).rstrip().endswith('"'):
+            continue
         candidate = _clean_finished_line_candidate(match.group("body"))
         if candidate:
             return candidate
