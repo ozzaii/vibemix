@@ -1,0 +1,81 @@
+{
+  "schema_version": 1,
+  "proof": "launched_tauri_learn_smoke",
+  "passed": false,
+  "completed_lesson_id": "L1.01",
+  "l101_completed": true,
+  "quality_ok": false,
+  "quality_check_count": 19,
+  "quality_checks": [
+    {
+      "name": "no duplicate ids",
+      "ok": true
+    },
+    {
+      "name": "visible buttons have names",
+      "ok": true,
+      "unnamedButtons": []
+    },
+    {
+      "name": "practice map is opt-in",
+      "ok": true
+    },
+    {
+      "name": "booth frontstage is calm",
+      "ok": true,
+      "visibleButtonCount": 2
+    },
+    {
+      "name": "no visible focus targets inside aria-hidden",
+      "ok": true,
+      "hiddenFocusable": []
+    },
+    {
+      "name": "controller controls are keyboardable buttons",
+      "ok": true,
+      "badControls": []
+    },
+    {
+      "name": "booth recommends the next lesson after completion",
+      "ok": true,
+      "text": "start meet your controller"
+    },
+    {
+      "name": "practice map remains opt-in after completion",
+      "ok": true
+    },
+    {
+      "name": "axe-core serious violations",
+      "ok": false,
+      "violations": [
+        {
+          "id": "aria-prohibited-attr",
+          "impact": "serious",
+          "nodes": [
+            ".learn-waveforms"
+          ]
+        }
+      ]
+    }
+  ],
+  "failures": [
+    {
+      "name": "axe-core serious violations",
+      "violations": [
+        {
+          "id": "aria-prohibited-attr",
+          "impact": "serious",
+          "nodes": [
+            ".learn-waveforms"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "autorun completed without script error",
+      "error": "learn e2e quality failures: axe-core serious violations on .learn-waveforms"
+    }
+  ],
+  "href": "http://localhost:1420/learn.html",
+  "generated_at": "2026-06-04T14:45:12.984Z"
+}
