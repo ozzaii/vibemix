@@ -1,37 +1,34 @@
-# HANDOFF — post-compact re-entry for the organizer (2026-06-04)
+# HANDOFF — post-compact re-entry (2026-06-04, ingest done)
 
-The organizer (read-only swarm Claude; Codex sessions build) spawned a HUGE fresh-eye mapping workflow, wrote this handoff, and the user compacts now. On wake, this file + the workflow output are how you re-orient.
+The organizer (read-only swarm Claude; Codex lanes build) ran the full ship-ingestion, hand-synthesized it, wrote the start-gate fix goal, and de-slopped the README. Kaan compacts now. This is how you re-orient.
 
-## �first action on wake
-1. Check if the master map landed: `.planning/packets/2026-06-04/SHIP-MAP-MASTER.md` (workflow task `w27d369o1`). **READ IT FIRST** — it is your whole-system fresh eye (architecture + wired/dark + 3-tier ship state + decisions + blockers + critical path + doc index). If it is not there yet, the workflow is still running; wait for the task notification, then read it + commit it (pathspec: `git add` it then `git commit -- <path>`).
-2. Then check session convergence: `git log --since="2026-06-04 18:00" --format='%h %ci %s'` + `git status --porcelain -- src/vibemix tauri/ui/src`. The Codex lanes run autonomous loops on their OWN goals until Kaan pastes the re-rail goals.
+## First action on wake
+1. **READ `SHIP-INGEST-2026-06-04.md` FIRST** (committed `b078a176`). It is the consolidated post-codexes-done ship state, HEAD-verified, full context. Supersedes SHIP-MAP-MASTER for current state. The 14 raw surface ingests are in `.planning/packets/2026-06-04/ingest/ING-01..14.md`.
+2. Then `git log --oneline -8` + `git status --porcelain -- src/vibemix/__main__.py src/vibemix/runtime/session_loop.py` to see if the start-gate seam has been committed since (the #1 blocker below).
 
-## what happened this session (the load-bearing facts)
-- Ran 3 wiring workflows -> committed `FRONTEND-WIRING-EXIT-MAP.md` + `BACKEND-WIRING-EXIT-MAP.md` + `USER-READY-WIRING-EXIT-MAP.md` (W1/W2/W3). Dark is concentrated in 5 cross-engine seams.
-- **PROXY IS NOW LIVE + FUNDED (the big win):** swapped a new Tier-2 Prepay Gemini key into `VIBEMIX_PROXY_GEMINI_KEY` on `ssh altidus` (`/var/www/bravoh-backend/.env`, backup kept; Bravoh's own key untouched), rolling-restarted `bravoh-clean-api-0/1`. Verified end-to-end: `register -> JWT -> POST /api/vibemix/v1/register` 200 and `gemini-3.5-flash` passthrough -> HTTP 200 "pong". The keyless brain is live on our funded dime. (Key was pasted in chat -> Kaan should rotate as hygiene.) Detail: memory `project_vibemix_proxy_deployed_altidus`.
-- Locked 4 decisions + resolved W3's 4 clarifications + wrote the STOP protocol + per-session re-rail goals (`SHIP-WIRE-GOALS-RERAIL.md`).
+## The state in 6 lines
+- **3 of 4 locked decisions LANDED + committed:** VOICE (Chatterbox-only, mlx extra, ref bundle, model fetch, env-seed, gate-swap — the maps' "#1 voice blocker" is RESOLVED), BRAIN (proxy-default + set_brain + no-key graceful, no crash), STREAK (correctly deferred).
+- **#1 BLOCKER — START-GATE backend is REAL but UNCOMMITTED:** an 803-line dirty diff in `__main__.py` (+738) + `session_loop.py` (+72); `git show HEAD` has 0 start-gate symbols; committed smoke tests assert against it (clean-checkout RED); one sibling `git checkout` from oblivion. HEAD-verified at `23bd6c0e`.
+- **NEW severe bug:** the start-gate `main()` refactor returns at `__main__.py:2314` but `LessonRuntime` is built at `:3606` + loops at `:3890/:3891` = dead code → committing as-is darkens Learn live. W12 live credit dark for the same family (`learn_progress=None` at `:2010`).
+- **README de-slopped THIS session** (`23bd6c0e`): model names/altidus/MOSS/bravoh.com/ozzaii/Phase-dump all gone, 2 coupled tests re-pinned, 5 matrix-sync tests retired, all 4 README gates green. The ingests' README findings are STALE (they read the pre-fix README).
+- **Proxy is live + funded.** GA-tag landmine ARMED (`release.yml` + `companion-sign` fire Windows+Intel on a `v*` tag; `VIBEMIX_PRETAG_MAC_ONLY` does NOT gate the Actions matrix). PKG=0 (all DMGs stale), LIVE=0 (co-host never spoke over real audio).
+- **Honest calibration (Kaan challenged "too good to be true"):** the audit verified WIRING, not QUALITY. 6 of 14 agents got the start-gate WRONG; I HEAD-resolved it. The product thesis (real friend, no slop, grounded, on-time) is UNVERIFIED — LIVE=0. The narrator→coach gap (only the EQ-move guard speaks on the master-only rig) is the real product risk a static audit can't fix.
 
-## the 4 LOCKED decisions (final, do not re-open)
-1. VOICE = zero-shot pranker Chatterbox is the ONLY cohost voice; MOSS NUKED; Mac=mlx-audio (built), Windows=GPU backend BUILD, no-GPU=voiceless+honest banner. Ref `~/.cache/vibemix/cohost_voice_ref.wav` (source `~/Downloads/Prank_L4_t20 (1).wav`). NOT finetuned.
-2. BRAIN ACCESS = hosted proxy DEFAULT (now live+funded). Client must flip `VIBEMIX_LLM_MODE` default direct->proxy + base_url api.altidus.world. In-GUI key field = advanced BYO.
-3. START gate + model lifecycle = ship-critical (no resident model at idle, "Start/Başlat" button, silent pre-warm). NOT a full main() refactor.
-4. STREAK = full Technologic robot voice in v1, rebind to a cited EXECUTED transition first.
+## The single next move
+The backend-boot Codex lane runs `CODEX_READY-STARTGATE-COMMIT-LEARN-ORPHAN.md` (committed `b0c0e291`; paste-ready `/goal` block inside): lift LessonRuntime above the `main()` return + wire learn_progress/learn_state into the live path + prune the dead tail + R10 one-kwarg + commit the seam surgically. Proof = clean-checkout green + by-bus, NOT working-tree-green. **Kaan pastes the goal into the loop; the organizer only writes packets.**
 
-## the #1 ship-blocker
-The FRESH-USER CRASH: wizard done -> session boots `mode=direct` (config_store.py:194) -> no key -> `sys.exit(4)`. Fix = flip default to proxy (now funded) + the `set_brain` backend handler (KEYFIELD shipped the UI `8c6a7b6e`, backend half absent) + never sys.exit on missing key.
+## Open decision for Kaan (offered, not yet answered)
+Write the **narrator→coach engine goal** next (make transition scorer/judge/move-grade speak on a single master mix, or default per-deck capture on, so the co-host coaches instead of narrating on the bare rig)? Or hold until the start-gate lands + a keystone ear-pass.
 
-## sessions + ownership (single-owner, shared tree)
-- main() + config_store + agent/voice + set_brain = ONE backend-boot lane (Sven Codex). __main__.py was dirty from Library -> Library commits+vacates it first.
-- IPC schema + tauri/ui + Start-gate UI = Frontend (Claude). library/intel + Rust library_cmds + CueSet fields = Library Codex. learn/ + the smoke-failure (462157e7) = Learn Codex.
-- The re-rail goals are paste-ready in `SHIP-WIRE-GOALS-RERAIL.md`; Kaan injects them into the loops (the organizer only writes packets).
+## Ownership / law (unchanged)
+Claude = read-only swarm (packets/docs only, never product code); Codex lanes build; Kaan pastes goals into loops + owns the keystone/Apple-notarize/secrets/`v*`-tag. `__main__.py`/`config_store.py` = single-owner (backend-boot lane). IPC schema = frontend lane. Commit packets via pathspec (`git add <exact paths>`, verify `git diff --cached --name-only`, never `-A`). One socket `127.0.0.1:8765` (pkill before any probe).
 
-## doc index (live 2026-06-04 packets)
-- `SHIP-MAP-MASTER.md` — the fresh-eye whole-system map (READ FIRST when it lands).
-- `WIRE-DRIVE.md` — the wiring program spine + the 4 locked decisions + gate.
-- `SHIP-WIRE-GOALS-RERAIL.md` — the STOP protocol + per-session terminating ship-goals + the W3 clarification resolutions.
-- `USER-READY-WIRING-EXIT-MAP.md` / `BACKEND-WIRING-EXIT-MAP.md` / `FRONTEND-WIRING-EXIT-MAP.md` — the W1/W2/W3 wire maps.
-- `SHIP-READINESS-2026-06-04.md` — the 5-tier ship DoD.
-- `ship-final-wf.js` + `SHIP-DRIVE.md` — the ship verification workflow + loop (older, pre-rerail).
+## Kaan-only (no autonomous lane)
+GA-tag matrix de-arm + org signing secrets + updater keypair; Apple notarize + licensed-ref placement + DMG sign; the keystone LIVE capture (his ear); the `v0.1.0` tag push; proxy credits top-up; Free/Pro/Studio tier shape.
 
-## how to organize on wake
-Read SHIP-MAP-MASTER.md -> confirm the critical path (fresh-user crash -> voice -> start-gate -> packaging -> Kaan's keystone capture) -> check which re-rail goals the lanes picked up (git) -> surface the single next move to Kaan + any new blocker the map found. Stay read-only; Codex builds; commit packets surgically (pathspec or `git add <exact path>`, never -A). Proxy is DONE server-side; the remaining proxy work is the client default flip (backend-boot lane).
+## Doc index (live 2026-06-04)
+- `SHIP-INGEST-2026-06-04.md` — THE consolidated ship state (read first). `ingest/ING-01..14.md` = raw.
+- `CODEX_READY-STARTGATE-COMMIT-LEARN-ORPHAN.md` — the #1 next goal (paste-ready).
+- `SHIP-NEXT-GOALS-2026-06-04.md` — per-lane goals + resolved decisions (D1 mlx 8bit, D3 macOS-arm64-v1, GA-tag landmine).
+- `SHIP-MAP-MASTER.md` — architecture orientation (superseded for ship state).
+- README de-slop landed `23bd6c0e`.
