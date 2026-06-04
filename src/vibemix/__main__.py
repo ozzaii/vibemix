@@ -3616,6 +3616,36 @@ def _build_library_subparsers(parser: argparse.ArgumentParser) -> None:
     sp_cue.add_argument("--json", action="store_true")
     sp_cue.set_defaults(func=_cmd_library_cue)
 
+    # Review-packet cue landing: CueTray/Viber hands us a grounded CueSet JSON
+    # packet, then one explicit consent lands it through the shared carriers.
+    sp_land_cues = sub.add_parser(
+        "land-cues",
+        help="Land a reviewed cue packet into a DJ-software carrier",
+        description=(
+            "Read a vibemix CueSet JSON packet, require per-call permission, "
+            "then land it through the non-destructive Rekordbox XML/M3U8 path "
+            "or the explicit Serato/Mixxx tag-write path."
+        ),
+    )
+    sp_land_cues.add_argument("cueset", help="CueSet JSON packet path")
+    sp_land_cues.add_argument(
+        "--target",
+        choices=("rekordbox_xml", "m3u8", "serato_tags", "mixxx_tags"),
+        default=None,
+        help="landing target (default: packet detected_target)",
+    )
+    sp_land_cues.add_argument("--out", default=None, help="output path for XML/M3U8")
+    sp_land_cues.add_argument(
+        "--name", default="vibemix landed cues", help="playlist/export name"
+    )
+    sp_land_cues.add_argument(
+        "--granted",
+        action="store_true",
+        help="per-call user permission to land these cues",
+    )
+    sp_land_cues.add_argument("--json", action="store_true")
+    sp_land_cues.set_defaults(func=_cmd_library_land_cues)
+
     # Viber Agent Phase 1 — theme → curated playlist (M3U/JSON)
     sp_curate = sub.add_parser(
         "curate",
@@ -7690,6 +7720,82 @@ def _cmd_library_cue(args: argparse.Namespace) -> int:
                 f"skipped={payload['skipped']} outputs={outputs}"
             )
     return 0 if payload.get("ok") else 1
+
+
+def _cmd_library_land_cues(args: argparse.Namespace) -> int:
+    """Land a reviewed CueSet JSON packet after explicit per-call permission."""
+    import json as _json
+    from dataclasses import asdict as _asdict
+    from pathlib import Path as _Path
+
+    from vibemix.library.cue_landing import cue_set_from_dict, cue_set_to_dict, land
+
+    as_json = bool(getattr(args, "json", False))
+    try:
+        packet_path = _Path(str(getattr(args, "cueset", ""))).expanduser()
+        raw = _json.loads(packet_path.read_text(encoding="utf-8"))
+        cueset = cue_set_from_dict(raw)
+        target_kind = str(getattr(args, "target", None) or cueset.detected_target)
+        target = _cue_landing_export_target(
+            target_kind,
+            out_path=getattr(args, "out", None),
+            name=str(getattr(args, "name", "vibemix landed cues")),
+        )
+        receipt = land(cueset, target, granted=bool(getattr(args, "granted", False)))
+        payload = {
+            "ok": True,
+            "mode": "land-cues",
+            "target": target.kind,
+            "receipt": _asdict(receipt),
+            "cueset": cue_set_to_dict(cueset),
+        }
+    except Exception as exc:
+        payload = {
+            "ok": False,
+            "mode": "land-cues",
+            "error": f"land-cues failed: {type(exc).__name__}: {exc}",
+        }
+        print(_json.dumps(payload), file=sys.stderr)
+        return 1
+
+    if as_json:
+        _json.dump(payload, sys.stdout, indent=2)
+        sys.stdout.write("\n")
+    else:
+        receipt = payload["receipt"]
+        print(
+            "land-cues done: "
+            f"target={payload['target']} written={receipt['written_count']} "
+            f"kept_dj={receipt['kept_dj_count']} path={receipt['path']}"
+        )
+    return 0
+
+
+def _cue_landing_export_target(kind: str, *, out_path: str | None, name: str):
+    from vibemix.library.cue_landing import ExportTarget
+
+    if kind == "rekordbox_xml":
+        return ExportTarget.rekordbox_xml(
+            out_path or _default_landed_cue_path("xml"),
+            name=name,
+        )
+    if kind == "m3u8":
+        return ExportTarget.m3u8(
+            out_path or _default_landed_cue_path("m3u8"),
+            name=name,
+        )
+    if kind == "serato_tags":
+        return ExportTarget.serato_tags()
+    if kind == "mixxx_tags":
+        return ExportTarget.mixxx_tags()
+    raise ValueError(f"unknown cue landing target: {kind!r}")
+
+
+def _default_landed_cue_path(suffix: str) -> str:
+    from pathlib import Path as _Path
+
+    path = _Path.home() / ".cache" / "vibemix" / "cues" / f"vibemix-landed-cues.{suffix}"
+    return str(path)
 
 
 def _normalize_codex_curate_result(
