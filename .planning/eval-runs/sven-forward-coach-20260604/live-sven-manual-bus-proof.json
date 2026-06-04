@@ -1,0 +1,106 @@
+{
+  "schema_version": 1,
+  "created_at": "2026-06-04T14:25:00+03:00",
+  "lane": "sven-forward-coach",
+  "purpose": "Live by-bus proof for the current Sven voice path after the Respan forward-coach work.",
+  "runtime": {
+    "command": "PYTHONFAULTHANDLER=1 VIBEMIX_DEV_SIDECAR=1 uv run python -m vibemix",
+    "session_dir": "20260604-142137",
+    "recording_root": "/Users/ozai/Library/Application Support/vibemix/recordings/20260604-142137",
+    "mode": "coach",
+    "mood": "teacher",
+    "skill": "intermediate",
+    "tts": "MOSS-TTS-Nano local only",
+    "llm_provider": "gemini",
+    "llm_model": "gemini-3.5-flash",
+    "bus": "ws://127.0.0.1:8765"
+  },
+  "control_probe": {
+    "command": "uv run python .claude/skills/drive-vibemix/scripts/ws_probe.py --watch ipc.session --seconds 5",
+    "matched_frames": 46,
+    "result": "connected and disconnected cleanly; no transcript; engine stayed up",
+    "snapshot_summary": {
+      "cohost_status": "LISTENING",
+      "grounded": true,
+      "bpm": 166.7
+    }
+  },
+  "early_manual_probe": {
+    "command": "uv run python .claude/skills/drive-vibemix/scripts/ws_probe.py --trigger --watch ipc.session --seconds 20",
+    "manual_trigger_t_rel_s": 30.346,
+    "prior_event": {
+      "type": "HEARTBEAT",
+      "t_rel_s": 10.351
+    },
+    "gap_s": 19.995,
+    "event_global_min_gap_s": 22.0,
+    "result": "manual frame reached the bus, but EventDetector did not emit MANUAL inside the global event gap; next emitted event was PHASE at t=32.548 and was silenced as describe_bank_only"
+  },
+  "spoken_manual_probe": {
+    "command": "uv run python .claude/skills/drive-vibemix/scripts/ws_probe.py --trigger --watch ipc.session --seconds 35",
+    "matched_frames": 349,
+    "manual_trigger_t_rel_s": 102.114,
+    "manual_event_t_rel_s": 102.266,
+    "llm_invoke_t_rel_s": 102.272,
+    "ai_text_t_rel_s": 105.721,
+    "playout_done_t_rel_s": 106.897,
+    "latency_s": 3.45,
+    "playout_latency_ms": 4630.9,
+    "cohost_reaction_seen": true,
+    "transcript_delta_seen": true,
+    "cohost_talking_seen": true,
+    "returned_to_listening": true,
+    "line": "That high end is getting busy with that synth loop--let it roll for a minute before you stack anything else on top."
+  },
+  "event_log_evidence": {
+    "manual_event": {
+      "type": "MANUAL",
+      "audible": true,
+      "deck": "A",
+      "track": "Varg\\u00b2\\u2122, Ecco2k, & Bladee - H2D",
+      "track_conf": 0.62,
+      "phase": "low"
+    },
+    "attached_audio": {
+      "p1_seconds": 60,
+      "deck_audio_parts": 2,
+      "deck_audio_activity": "A:active+B:silent"
+    },
+    "grounding_refs": [
+      "mix:deck_audio_support=no_deck_route",
+      "mix:transition_block=no_resolved_decks",
+      "mix:second_deck_identity=blocked",
+      "mix:deck_audio_capture=A_active+B_silent",
+      "mix:deck_audio_features=A_active_rms_0.024+B_silent_rms_0.000",
+      "mix:deck_audio_delta=A_rms_fell_45pct_strong",
+      "mix:deck_audio_window=A_active_pre_0.024_current_0.027+B_silent_pre_0.000_current_0.000"
+    ],
+    "post_line_gate": {
+      "event": "PHASE",
+      "t_rel_s": 134.553,
+      "verdict": "silent",
+      "reason": "describe_bank_only"
+    }
+  },
+  "citation_review": {
+    "citation_count": 0,
+    "citation_action": "emit",
+    "citation_valid": null,
+    "citation_lint_setting": "off",
+    "grounding_review_verdict": "mixed_not_clean_ship_proof",
+    "notes": [
+      "The live line is coach-like and concrete: it suggests restraint instead of describing the whole track.",
+      "The line is not a clean grounding proof because it emitted with citation_count=0.",
+      "The prompt had attached P1 audio and deck-audio feature context, but deck identity remained partially unresolved and the spoken line carried no explicit citation chip.",
+      "This artifact proves live routing, MOSS speech, bus transcript delivery, and rare-gate silence around PHASE/HEARTBEAT; it does not prove the target Respan friend/voice thresholds beyond the committed sim artifact."
+    ]
+  },
+  "verdict": {
+    "live_route": "pass",
+    "moss_speech": "pass",
+    "idle_describe_bank_gate": "pass",
+    "manual_sven_voice": "pass",
+    "grounded_ship_quality_for_this_line": "mixed",
+    "overclaim_guard": "Do not present this manual live line as citation-grounded; use it as live route/audio proof only."
+  }
+}
