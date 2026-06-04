@@ -558,6 +558,110 @@ def test_recovery_drill_lesson_arms_each_authored_owned_deck_miss() -> None:
     assert runtime.current_state.id == "awaiting_action"
 
 
+def test_recovery_drill_bailout_actions_give_meaningful_credit(monkeypatch) -> None:
+    """Recovery drills credit the actual bailout move, not a generic continue click."""
+    monkeypatch.setattr("vibemix.learn.progress.save_progress", lambda _progress: None)
+    driver = BeatmatchPracticeDriver()
+    registry = EvidenceRegistry()
+    events: list[tuple[str, dict]] = []
+    progress = LearnProgress(course_3_unlocked=True)
+    runtime = LessonRuntime(
+        learn_state=LearnState(),
+        midi_mirror=MagicMock(name="midi_mirror"),
+        controller_state=MagicMock(name="controller_state"),
+        ipc_router=MagicMock(name="ipc_router"),
+        progress_store=progress,
+        evidence_registry=registry,
+        evidence_clock=lambda: 72.5,
+        beatmatch_practice_loader=driver.snapshot,
+        beatmatch_practice_action_recorder=driver.record_action,
+        session_event_logger=lambda kind, fields: events.append((kind, dict(fields))),
+    )
+    runtime.send(
+        "load",
+        lesson_id="L3.05",
+        course_id="course_3_play_mode",
+        controller_id="pioneer_ddj_flx4",
+    )
+    runtime.send("begin")
+
+    handled = runtime.handle_recovery_drill_ack(
+        {
+            "type": "cc",
+            "control": "eq_hi",
+            "deck": "B",
+            "direction": "up",
+            "value": 110,
+            "prev_value": 64,
+            "source": "click",
+        }
+    )
+
+    assert handled is True
+    assert runtime.current_step_id == "L3.05.beat.0"
+    hint = _hint_payloads(runtime._ipc)[-1]
+    assert hint["text"] == (
+        "That move does not get deck B out. Use echo-out, sweep deck B's "
+        "filter, pull its volume down, or cut the crossfader away."
+    )
+    assert hint["citations"] == ["[ev:RECOVERY_DRILL_ARMED@72.500]"]
+    assert not registry.has("ev", "RECOVERY_DRILL_RECOVERED", 72.5, tol=1.0)
+
+    handled = runtime.handle_recovery_drill_ack(
+        {
+            "type": "cc",
+            "control": "filter",
+            "deck": "B",
+            "direction": "up",
+            "value": 96,
+            "prev_value": 64,
+            "source": "click",
+        }
+    )
+
+    assert handled is True
+    assert runtime.current_state.id == "awaiting_action"
+    assert runtime.current_step_id == "L3.05.beat.1"
+    assert registry.has("ev", "RECOVERY_DRILL_RECOVERED", 72.5, tol=1.0)
+    tutor_texts = [payload["text"] for payload in _tutor_speak_payloads(runtime._ipc)]
+    assert (
+        "Good - that filter sweep pulls deck B out, so deck A reads clean."
+        in tutor_texts
+    )
+    recovery_events = [
+        fields for kind, fields in events if kind == "learn_recovery_drill_recovered"
+    ]
+    assert recovery_events[-1]["bailout"] == "deck B filter sweep"
+
+    handled = runtime.handle_recovery_drill_ack(
+        {
+            "type": "cc",
+            "control": "vol",
+            "deck": "B",
+            "direction": "down",
+            "value": 0,
+            "prev_value": 80,
+            "source": "click",
+        }
+    )
+
+    assert handled is True
+    assert progress.lessons["L3.05"]["completed"] is True
+    assert runtime._learn.current_lesson_id == "L3.06"
+    assert runtime.current_state.id == "awaiting_action"
+    emitted_types = [
+        call.args[0].get("type")
+        for call in runtime._ipc.emit.call_args_list
+        if call.args and isinstance(call.args[0], dict)
+    ]
+    assert "ipc.learn.complete_lesson" in emitted_types
+    assert emitted_types.count("ipc.learn.advance") >= 2
+    recovery_events = [
+        fields for kind, fields in events if kind == "learn_recovery_drill_recovered"
+    ]
+    assert recovery_events[-1]["bailout"] == "deck B volume cut"
+
+
 def test_live_beatmatch_grade_voices_drift_without_fabricated_citation() -> None:
     """Measured non-locked coaching is authored, but no ev atom is invented."""
     registry = EvidenceRegistry()

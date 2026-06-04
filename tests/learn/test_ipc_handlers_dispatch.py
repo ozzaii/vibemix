@@ -760,6 +760,56 @@ def test_lesson_continue_walks_authored_tutor_beats_before_completion() -> None:
     assert runtime.current_state.id in {"advancing", "completed"}
 
 
+def test_ack_dispatch_lets_recovery_drill_consume_bailout_move() -> None:
+    """Recovery-drill moves get a claim before generic step/mismatch gates."""
+    runtime = MagicMock(name="lesson_runtime")
+    runtime.handle_observer_ack.return_value = False
+    runtime.handle_recovery_drill_ack.return_value = True
+    runtime.handle_step_ack.return_value = False
+    runtime.handle_beatmatch_practice_ack.return_value = False
+    runtime.handle_mismatch_ack.return_value = False
+    progress = LearnProgress()
+    router = IpcRouterBus()
+    midi_mirror = MagicMock(name="midi_mirror_inbound")
+    midi_mirror.current_profile.return_value = None
+    register_learn_handlers(
+        ipc_router=router,
+        lesson_runtime=runtime,
+        midi_mirror=midi_mirror,
+        progress=progress,
+    )
+
+    async def dispatch_ack() -> bool:
+        return await router.dispatch(
+            {
+                "type": "ipc.learn.ack",
+                "payload": {
+                    "control_id": "filter:B",
+                    "source": "click",
+                    "value": 96,
+                    "prev_value": 64,
+                    "direction": "up",
+                },
+            }
+        )
+
+    assert asyncio.run(dispatch_ack()) is True
+    midi = runtime.handle_recovery_drill_ack.call_args.args[0]
+    assert midi == {
+        "type": "cc",
+        "control": "filter",
+        "deck": "B",
+        "direction": "up",
+        "value": 96,
+        "prev_value": 64,
+        "source": "click",
+    }
+    runtime.handle_step_ack.assert_not_called()
+    runtime.handle_beatmatch_practice_ack.assert_not_called()
+    runtime.handle_mismatch_ack.assert_not_called()
+    runtime.send.assert_not_called()
+
+
 def test_beginner_path_dispatch_continue_finish_persists(
     progress_path_in_tmp: Path,
 ) -> None:

@@ -130,11 +130,11 @@ from vibemix.ui_bus.learn_messages import (
     LearnAdvance,
     LearnCompleteLesson,
     LearnHighlight,
-    LearnTeachingFocus,
     LearnLessonLoaded,
     LearnLiveGrade,
     LearnPlayheadTick,
     LearnProgressState,
+    LearnTeachingFocus,
     LearnTeachingLoopPayload,
     LearnTeachingObservationPayload,
     LearnTeachingVerificationPayload,
@@ -157,6 +157,11 @@ _BEATMATCH_PRACTICE_GRADE_STATES = frozenset(
     {"awaiting_action", "hint_strike_1", "hint_strike_2", "hint_strike_3", "advancing"}
 )
 _RECOVERY_DRILL_ARMED_EVENT = "RECOVERY_DRILL_ARMED"
+_RECOVERY_DRILL_RECOVERED_EVENT = "RECOVERY_DRILL_RECOVERED"
+_RECOVERY_BAILOUT_MIN_DELTA = 8
+_RECOVERY_FILTER_CENTER_MIN_DELTA = 18
+_RECOVERY_CHANNEL_CUT_CC = 32
+_RECOVERY_XFADER_CUT_CC = 38
 _PRACTICE_AUDIO_CONTROLS = frozenset(
     {
         "cue",
@@ -251,6 +256,14 @@ def _control_and_deck(action: dict[str, Any]) -> tuple[str, str]:
 
 def _observable_control_id(control: str, deck: str) -> str:
     return f"{control}:{deck}" if deck else control
+
+
+def _cc_int(value: Any, *, default: int = 64) -> int:
+    try:
+        raw = int(value)
+    except (TypeError, ValueError):
+        raw = default
+    return max(0, min(127, raw))
 
 
 # EQ band lookup for the organism teaching-focus swirl. A control like
@@ -463,6 +476,12 @@ class LessonRuntime(StateMachine):
         | hint_strike_3.to(advancing, cond="min_dwell_elapsed")
     )
     observer_complete = (
+        awaiting_action.to(completed)
+        | hint_strike_1.to(completed)
+        | hint_strike_2.to(completed)
+        | hint_strike_3.to(completed)
+    )
+    recovery_complete = (
         awaiting_action.to(completed)
         | hint_strike_1.to(completed)
         | hint_strike_2.to(completed)
@@ -932,6 +951,53 @@ class LessonRuntime(StateMachine):
         self._arm_recovery_drill_if_needed()
         return True
 
+    def handle_recovery_drill_ack(self, midi: dict[str, Any]) -> bool:
+        """Consume L3 recovery-drill bailout moves.
+
+        The authored L3.05 prompt asks for echo-out, filter sweep, or a hard
+        cut. The generic lesson gate still expects ``lesson_continue`` between
+        drill beats, so without this hook real corrective fader/filter moves
+        were treated as mismatches. This path only credits moves that actually
+        remove the problem deck from the owned MiniDeck mix.
+        """
+
+        if self.current_state.id not in (
+            "awaiting_action",
+            "hint_strike_1",
+            "hint_strike_2",
+            "hint_strike_3",
+        ):
+            return False
+        if self._active_observer() is not None:
+            return False
+        drill = self._active_recovery_drill()
+        if drill is None:
+            return False
+        control, _deck = _control_and_deck(midi)
+        if control == "lesson_continue":
+            return False
+
+        problem_deck = (drill.deck or "B").upper()
+        bailout_label = self._recovery_bailout_label(midi, problem_deck=problem_deck)
+        if bailout_label is None:
+            self._emit_recovery_drill_hint(midi, problem_deck=problem_deck)
+            return True
+
+        self._record_recovery_drill_success(
+            midi,
+            drill=drill,
+            bailout_label=bailout_label,
+            problem_deck=problem_deck,
+        )
+        next_index = self._active_step_index + 1
+        next_step = self._flow_step(next_index)
+        flow = self._active_flow
+        if flow is not None and next_step is not None and next_index < len(flow.drill_shapes):
+            self._advance_recovery_drill_step(next_step)
+        else:
+            self._complete_recovery_drill_lesson()
+        return True
+
     def handle_beatmatch_practice_ack(self, midi: dict[str, Any]) -> bool:
         """Consume L2 beatmatch acks until the measured grade is actually locked.
 
@@ -1283,6 +1349,197 @@ class LessonRuntime(StateMachine):
             self._beatmatch_practice_lock_active = False
             self._emit_live_beatmatch_grade(self._grade_beatmatch_practice_tick())
 
+    def _active_recovery_drill(self) -> Any | None:
+        flow = self._active_flow
+        lesson_id = self._learn.current_lesson_id
+        if flow is None or lesson_id is None or not flow.drill_shapes:
+            return None
+        step_index = self._active_step_index
+        if step_index >= len(flow.drill_shapes):
+            return None
+        if (lesson_id, step_index) != self._recovery_drill_armed_step_key:
+            return None
+        return flow.drill_shapes[step_index]
+
+    def _recovery_bailout_label(
+        self,
+        midi: dict[str, Any],
+        *,
+        problem_deck: str,
+    ) -> str | None:
+        control, deck = _control_and_deck(midi)
+        midi_deck = (deck or "").upper()
+        cur = _cc_int(midi.get("value"))
+        prev = _cc_int(midi.get("prev_value"), default=cur)
+        delta = abs(cur - prev)
+
+        if (
+            control == "fx_echo"
+            and midi.get("type") == "button"
+            and midi.get("direction") == "down"
+        ):
+            return "echo-out"
+        if (
+            control == "filter"
+            and midi_deck == problem_deck
+            and abs(cur - 64) >= _RECOVERY_FILTER_CENTER_MIN_DELTA
+            and delta >= _RECOVERY_BAILOUT_MIN_DELTA
+        ):
+            return f"deck {problem_deck} filter sweep"
+        if (
+            control == "vol"
+            and midi_deck == problem_deck
+            and cur <= _RECOVERY_CHANNEL_CUT_CC
+            and prev - cur >= _RECOVERY_BAILOUT_MIN_DELTA
+        ):
+            return f"deck {problem_deck} volume cut"
+        if control == "xfader":
+            if (
+                problem_deck == "B"
+                and cur <= _RECOVERY_XFADER_CUT_CC
+                and prev - cur >= _RECOVERY_BAILOUT_MIN_DELTA
+            ):
+                return "crossfader cut to deck A"
+            if (
+                problem_deck == "A"
+                and cur >= 127 - _RECOVERY_XFADER_CUT_CC
+                and cur - prev >= _RECOVERY_BAILOUT_MIN_DELTA
+            ):
+                return "crossfader cut to deck B"
+        return None
+
+    def _emit_recovery_drill_hint(
+        self,
+        midi: dict[str, Any],
+        *,
+        problem_deck: str,
+    ) -> None:
+        now = time.monotonic()
+        self._state_entered_at = now
+        if now - self._last_mismatch_hint_at < _MISMATCH_HINT_THROTTLE_S:
+            return
+        self._last_mismatch_hint_at = now
+        self._record_action_evidence(expected=None, midi=midi, matched=False)
+        self._mark_progress_practice_source(midi)
+        citations = (
+            (self._recovery_drill_armed_citation,)
+            if self._recovery_drill_armed_citation is not None
+            else ()
+        )
+        text = (
+            f"That move does not get deck {problem_deck} out. Use echo-out, "
+            f"sweep deck {problem_deck}'s filter, pull its volume down, or "
+            "cut the crossfader away."
+        )
+        try:
+            speak = LearnTutorSpeak.make(
+                text=text,
+                tts_marker=f"{self._learn.current_lesson_id or 'learn'}.recovery_hint",
+                citations=citations,
+                data_state="hint",
+            ).to_dict()
+            self._emit_tutor_speak(speak)
+        except Exception as exc:  # pragma: no cover - defensive
+            import sys
+
+            print(
+                f"[learn.runtime] recovery drill hint emit failed: {exc!r}",
+                file=sys.stderr,
+            )
+
+    def _record_recovery_drill_success(
+        self,
+        midi: dict[str, Any],
+        *,
+        drill: Any,
+        bailout_label: str,
+        problem_deck: str,
+    ) -> None:
+        evidence_time = self._record_action_evidence(
+            expected=None,
+            midi=midi,
+            matched=True,
+        )
+        self._mark_progress_practice_source(midi)
+        citation = None
+        if self._evidence_registry is not None:
+            self._record_evidence(
+                source=BEATMATCH_EVIDENCE_SOURCE,
+                key=_RECOVERY_DRILL_RECOVERED_EVENT,
+                t_session=evidence_time,
+            )
+            citation = (
+                f"[{BEATMATCH_EVIDENCE_SOURCE}:{_RECOVERY_DRILL_RECOVERED_EVENT}@"
+                f"{evidence_time:.3f}]"
+            )
+        self._log_session_event(
+            "learn_recovery_drill_recovered",
+            lesson_id=self._learn.current_lesson_id or "",
+            course_id=self._learn.current_course_id or "",
+            step_id=self._current_step_id(),
+            drill=getattr(drill, "drill", ""),
+            deck=problem_deck,
+            bailout=bailout_label,
+            evidence_time=evidence_time,
+        )
+        citations = (citation,) if citation is not None else ()
+        try:
+            speak = LearnTutorSpeak.make(
+                text=self._recovery_drill_success_text(
+                    bailout_label,
+                    problem_deck=problem_deck,
+                ),
+                tts_marker=f"{self._learn.current_lesson_id or 'learn'}.recovery_ok",
+                citations=citations,
+                data_state="hint",
+            ).to_dict()
+            self._emit_tutor_speak(speak)
+        except Exception as exc:  # pragma: no cover - defensive
+            import sys
+
+            print(
+                f"[learn.runtime] recovery drill success emit failed: {exc!r}",
+                file=sys.stderr,
+            )
+
+    def _recovery_drill_success_text(
+        self,
+        bailout_label: str,
+        *,
+        problem_deck: str,
+    ) -> str:
+        clean_deck = "A" if problem_deck == "B" else "B"
+        if "filter" in bailout_label:
+            return (
+                f"Good - that filter sweep pulls deck {problem_deck} out, so "
+                f"deck {clean_deck} reads clean."
+            )
+        if "volume" in bailout_label:
+            return (
+                f"Good - pulling deck {problem_deck} down removes the bad layer, "
+                f"so deck {clean_deck} stays clean."
+            )
+        if "crossfader" in bailout_label:
+            return f"Good - that crossfader cut gets deck {problem_deck} out fast."
+        return (
+            f"Good - echo-out gives deck {problem_deck} a clean exit instead of "
+            "letting it fight the mix."
+        )
+
+    def _advance_recovery_drill_step(self, next_step: LessonStep) -> None:
+        self._active_step_index += 1
+        self._learn.current_beat_index = self._active_step_index
+        self._learn.strike_count = 0
+        self._state_entered_at = time.monotonic()
+        self._emit_advance(reason="action_matched")
+        self._emit_highlight(next_step.expected_action)
+        self._emit_step_tutor(next_step)
+        self._arm_recovery_drill_if_needed()
+
+    def _complete_recovery_drill_lesson(self) -> None:
+        self._emit_advance(reason="action_matched")
+        self.send("recovery_complete")
+
     def _record_cue_placement_practice_action(self, midi: dict[str, Any]) -> None:
         """Arm and grade an owned-deck cue placement practice attempt, if wired."""
 
@@ -1352,6 +1609,10 @@ class LessonRuntime(StateMachine):
     ) -> None:
         self._last_was_match = completed
         self._last_completion_can_advance = False
+
+    def on_recovery_complete(self, **_kwargs: Any) -> None:
+        self._last_was_match = True
+        self._last_completion_can_advance = True
 
     # ------------------------------------------------------------------
     # State-entry callbacks — the sole-writer surface for LearnState

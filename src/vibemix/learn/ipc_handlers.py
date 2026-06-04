@@ -427,6 +427,8 @@ def register_learn_handlers(
         lesson_runtime.handle_practice_audio_ack(midi)
         if lesson_runtime.handle_observer_ack(midi):
             return
+        if lesson_runtime.handle_recovery_drill_ack(midi):
+            return
         if lesson_runtime.handle_step_ack(midi):
             return
         if lesson_runtime.handle_beatmatch_practice_ack(midi):
