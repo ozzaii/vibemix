@@ -39,8 +39,8 @@
   },
   "verdict": {
     "engine_heard_master_audio": true,
-    "mic_was_muted": false,
+    "mic_was_muted": true,
     "sidecar_status": "stopped_after_probe",
-    "voice_was_muted": false
+    "voice_was_muted": true
   }
 }
