@@ -1,0 +1,255 @@
+{
+  "frames": [
+    {
+      "after_mastered_line": false,
+      "payload": {
+        "controller_id": "pioneer_ddj_flx4",
+        "course_id": "course_1_anatomy",
+        "lesson_id": "L1.03",
+        "progress_dots": [
+          {
+            "lesson_id": "L1.01",
+            "status": "pending"
+          },
+          {
+            "lesson_id": "L1.02",
+            "status": "pending"
+          },
+          {
+            "lesson_id": "L1.03",
+            "status": "current"
+          },
+          {
+            "lesson_id": "L1.04",
+            "status": "pending"
+          },
+          {
+            "lesson_id": "L1.05",
+            "status": "pending"
+          },
+          {
+            "lesson_id": "L1.06",
+            "status": "pending"
+          },
+          {
+            "lesson_id": "L1.07",
+            "status": "pending"
+          },
+          {
+            "lesson_id": "L1.08",
+            "status": "pending"
+          },
+          {
+            "lesson_id": "L1.09",
+            "status": "pending"
+          },
+          {
+            "lesson_id": "L1.10",
+            "status": "pending"
+          },
+          {
+            "lesson_id": "L1.11",
+            "status": "pending"
+          },
+          {
+            "lesson_id": "L1.12",
+            "status": "pending"
+          },
+          {
+            "lesson_id": "L1.13",
+            "status": "pending"
+          },
+          {
+            "lesson_id": "L1.14",
+            "status": "completed"
+          },
+          {
+            "lesson_id": "L1.15",
+            "status": "pending"
+          },
+          {
+            "lesson_id": "L1.16",
+            "status": "pending"
+          }
+        ],
+        "title": "channel strip"
+      },
+      "ts": "2026-06-04T13:39:18.146296+00:00",
+      "type": "ipc.learn.lesson_loaded"
+    },
+    {
+      "after_mastered_line": false,
+      "payload": {
+        "action": "snapshot",
+        "eq_mixing": {
+          "competent": true,
+          "first_mastered_at": null,
+          "live_proof_count": 2,
+          "mastered": false,
+          "skill_id": "eq_mixing",
+          "stage": "competent",
+          "what_remains": "1 more cited proof to Master"
+        },
+        "lesson_L103": {
+          "completed": false,
+          "completed_at": null,
+          "strikes_used": 0
+        }
+      },
+      "ts": "2026-06-04T13:39:18.149402+00:00",
+      "type": "ipc.learn.progress_state"
+    },
+    {
+      "after_mastered_line": false,
+      "payload": {
+        "annotation": "",
+        "control_id": "eq_hi",
+        "cue_color": "amber",
+        "cue_shape": "pulse-ring",
+        "deck": "A",
+        "expected_action": {
+          "control": "eq_hi",
+          "deck": "A",
+          "direction": "",
+          "min_delta": 80,
+          "type": "cc"
+        }
+      },
+      "ts": "2026-06-04T13:39:18.152229+00:00",
+      "type": "ipc.learn.highlight"
+    },
+    {
+      "after_mastered_line": false,
+      "payload": {
+        "band": "hi",
+        "control_id": "eq_hi",
+        "deck": "A",
+        "phase": "focus"
+      },
+      "ts": "2026-06-04T13:39:18.154045+00:00",
+      "type": "ipc.learn.teaching_focus"
+    },
+    {
+      "after_mastered_line": false,
+      "payload": {
+        "citations": [],
+        "data_state": "active",
+        "text": "the channel strip is the vertical column above each deck: gain on top, three EQ knobs, fader at the bottom.",
+        "tts_marker": "L103.beat0"
+      },
+      "ts": "2026-06-04T13:39:18.157379+00:00",
+      "type": "ipc.learn.tutor_speak"
+    },
+    {
+      "after_mastered_line": false,
+      "payload": {
+        "citations": [
+          "[screen:eq_hi:A]"
+        ],
+        "data_state": "active",
+        "text": "twist the top EQ knob on deck A and listen for the cymbals getting brighter or darker.",
+        "tts_marker": "L103.beat1"
+      },
+      "ts": "2026-06-04T13:39:18.216816+00:00",
+      "type": "ipc.learn.tutor_speak"
+    },
+    {
+      "after_mastered_line": true,
+      "payload": {
+        "citations": [
+          "[ev:LEARN_CONTROL_GRADED@68.113]"
+        ],
+        "data_state": "hint",
+        "text": "EQ mixing is mastered from cited EQ practice.",
+        "tts_marker": "L1.03.mastered.eq_mixing"
+      },
+      "ts": "2026-06-04T13:39:19.409867+00:00",
+      "type": "ipc.learn.tutor_speak"
+    },
+    {
+      "after_mastered_line": true,
+      "payload": {
+        "action": "snapshot",
+        "eq_mixing": {
+          "competent": true,
+          "first_mastered_at": "2026-06-04T13:39:19.409792+00:00",
+          "live_proof_count": 3,
+          "mastered": true,
+          "skill_id": "eq_mixing",
+          "stage": "mastered",
+          "what_remains": ""
+        },
+        "lesson_L103": {
+          "completed": false,
+          "completed_at": null,
+          "last_practice_source": "hardware",
+          "practice_sources": {
+            "hardware": 1,
+            "screen": 0
+          },
+          "strikes_used": 0
+        }
+      },
+      "ts": "2026-06-04T13:39:19.413622+00:00",
+      "type": "ipc.learn.progress_state"
+    },
+    {
+      "after_mastered_line": true,
+      "payload": {
+        "lesson_id": "L1.03",
+        "reason": "action_matched"
+      },
+      "ts": "2026-06-04T13:39:19.526312+00:00",
+      "type": "ipc.learn.advance"
+    },
+    {
+      "after_mastered_line": true,
+      "payload": {
+        "band": "hi",
+        "control_id": "eq_hi",
+        "deck": "A",
+        "phase": "reform"
+      },
+      "ts": "2026-06-04T13:39:19.528318+00:00",
+      "type": "ipc.learn.teaching_focus"
+    },
+    {
+      "after_mastered_line": true,
+      "payload": {
+        "cohost_status": "IDLE",
+        "voice_peak": 0.42036010742187496,
+        "voice_rms": 0.04989878401920578
+      },
+      "ts": "2026-06-04T13:39:19.566006+00:00",
+      "type": "ipc.session.snapshot"
+    }
+  ],
+  "observed": {
+    "mastered_tutor_line": true,
+    "max_voice_peak_after_mastered_line": 0.42036010742187496,
+    "progress_mastered": true
+  },
+  "progress_seed": "/tmp/vibemix-learn-mastered-proof-progress.json",
+  "run": "learn-mastered-feedback-current-20260604",
+  "sent": [
+    {
+      "payload": {
+        "controller_id": "pioneer_ddj_flx4",
+        "course_id": "course_1_anatomy",
+        "lesson_id": "L1.03"
+      },
+      "type": "ipc.learn.start_lesson"
+    },
+    {
+      "payload": {
+        "control_id": "eq_hi:A",
+        "direction": "",
+        "prev_value": 0,
+        "source": "midi",
+        "value": 127
+      },
+      "type": "ipc.learn.ack"
+    }
+  ],
+  "source": "current HEAD via VIBEMIX_DEV_SIDECAR=1"
+}

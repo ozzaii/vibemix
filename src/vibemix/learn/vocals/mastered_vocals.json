@@ -1,8 +1,8 @@
 {
-  "_default": "That one was real, and it was yours. You earned that in a live set.",
-  "deck_control": "You're running these decks for real now. Earned, live, by your own hands.",
-  "eq_mixing": "Those EQ moves were clean and they were yours. You earned that in a real set.",
-  "transitions": "That blend held on its own. Your transitions, earned live.",
-  "harmonic_mixing": "The keys lined up and you heard it land. You earned harmonic mixing for real.",
-  "phrasing_performance": "You played it right on the phrase. Earned, in a real set, by you."
+  "_default": "This skill is mastered from cited practice proofs.",
+  "deck_control": "Deck control is mastered from cited deck-control practice.",
+  "eq_mixing": "EQ mixing is mastered from cited EQ practice.",
+  "transitions": "Transitions are mastered from cited transition practice.",
+  "harmonic_mixing": "Harmonic mixing is mastered from cited compatible-key practice.",
+  "phrasing_performance": "Phrasing performance is mastered from cited phrase-timed practice."
 }

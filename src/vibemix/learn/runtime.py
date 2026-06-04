@@ -86,6 +86,7 @@ from statemachine import State, StateMachine
 from vibemix.audio.grid import BeatGrid
 from vibemix.audio.miniplayer import DeckState
 from vibemix.learn.control_practice import (
+    CONTROL_PRACTICE_GRADED_EVENT,
     ControlPracticeResult,
     grade_matched_control_practice,
 )
@@ -110,6 +111,7 @@ from vibemix.learn.harmonic_practice import (
     harmonic_practice_citations,
 )
 from vibemix.learn.lesson_flow import LessonFlow, LessonStep, build_lesson_flow
+from vibemix.learn.mastered_vocal import mastered_unlock_line
 from vibemix.learn.observability import learn_tutor_speak_observability_events
 from vibemix.learn.practice_loop import (
     BEATMATCH_EVIDENCE_SOURCE,
@@ -1300,6 +1302,7 @@ class LessonRuntime(StateMachine):
         if self._evidence_registry is None:
             return None
         t_session = self._evidence_time() if evidence_time is None else evidence_time
+        before_mastered = self._mastered_flags()
         try:
             result = grade_matched_control_practice(
                 expected=expected,
@@ -1321,6 +1324,13 @@ class LessonRuntime(StateMachine):
         if result.event is None:
             return result
         if result.credited:
+            self._emit_mastered_unlocks(
+                result.credited,
+                before_mastered,
+                citations=(
+                    f"[ev:{CONTROL_PRACTICE_GRADED_EVENT}@{result.t_session:.3f}]",
+                ),
+            )
             try:
                 from vibemix.learn.progress import LearnProgress, save_progress
 
@@ -1554,6 +1564,7 @@ class LessonRuntime(StateMachine):
                 f"[{BEATMATCH_EVIDENCE_SOURCE}:{_RECOVERY_DRILL_RECOVERED_EVENT}@"
                 f"{evidence_time:.3f}]"
             )
+            before_mastered = self._mastered_flags()
             credited = tuple(
                 recognize(
                     SimpleNamespace(
@@ -1576,6 +1587,11 @@ class LessonRuntime(StateMachine):
                 )
             )
             if credited:
+                self._emit_mastered_unlocks(
+                    credited,
+                    before_mastered,
+                    citations=(citation,),
+                )
                 try:
                     from vibemix.learn.progress import LearnProgress, save_progress
 
@@ -2189,6 +2205,54 @@ class LessonRuntime(StateMachine):
                 file=sys.stderr,
             )
 
+    def _mastered_flags(self) -> dict[str, bool]:
+        """Snapshot stored Mastered flags before a cited skill-credit mutation."""
+        skills = getattr(self._progress, "skills", {}) or {}
+        if not isinstance(skills, dict):
+            return {}
+        return {
+            skill_id: bool(row.get("mastered", False))
+            for skill_id, row in skills.items()
+            if isinstance(row, dict)
+        }
+
+    def _emit_mastered_unlocks(
+        self,
+        credited: tuple[str, ...] | list[str],
+        before_mastered: dict[str, bool],
+        *,
+        citations: tuple[str, ...] = (),
+    ) -> None:
+        """Speak the one-time Mastered line only for a just-flipped skill."""
+        for skill_id in credited:
+            row = (getattr(self._progress, "skills", {}) or {}).get(skill_id)
+            if not isinstance(row, dict):
+                continue
+            line = mastered_unlock_line(
+                skill_id,
+                was_mastered=before_mastered.get(skill_id, False),
+                now_mastered=bool(row.get("mastered", False)),
+            )
+            if not line:
+                continue
+            try:
+                speak = LearnTutorSpeak.make(
+                    text=line,
+                    tts_marker=(
+                        f"{self._learn.current_lesson_id or 'learn'}.mastered.{skill_id}"
+                    ),
+                    citations=citations,
+                    data_state="hint",
+                ).to_dict()
+                self._emit_tutor_speak(speak)
+            except Exception as exc:  # pragma: no cover - defensive
+                import sys
+
+                print(
+                    f"[learn.runtime] mastered unlock emit failed: {exc!r}",
+                    file=sys.stderr,
+                )
+
     def _emit_highlight(self, expected: dict[str, Any]) -> None:
         """Emit the current expected-action highlight."""
         try:
@@ -2373,6 +2437,7 @@ class LessonRuntime(StateMachine):
             )
 
         self._beatmatch_practice_lock_active = True
+        before_mastered = self._mastered_flags()
         result = grade_owned_beatmatch_attempt(
             snapshot.grid_a,
             snapshot.grid_b,
@@ -2383,6 +2448,14 @@ class LessonRuntime(StateMachine):
             now=datetime.now(UTC).isoformat(),
         )
         if result.credited:
+            self._emit_mastered_unlocks(
+                result.credited,
+                before_mastered,
+                citations=(
+                    f"[{BEATMATCH_EVIDENCE_SOURCE}:{BEATMATCH_GRADED_EVENT}@"
+                    f"{result.t_session:.3f}]",
+                ),
+            )
             try:
                 from vibemix.learn.progress import LearnProgress, save_progress
 
@@ -2593,6 +2666,7 @@ class LessonRuntime(StateMachine):
             )
 
         self._cue_placement_practice_lock_active = True
+        before_mastered = self._mastered_flags()
         result = grade_owned_cue_placement_attempt(
             snapshot.grid,
             snapshot.cue_frame,
@@ -2603,6 +2677,14 @@ class LessonRuntime(StateMachine):
             now=datetime.now(UTC).isoformat(),
         )
         if result.credited:
+            self._emit_mastered_unlocks(
+                result.credited,
+                before_mastered,
+                citations=(
+                    f"[{CUE_PLACEMENT_EVIDENCE_SOURCE}:{CUE_PLACEMENT_GRADED_EVENT}@"
+                    f"{result.t_session:.3f}]",
+                ),
+            )
             try:
                 from vibemix.learn.progress import LearnProgress, save_progress
 

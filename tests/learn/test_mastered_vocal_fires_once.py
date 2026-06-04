@@ -74,6 +74,26 @@ def test_every_vocal_line_passes_the_tutor_slop_blocklist():
             assert tok not in low, f"mastered vocal {key!r} contains slop token {tok!r}: {line!r}"
 
 
+def test_every_vocal_line_is_factual_proof_feedback():
+    """Mastered speech names the cited proof, not a generic reward."""
+
+    empty_reward_tokens = (
+        "earned",
+        "for real",
+        "yours",
+        "by you",
+        "by your",
+        "that one was real",
+    )
+    for key, line in MASTERED_VOCALS.items():
+        low = line.lower()
+        assert "cited" in low, f"mastered vocal {key!r} must name cited proof: {line!r}"
+        for tok in empty_reward_tokens:
+            assert tok not in low, (
+                f"mastered vocal {key!r} contains reward filler {tok!r}: {line!r}"
+            )
+
+
 def test_no_vocal_line_uses_em_dash_glue():
     # Mirror the transcripts dash-glue rule: spoken copy stays terse (commas/colons/
     # periods, no em/en dashes). The fixture lives outside transcripts/, so we pin it here.

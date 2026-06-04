@@ -402,6 +402,86 @@ def test_matched_eq_lesson_action_writes_control_receipt_and_progress(monkeypatc
     assert event["credited"] == ["eq_mixing"]
 
 
+def test_matched_control_mastered_flip_speaks_factual_proof_once(monkeypatch) -> None:
+    """A cited Learn-practice credit speaks only on the Mastered threshold flip."""
+
+    monkeypatch.setattr("vibemix.learn.progress.save_progress", lambda _progress: None)
+    progress = LearnProgress()
+    _make_skill_competent(progress, "eq_mixing")
+    threshold = SKILL_MANIFEST["eq_mixing"].mastered_threshold
+    progress.skills["eq_mixing"] = {
+        "live_proof_count": threshold - 1,
+        "mastered": False,
+        "first_mastered_at": None,
+    }
+    registry = EvidenceRegistry()
+    ipc = MagicMock(name="ipc_router")
+    runtime = LessonRuntime(
+        learn_state=LearnState(),
+        midi_mirror=MagicMock(name="midi_mirror"),
+        controller_state=MagicMock(name="controller_state"),
+        ipc_router=ipc,
+        progress_store=progress,
+        evidence_registry=registry,
+    )
+    runtime.send(
+        "load",
+        lesson_id="L2.04",
+        course_id="course_2_transitions",
+        controller_id="pioneer_ddj_flx4",
+    )
+    midi = {
+        "type": "cc",
+        "control": "eq_low",
+        "deck": "A",
+        "value": 127,
+        "prev_value": 0,
+        "source": "midi",
+    }
+    expected = {"type": "cc", "control": "eq_low", "deck": "A"}
+
+    first = runtime._record_learn_control_practice_action(
+        midi,
+        expected=expected,
+        evidence_time=58.25,
+    )
+
+    assert first is not None
+    assert first.credited == ("eq_mixing",)
+    assert progress.skills["eq_mixing"]["mastered"] is True
+    mastered_payloads = [
+        payload
+        for payload in _tutor_speak_payloads(ipc)
+        if payload["tts_marker"] == "L2.04.mastered.eq_mixing"
+    ]
+    assert mastered_payloads == [
+        {
+            "text": "EQ mixing is mastered from cited EQ practice.",
+            "tts_marker": "L2.04.mastered.eq_mixing",
+            "citations": ["[ev:LEARN_CONTROL_GRADED@58.250]"],
+            "data_state": "hint",
+        }
+    ]
+    assert CitationLinter().check(
+        " ".join(mastered_payloads[0]["citations"]),
+        registry.snapshot(),
+    ).valid is True
+
+    second = runtime._record_learn_control_practice_action(
+        midi,
+        expected=expected,
+        evidence_time=59.25,
+    )
+
+    assert second is not None
+    assert second.credited == ("eq_mixing",)
+    assert [
+        payload
+        for payload in _tutor_speak_payloads(ipc)
+        if payload["tts_marker"] == "L2.04.mastered.eq_mixing"
+    ] == mastered_payloads
+
+
 def test_observer_ack_writes_control_receipt_before_lesson_cycle_ack(monkeypatch) -> None:
     """Observer-driven L1.14 actions still become cited control practice."""
     saved: list[LearnProgress] = []
