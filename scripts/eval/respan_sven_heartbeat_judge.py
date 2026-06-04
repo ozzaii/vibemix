@@ -21,8 +21,9 @@ spoken line). We build the evidence digest from `meta.json` ONLY (no persona /
 prompt leakage into the judge) and judge the line blind.
 
 Respan: generation+judge go through the gateway `POST /api/chat/completions`
-(`gemini/gemini-3.5-flash`), each judge call logged to `/api/request-logs/create`
-with a dataset tag. Key is read from `RESPAN_API_KEY` (env ONLY — never written).
+using the model derived from the central live-coach router, each judge call
+logged to `/api/request-logs/create` with a dataset tag. Key is read from
+`RESPAN_API_KEY` (env ONLY — never written).
 
 Usage:
     export RESPAN_API_KEY=...   # env only
@@ -45,10 +46,21 @@ from pathlib import Path
 
 import httpx  # vibemix core dep; run via `uv run python …`
 
+from vibemix.llm.model_router import resolve_model
+
 RESPAN_BASE = "https://api.respan.ai/api"
 GATEWAY = f"{RESPAN_BASE}/chat/completions"
 LOG_ENDPOINT = f"{RESPAN_BASE}/request-logs/create"  # SDK base_url bug → call directly via httpx
-JUDGE_MODEL = "gemini/gemini-3.5-flash"
+
+
+def _respan_gateway_model() -> str:
+    """Return the Respan model id derived from the central live-coach route."""
+
+    routed = resolve_model("live_coach_openrouter")
+    return routed.replace("google/", "gemini/", 1)
+
+
+JUDGE_MODEL = _respan_gateway_model()
 
 # The 5 product dims (verbatim intent from CODEX_READY-SVEN-PROMPT-BENCH-MEASURED)
 # + a should_speak verdict (the bench's structural blind spot). Positive framing.
@@ -196,7 +208,7 @@ def judge_one(row: dict, key: str, dataset_tag: str, do_log: bool) -> dict:
                 {"role": "user", "content": user},
             ],
             "temperature": 0,
-            "max_tokens": 900,  # gemini-3.5-flash thinking burns budget; leave room for the JSON
+            "max_tokens": 900,  # leave room for the judge JSON after thinking budget
             "response_format": {"type": "json_object"},
         },
         key,
