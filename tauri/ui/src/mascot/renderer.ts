@@ -45,6 +45,10 @@ import {
   spawnParticlePuff,
   type ParticlePuffController,
 } from "./particle-puff.js";
+import {
+  ParticleOrganism,
+  type OrganismSignals,
+} from "./particle-organism.js";
 import type { MascotState } from "./types.js";
 
 // ── Tuning constants (CONTEXT Area 2) ─────────────────────────────────────
@@ -137,6 +141,8 @@ export class MascotRenderer {
   private cachedHeadPosition: Vector3 | null = null;
   /** Live ParticlePuff controllers; ticked each frame, filtered when dead. */
   private puffs: ParticlePuffController[] = [];
+  /** The persistent mask organism: one Points cloud in the existing scene. */
+  private readonly organism: ParticleOrganism;
 
   constructor(canvas: HTMLCanvasElement, assets: LoadedAssets) {
     this.assets = assets;
@@ -193,6 +199,7 @@ export class MascotRenderer {
       CAMERA_FAR,
     );
     this.frameCameraForBust(characterRoot);
+    this.organism = new ParticleOrganism(this.scene);
   }
 
   /**
@@ -321,6 +328,7 @@ export class MascotRenderer {
       for (const puff of this.puffs) puff.update(deltaSeconds);
       this.puffs = this.puffs.filter((p) => p.alive);
     }
+    this.organism.tick(deltaSeconds);
 
     this.renderer.render(this.scene, this.camera);
   }
@@ -397,6 +405,11 @@ export class MascotRenderer {
     this.directionalLight.intensity = profile.key_intensity;
   }
 
+  setOrganismSignals(signals: OrganismSignals): void {
+    if (this.disposed) return;
+    this.organism.setSignals(signals);
+  }
+
   /**
    * Re-fit the renderer + camera aspect after a window resize. Bound to
    * the window's resize event in index.ts.
@@ -416,6 +429,7 @@ export class MascotRenderer {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
+    this.organism.dispose();
     // Plan 13-07 — end any live puffs (per-puff geometry/material dispose).
     for (const puff of this.puffs) {
       try {

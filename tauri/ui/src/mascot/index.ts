@@ -410,6 +410,11 @@ async function boot(): Promise<void> {
     //    machine.current has actually changed (free no-op on most frames).
     writeStateCaptionIfChanged();
 
+    renderer.setOrganismSignals({
+      voice: currentSnapshot.voice,
+      beatPhase: currentSnapshot.downbeat_phase,
+      bpmConfidence: currentSnapshot.bpm_confidence,
+    });
     renderer.tick(dt);
     requestAnimationFrame(frame);
   }
