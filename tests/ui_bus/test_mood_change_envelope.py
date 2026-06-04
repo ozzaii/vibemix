@@ -169,10 +169,11 @@ def test_count_parity_holds_after_addition():
     schema = json.loads(schema_path.read_text())
     oneof_count = len(schema["oneOf"])
 
-    assert wrapper_count == oneof_count == 77, (
+    assert wrapper_count == oneof_count == 79, (
         f"count parity violated: wrappers={wrapper_count} vs oneOf={oneof_count}; "
-        "expected both 77 after adding LearnWaveformReady/LearnPlayheadTick "
-        "and the organism LearnTeachingFocus/LearnControlRect envelopes"
+        "expected both 79 after adding the DEMOCRATIZATION-1 "
+        "SettingsSetBrain/SettingsBrainAck envelopes on top of the organism "
+        "LearnTeachingFocus/LearnControlRect envelopes"
     )
 
 

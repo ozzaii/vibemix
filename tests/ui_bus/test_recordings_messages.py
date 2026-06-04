@@ -322,12 +322,13 @@ def test_count_parity_at_72() -> None:
                 seen.add(obj)
                 wrapper_count += 1
 
-    assert len(_SCHEMA["oneOf"]) == 77, (
-        "schema oneOf count should be 77 after adding "
-        "LearnWaveformReady/LearnPlayheadTick and the organism "
+    assert len(_SCHEMA["oneOf"]) == 79, (
+        "schema oneOf count should be 79 after adding the DEMOCRATIZATION-1 "
+        "SettingsSetBrain/SettingsBrainAck envelopes (in-GUI Gemini-key field "
+        "+ proxy/direct brain toggle) on top of the organism "
         "LearnTeachingFocus/LearnControlRect envelopes"
     )
-    assert wrapper_count == 77, f"wrapper count {wrapper_count} != 77"
+    assert wrapper_count == 79, f"wrapper count {wrapper_count} != 79"
 
 
 def test_check_ipc_schema_script_exits_zero() -> None:

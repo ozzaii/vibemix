@@ -80,6 +80,7 @@ import {
   type RetentionSliderHandle,
 } from "./components/retention-slider.js";
 import { renderConfirmDialog } from "./components/confirm-dialog.js";
+import { BrainGroup } from "./components/brain-group.js";
 import { HelpGroup } from "./components/help-group.js";
 import { LearnGroup } from "./components/learn-group.js";
 import { MascotGroup } from "./components/mascot-group.js";
@@ -1034,6 +1035,12 @@ function renderDrawerBody(body: HTMLElement, modalSlot: HTMLElement): void {
       children: personaBody,
     }),
   );
+
+  // --- BRAIN ----------------------------------------------------------------
+  // DEMOCRATIZATION-1 — mounted directly under PERSONA, before OUTPUT: the
+  // brain is the most consequential setting and the one a blocked stranger
+  // (no GEMINI_API_KEY) needs first. In-GUI key / proxy toggle, no .env edit.
+  body.append(BrainGroup());
 
   // --- OUTPUT ---------------------------------------------------------------
   const outputBody = document.createElement("div");

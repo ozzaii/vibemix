@@ -38,6 +38,35 @@ import { parseIpcMessage } from "./validator.js";
 
 const REQUEST_TIMEOUT_MS = 10_000;
 
+// DEMOCRATIZATION-1 — message types whose payload carries a secret that must
+// NEVER reach the on-disk log (ui.log). The wire payload is sent verbatim; only
+// the LOGGED copy is redacted. `ipc.settings.set_brain` carries the raw Gemini
+// key. Add new secret-bearing types here, never route them through a logger
+// without redaction.
+const _LOG_REDACT_KEYS: Record<string, readonly string[]> = {
+  "ipc.settings.set_brain": ["gemini_api_key"],
+};
+
+/** Return a log-safe shallow copy of a payload — any secret-bearing field for
+ *  the given message type is replaced with "<redacted>". NEVER mutates the
+ *  original (the real value still goes over the wire). A no-op for the common
+ *  (non-secret) case so existing logging is unchanged. */
+export function redactForLog(
+  type: string,
+  payload: Record<string, unknown>,
+): Record<string, unknown> {
+  const keys = _LOG_REDACT_KEYS[type];
+  if (!keys) return payload;
+  const safe: Record<string, unknown> = { ...payload };
+  for (const key of keys) {
+    const value = safe[key];
+    if (value !== undefined && value !== null && value !== "") {
+      safe[key] = "<redacted>";
+    }
+  }
+  return safe;
+}
+
 /** Send a one-shot request expecting exactly one reply of the named type.
  *
  * Rejects on:
@@ -63,7 +92,7 @@ export async function sendIpcRequest<TResponse extends IpcMessage = IpcMessage>(
   };
 
   vmxLog("[vmx:ipc>]", `request ${requestType} → expect ${responseType}`, {
-    payload: requestPayload,
+    payload: redactForLog(requestType, requestPayload),
   });
 
   // Subscribe to the response channel FIRST, then send the request — closes
@@ -179,7 +208,9 @@ export async function emitIpc(
   type: string,
   payload: Record<string, unknown>,
 ): Promise<void> {
-  vmxLog("[vmx:ipc>]", `emit ${type} (fire-and-forget)`, { payload });
+  vmxLog("[vmx:ipc>]", `emit ${type} (fire-and-forget)`, {
+    payload: redactForLog(type, payload),
+  });
   await invokeTauri("forward_ipc_to_sidecar", {
     message: { type, ts: new Date().toISOString(), payload },
   });

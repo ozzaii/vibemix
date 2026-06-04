@@ -32,6 +32,7 @@ import {
   ACTIVE_MOCK_ITERATION_TEMPLATE,
   MOCK_TRANSFER_CONTRACT,
   MOCK_TRANSFER_RUNTIME_CONTRACT,
+  SETTINGS_BRAIN_CONTROL_WIRES,
   SETTINGS_GROUP_WIRES,
   SETTINGS_PERSONA_CONTROL_WIRES,
   wireSelector,
@@ -58,6 +59,7 @@ const SESSION_RUNTIME_PRODUCER_FILES = [
 ] as const;
 const SETTINGS_RUNTIME_PRODUCER_FILES = [
   "src/settings/SettingsDrawer.ts",
+  "src/settings/components/brain-group.ts",
   "src/settings/components/help-group.ts",
   "src/settings/components/library-panel.ts",
   "src/settings/components/learn-group.ts",
@@ -223,6 +225,9 @@ function expectedRuntimeWireValues(surface: MockTransferRuntimeSurface): string[
       values.add(`${wire}.body`);
     }
     for (const wire of SETTINGS_PERSONA_CONTROL_WIRES) {
+      values.add(wire);
+    }
+    for (const wire of SETTINGS_BRAIN_CONTROL_WIRES) {
       values.add(wire);
     }
   }

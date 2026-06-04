@@ -378,6 +378,25 @@ class SettingsSetPayload:
 
 
 @dataclass(frozen=True, slots=True)
+class SettingsSetBrainPayload:
+    # DEMOCRATIZATION-1 — which live-co-host brain path to persist. gemini_api_key
+    # is present only for mode="direct" when the user typed a new key; None means
+    # "keep existing key, persist mode only". The backend never echoes/logs it.
+    mode: Literal["direct", "proxy"]
+    gemini_api_key: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class SettingsBrainAckPayload:
+    # No secret crosses this ack — key_set is a boolean, never the key value.
+    ok: bool
+    mode: Literal["direct", "proxy"]
+    key_set: bool
+    restart_required: bool
+    error: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
 class SettingsGetPayload:
     pass
 
@@ -993,6 +1012,61 @@ class SettingsSet:
             type="ipc.settings.set",
             ts=_now_iso(),
             payload=SettingsSetPayload(field=field, value=value),  # type: ignore[arg-type]
+        )
+
+    def to_json(self) -> str:
+        return _serialize(self)
+
+
+@dataclass(frozen=True, slots=True)
+class SettingsSetBrain:
+    type: Literal["ipc.settings.set_brain"]
+    ts: str
+    payload: SettingsSetBrainPayload
+
+    @classmethod
+    def make(
+        cls,
+        *,
+        mode: Literal["direct", "proxy"],
+        gemini_api_key: str | None = None,
+    ) -> SettingsSetBrain:
+        return cls(
+            type="ipc.settings.set_brain",
+            ts=_now_iso(),
+            payload=SettingsSetBrainPayload(mode=mode, gemini_api_key=gemini_api_key),
+        )
+
+    def to_json(self) -> str:
+        return _serialize(self)
+
+
+@dataclass(frozen=True, slots=True)
+class SettingsBrainAck:
+    type: Literal["ipc.settings.brain_ack"]
+    ts: str
+    payload: SettingsBrainAckPayload
+
+    @classmethod
+    def make(
+        cls,
+        *,
+        ok: bool,
+        mode: Literal["direct", "proxy"],
+        key_set: bool,
+        restart_required: bool = True,
+        error: str | None = None,
+    ) -> SettingsBrainAck:
+        return cls(
+            type="ipc.settings.brain_ack",
+            ts=_now_iso(),
+            payload=SettingsBrainAckPayload(
+                ok=ok,
+                mode=mode,
+                key_set=key_set,
+                restart_required=restart_required,
+                error=error,
+            ),
         )
 
     def to_json(self) -> str:

@@ -320,6 +320,7 @@ export const SETTINGS_RUNTIME_WIRES = [
 
 export const SETTINGS_GROUP_WIRES = [
   "settings.group.persona",
+  "settings.group.brain",
   "settings.group.output",
   "settings.group.hotkey",
   "settings.group.recording",
@@ -339,6 +340,16 @@ export const SETTINGS_PERSONA_CONTROL_WIRES = [
   "settings.persona.lens",
   "settings.persona.genre",
   "settings.persona.skill",
+] as const;
+
+// DEMOCRATIZATION-1 — the BRAIN group's inner controls (direct/proxy rocker,
+// masked key input, save, state line). All four mount at the default DIRECT
+// mode; the key/save pair is hidden under PROXY at runtime.
+export const SETTINGS_BRAIN_CONTROL_WIRES = [
+  "settings.brain.mode",
+  "settings.brain.key",
+  "settings.brain.save",
+  "settings.brain.state",
 ] as const;
 
 export const SETTINGS_MOCK_SOURCES = [
@@ -444,6 +455,7 @@ export const MOCK_TRANSFER_RUNTIME_CONTRACT: readonly MockTransferRuntimeSurface
     ),
     inbound: [
       "ipc.settings.state",
+      "ipc.settings.brain_ack",
       "ipc.recordings.usage",
       "ipc.recordings.list_result",
       "ipc.recordings.delete_ack",
@@ -457,6 +469,8 @@ export const MOCK_TRANSFER_RUNTIME_CONTRACT: readonly MockTransferRuntimeSurface
     ],
     outbound: [
       "ipc.settings.set",
+      "ipc.settings.set_brain",
+      "restart_sidecar",
       "ipc.recordings.list",
       "ipc.recordings.delete",
       "ipc.recordings.events",

@@ -86,6 +86,12 @@
       "$ref": "#/definitions/SettingsState"
     },
     {
+      "$ref": "#/definitions/SettingsSetBrain"
+    },
+    {
+      "$ref": "#/definitions/SettingsBrainAck"
+    },
+    {
       "$ref": "#/definitions/StatusRecheck"
     },
     {
@@ -1473,6 +1479,101 @@
                 {
                   "type": "null"
                 }
+              ]
+            }
+          }
+        }
+      }
+    },
+    "SettingsSetBrain": {
+      "$comment": "2026-06-04 DEMOCRATIZATION-1 \u2014 Shell \u2192 sidecar. Persist the live-co-host brain path so a non-dev reaches the model WITHOUT hand-editing .env. mode persists to ConfigStore.llm_mode; gemini_api_key (direct only, when present) is written by the BACKEND to app_data_dir()/.env (or keychain) and is NEVER echoed back, NEVER logged, NEVER committed. The ack is ipc.settings.brain_ack (no secret). The user restarts the sidecar to pick up the new key/mode.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "ts",
+        "payload"
+      ],
+      "properties": {
+        "type": {
+          "const": "ipc.settings.set_brain"
+        },
+        "ts": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "mode"
+          ],
+          "properties": {
+            "mode": {
+              "type": "string",
+              "enum": [
+                "direct",
+                "proxy"
+              ]
+            },
+            "gemini_api_key": {
+              "$comment": "Present ONLY for mode=direct when the user typed a new key. null/omitted = keep existing key, persist mode only. The backend treats empty string as no-change.",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "SettingsBrainAck": {
+      "$comment": "2026-06-04 DEMOCRATIZATION-1 \u2014 Sidecar \u2192 shell ack for ipc.settings.set_brain. Carries NO secret \u2014 key_set is a boolean, never the key value. restart_required is always true today (the brain path is read at boot; there is no mid-session model-client hot-swap).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "ts",
+        "payload"
+      ],
+      "properties": {
+        "type": {
+          "const": "ipc.settings.brain_ack"
+        },
+        "ts": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "ok",
+            "mode",
+            "key_set",
+            "restart_required"
+          ],
+          "properties": {
+            "ok": {
+              "type": "boolean"
+            },
+            "mode": {
+              "type": "string",
+              "enum": [
+                "direct",
+                "proxy"
+              ]
+            },
+            "key_set": {
+              "type": "boolean"
+            },
+            "restart_required": {
+              "type": "boolean"
+            },
+            "error": {
+              "type": [
+                "string",
+                "null"
               ]
             }
           }

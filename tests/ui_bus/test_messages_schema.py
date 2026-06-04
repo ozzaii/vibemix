@@ -109,8 +109,10 @@ from vibemix.ui_bus import (
     SessionOverlayHighlight,
     SessionSetMode,
     SessionSnapshot,
+    SettingsBrainAck,
     SettingsGet,
     SettingsSet,
+    SettingsSetBrain,
     SettingsState,
     StatusRecheck,
     StatusTick,
@@ -231,6 +233,14 @@ def _make_examples() -> list[tuple[str, object]]:
         ("SessionMute", SessionMute.make_toggle()),
         ("SessionSetMode", SessionSetMode.make(mode="build")),
         ("SettingsSet", SettingsSet.make(field="voice", value="Adam")),
+        (
+            "SettingsSetBrain",
+            SettingsSetBrain.make(mode="direct", gemini_api_key="AIza-test-fake"),
+        ),
+        (
+            "SettingsBrainAck",
+            SettingsBrainAck.make(ok=True, mode="direct", key_set=True, restart_required=True),
+        ),
         ("SettingsGet", SettingsGet.make()),
         (
             "SettingsState",
@@ -669,7 +679,9 @@ def test_example_count_matches_schema_oneof() -> None:
     adds LearnWaveformReady + LearnPlayheadTick → 75. Organism focus
     mechanic adds LearnTeachingFocus + LearnControlRect → 77.
     """
-    assert len(_EXAMPLES) == len(_SCHEMA["oneOf"]) == 77
+    # DEMOCRATIZATION-1 adds SettingsSetBrain + SettingsBrainAck (in-GUI
+    # Gemini-key field + proxy/direct brain toggle) → 79.
+    assert len(_EXAMPLES) == len(_SCHEMA["oneOf"]) == 79
 
 
 @pytest.mark.parametrize(
@@ -772,8 +784,10 @@ def test_schema_oneof_count_is_72() -> None:
     ``LearnWaveformDeck`` / ``LearnPlayheadDeck`` nested helpers contribute
     to ``definitions`` but not to ``oneOf``.
     """
-    assert len(_SCHEMA["oneOf"]) == 77
-    assert len(_SCHEMA["definitions"]) == 80
+    # DEMOCRATIZATION-1 adds SettingsSetBrain + SettingsBrainAck → 79 oneOf,
+    # 82 definitions (both are top-level ipc.* messages; skew vs oneOf stays 3).
+    assert len(_SCHEMA["oneOf"]) == 79
+    assert len(_SCHEMA["definitions"]) == 82
 
 
 def test_no_pydantic_imports_in_ui_bus() -> None:

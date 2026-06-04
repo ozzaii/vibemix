@@ -107,8 +107,10 @@ from vibemix.ui_bus import (
     SessionOverlayHighlight,
     SessionSetMode,
     SessionSnapshot,
+    SettingsBrainAck,
     SettingsGet,
     SettingsSet,
+    SettingsSetBrain,
     SettingsState,
     StatusRecheck,
     StatusTick,
@@ -223,6 +225,14 @@ def _minimal_examples() -> list[tuple[str, object]]:
         ("SessionMute", SessionMute.make_toggle()),
         ("SessionSetMode", SessionSetMode.make(mode="build")),
         ("SettingsSet", SettingsSet.make(field="voice", value="kore")),
+        (
+            "SettingsSetBrain",
+            SettingsSetBrain.make(mode="direct", gemini_api_key="AIza-test-fake"),
+        ),
+        (
+            "SettingsBrainAck",
+            SettingsBrainAck.make(ok=True, mode="direct", key_set=True, restart_required=True),
+        ),
         ("SettingsGet", SettingsGet.make()),
         (
             "SettingsState",

@@ -31,6 +31,8 @@ export type VibemixIPCMessages =
   | SettingsSet
   | SettingsGet
   | SettingsState
+  | SettingsSetBrain
+  | SettingsBrainAck
   | StatusRecheck
   | IpcError
   | MascotMoodChange
@@ -362,6 +364,25 @@ export interface SettingsState {
     lens?: ("hype" | "critique" | "tutor") | null;
     "learn.headphone_device_index"?: number | null;
     "session.mode"?: ("cohost" | "learn" | "build" | "debrief") | null;
+  };
+}
+export interface SettingsSetBrain {
+  type: "ipc.settings.set_brain";
+  ts: string;
+  payload: {
+    mode: "direct" | "proxy";
+    gemini_api_key?: string | null;
+  };
+}
+export interface SettingsBrainAck {
+  type: "ipc.settings.brain_ack";
+  ts: string;
+  payload: {
+    ok: boolean;
+    mode: "direct" | "proxy";
+    key_set: boolean;
+    restart_required: boolean;
+    error?: string | null;
   };
 }
 export interface StatusRecheck {
