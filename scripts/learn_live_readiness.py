@@ -2263,11 +2263,46 @@ def diagnose_course3_audio(
             "nowplaying": nowplaying_check,
         }
     if loopback_signal_check is not None and loopback_signal_check.get("ok") is False:
+        rekordbox_hint = _rekordbox_route_hint(
+            capture_matrix_check,
+            rekordbox_audio_settings_check=rekordbox_audio_settings_check,
+        )
+        nowplaying_blocker = _course3_nowplaying_blocker(nowplaying_check)
+        has_route_context = (
+            rekordbox_hint is not None
+            or isinstance(auto_master_recommendation, dict)
+            or isinstance(rekordbox_audio_settings_check, dict)
+        )
+        operator_action = (
+            _course3_external_playback_action(
+                rekordbox_hint=rekordbox_hint,
+                rekordbox_audio_settings_check=rekordbox_audio_settings_check,
+                auto_master_recommendation=auto_master_recommendation,
+                nowplaying_blocker=nowplaying_blocker,
+            )
+            if has_route_context
+            else None
+        )
+        next_action = (
+            str(rekordbox_hint.get("next_action"))
+            if isinstance(rekordbox_hint, dict) and rekordbox_hint.get("next_action")
+            else "Start playback into the selected loopback route."
+        )
+        if nowplaying_blocker:
+            next_action = (
+                f"{next_action} Current macOS now-playing is not a citable Rekordbox "
+                "deck title; stop unrelated media or make Rekordbox the active "
+                "playing source."
+            )
         return {
             "code": "selected_loopback_silent",
             "severity": "start_playback",
             "message": "The selected loopback capture is silent.",
-            "next_action": "Start playback into the selected loopback route.",
+            "next_action": next_action,
+            **({"rekordbox_route_hint": rekordbox_hint} if rekordbox_hint else {}),
+            **({"operator_action": operator_action} if operator_action else {}),
+            **({"nowplaying_hint": nowplaying_blocker} if nowplaying_blocker else {}),
+            **({"nowplaying": nowplaying_check} if nowplaying_check else {}),
         }
     return {
         "code": "course3_audio_context_incomplete",

@@ -1930,6 +1930,69 @@ def test_course3_operator_action_prefers_auto_master_when_current_route_unaligne
     assert diagnosis["operator_action"]["target_capture_route"] == "BlackHole 16ch @ 48000Hz"
 
 
+def test_selected_loopback_silent_names_multi_output_capture_trap() -> None:
+    diagnosis = readiness.diagnose_course3_audio(
+        audio_route_check={
+            "available": True,
+            "ok": False,
+            "output_device": "MacBook Pro Speakers (eqMac)",
+            "blockers": ["current macOS output route is not loopback"],
+        },
+        loopback_signal_check={
+            "enabled": True,
+            "ok": False,
+            "blockers": ["direct loopback capture is silent"],
+        },
+        capture_matrix_check={
+            "enabled": True,
+            "ok": False,
+            "rows": [
+                {
+                    "name": "DDJ-FLX4",
+                    "sample_rate": 48000,
+                    "rms": 0.000107,
+                    "peak": 0.000519,
+                    "signal": False,
+                },
+                {
+                    "name": "BlackHole 16ch",
+                    "sample_rate": 48000,
+                    "rms": 0.0,
+                    "peak": 0.0,
+                    "signal": False,
+                },
+            ],
+            "blockers": ["all sampled DJ/loopback capture inputs are below signal floor"],
+        },
+        live_context_check={"ok": False},
+        rekordbox_audio_settings_check={
+            "ok": True,
+            "path": "/tmp/rekordbox3.settings",
+            "current": {
+                "audio_output_device_name": "Multi-Output Device",
+                "audio_device_rate": "48000.0",
+            },
+            "recent": [],
+            "blockers": [],
+        },
+        auto_master_recommendation={
+            "status": "ready",
+            "device_name": "BlackHole 16ch",
+            "sample_rate": 48000,
+            "live_signal": False,
+        },
+    )
+
+    assert diagnosis["code"] == "selected_loopback_silent"
+    assert "Multi-Output Device" in diagnosis["next_action"]
+    assert "aggregate that includes" in diagnosis["next_action"]
+    assert diagnosis["rekordbox_route_hint"]["current_rekordbox_route_aligned"] is False
+    assert diagnosis["operator_action"]["current_rekordbox_route"] == (
+        "Multi-Output Device @ 48000Hz"
+    )
+    assert diagnosis["operator_action"]["target_capture_route"] == "BlackHole 16ch @ 48000Hz"
+
+
 def test_course3_operator_action_uses_auto_master_when_rekordbox_route_unknown() -> None:
     diagnosis = readiness.diagnose_course3_audio(
         audio_route_check={"available": True, "ok": True, "blockers": []},
