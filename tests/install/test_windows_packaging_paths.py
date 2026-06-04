@@ -24,7 +24,7 @@ def test_release_workflow_uses_staged_windows_app_payload() -> None:
     text = _read(RELEASE_YML)
     assert "scripts/win/stage_app_payload.ps1" in text
     assert "scripts/dist/check_windows_app_payload_ready.py" in text
-    assert "--require-moss-source" in text
+    assert "--require-chatterbox-ref" in text
     assert "VERIFY — Windows app payload sidecar ready" in text
     assert "dist/windows-app/**" in text
     assert "cargo tauri build --no-bundle" in text
@@ -60,7 +60,7 @@ def test_local_windows_build_feeds_inno_from_staged_payload() -> None:
     text = _read(BUILD_LOCAL)
     assert "scripts\\win\\stage_app_payload.ps1" in text
     assert "scripts/dist/check_windows_app_payload_ready.py" in text
-    assert "--require-moss-source" in text
+    assert "--require-chatterbox-ref" in text
     assert "cargo tauri build --no-bundle" in text
     assert "/DSourceDir=..\\..\\dist\\windows-app" in text
     assert "docs/install-rehearsal.md" in text
@@ -85,7 +85,7 @@ def test_windows_app_payload_verifier_checks_exes_and_internal_tree() -> None:
     assert "_internal" in text
     assert "placeholder-only" in text
     assert 'handle.read(2) == b"MZ"' in text
-    assert "moss_release_source_ready" in text
+    assert "chatterbox_release_ref_ready" in text
 
 
 def test_inno_default_source_dir_matches_staged_payload() -> None:

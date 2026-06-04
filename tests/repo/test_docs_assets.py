@@ -126,7 +126,7 @@ def test_arch_svg_has_named_boxes() -> None:
         "Local recording",
         "Bravoh proxy",
         "Gemini 3 Flash",
-        "Local MOSS TTS",
+        "Local Chatterbox",
     ]
     missing = [r for r in required if r not in text]
     assert not missing, f"SVG missing required box labels: {missing}"

@@ -17,10 +17,10 @@ if str(_PROJECT_ROOT) not in sys.path:
 
 from scripts.dist.check_sidecar_bundle_ready import (  # noqa: E402
     DEFAULT_MIN_BYTES,
+    chatterbox_release_ref_ready,
     detect_host_triple,
     exe_suffix_for_triple,
     learn_exemplar_audio_ready,
-    moss_release_source_ready,
     sidecar_build_manifest_ready,
 )
 from scripts.dist.repair_macos_app_sidecar_symlinks import DYLIB_DIRS  # noqa: E402
@@ -35,7 +35,7 @@ class MacOSAppBundleStatus:
     warnings: list[str] = field(default_factory=list)
     developer_id: str = ""
     sidecar_binary: str = ""
-    moss_source: str = ""
+    chatterbox_ref: str = ""
     smoke_stdout: str = ""
 
     def fail(self, message: str) -> None:
@@ -184,7 +184,7 @@ def check_macos_app_bundle_ready(
     *,
     triple: str | None = None,
     min_bytes: int = DEFAULT_MIN_BYTES,
-    require_moss_source: bool = False,
+    require_chatterbox_ref: bool = False,
     require_developer_id: bool = False,
     developer_team_id: str | None = None,
     smoke: str = "version",
@@ -245,11 +245,11 @@ def check_macos_app_bundle_ready(
     )
     if not manifest_ok:
         status.fail(manifest_message)
-    if require_moss_source:
-        moss_ok, moss_message = moss_release_source_ready(bundle_dir)
-        status.moss_source = moss_message
-        if not moss_ok:
-            status.fail(moss_message)
+    if require_chatterbox_ref:
+        ref_ok, ref_message = chatterbox_release_ref_ready(bundle_dir)
+        status.chatterbox_ref = ref_message
+        if not ref_ok:
+            status.fail(ref_message)
     if status.ok:
         _run_smoke(sidecar, smoke, smoke_timeout_s, status)
     return status
@@ -274,12 +274,9 @@ def main(argv: list[str] | None = None) -> int:
         help="sidecar command to run after structural checks",
     )
     parser.add_argument(
-        "--require-moss-source",
+        "--require-chatterbox-ref",
         action="store_true",
-        help=(
-            "release gate: require either a complete bundled MOSS model tree or "
-            "verified VIBEMIX_MOSS_TTS_ARCHIVE_* pins"
-        ),
+        help="release gate: require the bundled Chatterbox production reference WAV",
     )
     parser.add_argument(
         "--require-developer-id",
@@ -304,7 +301,7 @@ def main(argv: list[str] | None = None) -> int:
             args.app,
             triple=args.triple,
             min_bytes=args.min_bytes,
-            require_moss_source=args.require_moss_source,
+            require_chatterbox_ref=args.require_chatterbox_ref,
             require_developer_id=args.require_developer_id,
             developer_team_id=args.developer_team_id,
             smoke=args.smoke,

@@ -27,7 +27,7 @@ from scripts.dist.check_sidecar_bundle_ready import (  # noqa: E402
 )
 
 _FORCE_SIDECAR_ENV = "VIBEMIX_FORCE_SIDECAR"
-_REQUIRE_MOSS_SOURCE_ENV = "VIBEMIX_REQUIRE_MOSS_SOURCE"
+_REQUIRE_CHATTERBOX_REF_ENV = "VIBEMIX_REQUIRE_CHATTERBOX_REF"
 
 
 def _run(cmd: list[str], *, cwd: Path = REPO_ROOT) -> None:
@@ -55,11 +55,13 @@ def prepare_tauri_build(
     skip_frontend: bool = False,
     check_only: bool = False,
     force_sidecar: bool = False,
-    require_moss_source: bool = False,
+    require_chatterbox_ref: bool = False,
 ) -> None:
     target_triple = triple or detect_host_triple()
     force_sidecar = force_sidecar or _env_flag(_FORCE_SIDECAR_ENV)
-    require_moss_source = require_moss_source or _env_flag(_REQUIRE_MOSS_SOURCE_ENV)
+    require_chatterbox_ref = require_chatterbox_ref or _env_flag(
+        _REQUIRE_CHATTERBOX_REF_ENV
+    )
 
     if not skip_frontend:
         _run(["npm", "--prefix", str(REPO_ROOT / "tauri" / "ui"), "run", "build"])
@@ -67,7 +69,7 @@ def prepare_tauri_build(
     status = check_sidecar_bundle_ready(
         root=REPO_ROOT,
         triple=target_triple,
-        require_moss_source=require_moss_source,
+        require_chatterbox_ref=require_chatterbox_ref,
     )
     if check_only:
         if not status.ok:
@@ -88,7 +90,7 @@ def prepare_tauri_build(
     status = check_sidecar_bundle_ready(
         root=REPO_ROOT,
         triple=target_triple,
-        require_moss_source=require_moss_source,
+        require_chatterbox_ref=require_chatterbox_ref,
     )
     if not status.ok:
         raise RuntimeError(
@@ -119,12 +121,9 @@ def main(argv: list[str] | None = None) -> int:
         help="rebuild the sidecar even if the readiness check already passes",
     )
     parser.add_argument(
-        "--require-moss-source",
+        "--require-chatterbox-ref",
         action="store_true",
-        help=(
-            "fail unless the MOSS-only release has a bundled model tree or pinned "
-            "VIBEMIX_MOSS_TTS_ARCHIVE_* metadata"
-        ),
+        help="fail unless the sidecar bundles the production Chatterbox reference WAV",
     )
     args = parser.parse_args(argv)
 
@@ -134,7 +133,7 @@ def main(argv: list[str] | None = None) -> int:
             skip_frontend=args.skip_frontend,
             check_only=args.check_only,
             force_sidecar=args.force_sidecar,
-            require_moss_source=args.require_moss_source,
+            require_chatterbox_ref=args.require_chatterbox_ref,
         )
     except (RuntimeError, subprocess.CalledProcessError) as exc:
         print(f"[prepare-tauri] FAIL: {exc}", file=sys.stderr)

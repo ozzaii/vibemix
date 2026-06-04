@@ -352,7 +352,7 @@ jobs:
           python3 scripts/dist/check_macos_app_bundle_ready.py \
             tauri/src-tauri/target/${{ matrix.rust_target }}/release/bundle/macos/vibemix.app \
             --triple ${{ matrix.target_triple }} \
-            --require-moss-source \
+            --require-chatterbox-ref \
             --smoke version
 
       # ---- Stage 2 + 3 — SIGN + PACKAGE (DMG + notarize + staple) ----------
@@ -395,7 +395,7 @@ jobs:
           python3 scripts/dist/check_macos_dmg_artifact_ready.py \
             "$DMG" \
             --triple ${{ matrix.target_triple }} \
-            --require-moss-source \
+            --require-chatterbox-ref \
             --require-developer-id \
             --smoke version
 
@@ -421,7 +421,7 @@ jobs:
           python3 scripts/dist/check_macos_updater_artifact_ready.py \
             "$UPDATER" \
             --triple ${{ matrix.target_triple }} \
-            --require-moss-source \
+            --require-chatterbox-ref \
             --require-developer-id \
             --smoke version
 
@@ -535,7 +535,7 @@ jobs:
           uv run python scripts/dist/check_windows_app_payload_ready.py `
             dist/windows-app `
             --triple x86_64-pc-windows-msvc `
-            --require-moss-source `
+            --require-chatterbox-ref `
             --smoke version
 
       - name: BUILD — Upload unsigned binaries for SignPath request

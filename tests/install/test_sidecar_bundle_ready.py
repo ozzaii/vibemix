@@ -6,6 +6,7 @@ import builtins
 import json
 import os
 import stat
+import wave
 from pathlib import Path
 
 import pytest
@@ -105,55 +106,22 @@ def _write_source_schema(root: Path, body: str = '{"oneOf": []}\n') -> None:
     schema.write_text(body, encoding="utf-8")
 
 
-def _write_bundled_moss_model(root: Path, triple: str) -> Path:
-    base = _bundle_dir(root, triple) / "_internal" / "models" / "moss-tts-onnx"
-    model_dir = base / gate.MOSS_MODEL_DIRNAME
-    codec_dir = base / "MOSS-Audio-Tokenizer-Nano-ONNX"
-    model_dir.mkdir(parents=True)
-    codec_dir.mkdir(parents=True)
-    (model_dir / gate.MOSS_MANIFEST).write_text(
-        json.dumps(
-            {
-                "model_files": {
-                    "tts_meta": "tts_browser_onnx_meta.json",
-                    "codec_meta": "../MOSS-Audio-Tokenizer-Nano-ONNX/codec_browser_onnx_meta.json",
-                    "tokenizer_model": "tokenizer.model",
-                }
-            }
-        ),
-        encoding="utf-8",
-    )
-    (model_dir / "tts_browser_onnx_meta.json").write_text(
-        json.dumps(
-            {
-                "files": {"prefill": "moss_tts_prefill.onnx"},
-                "external_data_files": {"moss_tts_prefill.onnx": ["moss_tts_global_shared.data"]},
-            }
-        ),
-        encoding="utf-8",
-    )
-    (codec_dir / "codec_browser_onnx_meta.json").write_text(
-        json.dumps(
-            {
-                "files": {"decode": "moss_audio_tokenizer_decode_step.onnx"},
-                "external_data_files": {
-                    "moss_audio_tokenizer_decode_step.onnx": [
-                        "moss_audio_tokenizer_decode_shared.data"
-                    ]
-                },
-            }
-        ),
-        encoding="utf-8",
-    )
-    for path in (
-        model_dir / "tokenizer.model",
-        model_dir / "moss_tts_prefill.onnx",
-        model_dir / "moss_tts_global_shared.data",
-        codec_dir / "moss_audio_tokenizer_decode_step.onnx",
-        codec_dir / "moss_audio_tokenizer_decode_shared.data",
-    ):
-        path.write_bytes(b"x")
-    return model_dir
+def _write_bundled_chatterbox_ref(
+    root: Path,
+    triple: str,
+    *,
+    channels: int = gate.CHATTERBOX_REF_CHANNELS,
+    sample_width: int = gate.CHATTERBOX_REF_SAMPLE_WIDTH,
+    sample_rate: int = gate.CHATTERBOX_REF_SAMPLE_RATE,
+) -> Path:
+    ref_path = _bundle_dir(root, triple) / gate.CHATTERBOX_REF_REL
+    ref_path.parent.mkdir(parents=True, exist_ok=True)
+    with wave.open(str(ref_path), "wb") as wav:
+        wav.setnchannels(channels)
+        wav.setsampwidth(sample_width)
+        wav.setframerate(sample_rate)
+        wav.writeframes(b"\x00" * channels * sample_width * 24)
+    return ref_path
 
 
 def test_ready_macos_bundle_passes(tmp_path: Path) -> None:
@@ -339,103 +307,85 @@ def test_bundled_test_fixture_payloads_fail(tmp_path: Path) -> None:
     assert "tests/library/fixtures/synthetic_collection.xml" in status.message
 
 
-def test_require_moss_source_fails_without_bundle_or_archive(
-    tmp_path: Path, monkeypatch
-) -> None:
+def test_require_chatterbox_ref_fails_without_bundled_ref(tmp_path: Path) -> None:
     _write_bundle(tmp_path, MAC_TRIPLE)
-    monkeypatch.delenv(gate.MOSS_ARCHIVE_URL_ENV, raising=False)
-    monkeypatch.delenv(gate.MOSS_ARCHIVE_SHA_ENV, raising=False)
-    monkeypatch.delenv(gate.MOSS_ARCHIVE_SIZE_ENV, raising=False)
 
     status = gate.check_sidecar_bundle_ready(
         root=tmp_path,
         triple=MAC_TRIPLE,
-        require_moss_source=True,
+        require_chatterbox_ref=True,
     )
 
     assert status.ok is False
-    assert "MOSS-only release has no model source" in status.message
-    assert gate.MOSS_ARCHIVE_URL_ENV in status.message
+    assert "Chatterbox release has no bundled voice reference" in status.message
+    assert str(gate.CHATTERBOX_REF_REL) in status.message
 
 
-def test_require_moss_source_accepts_release_archive_pins(
-    tmp_path: Path, monkeypatch
-) -> None:
+def test_require_chatterbox_ref_accepts_complete_bundled_ref(tmp_path: Path) -> None:
     binary = _write_bundle(tmp_path, MAC_TRIPLE)
-    monkeypatch.setenv(gate.MOSS_ARCHIVE_URL_ENV, "https://models.example/moss.zip")
-    monkeypatch.setenv(gate.MOSS_ARCHIVE_SHA_ENV, "a" * 64)
-    monkeypatch.setenv(gate.MOSS_ARCHIVE_SIZE_ENV, "123")
+    ref_path = _write_bundled_chatterbox_ref(tmp_path, MAC_TRIPLE)
 
     status = gate.check_sidecar_bundle_ready(
         root=tmp_path,
         triple=MAC_TRIPLE,
-        require_moss_source=True,
+        require_chatterbox_ref=True,
     )
 
     assert status.ok is True
     assert status.binary == binary
+    assert str(ref_path) in gate.chatterbox_release_ref_ready(binary.parent)[1]
 
 
-def test_require_moss_source_rejects_unverified_archive_pins(
-    tmp_path: Path, monkeypatch
+def test_require_chatterbox_ref_rejects_wrong_sample_rate(
+    tmp_path: Path,
 ) -> None:
     _write_bundle(tmp_path, MAC_TRIPLE)
-    monkeypatch.setenv(gate.MOSS_ARCHIVE_URL_ENV, "http://models.example/moss.zip")
-    monkeypatch.setenv(gate.MOSS_ARCHIVE_SHA_ENV, "not-a-sha")
-    monkeypatch.setenv(gate.MOSS_ARCHIVE_SIZE_ENV, "0")
+    _write_bundled_chatterbox_ref(tmp_path, MAC_TRIPLE, sample_rate=16_000)
 
     status = gate.check_sidecar_bundle_ready(
         root=tmp_path,
         triple=MAC_TRIPLE,
-        require_moss_source=True,
+        require_chatterbox_ref=True,
     )
 
     assert status.ok is False
-    assert "https:// URL" in status.message
-    assert "64-character lowercase SHA-256" in status.message
-    assert "positive byte count" in status.message
+    assert "expected 24000 Hz Chatterbox ref" in status.message
 
 
-def test_require_moss_source_accepts_complete_bundled_model(
-    tmp_path: Path, monkeypatch
-) -> None:
-    binary = _write_bundle(tmp_path, MAC_TRIPLE)
-    model_dir = _write_bundled_moss_model(tmp_path, MAC_TRIPLE)
-    monkeypatch.delenv("VIBEMIX_MOSS_TTS_DIR", raising=False)
-    monkeypatch.delenv(gate.MOSS_ARCHIVE_URL_ENV, raising=False)
-    monkeypatch.delenv(gate.MOSS_ARCHIVE_SHA_ENV, raising=False)
-    monkeypatch.delenv(gate.MOSS_ARCHIVE_SIZE_ENV, raising=False)
+def test_require_chatterbox_ref_rejects_unreadable_wav(tmp_path: Path) -> None:
+    _write_bundle(tmp_path, MAC_TRIPLE)
+    ref_path = _bundle_dir(tmp_path, MAC_TRIPLE) / gate.CHATTERBOX_REF_REL
+    ref_path.parent.mkdir(parents=True, exist_ok=True)
+    ref_path.write_text("nope", encoding="utf-8")
 
     status = gate.check_sidecar_bundle_ready(
         root=tmp_path,
         triple=MAC_TRIPLE,
-        require_moss_source=True,
+        require_chatterbox_ref=True,
     )
 
-    assert status.ok is True
-    assert status.binary == binary
-    assert os.environ.get("VIBEMIX_MOSS_TTS_DIR") is None
-    assert str(model_dir) in gate._bundled_moss_model_status(binary.parent)[1]
+    assert status.ok is False
+    assert "unreadable WAV" in status.message
 
 
-def test_bundled_moss_model_check_does_not_import_tts_runtime(
+def test_bundled_chatterbox_ref_check_does_not_import_tts_runtime(
     tmp_path: Path, monkeypatch
 ) -> None:
     binary = _write_bundle(tmp_path, MAC_TRIPLE)
-    _write_bundled_moss_model(tmp_path, MAC_TRIPLE)
+    _write_bundled_chatterbox_ref(tmp_path, MAC_TRIPLE)
     real_import = builtins.__import__
 
     def guard_import(name, *args, **kwargs):
-        if name == "vibemix.agent.local_tts" or name.startswith("livekit"):
+        if name.startswith("vibemix.agent") or name.startswith("mlx_audio"):
             raise AssertionError(f"release verifier imported runtime-only module: {name}")
         return real_import(name, *args, **kwargs)
 
     monkeypatch.setattr(builtins, "__import__", guard_import)
 
-    ok, detail = gate._bundled_moss_model_status(binary.parent)
+    ok, detail = gate.chatterbox_release_ref_ready(binary.parent)
 
     assert ok is True
-    assert "bundled MOSS model ready" in detail
+    assert "bundled Chatterbox ref ready" in detail
 
 
 def test_main_returns_zero_for_ready_explicit_triple(tmp_path: Path, capsys) -> None:

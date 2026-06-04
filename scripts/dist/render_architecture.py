@@ -7,7 +7,7 @@ diagram with 4 horizontal swim-lanes:
   1. User Hardware  — DJ Controller, Master output, Headphones
   2. vibemix Client — Python sidecar, Tauri UI, Local recording
   3. Network        — Bravoh proxy
-  4. AI + Voice     — Gemini 3 Flash, local MOSS TTS
+  4. AI + Voice     — Gemini 3 Flash, local Chatterbox voice
 
 Palette is hard-coded from `tauri/ui/src/tokens.css` (v5 CDJ Whisper
 direction, 2026-05-12). Output is fully deterministic: same input dict
@@ -158,8 +158,8 @@ SWIM_LANES: list[dict[str, Any]] = [
             },
             {
                 "id": "tts",
-                "label": "Local MOSS TTS",
-                "subtitle": "on-device PCM chunks",
+                "label": "Local Chatterbox",
+                "subtitle": "zero-shot ref voice PCM chunks",
                 "x": 580,
                 "w": 360,
             },

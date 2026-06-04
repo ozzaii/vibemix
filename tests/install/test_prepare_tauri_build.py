@@ -24,13 +24,13 @@ def test_check_only_raises_when_sidecar_not_ready(monkeypatch: pytest.MonkeyPatc
 
 def test_ready_inputs_skip_sidecar_rebuild(monkeypatch: pytest.MonkeyPatch) -> None:
     calls: list[list[str]] = []
-    require_moss_source_calls: list[bool] = []
+    require_chatterbox_ref_calls: list[bool] = []
     monkeypatch.delenv("VIBEMIX_FORCE_SIDECAR", raising=False)
-    monkeypatch.delenv("VIBEMIX_REQUIRE_MOSS_SOURCE", raising=False)
+    monkeypatch.delenv("VIBEMIX_REQUIRE_CHATTERBOX_REF", raising=False)
     monkeypatch.setattr(prep, "detect_host_triple", lambda: "aarch64-apple-darwin")
 
     def ready_status(**kwargs) -> SidecarBundleStatus:
-        require_moss_source_calls.append(kwargs["require_moss_source"])
+        require_chatterbox_ref_calls.append(kwargs["require_chatterbox_ref"])
         return SidecarBundleStatus(True, "ready", Path("vibemix-core"))
 
     monkeypatch.setattr(prep, "check_sidecar_bundle_ready", ready_status)
@@ -39,46 +39,46 @@ def test_ready_inputs_skip_sidecar_rebuild(monkeypatch: pytest.MonkeyPatch) -> N
     prep.prepare_tauri_build(skip_frontend=True)
 
     assert calls == []
-    assert require_moss_source_calls == [False, False]
+    assert require_chatterbox_ref_calls == [False, False]
 
 
-def test_require_moss_source_flag_threads_to_readiness_checks(
+def test_require_chatterbox_ref_flag_threads_to_readiness_checks(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     calls: list[list[str]] = []
-    require_moss_source_calls: list[bool] = []
+    require_chatterbox_ref_calls: list[bool] = []
     monkeypatch.setattr(prep, "detect_host_triple", lambda: "aarch64-apple-darwin")
 
     def ready_status(**kwargs) -> SidecarBundleStatus:
-        require_moss_source_calls.append(kwargs["require_moss_source"])
+        require_chatterbox_ref_calls.append(kwargs["require_chatterbox_ref"])
         return SidecarBundleStatus(True, "ready", Path("vibemix-core"))
 
     monkeypatch.setattr(prep, "check_sidecar_bundle_ready", ready_status)
     monkeypatch.setattr(prep, "_run", lambda cmd, **_: calls.append(cmd))
 
-    prep.prepare_tauri_build(skip_frontend=True, require_moss_source=True)
+    prep.prepare_tauri_build(skip_frontend=True, require_chatterbox_ref=True)
 
     assert calls == []
-    assert require_moss_source_calls == [True, True]
+    assert require_chatterbox_ref_calls == [True, True]
 
 
-def test_require_moss_source_env_threads_to_check_only(
+def test_require_chatterbox_ref_env_threads_to_check_only(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    require_moss_source_calls: list[bool] = []
-    monkeypatch.setenv("VIBEMIX_REQUIRE_MOSS_SOURCE", "1")
+    require_chatterbox_ref_calls: list[bool] = []
+    monkeypatch.setenv("VIBEMIX_REQUIRE_CHATTERBOX_REF", "1")
     monkeypatch.setattr(prep, "detect_host_triple", lambda: "aarch64-apple-darwin")
 
-    def missing_moss_status(**kwargs) -> SidecarBundleStatus:
-        require_moss_source_calls.append(kwargs["require_moss_source"])
-        return SidecarBundleStatus(False, "missing moss source", Path("vibemix-core"))
+    def missing_chatterbox_status(**kwargs) -> SidecarBundleStatus:
+        require_chatterbox_ref_calls.append(kwargs["require_chatterbox_ref"])
+        return SidecarBundleStatus(False, "missing chatterbox ref", Path("vibemix-core"))
 
-    monkeypatch.setattr(prep, "check_sidecar_bundle_ready", missing_moss_status)
+    monkeypatch.setattr(prep, "check_sidecar_bundle_ready", missing_chatterbox_status)
 
-    with pytest.raises(RuntimeError, match="missing moss source"):
+    with pytest.raises(RuntimeError, match="missing chatterbox ref"):
         prep.prepare_tauri_build(skip_frontend=True, check_only=True)
 
-    assert require_moss_source_calls == [True]
+    assert require_chatterbox_ref_calls == [True]
 
 
 def test_force_sidecar_env_rebuilds_ready_inputs(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -173,10 +173,10 @@ def test_main_returns_one_on_failed_subprocess(monkeypatch: pytest.MonkeyPatch) 
     assert prep.main([]) == 1
 
 
-def test_main_threads_require_moss_source_flag(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_main_threads_require_chatterbox_ref_flag(monkeypatch: pytest.MonkeyPatch) -> None:
     captured: dict[str, object] = {}
     monkeypatch.setattr(prep, "prepare_tauri_build", lambda **kwargs: captured.update(kwargs))
 
-    assert prep.main(["--skip-frontend", "--require-moss-source"]) == 0
+    assert prep.main(["--skip-frontend", "--require-chatterbox-ref"]) == 0
     assert captured["skip_frontend"] is True
-    assert captured["require_moss_source"] is True
+    assert captured["require_chatterbox_ref"] is True

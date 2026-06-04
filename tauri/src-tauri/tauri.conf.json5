@@ -25,9 +25,9 @@
     // both `tauri/` and `tauri/ui/` depending on the launch path, so the shell
     // guard resolves the repo-root script from either cwd. Without this, a
     // direct local `cargo tauri build` can silently ship the committed
-    // `.placeholder` sidecar directories, or a MOSS-only voice path with no
-    // bundled/downloadable model source.
-    "beforeBuildCommand": "sh -c 'if [ -f ../scripts/dist/prepare_tauri_build.py ]; then uv run python ../scripts/dist/prepare_tauri_build.py --require-moss-source; else cd ../.. && uv run python scripts/dist/prepare_tauri_build.py --require-moss-source; fi'"
+    // `.placeholder` sidecar directories, or a Chatterbox voice path with no
+    // bundled production reference.
+    "beforeBuildCommand": "sh -c 'if [ -f ../scripts/dist/prepare_tauri_build.py ]; then uv run python ../scripts/dist/prepare_tauri_build.py --require-chatterbox-ref; else cd ../.. && uv run python scripts/dist/prepare_tauri_build.py --require-chatterbox-ref; fi'"
   },
   "app": {
     "windows": [

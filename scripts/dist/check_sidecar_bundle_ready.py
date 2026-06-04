@@ -14,6 +14,7 @@ import json
 import os
 import subprocess
 import sys
+import wave
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -35,11 +36,11 @@ from scripts.build_sidecar import (  # noqa: E402
 BINARIES_REL = Path("tauri/src-tauri/binaries")
 IPC_SCHEMA_REL = Path("tauri/ui/src/ipc/messages.schema.json")
 DEFAULT_MIN_BYTES = 4096
-MOSS_MODEL_DIRNAME = "MOSS-TTS-Nano-100M-ONNX"
-MOSS_MANIFEST = "browser_poc_manifest.json"
-MOSS_ARCHIVE_URL_ENV = "VIBEMIX_MOSS_TTS_ARCHIVE_URL"
-MOSS_ARCHIVE_SHA_ENV = "VIBEMIX_MOSS_TTS_ARCHIVE_SHA256"
-MOSS_ARCHIVE_SIZE_ENV = "VIBEMIX_MOSS_TTS_ARCHIVE_SIZE"
+CHATTERBOX_REF_NAME = "cohost_voice_ref.wav"
+CHATTERBOX_REF_REL = Path("_internal") / "models" / "chatterbox" / CHATTERBOX_REF_NAME
+CHATTERBOX_REF_CHANNELS = 1
+CHATTERBOX_REF_SAMPLE_WIDTH = 2
+CHATTERBOX_REF_SAMPLE_RATE = 24_000
 LEARN_EXEMPLAR_WAVS: tuple[Path, ...] = (
     Path("vibemix/learn/assets/band_exemplars/high/vibemix_internal_high_hat_air.wav"),
     Path("vibemix/learn/assets/band_exemplars/low/vibemix_internal_low_bass_gate.wav"),
@@ -123,114 +124,6 @@ def _resolve_manifest_path(base: Path, rel_path: str) -> Path:
     return path if path.is_absolute() else (base / path).resolve(strict=False)
 
 
-def _display_model_path(path: Path, model_dir: Path) -> str:
-    for root in (model_dir, model_dir.parent):
-        try:
-            return str(path.relative_to(root))
-        except ValueError:
-            continue
-    return str(path)
-
-
-def _read_moss_json_file(
-    path: Path,
-    *,
-    mismatched: list[str],
-    model_dir: Path,
-) -> dict[str, object] | None:
-    try:
-        return json.loads(path.read_text(encoding="utf-8"))
-    except Exception:
-        mismatched.append(_display_model_path(path, model_dir))
-        return None
-
-
-def _add_moss_meta_files(
-    *,
-    meta_path: Path,
-    required: set[Path],
-    missing: list[str],
-    mismatched: list[str],
-    model_dir: Path,
-) -> None:
-    """Add ONNX/data files referenced by a MOSS meta file to ``required``."""
-    if not meta_path.is_file():
-        missing.append(_display_model_path(meta_path, model_dir))
-        return
-    meta = _read_moss_json_file(meta_path, mismatched=mismatched, model_dir=model_dir)
-    if not meta:
-        return
-    base = meta_path.parent
-    files = meta.get("files")
-    if isinstance(files, dict):
-        for rel_path in files.values():
-            if isinstance(rel_path, str):
-                required.add(_resolve_manifest_path(base, rel_path))
-    external = meta.get("external_data_files")
-    if isinstance(external, dict):
-        for rel_paths in external.values():
-            if isinstance(rel_paths, list):
-                for rel_path in rel_paths:
-                    if isinstance(rel_path, str):
-                        required.add(_resolve_manifest_path(base, rel_path))
-
-
-def _moss_model_tree_status(model_dir: Path) -> tuple[bool, str]:
-    """Return whether ``model_dir`` has the MOSS files needed before ORT load.
-
-    Keep this release verifier stdlib-only. Importing ``vibemix.agent.local_tts``
-    would also import LiveKit, so a machine that can inspect a DMG could fail the
-    artifact gate before it even checks the packaged files.
-    """
-    manifest_path = model_dir / MOSS_MANIFEST
-    missing: list[str] = []
-    mismatched: list[str] = []
-    required: set[Path] = {manifest_path}
-
-    if not manifest_path.is_file():
-        missing.append(MOSS_MANIFEST)
-    else:
-        manifest = _read_moss_json_file(
-            manifest_path,
-            mismatched=mismatched,
-            model_dir=model_dir,
-        )
-        if manifest:
-            model_files = manifest.get("model_files")
-            if isinstance(model_files, dict):
-                for key, rel_path in model_files.items():
-                    if not isinstance(rel_path, str):
-                        continue
-                    path = _resolve_manifest_path(model_dir, rel_path)
-                    required.add(path)
-                    if key in {"tts_meta", "codec_meta"}:
-                        _add_moss_meta_files(
-                            meta_path=path,
-                            required=required,
-                            missing=missing,
-                            mismatched=mismatched,
-                            model_dir=model_dir,
-                        )
-
-    for path in sorted(required, key=lambda item: str(item)):
-        if not path.is_file():
-            display = _display_model_path(path, model_dir)
-            if display not in missing:
-                missing.append(display)
-
-    if not missing and not mismatched:
-        return (True, f"bundled MOSS model ready: {model_dir}")
-    detail = "; ".join(
-        part
-        for part in (
-            "missing " + ", ".join(missing) if missing else "",
-            "mismatched " + ", ".join(mismatched) if mismatched else "",
-        )
-        if part
-    )
-    return (False, f"{model_dir}: {detail or 'not usable'}")
-
-
 def learn_exemplar_audio_ready(bundle_dir: Path) -> tuple[bool, str]:
     """Return whether the frozen sidecar carries the packaged Learn audio bank."""
     internal = bundle_dir / "_internal"
@@ -242,68 +135,38 @@ def learn_exemplar_audio_ready(bundle_dir: Path) -> tuple[bool, str]:
     return (True, f"Learn exemplar WAV bank ready: {len(LEARN_EXEMPLAR_WAVS)} file(s)")
 
 
-def _moss_archive_pin_errors() -> list[str]:
-    """Return release-source pin errors for the hosted MOSS model archive."""
-    url = os.environ.get(MOSS_ARCHIVE_URL_ENV, "").strip()
-    if not url:
-        return [f"{MOSS_ARCHIVE_URL_ENV} is not set"]
-
-    errors: list[str] = []
-    if not url.startswith("https://"):
-        errors.append(f"{MOSS_ARCHIVE_URL_ENV} must be an https:// URL")
-
-    sha = os.environ.get(MOSS_ARCHIVE_SHA_ENV, "").strip().lower()
-    if len(sha) != 64 or any(c not in "0123456789abcdef" for c in sha):
-        errors.append(f"{MOSS_ARCHIVE_SHA_ENV} must be a 64-character lowercase SHA-256")
-
-    raw_size = os.environ.get(MOSS_ARCHIVE_SIZE_ENV, "").strip()
+def _chatterbox_ref_wave_status(path: Path) -> tuple[bool, str]:
     try:
-        size = int(raw_size)
-    except ValueError:
-        size = 0
-    if size <= 0:
-        errors.append(f"{MOSS_ARCHIVE_SIZE_ENV} must be a positive byte count")
+        with wave.open(str(path), "rb") as ref:
+            channels = ref.getnchannels()
+            sample_width = ref.getsampwidth()
+            sample_rate = ref.getframerate()
+            frames = ref.getnframes()
+    except (OSError, EOFError, wave.Error) as exc:
+        return (False, f"unreadable WAV: {path}: {exc}")
 
-    return errors
-
-
-def _bundled_moss_model_status(bundle_dir: Path) -> tuple[bool, str]:
-    """Return whether ``bundle_dir`` contains a complete MOSS model tree.
-
-    The PyInstaller layout may choose a different destination for future bundled
-    data, so search for the canonical model dir name instead of hardcoding one
-    path under ``_internal``.
-    """
-    manifests = sorted(bundle_dir.rglob(f"{MOSS_MODEL_DIRNAME}/{MOSS_MANIFEST}"))
-    if not manifests:
-        return (False, f"no bundled {MOSS_MODEL_DIRNAME}/{MOSS_MANIFEST}")
-
-    details: list[str] = []
-    for manifest in manifests:
-        model_dir = manifest.parent
-        ok, detail = _moss_model_tree_status(model_dir)
-        if ok:
-            return (True, detail)
-        details.append(detail)
-
-    return (False, "bundled MOSS model incomplete: " + " | ".join(details))
+    if channels != CHATTERBOX_REF_CHANNELS:
+        return (False, f"expected mono Chatterbox ref, got {channels} channel(s): {path}")
+    if sample_width != CHATTERBOX_REF_SAMPLE_WIDTH:
+        bits = sample_width * 8
+        return (False, f"expected 16-bit PCM Chatterbox ref, got {bits}-bit: {path}")
+    if sample_rate != CHATTERBOX_REF_SAMPLE_RATE:
+        return (False, f"expected 24000 Hz Chatterbox ref, got {sample_rate} Hz: {path}")
+    if frames <= 0:
+        return (False, f"Chatterbox ref has no audio frames: {path}")
+    return (True, f"bundled Chatterbox ref ready: {path}")
 
 
-def moss_release_source_ready(bundle_dir: Path) -> tuple[bool, str]:
-    """Return whether a sidecar bundle has a release-usable MOSS model source."""
-    bundled_ok, bundled_detail = _bundled_moss_model_status(bundle_dir)
-    if bundled_ok:
-        return (True, bundled_detail)
-    archive_errors = _moss_archive_pin_errors()
-    if not archive_errors:
-        return (True, f"MOSS archive pins configured via {MOSS_ARCHIVE_URL_ENV}")
-    return (
-        False,
-        "MOSS-only release has no model source. "
-        f"Bundle a complete {MOSS_MODEL_DIRNAME} tree or set "
-        f"{MOSS_ARCHIVE_URL_ENV}/{MOSS_ARCHIVE_SHA_ENV}/{MOSS_ARCHIVE_SIZE_ENV}. "
-        f"Bundled check: {bundled_detail}. Archive pins: {', '.join(archive_errors)}.",
-    )
+def chatterbox_release_ref_ready(bundle_dir: Path) -> tuple[bool, str]:
+    """Return whether a sidecar bundle carries the production Chatterbox reference."""
+    ref_path = bundle_dir / CHATTERBOX_REF_REL
+    if not ref_path.is_file():
+        return (
+            False,
+            f"Chatterbox release has no bundled voice reference. "
+            f"Bundle {CHATTERBOX_REF_REL} from the approved production WAV.",
+        )
+    return _chatterbox_ref_wave_status(ref_path)
 
 
 def _preview_paths(paths: list[str], *, limit: int = 5) -> str:
@@ -396,7 +259,7 @@ def check_sidecar_bundle_ready(
     root: Path = REPO_ROOT,
     triple: str | None = None,
     min_bytes: int = DEFAULT_MIN_BYTES,
-    require_moss_source: bool = False,
+    require_chatterbox_ref: bool = False,
 ) -> SidecarBundleStatus:
     """Check that the Tauri resource tree contains a real sidecar bundle."""
     target_triple = triple or detect_host_triple()
@@ -488,10 +351,10 @@ def check_sidecar_bundle_ready(
     if not manifest_ok:
         return SidecarBundleStatus(False, manifest_message, binary)
 
-    if require_moss_source:
-        moss_ok, moss_message = moss_release_source_ready(bundle_dir)
-        if not moss_ok:
-            return SidecarBundleStatus(False, moss_message, binary)
+    if require_chatterbox_ref:
+        ref_ok, ref_message = chatterbox_release_ref_ready(bundle_dir)
+        if not ref_ok:
+            return SidecarBundleStatus(False, ref_message, binary)
 
     return SidecarBundleStatus(True, f"sidecar bundle ready: {binary}", binary)
 
@@ -509,11 +372,11 @@ def main(argv: list[str] | None = None) -> int:
         help=f"minimum acceptable sidecar binary size (default: {DEFAULT_MIN_BYTES})",
     )
     parser.add_argument(
-        "--require-moss-source",
+        "--require-chatterbox-ref",
         action="store_true",
         help=(
-            "release gate: require either a complete bundled MOSS model tree or "
-            "verified VIBEMIX_MOSS_TTS_ARCHIVE_* pins"
+            f"release gate: require bundled {CHATTERBOX_REF_REL} as mono "
+            "16-bit 24000 Hz WAV"
         ),
     )
     parser.add_argument("--quiet", action="store_true", help="print only failures")
@@ -524,7 +387,7 @@ def main(argv: list[str] | None = None) -> int:
             root=args.root.resolve(),
             triple=args.triple,
             min_bytes=args.min_bytes,
-            require_moss_source=args.require_moss_source,
+            require_chatterbox_ref=args.require_chatterbox_ref,
         )
     except RuntimeError as exc:
         print(f"[sidecar-bundle] FAIL: {exc}", file=sys.stderr)

@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import subprocess
+import wave
 from pathlib import Path
 
 from scripts.dist import check_windows_app_payload_ready as gate
@@ -22,6 +23,17 @@ def _write_learn_exemplar_wavs(sidecar_dir: Path) -> None:
         path = sidecar_dir / "_internal" / rel
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_bytes(b"wav")
+
+
+def _write_chatterbox_ref(sidecar_dir: Path) -> Path:
+    ref_path = sidecar_dir / "_internal" / "models" / "chatterbox" / "cohost_voice_ref.wav"
+    ref_path.parent.mkdir(parents=True, exist_ok=True)
+    with wave.open(str(ref_path), "wb") as wav:
+        wav.setnchannels(1)
+        wav.setsampwidth(2)
+        wav.setframerate(24_000)
+        wav.writeframes(b"\x00" * 48)
+    return ref_path
 
 
 def _fake_payload(
@@ -137,41 +149,33 @@ def test_smoke_runs_sidecar_command(tmp_path: Path, monkeypatch) -> None:
     assert status.smoke_stdout == "vibemix 0.1.0"
 
 
-def test_require_moss_source_fails_without_bundle_or_archive(
-    tmp_path: Path, monkeypatch
-) -> None:
+def test_require_chatterbox_ref_fails_without_bundled_ref(tmp_path: Path) -> None:
     payload = _fake_payload(tmp_path)
-    monkeypatch.delenv("VIBEMIX_MOSS_TTS_ARCHIVE_URL", raising=False)
-    monkeypatch.delenv("VIBEMIX_MOSS_TTS_ARCHIVE_SHA256", raising=False)
-    monkeypatch.delenv("VIBEMIX_MOSS_TTS_ARCHIVE_SIZE", raising=False)
 
     status = gate.check_windows_app_payload_ready(
         payload,
         triple=WIN_TRIPLE,
-        require_moss_source=True,
+        require_chatterbox_ref=True,
     )
 
     assert status.ok is False
-    assert any("MOSS-only release has no model source" in error for error in status.errors)
-    assert "VIBEMIX_MOSS_TTS_ARCHIVE_URL is not set" in status.moss_source
+    assert any("Chatterbox release has no bundled voice reference" in error for error in status.errors)
+    assert "models/chatterbox/cohost_voice_ref.wav" in status.chatterbox_ref
 
 
-def test_require_moss_source_accepts_release_archive_pins(
-    tmp_path: Path, monkeypatch
-) -> None:
+def test_require_chatterbox_ref_accepts_bundled_ref(tmp_path: Path) -> None:
     payload = _fake_payload(tmp_path)
-    monkeypatch.setenv("VIBEMIX_MOSS_TTS_ARCHIVE_URL", "https://models.example/moss.zip")
-    monkeypatch.setenv("VIBEMIX_MOSS_TTS_ARCHIVE_SHA256", "c" * 64)
-    monkeypatch.setenv("VIBEMIX_MOSS_TTS_ARCHIVE_SIZE", "123")
+    sidecar_dir = payload / "binaries" / f"vibemix-core-{WIN_TRIPLE}"
+    _write_chatterbox_ref(sidecar_dir)
 
     status = gate.check_windows_app_payload_ready(
         payload,
         triple=WIN_TRIPLE,
-        require_moss_source=True,
+        require_chatterbox_ref=True,
     )
 
     assert status.ok is True
-    assert "MOSS archive pins configured" in status.moss_source
+    assert "bundled Chatterbox ref ready" in status.chatterbox_ref
 
 
 def test_main_returns_one_for_missing_payload(tmp_path: Path, capsys) -> None:

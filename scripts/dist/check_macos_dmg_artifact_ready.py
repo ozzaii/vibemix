@@ -87,7 +87,7 @@ def check_macos_dmg_artifact_ready(
     triple: str | None = None,
     install_dir: Path | None = None,
     app_name: str | None = "vibemix.app",
-    require_moss_source: bool = False,
+    require_chatterbox_ref: bool = False,
     require_developer_id: bool = False,
     developer_team_id: str | None = None,
     smoke: str = "version",
@@ -129,7 +129,7 @@ def check_macos_dmg_artifact_ready(
         app_status = check_macos_app_bundle_ready(
             Path(status.installed_app),
             triple=triple,
-            require_moss_source=require_moss_source,
+            require_chatterbox_ref=require_chatterbox_ref,
             require_developer_id=require_developer_id,
             developer_team_id=developer_team_id,
             smoke=smoke,
@@ -159,12 +159,9 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--app-name", default="vibemix.app")
     parser.add_argument(
-        "--require-moss-source",
+        "--require-chatterbox-ref",
         action="store_true",
-        help=(
-            "release gate: require either a complete bundled MOSS model tree or "
-            "verified VIBEMIX_MOSS_TTS_ARCHIVE_* pins"
-        ),
+        help="release gate: require the bundled Chatterbox production reference WAV",
     )
     parser.add_argument(
         "--require-developer-id",
@@ -195,7 +192,7 @@ def main(argv: list[str] | None = None) -> int:
         triple=args.triple,
         install_dir=args.install_dir,
         app_name=args.app_name,
-        require_moss_source=args.require_moss_source,
+        require_chatterbox_ref=args.require_chatterbox_ref,
         require_developer_id=args.require_developer_id,
         developer_team_id=args.developer_team_id,
         smoke=args.smoke,

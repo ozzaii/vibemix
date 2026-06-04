@@ -23,7 +23,7 @@ def test_local_dmg_wrapper_repairs_before_creating_dmg() -> None:
 
     assert "cargo tauri build --bundles app --no-sign --ci" in body
     assert "VIBEMIX_FORCE_SIDECAR=1 cargo tauri build" in body
-    assert body.count("--require-moss-source") == 2
+    assert body.count("--require-chatterbox-ref") == 2
     assert repair < app_check < create < dmg_check
     assert "cargo tauri build --bundles dmg --no-sign" not in executable_body
 

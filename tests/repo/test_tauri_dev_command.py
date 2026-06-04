@@ -20,6 +20,6 @@ def test_before_build_command_prepares_frontend_and_sidecar() -> None:
     body = TAURI_CONF.read_text(encoding="utf-8")
 
     assert '"beforeBuildCommand": ' in body
-    assert "prepare_tauri_build.py --require-moss-source" in body
+    assert "prepare_tauri_build.py --require-chatterbox-ref" in body
     assert "`.placeholder` sidecar directories" in body
-    assert "bundled/downloadable model source" in body
+    assert "bundled production reference" in body
