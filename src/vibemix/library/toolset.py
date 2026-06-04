@@ -1020,7 +1020,7 @@ class LibraryToolset:
                     ).strip("-")
                     or "set"
                 )
-                out_path = str(_Path.home() / ".cache" / "vibemix" / "sets" / f"{slug}.xml")
+                out_path = str(_Path.home() / "Music" / "vibemix" / "cues" / f"{slug}.xml")
             result: ExportResult = export_rekordbox.export_set(
                 items, name, out_path, library=self._library
             )

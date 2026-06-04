@@ -18,6 +18,7 @@ fake store + in-memory library; energy is monkeypatched.
 
 from __future__ import annotations
 
+import pathlib
 import time
 import xml.etree.ElementTree as ET
 from types import SimpleNamespace
@@ -870,6 +871,18 @@ def test_export_set_writes_grounded_xml(toolset, tmp_path):
     assert out["path"] == str(out_xml)
     assert out_xml.exists()
     assert out["written"] >= 1
+
+
+def test_export_set_default_path_is_visible_music_cue_folder(toolset, tmp_path, monkeypatch):
+    toolset.seen.add("t000")
+    monkeypatch.setattr(pathlib.Path, "home", lambda: tmp_path)
+
+    out = toolset.export_set({"name": "Peak Set!", "track_ids": ["t000"], "cue": False})
+
+    expected = tmp_path / "Music" / "vibemix" / "cues" / "peak-set.xml"
+    assert out.get("exported") is True
+    assert out["path"] == str(expected)
+    assert expected.exists()
 
 
 def test_export_set_forwards_rekordbox_cues_and_beatgrid(toolset, tmp_path):
