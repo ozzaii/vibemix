@@ -1,0 +1,10 @@
+{
+  "cache_loaded": false,
+  "cached_tracks": 0,
+  "error": "No product found in /Users/ozai/Documents/Library.xml",
+  "error_type": "RuntimeError",
+  "library_input_mode": "rekordbox_xml",
+  "library_source_path": "/Users/ozai/Documents/Library.xml",
+  "schema": "anlz_cue_agreement_v1",
+  "status": "blocked_invalid_rekordbox_xml"
+}

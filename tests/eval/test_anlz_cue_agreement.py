@@ -1,7 +1,12 @@
 # SPDX-License-Identifier: Apache-2.0
 from __future__ import annotations
 
-from scripts.eval.anlz_cue_agreement import evaluate_anlz_cue_agreement
+from pathlib import Path
+
+from scripts.eval.anlz_cue_agreement import (
+    evaluate_anlz_cue_agreement,
+    load_rekordbox_xml_library,
+)
 
 from vibemix.library.anlz_ingest import (
     AnlzBeatGrid,
@@ -10,7 +15,7 @@ from vibemix.library.anlz_ingest import (
     AnlzPhrase,
     AnlzTrackMeta,
 )
-from vibemix.library.rekordbox import CuePoint, TrackEntry
+from vibemix.library.rekordbox import CuePoint, RekordboxLibrary, TrackEntry
 
 
 def _track(cues: tuple[CuePoint, ...] = ()) -> TrackEntry:
@@ -51,6 +56,31 @@ def _index(*, dj_cues: tuple[AnlzDjCue, ...] = ()) -> AnlzIndex:
         dj_cues=dj_cues,
     )
     return AnlzIndex(by_basename={"track one.mp3": (meta,)})
+
+
+def _index_for_basename(basename: str, *, phrase_start_s: float) -> AnlzIndex:
+    phrase = AnlzPhrase(
+        index=0,
+        mood=1,
+        kind=1,
+        raw_label="Intro 1",
+        cue_label="intro",
+        start_beat=1,
+        end_beat=65,
+        start_s=phrase_start_s,
+        end_s=phrase_start_s + 30.0,
+        confidence=0.84,
+        flags={},
+    )
+    meta = AnlzTrackMeta(
+        ext_path="/tmp/ANLZ0001.EXT",  # type: ignore[arg-type]
+        dat_path="/tmp/ANLZ0001.DAT",  # type: ignore[arg-type]
+        ppth_path=f"/Users/test/Music/{basename}",
+        basename_key=basename,
+        beatgrid=AnlzBeatGrid(times_s=(0.0,), bpms=(124.0,), beat_in_bar=(1,)),
+        phrases=(phrase,),
+    )
+    return AnlzIndex(by_basename={basename: (meta,)})
 
 
 def test_anlz_cue_agreement_scores_when_dj_reference_exists() -> None:
@@ -121,3 +151,41 @@ def test_anlz_cue_agreement_honest_null_without_dj_reference() -> None:
         ),
     }
     assert report["notes"]["agreement_score_is_not_fabricated_without_dj_refs"] is True
+
+
+def test_load_rekordbox_xml_library_uses_isolated_cache(monkeypatch, tmp_path) -> None:
+    user_cache = tmp_path / "user" / "library.pkl"
+    isolated_cache = tmp_path / "eval" / "library.pkl"
+    monkeypatch.setattr(RekordboxLibrary, "CACHE_PATH", user_cache)
+
+    tracks, source_path = load_rekordbox_xml_library(
+        Path("tests/library/fixtures/synthetic_collection.xml"),
+        cache_path=isolated_cache,
+    )
+
+    assert source_path == "tests/library/fixtures/synthetic_collection.xml"
+    assert len(tracks) == 5
+    assert isolated_cache.exists()
+    assert not user_cache.exists()
+    assert RekordboxLibrary.CACHE_PATH == user_cache
+
+
+def test_xml_reference_can_score_against_matching_anlz(monkeypatch, tmp_path) -> None:
+    monkeypatch.setattr(RekordboxLibrary, "CACHE_PATH", tmp_path / "user" / "library.pkl")
+    tracks, _source_path = load_rekordbox_xml_library(
+        Path("tests/library/fixtures/synthetic_collection.xml"),
+        cache_path=tmp_path / "eval" / "library.pkl",
+    )
+
+    report = evaluate_anlz_cue_agreement(
+        tracks,
+        _index_for_basename("track-1.mp3", phrase_start_s=8.5),
+    )
+
+    assert report["status"] == "ok"
+    assert report["anlz_matched_cached_tracks"] == 1
+    assert report["cache_dj_reference_tracks"] == 1
+    assert report["cue_agreement_scored_tracks"] == 1
+    assert report["cue_agreement_mean_score"] == 0.333333
+    assert report["cue_agreement_mean_abs_offset_s"] == 0.5
+    assert report["reference_audit"]["numeric_agreement_claimable"] is True

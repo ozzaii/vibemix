@@ -1,0 +1,40 @@
+{
+  "anlz_index_metas": 1045,
+  "anlz_index_tracks": 1039,
+  "anlz_matched_cached_tracks": 0,
+  "anlz_sidecar_dj_anchor_count": 0,
+  "anlz_sidecar_dj_reference_tracks": 0,
+  "cache_dj_reference_tracks": 0,
+  "cache_loaded": true,
+  "cached_cue_source_counts": {
+    "dj": 17
+  },
+  "cached_tracks": 5,
+  "cue_agreement_mean_abs_offset_s": null,
+  "cue_agreement_mean_score": null,
+  "cue_agreement_scored_tracks": 0,
+  "cue_agreement_weak_labels": 0,
+  "dj_reference_tracks": 0,
+  "library_input_mode": "rekordbox_xml",
+  "library_source_path": "tests/library/fixtures/synthetic_collection.xml",
+  "notes": {
+    "agreement_score_is_not_fabricated_without_dj_refs": true,
+    "anlz_first_fill_already_in_current_source": true,
+    "compares": "dj_or_anlz_pcob_pco2_cues_vs_anlz_pssi_phrase_anchors"
+  },
+  "pssi_anchor_count": 0,
+  "pssi_first_fill_candidate_tracks": 0,
+  "reference_audit": {
+    "anlz_sidecar_pcob_pco2_dj_anchor_count": 0,
+    "anlz_sidecar_tracks_with_pcob_pco2_dj_cues": 0,
+    "cache_structural_dj_anchor_count": 0,
+    "cache_tracks_with_structural_dj_cues": 0,
+    "missing_reference_reason": "cache has no structural DJ cues and matched ANLZ sidecars have no PCOB/PCO2 DJ cue entries",
+    "numeric_agreement_claimable": false
+  },
+  "rekordbox_xml_cache_isolated": true,
+  "sample_rows": [],
+  "schema": "anlz_cue_agreement_v1",
+  "status": "honest_null_no_dj_reference_cues",
+  "tracks_with_pssi_anchors": 0
+}

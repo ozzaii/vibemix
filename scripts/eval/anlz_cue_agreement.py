@@ -17,6 +17,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+import tempfile
 from collections import Counter
 from collections.abc import Iterable, Mapping
 from pathlib import Path
@@ -193,24 +194,99 @@ def load_cached_library() -> tuple[dict[str, TrackEntry], str | None]:
     return dict(lib.tracks), lib.xml_path
 
 
+def load_rekordbox_xml_library(
+    xml_path: Path,
+    *,
+    cache_path: Path | None = None,
+) -> tuple[dict[str, TrackEntry], str]:
+    """Parse an explicit Rekordbox XML export without touching the user cache.
+
+    ``RekordboxLibrary.load_xml()`` intentionally writes ``CACHE_PATH`` as a
+    production warm-start side effect. This bench is different: it often probes
+    throwaway exports or fixtures, so it must isolate that write and restore the
+    process-global cache path before returning.
+    """
+    if cache_path is None:
+        with tempfile.TemporaryDirectory(prefix="vibemix-anlz-cue-agreement-") as tmp:
+            return load_rekordbox_xml_library(
+                xml_path,
+                cache_path=Path(tmp) / "library.pkl",
+            )
+
+    old_cache_path = RekordboxLibrary.CACHE_PATH
+    try:
+        RekordboxLibrary.CACHE_PATH = cache_path
+        lib = RekordboxLibrary()
+        lib.load_xml(xml_path)
+        return dict(lib.tracks), lib.xml_path
+    finally:
+        RekordboxLibrary.CACHE_PATH = old_cache_path
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--anlz-root", type=Path, default=None)
+    parser.add_argument(
+        "--rekordbox-xml",
+        type=Path,
+        default=None,
+        help=(
+            "score against an explicit Rekordbox XML export instead of the warm cache; "
+            "parsed through an isolated eval cache"
+        ),
+    )
+    parser.add_argument(
+        "--xml-cache-path",
+        type=Path,
+        default=None,
+        help=argparse.SUPPRESS,
+    )
     parser.add_argument("--out", type=Path, default=None)
     args = parser.parse_args(argv)
 
-    tracks, source_path = load_cached_library()
+    input_mode = "rekordbox_xml" if args.rekordbox_xml else "cache"
+    if args.rekordbox_xml:
+        try:
+            tracks, source_path = load_rekordbox_xml_library(
+                args.rekordbox_xml,
+                cache_path=args.xml_cache_path,
+            )
+        except Exception as e:
+            report = {
+                "schema": SCHEMA,
+                "cache_loaded": False,
+                "cached_tracks": 0,
+                "library_input_mode": input_mode,
+                "library_source_path": str(args.rekordbox_xml),
+                "status": "blocked_invalid_rekordbox_xml",
+                "error_type": type(e).__name__,
+                "error": str(e),
+            }
+            text = json.dumps(report, indent=2, sort_keys=True) + "\n"
+            if args.out:
+                args.out.parent.mkdir(parents=True, exist_ok=True)
+                args.out.write_text(text, encoding="utf-8")
+            sys.stdout.write(text)
+            return 2
+    else:
+        tracks, source_path = load_cached_library()
+
     if not tracks:
         report = {
             "schema": SCHEMA,
             "cache_loaded": False,
             "cached_tracks": 0,
+            "library_input_mode": input_mode,
+            "library_source_path": source_path,
             "status": "blocked_no_library_cache",
         }
     else:
         index = build_anlz_index(args.anlz_root)
         report = evaluate_anlz_cue_agreement(tracks, index)
+        report["library_input_mode"] = input_mode
         report["library_source_path"] = source_path
+        if args.rekordbox_xml:
+            report["rekordbox_xml_cache_isolated"] = True
 
     text = json.dumps(report, indent=2, sort_keys=True) + "\n"
     if args.out:
