@@ -3643,22 +3643,27 @@ def _build_library_subparsers(parser: argparse.ArgumentParser) -> None:
     sp_build_set.add_argument("--n-slots", type=int, default=None, help="target set length (slots)")
     sp_build_set.add_argument(
         "--export",
-        choices=("rekordbox",),
+        choices=("rekordbox", "m3u8", "both", "serato_tags", "mixxx_tags", "all"),
         default=None,
-        help="auto-export the chosen set (rekordbox = Rekordbox XML)",
+        help="auto-export the chosen set (rekordbox XML, m3u8, tags, or all carriers)",
     )
     sp_build_set.add_argument(
         "--cue",
         dest="cue",
         action="store_true",
         default=True,
-        help="with --export rekordbox, fill empty hot-cue slots with VM-stamped auto cues",
+        help="with --export, fill empty hot-cue slots with VM-stamped auto cues",
     )
     sp_build_set.add_argument(
         "--no-cue",
         dest="cue",
         action="store_false",
-        help="with --export rekordbox, export order/BPM/key only and do not add auto cues",
+        help="with --export, export order/BPM/key only and do not add auto cues",
+    )
+    sp_build_set.add_argument(
+        "--write-tags",
+        action="store_true",
+        help="grant Serato/Mixxx Markers2 tag writes into audio files for tag targets",
     )
     sp_build_set.add_argument(
         "--name", default=None, help="set name (default: derived from the brief)"
@@ -7232,13 +7237,33 @@ def _cmd_library_build_set_codex(args: argparse.Namespace, lib) -> int:
 
     from vibemix.library.codex_curate import build_set_with_codex
 
+    export_target = getattr(args, "export", None)
+    tag_write_granted = bool(getattr(args, "write_tags", False))
+    if export_target in {"serato_tags", "mixxx_tags", "all"} and not tag_write_granted:
+        print(
+            _json.dumps(
+                {
+                    "error": (
+                        "library build-set: --export "
+                        f"{export_target} writes Serato/Mixxx Markers2 tags into audio files; "
+                        "re-run with --write-tags after explicit user permission"
+                    ),
+                    "set": None,
+                }
+            ),
+            file=sys.stderr,
+        )
+        return 1
+
     result = build_set_with_codex(
         args.brief,
         lib,
         curve=getattr(args, "curve", None),
         name=getattr(args, "name", None),
         n_slots=getattr(args, "n_slots", None),
-        export=getattr(args, "export", None) == "rekordbox",
+        export=export_target is not None,
+        export_target=export_target,
+        tag_write_granted=tag_write_granted,
         cue=bool(getattr(args, "cue", True)),
     )
     out = result.to_dict()

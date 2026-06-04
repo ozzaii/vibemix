@@ -1121,11 +1121,15 @@ _BUILD_SET_RULES = (
     "export_smart_cues with issued proposal/cue ids. Never pass raw cue "
     "payloads. For normal set export, do not call smart_hot_cues first: "
     "export_set fills empty hot-cue slots with VM-stamped auto cues by default.\n"
-    "6. If export is requested, export_set — write the final ordered set to a "
-    "Rekordbox XML and capture the returned `path`. Pass cue=true unless the "
-    "brief explicitly says not to land auto-cues; pass cue=false for no-cue "
-    "exports. If export is not requested, skip export_set and return "
-    "export_path as an empty string.\n"
+    "6. If export is requested, export_set — write the final ordered set to the "
+    "requested DJ-software carrier target and capture the returned `path`. "
+    "Pass the explicit `target` hint when present (rekordbox / m3u8 / both / "
+    "serato_tags / mixxx_tags / all). Serato/Mixxx tag targets require the "
+    "tool arg `tag_write_granted=true`, which is only allowed when the prompt "
+    "says CLI tag-write permission was granted. Pass cue=true unless the brief "
+    "explicitly says not to land auto-cues; pass cue=false for no-cue exports. "
+    "If export is not requested, skip export_set and return export_path as an "
+    "empty string.\n"
     "RULES (non-negotiable):\n"
     "1. NEVER invent a track_id, title, artist, BPM, or key. Every track_id MUST "
     "have come from a discover_pool result in THIS run.\n"
@@ -1168,6 +1172,8 @@ def build_set_prompt(
     name: str | None = None,
     n_slots: int | None = None,
     export: bool = True,
+    export_target: str | None = None,
+    tag_write_granted: bool = False,
     cue: bool = True,
 ) -> str:
     """Compose the set-prep prompt: shared persona/lens + set-prep rules + brief.
@@ -1184,6 +1190,15 @@ def build_set_prompt(
         hints.append(f"target exactly {n_slots} slots")
     if export:
         hints.append("export requested")
+        target = export_target or "rekordbox"
+        hints.append(f"export target '{target}' requested; call export_set with target='{target}'")
+        if target in {"serato_tags", "mixxx_tags", "all"}:
+            if tag_write_granted:
+                hints.append(
+                    "Serato/Mixxx tag-write permission granted; pass tag_write_granted=true"
+                )
+            else:
+                hints.append("Serato/Mixxx tag-write permission NOT granted")
         hints.append(
             "auto-cue export requested; call export_set with cue=true"
             if cue
@@ -1272,6 +1287,8 @@ def _build_set_auto_crate_timeout_fallback(
     name: str | None,
     n_slots: int | None,
     export: bool,
+    export_target: str | None = None,
+    tag_write_granted: bool = False,
     after_partial_tools: bool = False,
 ) -> CodexCurateResult:
     from vibemix.library.auto_crate import build_auto_crate
@@ -1283,9 +1300,10 @@ def _build_set_auto_crate_timeout_fallback(
         n_slots=_infer_slots(brief, n_slots),
         k=max(24, _infer_slots(brief, n_slots) * 4),
         name=name,
-        export="rekordbox" if export else None,
+        export=(export_target or "rekordbox") if export else None,
         bpm_min=bpm_min,
         bpm_max=bpm_max,
+        tag_write_granted=tag_write_granted,
     )
     if result.stop_reason not in {"created", "exported"}:
         timeout_context = (
@@ -1332,6 +1350,8 @@ def build_set_with_codex(
     name: str | None = None,
     n_slots: int | None = None,
     export: bool = True,
+    export_target: str | None = None,
+    tag_write_granted: bool = False,
     cue: bool = True,
     timeout_s: float = BUILD_SET_TIMEOUT_S,
     codex_path: str | None = None,
@@ -1416,6 +1436,8 @@ def build_set_with_codex(
             name=name,
             n_slots=n_slots,
             export=export,
+            export_target=export_target,
+            tag_write_granted=tag_write_granted,
             cue=cue,
         )
         argv = build_argv(
@@ -1468,6 +1490,8 @@ def build_set_with_codex(
                     name=name,
                     n_slots=n_slots,
                     export=export,
+                    export_target=export_target,
+                    tag_write_granted=tag_write_granted,
                     after_partial_tools=bool(tool_events),
                 )
             )

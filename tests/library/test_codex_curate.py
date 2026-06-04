@@ -350,6 +350,8 @@ def test_build_set_prompt_has_set_prep_workflow():
     assert "name the set 'Peak Set'" in p
     assert "target exactly 3 slots" in p
     assert "export requested" in p
+    assert "export target 'rekordbox' requested" in p
+    assert "target='rekordbox'" in p
     assert "auto-cue export requested" in p
     assert "cue=true" in p
     assert "discover_pool" in p
@@ -379,6 +381,20 @@ def test_build_set_prompt_can_disable_auto_cue_export():
     assert "cue=false" in p
     assert "export_smart_cues" in p
     assert "export_set" in p
+
+
+def test_build_set_prompt_threads_all_carriers_and_tag_permission():
+    p = build_set_prompt(
+        "dark warehouse",
+        export=True,
+        export_target="all",
+        tag_write_granted=True,
+    )
+
+    assert "export target 'all' requested" in p
+    assert "target='all'" in p
+    assert "tag-write permission granted" in p
+    assert "tag_write_granted=true" in p
 
 
 def test_chat_timeout_is_interactive():
@@ -3112,6 +3128,8 @@ def test_build_set_timeout_before_tools_uses_auto_crate_fallback(library, monkey
         assert kwargs["query"].startswith("peak-time")
         assert kwargs["curve"] == "peak_time"
         assert kwargs["n_slots"] == 3
+        assert kwargs["export"] == "all"
+        assert kwargs["tag_write_granted"] is True
         assert kwargs["bpm_min"] == 128.0
         assert kwargs["bpm_max"] == 138.0
         return AutoCrateResult(
@@ -3143,6 +3161,8 @@ def test_build_set_timeout_before_tools_uses_auto_crate_fallback(library, monkey
         codex_path=sys.executable,
         allow_shell=True,
         timeout_s=5,
+        export_target="all",
+        tag_write_granted=True,
         _runner=runner,
     )
 
@@ -3576,6 +3596,8 @@ def test_build_set_cli_treats_codex_exported_as_success(library, monkeypatch, ca
     def fake_build_set_with_codex(*args, **kwargs):
         assert kwargs["n_slots"] == 3
         assert kwargs["export"] is True
+        assert kwargs["export_target"] == "rekordbox"
+        assert kwargs["tag_write_granted"] is False
         return codex_mod.CodexCurateResult(
             theme="dark warehouse",
             stop_reason="exported",
@@ -3593,6 +3615,7 @@ def test_build_set_cli_treats_codex_exported_as_success(library, monkeypatch, ca
             name=None,
             n_slots=3,
             export="rekordbox",
+            write_tags=False,
         ),
         library,
     )
@@ -3603,6 +3626,35 @@ def test_build_set_cli_treats_codex_exported_as_success(library, monkeypatch, ca
     assert payload["stop_reason"] == "exported"
     assert payload["export_path"] == str(export_xml)
     assert "exported" in captured.err
+
+
+def test_build_set_cli_requires_permission_for_all_tag_carriers(library, monkeypatch, capsys):
+    import argparse
+
+    import vibemix.__main__ as main_mod
+    import vibemix.library.codex_curate as codex_mod
+
+    def fake_build_set_with_codex(*args, **kwargs):  # pragma: no cover - must not run
+        raise AssertionError("Codex must not run without tag-write permission")
+
+    monkeypatch.setattr(codex_mod, "build_set_with_codex", fake_build_set_with_codex)
+    rc = main_mod._cmd_library_build_set_codex(
+        argparse.Namespace(
+            brief="dark warehouse",
+            curve="peak_time",
+            name=None,
+            n_slots=3,
+            export="all",
+            write_tags=False,
+            cue=True,
+        ),
+        library,
+    )
+
+    assert rc == 1
+    captured = capsys.readouterr()
+    assert "writes Serato/Mixxx Markers2 tags" in captured.err
+    assert "--write-tags" in captured.err
 
 
 def test_build_set_codex_export_path_nulled_when_missing(library, monkeypatch, tmp_path):
