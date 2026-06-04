@@ -849,6 +849,22 @@ describe("SessionLayout", () => {
     expect(root.textContent).toContain("eqMac Export is silent. Route DJ output there.");
   });
 
+  it("explains the blank BPM readout when the capture device is silent", () => {
+    const root = host();
+    const state = defaultState();
+    state.status.livekit = "ok";
+    state.status.captureDevice = "eqMac Export";
+    state.timecode.bpm = null;
+    state.meters.music = { rms: 0, peak: 0 };
+
+    mountSessionLayout(root, state);
+
+    const bpm = root.querySelector<HTMLElement>(".vmx-read__num");
+    expect(bpm?.textContent).toBe("—");
+    expect(bpm?.getAttribute("title")).toBe("BPM waits for audio from eqMac Export.");
+    expect(bpm?.getAttribute("aria-label")).toBe("BPM waits for audio from eqMac Export.");
+  });
+
   it("renders audible capture as hearing, not merely armed", () => {
     const root = host();
     const state = defaultState();

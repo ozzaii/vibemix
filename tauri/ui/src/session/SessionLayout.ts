@@ -1400,6 +1400,19 @@ function applyState(mounted: Mounted, next: SessionState, isMount: boolean): voi
   // --- foot readouts ---
   const bpmText = next.timecode.bpm != null ? next.timecode.bpm.toFixed(1) : "—";
   if (mounted.bpm.textContent !== bpmText) mounted.bpm.textContent = bpmText;
+  // A null BPM is usually read as "the counter is broken" when the deck is
+  // visually alive. Name the honest cause on the readout itself: no grounded
+  // audio has reached the detector yet, so the BPM must stay blank.
+  if (next.timecode.bpm == null) {
+    const bpmTitle = bpmWaitingTitle(next.status.captureDevice, next.meters.music);
+    if (mounted.bpm.getAttribute("aria-label") !== bpmTitle) {
+      mounted.bpm.setAttribute("title", bpmTitle);
+      mounted.bpm.setAttribute("aria-label", bpmTitle);
+    }
+  } else if (mounted.bpm.hasAttribute("aria-label")) {
+    mounted.bpm.removeAttribute("title");
+    mounted.bpm.removeAttribute("aria-label");
+  }
   const keyText = next.timecode.key ?? "—";
   if (mounted.key.textContent !== keyText) mounted.key.textContent = keyText;
   // A null key shows the dash glyph; name it so the dim slot reads as
@@ -1581,6 +1594,16 @@ function musicSignalActive(music: SessionState["meters"]["music"]): boolean {
 function captureDeviceLabel(captureDevice?: string | null): string {
   const text = (captureDevice ?? "").trim().replace(/\s+/g, " ");
   return text || "capture";
+}
+
+function bpmWaitingTitle(
+  captureDevice: SessionState["status"]["captureDevice"],
+  music: SessionState["meters"]["music"],
+): string {
+  const device = captureDeviceLabel(captureDevice);
+  return musicSignalActive(music)
+    ? "BPM is not locked yet."
+    : `BPM waits for audio from ${device}.`;
 }
 
 function midiDeviceLabel(midiDevice?: string | null): string {
