@@ -350,7 +350,6 @@ function mountMockTldrPlayer(totalDurationS: number, regionCount: number): void 
   for (const [label, value] of [
     ["Regions", String(regionCount)],
     ["Runtime", formatMockDuration(totalDurationS)],
-    ["Hash", "demo:7f4a"],
   ] as const) {
     const cell = document.createElement("span");
     cell.className = "vmx-debrief-tldr-hud-cell";
