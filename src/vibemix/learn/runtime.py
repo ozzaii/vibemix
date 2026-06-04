@@ -154,7 +154,35 @@ _BEATMATCH_PRACTICE_GRADE_STATES = frozenset(
     {"awaiting_action", "hint_strike_1", "hint_strike_2", "hint_strike_3", "advancing"}
 )
 _PRACTICE_AUDIO_CONTROLS = frozenset(
-    {"eq_hi", "eq_low", "eq_mid", "filter", "jog", "play", "sync", "tempo", "vol", "xfader"}
+    {
+        "cue",
+        "eq_hi",
+        "eq_low",
+        "eq_mid",
+        "filter",
+        "fx_echo",
+        "headphone_cue",
+        "hotcue",
+        "jog",
+        "loop_in",
+        "loop_out",
+        "play",
+        "sync",
+        "tempo",
+        "vol",
+        "xfader",
+    }
+)
+_PRACTICE_AUDIO_DEMO_LESSONS = frozenset(
+    {
+        "L1.10",
+        "L1.11",
+        "L1.12",
+        "L1.13",
+        "L1.15",
+        "L2.11",
+        "L2.13",
+    }
 )
 _CONTROL_LABELS = {
     "cue": "cue",
@@ -687,7 +715,7 @@ class LessonRuntime(StateMachine):
         self.send("observer_complete", completed=completed)
 
     def set_beatmatch_practice_player(self, player: Any | None) -> None:
-        """Install or clear the optional L2.01/L2.02 audible practice player."""
+        """Install or clear the optional audible practice player."""
         if player is self._beatmatch_practice_player:
             return
         self._stop_beatmatch_practice_player()
@@ -707,6 +735,8 @@ class LessonRuntime(StateMachine):
         lesson_meta = CURRICULUM.get(lesson_id)
         if lesson_meta is not None and lesson_meta.course_id == "course_0":
             return False
+        if lesson_id in _PRACTICE_AUDIO_DEMO_LESSONS:
+            return True
         try:
             flow = build_lesson_flow(lesson_id)
         except Exception:

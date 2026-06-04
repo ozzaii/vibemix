@@ -106,6 +106,56 @@ def test_course_one_deck_control_lesson_starts_practice_player() -> None:
     assert player.starts == 1
 
 
+def test_course_one_waveform_demo_lesson_starts_practice_player() -> None:
+    runtime = _runtime()
+    player = _FakePracticePlayer()
+
+    runtime.set_beatmatch_practice_player(player)
+    _load_begin(runtime, lesson_id="L1.13", course_id="course_1_anatomy")
+
+    assert player.starts == 1
+
+
+def test_course_one_recital_starts_practice_player_from_flow_controls() -> None:
+    runtime = _runtime()
+    player = _FakePracticePlayer()
+
+    runtime.set_beatmatch_practice_player(player)
+    _load_begin(runtime, lesson_id="L1.16", course_id="course_1_anatomy")
+
+    assert player.starts == 1
+
+
+def test_course_two_conceptual_demo_lessons_start_practice_player() -> None:
+    runtime = _runtime()
+    player = _FakePracticePlayer()
+
+    runtime.set_beatmatch_practice_player(player)
+    _load_begin(runtime, lesson_id="L2.11")
+
+    assert player.starts == 1
+
+    runtime.send("observer_complete", completed=True)
+    _load_begin(runtime, lesson_id="L2.13")
+
+    assert player.starts == 2
+
+
+def test_loop_and_hotcue_lessons_start_practice_player() -> None:
+    runtime = _runtime()
+    player = _FakePracticePlayer()
+
+    runtime.set_beatmatch_practice_player(player)
+    _load_begin(runtime, lesson_id="L2.09")
+
+    assert player.starts == 1
+
+    runtime.send("observer_complete", completed=True)
+    _load_begin(runtime, lesson_id="L2.10")
+
+    assert player.starts == 2
+
+
 def test_practice_audio_ack_applies_before_lesson_gate() -> None:
     calls: list[tuple[str | None, dict]] = []
 
