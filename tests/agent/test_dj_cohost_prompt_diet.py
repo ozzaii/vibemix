@@ -2,13 +2,13 @@
 """Plan 19-02 Task 2 — DJCoHostAgent.llm_node diet wiring.
 
 Pins:
-- Audio Part window: 6.0s only on runtime diet events, INVOKE_AUDIO_SECONDS
+- Audio Part window: 6.0s only on runtime diet events, COACH_AUDIO_SECONDS
   on musical/live-control and user-directed speech events.
 - Screen Part: SKIPPED on MIX_MOVE + HEARTBEAT (SCREEN_SKIP_EVENTS).
 - AICoach.build_prompt called with diet=True on ack events, diet=False on full.
 - recorder.log_event llm_invoke payload exposes diet bool + audio_seconds int
   for Phase 16 ear-test telemetry.
-- Pending None falls back to MANUAL (full window, diet=False).
+- Pending None falls back to MANUAL (coach window, diet=False).
 
 Reuses the test_dj_cohost.py fixture pattern (mocker, tmp_path,
 _FakeRecorder) — see tests/agent/test_dj_cohost.py for the shared shape.
@@ -23,12 +23,21 @@ from typing import Any
 from livekit.agents import Agent
 
 from vibemix.agent import DJCoHostAgent
-from vibemix.agent.dj_cohost import RUNTIME_DIET_EVENTS, SCREEN_SKIP_EVENTS
+from vibemix.agent.dj_cohost import (
+    COACH_AUDIO_SECONDS,
+    RUNTIME_DIET_EVENTS,
+    SCREEN_SKIP_EVENTS,
+)
 from vibemix.audio import INVOKE_AUDIO_SECONDS
 from vibemix.state import AICoach, Event, MusicState
 
 # 6s window from Plan 19-02 — heartbeat diet path payload.
 DIET_AUDIO_SECONDS = 6.0
+
+
+def test_coach_audio_seconds_stays_below_gemini_permission_cliff() -> None:
+    assert COACH_AUDIO_SECONDS == 48.0
+    assert COACH_AUDIO_SECONDS < INVOKE_AUDIO_SECONDS
 
 
 # ---------- helpers (mirrored from tests/agent/test_dj_cohost.py) ----------
@@ -118,22 +127,22 @@ def _drive_with_event(
 # ---------- audio window pinning ----------
 
 
-def test_phase_event_uses_full_18s_window_no_diet(mocker, tmp_path):
+def test_phase_event_uses_coach_window_no_diet(mocker, tmp_path):
     snapshot_wav_mock, _, _ = _drive_with_event(mocker, tmp_path, "PHASE")
-    assert snapshot_wav_mock.call_args.args[1] == INVOKE_AUDIO_SECONDS
+    assert snapshot_wav_mock.call_args.args[1] == COACH_AUDIO_SECONDS
     AICoach.build_prompt.assert_called_once()
     assert AICoach.build_prompt.call_args.kwargs.get("diet") is False
 
 
-def test_track_change_uses_full_18s_window_no_diet(mocker, tmp_path):
+def test_track_change_uses_coach_window_no_diet(mocker, tmp_path):
     snapshot_wav_mock, _, _ = _drive_with_event(mocker, tmp_path, "TRACK_CHANGE")
-    assert snapshot_wav_mock.call_args.args[1] == INVOKE_AUDIO_SECONDS
+    assert snapshot_wav_mock.call_args.args[1] == COACH_AUDIO_SECONDS
     assert AICoach.build_prompt.call_args.kwargs.get("diet") is False
 
 
-def test_manual_uses_full_18s_window_no_diet(mocker, tmp_path):
+def test_manual_uses_coach_window_no_diet(mocker, tmp_path):
     snapshot_wav_mock, _, _ = _drive_with_event(mocker, tmp_path, "MANUAL")
-    assert snapshot_wav_mock.call_args.args[1] == INVOKE_AUDIO_SECONDS
+    assert snapshot_wav_mock.call_args.args[1] == COACH_AUDIO_SECONDS
     assert AICoach.build_prompt.call_args.kwargs.get("diet") is False
 
 
@@ -145,27 +154,27 @@ def test_heartbeat_uses_6s_window_diet(mocker, tmp_path):
 
 def test_mix_move_uses_full_window_no_diet(mocker, tmp_path):
     snapshot_wav_mock, _, _ = _drive_with_event(mocker, tmp_path, "MIX_MOVE")
-    assert snapshot_wav_mock.call_args.args[1] == INVOKE_AUDIO_SECONDS
+    assert snapshot_wav_mock.call_args.args[1] == COACH_AUDIO_SECONDS
     assert AICoach.build_prompt.call_args.kwargs.get("diet") is False
 
 
 def test_layer_arrival_uses_full_window_no_diet(mocker, tmp_path):
     snapshot_wav_mock, _, _ = _drive_with_event(mocker, tmp_path, "LAYER_ARRIVAL")
-    assert snapshot_wav_mock.call_args.args[1] == INVOKE_AUDIO_SECONDS
+    assert snapshot_wav_mock.call_args.args[1] == COACH_AUDIO_SECONDS
     assert AICoach.build_prompt.call_args.kwargs.get("diet") is False
 
 
 def test_kaan_spoke_uses_full_window_no_diet(mocker, tmp_path):
     snapshot_wav_mock, _, _ = _drive_with_event(mocker, tmp_path, "KAAN_SPOKE")
-    assert snapshot_wav_mock.call_args.args[1] == INVOKE_AUDIO_SECONDS
+    assert snapshot_wav_mock.call_args.args[1] == COACH_AUDIO_SECONDS
     assert AICoach.build_prompt.call_args.kwargs.get("diet") is False
 
 
 def test_pending_none_falls_back_to_manual_full_window(mocker, tmp_path):
-    """When _pending_event is None, the fallback path uses MANUAL — full
-    18s window, diet=False."""
+    """When _pending_event is None, the fallback path uses MANUAL — coach
+    window, diet=False."""
     snapshot_wav_mock, _, _ = _drive_with_event(mocker, tmp_path, ev_type=None)
-    assert snapshot_wav_mock.call_args.args[1] == INVOKE_AUDIO_SECONDS
+    assert snapshot_wav_mock.call_args.args[1] == COACH_AUDIO_SECONDS
     AICoach.build_prompt.assert_called_once()
     assert AICoach.build_prompt.call_args.kwargs.get("diet") is False
     # Fallback Event was constructed with type=MANUAL.
@@ -213,14 +222,14 @@ def test_log_event_payload_mix_move_has_full_audio_window(mocker, tmp_path):
     assert len(invoke_events) == 1
     fields = invoke_events[0][1]
     assert fields["diet"] is False
-    assert fields["audio_seconds"] == INVOKE_AUDIO_SECONDS
+    assert fields["audio_seconds"] == COACH_AUDIO_SECONDS
 
 
 def test_log_event_payload_diet_false_on_phase(mocker, tmp_path):
-    """PHASE logs diet=False + the current full INVOKE_AUDIO_SECONDS window."""
+    """PHASE logs diet=False + the current coach audio window."""
     _, recorder, _ = _drive_with_event(mocker, tmp_path, "PHASE")
     invoke_events = [e for e in recorder.events if e[0] == "llm_invoke"]
     assert len(invoke_events) == 1
     fields = invoke_events[0][1]
     assert fields["diet"] is False
-    assert fields["audio_seconds"] == INVOKE_AUDIO_SECONDS
+    assert fields["audio_seconds"] == COACH_AUDIO_SECONDS

@@ -2,7 +2,7 @@
 """DJCoHostAgent — Phase 10 cascade with prompt-matrix dispatch + anti-slop.
 
 Hijacks ``llm_node`` to bypass LiveKit's text-only cascade and call
-``google.genai`` directly with the last INVOKE_AUDIO_SECONDS of audio attached
+``google.genai`` directly with the last COACH_AUDIO_SECONDS of audio attached
 as a multimodal Part. The LLM literally hears the music.
 
 PHASE 10 ADDITIONS (on top of the Phase 4 v4-port):
@@ -283,10 +283,12 @@ _PARTIAL_PACKET_FRAGMENT_PREFIX_RE = re.compile(r"^\s*(?:`|[+-]?\d+\.\d*)")
 # UI/source details.
 SCREEN_SKIP_EVENTS: frozenset[str] = frozenset({"MIX_MOVE", "HEARTBEAT"})
 
-# Runtime diet audio window. Keep the short payload only for low-value chatter;
-# user-directed speech uses the full INVOKE_AUDIO_SECONDS window so Sven hears
-# the musical before/after while the separate mic Part carries what Kaan said.
+# Runtime diet audio window. Keep the short payload only for low-value chatter.
 DIET_AUDIO_SECONDS: float = 6.0
+# Current direct Gemini credentials accept the exact live prompt/audio shape up
+# to 48s and reject the old 60s inline WAV with PERMISSION_DENIED. Keep the
+# rolling capture buffer larger, but bound the Part sent to the live brain.
+COACH_AUDIO_SECONDS: float = min(INVOKE_AUDIO_SECONDS, 48.0)
 RUNTIME_DIET_EVENTS: frozenset[str] = frozenset({"HEARTBEAT"})
 DECK_AUDIO_PART_SECONDS_DEFAULT: float = 3.0
 DECK_AUDIO_PART_MIN_RMS: float = 0.003
@@ -872,7 +874,7 @@ def _build_attached_audio_context_clause(
             force=True,
         ),
         render_set_window_context(state, audio_seconds=audio_seconds)
-        if audio_seconds >= INVOKE_AUDIO_SECONDS
+        if audio_seconds >= COACH_AUDIO_SECONDS
         else None,
         _render_audio_window_map_line(
             render_audio_window_map(
@@ -2599,7 +2601,7 @@ class DJCoHostAgent(Agent):
             # context instead of reacting to an underfed instant.
             ev_type_for_diet = ev.type if ev is not None else "MANUAL"
             diet = ev_type_for_diet in RUNTIME_DIET_EVENTS
-            audio_seconds = DIET_AUDIO_SECONDS if diet else INVOKE_AUDIO_SECONDS
+            audio_seconds = DIET_AUDIO_SECONDS if diet else COACH_AUDIO_SECONDS
             skip_screen = ev_type_for_diet in SCREEN_SKIP_EVENTS
             ev_extra = ev.extra if ev is not None and isinstance(ev.extra, dict) else {}
             guard_option_scaffold = _should_guard_option_scaffold(ev_type_for_diet, ev_extra)
