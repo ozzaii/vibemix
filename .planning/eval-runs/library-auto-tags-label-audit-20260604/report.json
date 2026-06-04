@@ -5,8 +5,8 @@
   "enough_complete_eval_rows": false,
   "evaluation_complete_rows": 0,
   "evaluation_rows": 0,
-  "generated_at": "2026-06-04T11:13:28+00:00",
-  "git_head": "4f43e7aa12fc06f7d75f42eb3de65bbf729e9076",
+  "generated_at": "2026-06-04T11:19:41+00:00",
+  "git_head": "7cdc4b7a442cac5468b4e1eb9856f10f4467e595",
   "known_tags": {
     "instrument": [
       "acid_synth",
@@ -51,7 +51,7 @@
     },
     "track_id": "folder:example"
   },
-  "label_status": "missing",
+  "label_status": "empty",
   "min_required_rows": 50,
   "missing_category_counts": {
     "instrument": 0,
@@ -60,7 +60,7 @@
   },
   "next_action": "complete eval/private/library/auto_tag_labels.jsonl rows for mood, texture, and instrument",
   "path": "/Users/ozai/projects/dj-set-ai/eval/private/library/auto_tag_labels.jsonl",
-  "pending_rows": 0,
+  "pending_rows": 64,
   "required_categories": [
     "mood",
     "texture",
