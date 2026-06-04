@@ -1118,6 +1118,17 @@ def test_matched_cue_action_records_and_grades_immediately(monkeypatch) -> None:
         evidence_clock=lambda: 73.5,
         cue_placement_practice_loader=load_snapshot,
         cue_placement_practice_action_recorder=record_action,
+        playhead_payload_loader=lambda: {
+            "sample_rate": _SR,
+            "decks": {
+                "A": {"frame": 0.0, "position_s": 0.0, "bpm": 128.0},
+                "B": {
+                    "frame": target,
+                    "position_s": target / _SR,
+                    "bpm": 128.0,
+                },
+            },
+        },
         session_event_logger=lambda kind, fields: events.append((kind, dict(fields))),
     )
 
@@ -1147,7 +1158,8 @@ def test_matched_cue_action_records_and_grades_immediately(monkeypatch) -> None:
     assert lesson_id == "L2.10"
     for key, value in midi.items():
         assert recorded_midi[key] == value
-    assert recorded_midi["action_elapsed_s"] >= 0.0
+    assert recorded_midi["cue_frame"] == target
+    assert "action_elapsed_s" not in recorded_midi
     assert registry.has("ev", "CUE_PLACEMENT_GRADED", 73.5, tol=1.0)
     assert progress.skills["phrasing_performance"]["live_proof_count"] == 1
     assert progress in saved

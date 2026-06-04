@@ -79,10 +79,6 @@ class CuePlacementPracticeDriver:
             if cue_offset is not None:
                 cue_frame = self._target_frame + cue_offset * self._grid.beat_len_frames
         if cue_frame is None:
-            elapsed_s = _float_field(midi, "action_elapsed_s", "elapsed_s", "press_elapsed_s")
-            if elapsed_s is not None:
-                cue_frame = max(0.0, elapsed_s) * _SAMPLE_RATE
-        if cue_frame is None:
             self._cue_frame = None
             return False
         self._cue_frame = cue_frame

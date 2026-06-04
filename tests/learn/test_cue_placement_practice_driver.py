@@ -5,7 +5,7 @@ from __future__ import annotations
 from vibemix.learn.cue_placement_practice_driver import CuePlacementPracticeDriver
 from vibemix.learn.cue_practice import grade_owned_cue_placement_state
 
-_TARGET_ELAPSED_S = 16.0 * 60.0 / 128.0
+_TARGET_FRAME = 16.0 * 44_100.0 * 60.0 / 128.0
 
 
 def test_driver_is_honest_null_until_authored_hotcue_action() -> None:
@@ -35,7 +35,7 @@ def test_driver_arms_l2_hotcue_b_as_drop_locked_practice() -> None:
             "control": "hotcue",
             "deck": "B",
             "direction": "down",
-            "action_elapsed_s": _TARGET_ELAPSED_S,
+            "cue_frame": _TARGET_FRAME,
         },
     ) is True
 
@@ -53,7 +53,6 @@ def test_driver_arms_l2_hotcue_b_as_drop_locked_practice() -> None:
 
 def test_driver_prefers_cue_frame_over_wall_clock_elapsed() -> None:
     driver = CuePlacementPracticeDriver()
-    target_frame = _TARGET_ELAPSED_S * 44_100
 
     assert driver.record_action(
         "L2.10",
@@ -62,7 +61,7 @@ def test_driver_prefers_cue_frame_over_wall_clock_elapsed() -> None:
             "control": "hotcue",
             "deck": "B",
             "direction": "down",
-            "cue_frame": target_frame,
+            "cue_frame": _TARGET_FRAME,
             "action_elapsed_s": 999.0,
         },
     ) is True
@@ -103,6 +102,23 @@ def test_driver_grades_real_late_press_as_wrong_drop() -> None:
     assert grade.verdict == "wrong_drop"
     assert grade.beat_aligned is True
     assert grade.target_aligned is False
+
+
+def test_driver_rejects_wall_clock_elapsed_without_playhead_frame() -> None:
+    driver = CuePlacementPracticeDriver()
+
+    assert driver.record_action(
+        "L2.10",
+        {
+            "type": "button",
+            "control": "hotcue",
+            "deck": "B",
+            "direction": "down",
+            "action_elapsed_s": 16.0 * 60.0 / 128.0,
+        },
+    ) is False
+
+    assert driver.snapshot() is None
 
 
 def test_driver_ignores_wrong_deck_and_preserves_honest_null() -> None:

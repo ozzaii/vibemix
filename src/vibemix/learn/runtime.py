@@ -1549,8 +1549,6 @@ class LessonRuntime(StateMachine):
         cue_frame = self._cue_placement_playhead_frame()
         if cue_frame is not None:
             timed_midi.setdefault("cue_frame", cue_frame)
-        else:
-            timed_midi.setdefault("action_elapsed_s", self._lesson_elapsed_s())
         try:
             should_grade = self._cue_placement_practice_action_recorder(
                 self._learn.current_lesson_id,
@@ -2183,10 +2181,6 @@ class LessonRuntime(StateMachine):
                     f"[learn.runtime] evidence clock failed: {exc!r}",
                     file=sys.stderr,
                 )
-        return max(0.0, time.monotonic() - self._learn.lesson_started_at)
-
-    def _lesson_elapsed_s(self) -> float:
-        """Return wall-clock lesson elapsed time for owned practice timing."""
         return max(0.0, time.monotonic() - self._learn.lesson_started_at)
 
     def _record_evidence(
