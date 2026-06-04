@@ -141,3 +141,32 @@ def test_sync_practice_snaps_owned_deck_to_locked_state() -> None:
     assert grade.verdict == "locked"
     assert grade.tempo_matched is True
     assert grade.phase_locked is True
+
+
+def test_recovery_drills_arm_real_owned_deck_misses() -> None:
+    driver = BeatmatchPracticeDriver()
+
+    assert (
+        driver.record_action(
+            "L3.05",
+            {"control": "recovery_drill", "deck": "B", "drill": "key_clash"},
+        )
+        is True
+    )
+    key_clash = _grade(driver)
+
+    assert key_clash.verdict == "tempo_off"
+    assert key_clash.tempo_matched is False
+
+    assert (
+        driver.record_action(
+            "L3.05",
+            {"control": "recovery_drill", "deck": "B", "drill": "misaligned_phrase"},
+        )
+        is True
+    )
+    phrase_miss = _grade(driver)
+
+    assert phrase_miss.verdict == "trainwreck"
+    assert phrase_miss.tempo_matched is True
+    assert phrase_miss.phase_locked is False

@@ -29,6 +29,7 @@ _CENTER_CC = 64.0
 _TEMPO_CC_RATE_SPAN = 640.0
 _PRACTICE_LESSONS = frozenset({"L2.01", "L2.02"})
 _EQ_PRACTICE_LESSONS = frozenset({"L2.04", "L2.05"})
+_RECOVERY_DRILL_LESSONS = frozenset({"L3.05"})
 _MIXER_CONTROLS = frozenset({"eq_hi", "eq_mid", "eq_low", "filter", "vol"})
 _ASSET_PACKAGE = "vibemix.learn.assets.band_exemplars"
 _DEMO_LOOP_BEATS = 64
@@ -64,6 +65,10 @@ def _tempo_rate_from_cc(value: Any) -> float:
         cc = _CENTER_CC
     cc = min(127.0, max(0.0, cc))
     return 1.0 + (cc - _CENTER_CC) / _TEMPO_CC_RATE_SPAN
+
+
+def _beat_frames() -> int:
+    return round(_SAMPLE_RATE * 60.0 / _PRACTICE_BPM)
 
 
 def _practice_loop(*, bass_hz: float, hat_hz: float = 6_500.0) -> np.ndarray:
@@ -285,6 +290,10 @@ class BeatmatchPracticeDriver:
                 )
             return False
 
+        if lesson_id in _RECOVERY_DRILL_LESSONS and control == "recovery_drill":
+            self._arm_recovery_drill(midi)
+            return True
+
         if lesson_id not in _PRACTICE_LESSONS:
             self._armed = False
             return False
@@ -304,6 +313,18 @@ class BeatmatchPracticeDriver:
             self._armed = True
             return True
         return False
+
+    def _arm_recovery_drill(self, midi: dict[str, Any]) -> None:
+        """Introduce one authored L3.05 train-wreck state on the owned deck."""
+
+        deck = _deck_from_midi(midi).upper() or "B"
+        drill = str(midi.get("drill", "") or "").strip()
+        self._deck.set_rates(rate_a=1.0, rate_b=1.0, smooth=False)
+        if drill == "key_clash":
+            self._deck.set_rates(rate_a=1.0, rate_b=1.08, smooth=False)
+        else:
+            self._deck.offset_playhead(deck, _beat_frames() * 0.25)
+        self._armed = True
 
     def snapshot(self) -> BeatmatchPracticeSnapshot | None:
         """Return the latest owned practice state, if a practice action armed it."""

@@ -166,6 +166,16 @@ def test_loop_and_hotcue_lessons_start_practice_player() -> None:
     assert player.starts == 2
 
 
+def test_recovery_drill_lesson_starts_practice_player_from_drill_shapes() -> None:
+    runtime = _runtime()
+    player = _FakePracticePlayer()
+
+    runtime.set_beatmatch_practice_player(player)
+    _load_begin(runtime, lesson_id="L3.05", course_id="course_3_play_mode")
+
+    assert player.starts == 1
+
+
 def test_practice_audio_ack_applies_before_lesson_gate() -> None:
     calls: list[tuple[str | None, dict]] = []
 

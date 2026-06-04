@@ -628,6 +628,7 @@ class LessonRuntime(StateMachine):
         self._beatmatch_practice_player: Any | None = None
         self._beatmatch_practice_player_active = False
         self._waveform_ready_lesson_id: str | None = None
+        self._recovery_drill_armed_step_key: tuple[str, int] | None = None
         self._cue_placement_practice_lock_active = False
         super().__init__()
 
@@ -765,6 +766,8 @@ class LessonRuntime(StateMachine):
             flow = None
         actions: list[dict[str, Any]] = []
         if flow is not None:
+            if flow.drill_shapes:
+                return True
             actions.extend(step.expected_action for step in flow.steps)
             actions.append(flow.primary_expected_action)
         elif lesson_id in CURRICULUM:
@@ -924,6 +927,7 @@ class LessonRuntime(StateMachine):
         self._emit_advance(reason="action_matched")
         self._emit_highlight(next_step.expected_action)
         self._emit_step_tutor(next_step)
+        self._arm_recovery_drill_if_needed()
         return True
 
     def handle_beatmatch_practice_ack(self, midi: dict[str, Any]) -> bool:
@@ -1213,6 +1217,57 @@ class LessonRuntime(StateMachine):
             )
             return None
 
+    def _arm_recovery_drill_if_needed(self) -> None:
+        """Arm the authored Course 3 recovery drill for the active step."""
+
+        flow = self._active_flow
+        lesson_id = self._learn.current_lesson_id
+        if (
+            flow is None
+            or lesson_id is None
+            or self._beatmatch_practice_action_recorder is None
+            or not flow.drill_shapes
+        ):
+            return
+        step_index = self._active_step_index
+        if step_index >= len(flow.drill_shapes):
+            return
+        key = (lesson_id, step_index)
+        if key == self._recovery_drill_armed_step_key:
+            return
+        drill = flow.drill_shapes[step_index]
+        midi = {
+            "type": "recovery_drill",
+            "control": "recovery_drill",
+            "deck": drill.deck or "B",
+            "drill": drill.drill,
+            "shape": drill.shape,
+            "source": "learn_runtime",
+        }
+        try:
+            should_grade = self._beatmatch_practice_action_recorder(lesson_id, midi)
+        except Exception as exc:  # pragma: no cover - defensive
+            import sys
+
+            print(
+                f"[learn.runtime] recovery drill arm failed: {exc!r}",
+                file=sys.stderr,
+            )
+            return
+        self._recovery_drill_armed_step_key = key
+        self._log_session_event(
+            "learn_recovery_drill_armed",
+            lesson_id=lesson_id,
+            course_id=self._learn.current_course_id or "",
+            step_id=self._current_step_id(),
+            drill=drill.drill,
+            deck=drill.deck or "B",
+            shape=drill.shape,
+        )
+        if should_grade:
+            self._beatmatch_practice_lock_active = False
+            self._emit_live_beatmatch_grade(self._grade_beatmatch_practice_tick())
+
     def _record_cue_placement_practice_action(self, midi: dict[str, Any]) -> None:
         """Arm and grade an owned-deck cue placement practice attempt, if wired."""
 
@@ -1324,6 +1379,7 @@ class LessonRuntime(StateMachine):
         self._state_entered_at = self._learn.lesson_started_at
         self._active_flow = None
         self._active_step_index = 0
+        self._recovery_drill_armed_step_key = None
 
         # WR-02 fix (P92 REVIEW): defend against an invalid lesson_id
         # reaching the CURRICULUM lookup. The boundary (ipc_handlers.py)
@@ -1436,6 +1492,7 @@ class LessonRuntime(StateMachine):
 
         self._emit_opening_tutor_beats(expected)
         self._start_beatmatch_practice_player()
+        self._arm_recovery_drill_if_needed()
         # Reset the strike timer's state-entry anchor.
         self._state_entered_at = time.monotonic()
 
@@ -1981,7 +2038,7 @@ class LessonRuntime(StateMachine):
             "tempo_off": "tempos are off — ease the pitch back.",
             "trainwreck": "that's drifted off — pull it back and re-find the 1.",
         }
-        text = text_by_verdict.get(verdict)
+        text = self._recovery_drill_grade_text(verdict) or text_by_verdict.get(verdict)
         if text is None:
             return
 
@@ -2032,6 +2089,29 @@ class LessonRuntime(StateMachine):
                 f"[learn.runtime] beatmatch live grade emit failed: {exc!r}",
                 file=sys.stderr,
             )
+
+    def _recovery_drill_grade_text(self, verdict: str) -> str | None:
+        """Return drill-specific feedback for authored recovery misses."""
+
+        flow = self._active_flow
+        if flow is None or not flow.drill_shapes:
+            return None
+        step_index = self._active_step_index
+        if step_index >= len(flow.drill_shapes):
+            return None
+        key = (self._learn.current_lesson_id or "", step_index)
+        if key != self._recovery_drill_armed_step_key:
+            return None
+        drill = flow.drill_shapes[step_index].drill
+        if drill == "key_clash" and verdict == "tempo_off":
+            return (
+                "I pitched deck B up into the clash - hear that pull, then bail out clean."
+            )
+        if drill == "misaligned_phrase" and verdict == "trainwreck":
+            return (
+                "Deck B is a quarter-beat off - the kicks are fighting, so cut or filter out."
+            )
+        return None
 
     def _emit_live_beatmatch_grade_tick(self) -> None:
         """Emit the Learn-owned beatmatch HUD tick only while the lesson is active."""

@@ -7,6 +7,7 @@ from unittest.mock import MagicMock
 from vibemix.audio.grid import BeatGrid
 from vibemix.audio.miniplayer import DeckState
 from vibemix.coach.citation_linter import CitationLinter
+from vibemix.learn.beatmatch_practice_driver import BeatmatchPracticeDriver
 from vibemix.learn.cue_placement_practice_driver import CuePlacementPracticeDriver
 from vibemix.learn.progress import LearnProgress
 from vibemix.learn.runtime import (
@@ -493,6 +494,59 @@ def test_live_beatmatch_grade_cites_locked_event_before_mastery_credit() -> None
     assert live_grade["citation"] == "[ev:BEATMATCH_GRADED@43.200]"
     assert registry.has("ev", "BEATMATCH_GRADED", 43.2, tol=1.0)
     assert progress.skills.get("beatmatching", {}).get("live_proof_count", 0) == 0
+
+
+def test_recovery_drill_lesson_arms_each_authored_owned_deck_miss() -> None:
+    """L3.05 is not just metadata: each authored drill changes the owned deck."""
+    driver = BeatmatchPracticeDriver()
+    registry = EvidenceRegistry()
+    events: list[tuple[str, dict]] = []
+    runtime = LessonRuntime(
+        learn_state=LearnState(),
+        midi_mirror=MagicMock(name="midi_mirror"),
+        controller_state=MagicMock(name="controller_state"),
+        ipc_router=MagicMock(name="ipc_router"),
+        progress_store=LearnProgress(),
+        evidence_registry=registry,
+        evidence_clock=lambda: 71.0,
+        beatmatch_practice_loader=driver.snapshot,
+        beatmatch_practice_action_recorder=driver.record_action,
+        session_event_logger=lambda kind, fields: events.append((kind, dict(fields))),
+    )
+
+    runtime.send(
+        "load",
+        lesson_id="L3.05",
+        course_id="course_3_play_mode",
+        controller_id="pioneer_ddj_flx4",
+    )
+    runtime.send("begin")
+
+    live_grades = _live_grade_payloads(runtime._ipc)
+    assert live_grades[-1]["verdict"] == "tempo_off"
+    assert _tutor_speak_payloads(runtime._ipc)[-1]["text"] == (
+        "I pitched deck B up into the clash - hear that pull, then bail out clean."
+    )
+    drill_events = [
+        fields for kind, fields in events if kind == "learn_recovery_drill_armed"
+    ]
+    assert drill_events[-1]["drill"] == "key_clash"
+
+    handled = runtime.handle_step_ack(
+        {"type": "button", "control": "lesson_continue", "direction": "down"}
+    )
+
+    assert handled is True
+    live_grades = _live_grade_payloads(runtime._ipc)
+    assert live_grades[-1]["verdict"] == "trainwreck"
+    assert _tutor_speak_payloads(runtime._ipc)[-1]["text"] == (
+        "Deck B is a quarter-beat off - the kicks are fighting, so cut or filter out."
+    )
+    drill_events = [
+        fields for kind, fields in events if kind == "learn_recovery_drill_armed"
+    ]
+    assert drill_events[-1]["drill"] == "misaligned_phrase"
+    assert runtime.current_state.id == "awaiting_action"
 
 
 def test_live_beatmatch_grade_voices_drift_without_fabricated_citation() -> None:

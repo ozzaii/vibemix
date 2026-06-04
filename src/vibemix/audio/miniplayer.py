@@ -301,6 +301,14 @@ class MiniDeck:
         else:
             self._filter_b_active = active
 
+    def offset_playhead(self, deck: str, frames: float) -> None:
+        """Move one owned deck's read cursor by a signed frame offset."""
+
+        if deck.upper() == "A":
+            self._frame_a += float(frames)
+        else:
+            self._frame_b += float(frames)
+
     def state(self) -> DeckState:
         """Snapshot the two decks for the asyncio loop / Judge to read."""
         return DeckState(
