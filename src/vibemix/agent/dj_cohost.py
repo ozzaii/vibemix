@@ -90,6 +90,7 @@ from vibemix.runtime.ttft import TTFTMeter
 from vibemix.state import AICoach, Event, EvidenceRegistry, MusicState, parse_citations
 from vibemix.state.deck_context import (
     GEMINI_AUDIO_TOKENS_PER_SECOND,
+    LiveClaimGuardResult,
     apply_live_claim_guard,
     has_unsupported_audio_source_detail_claim,
     has_unsupported_audio_source_detail_mention,
@@ -145,6 +146,32 @@ _CUE_RECEIPT_FALLBACK_RE = re.compile(
     r"Copy\s+this\s+citation\s+exactly:\s*(?P<cite>\[cue:[^\]]+\])",
     re.IGNORECASE | re.DOTALL,
 )
+_BAND_INTENSITY_ALIAS_RE: dict[str, re.Pattern[str]] = {
+    "sub": re.compile(r"\b(?:sub(?:\s*bass)?|sub-bass)\b", re.IGNORECASE),
+    "low": re.compile(r"\b(?:low\s+end|lows?|bass)\b", re.IGNORECASE),
+    "mid": re.compile(r"\b(?:mid\s*range|mids?)\b", re.IGNORECASE),
+    "high": re.compile(r"\b(?:high\s+end|top\s+end|highs?|treble)\b", re.IGNORECASE),
+}
+_BAND_ABUNDANCE_RE = re.compile(
+    r"\b(?:"
+    r"getting\s+busy|busy|heavy|huge|big|full|loud|dominant|dominates?|dominating|"
+    r"flood(?:ed|ing)?|stack(?:ed|ing)?|thick|dense|bright|sharp|harsh|piercing|hot|"
+    r"prominent|crowded"
+    r")\b",
+    re.IGNORECASE,
+)
+_BAND_ABUNDANCE_FLOOR: dict[str, float] = {
+    "sub": 0.18,
+    "low": 0.18,
+    "mid": 0.18,
+    "high": 0.12,
+}
+_BAND_INTENSITY_EVENT_SUPPORT: dict[str, frozenset[str]] = {
+    "sub": frozenset({"SUB_LAYER_ARRIVAL", "REENTRY_KICK_LAND", "KICK_SWAP"}),
+    "low": frozenset({"BAND_SHIFT_LOW", "SUB_LAYER_ARRIVAL"}),
+    "mid": frozenset({"LAYER_ARRIVAL", "BAND_SHIFT_MID"}),
+    "high": frozenset({"LAYER_ARRIVAL", "BAND_SHIFT_HIGH"}),
+}
 _OPTION_SCAFFOLD_PREFIX_RE = re.compile(
     r"^\s*(?:[-*]\s*)?(?:option(?:\s+[ab])?\b|[ab][).:])",
     re.IGNORECASE,
@@ -273,6 +300,55 @@ def _grounded_receipt_fallback_line(ev_extra: dict[str, Any]) -> str | None:
         timing = timing[: -len(" ahead")]
         return f"Hold this for {timing}; make the move on the next phrase. {cite}"
     return f"Hold this to the next phrase boundary; make the move on the phrase. {cite}"
+
+
+def _unsupported_band_intensity_reason(
+    text: str,
+    state: MusicState,
+    moves: list[str] | tuple[str, ...],
+    *,
+    event_type: str | None,
+) -> str | None:
+    """Return a reason when move-less abundance talk contradicts live bands."""
+
+    raw = str(text or "").strip()
+    if not raw or moves or not _BAND_ABUNDANCE_RE.search(raw):
+        return None
+    bands = getattr(state, "bands", {})
+    if not isinstance(bands, dict):
+        bands = {}
+    event = str(event_type or "").strip().upper()
+    for band, alias_re in _BAND_INTENSITY_ALIAS_RE.items():
+        if not alias_re.search(raw):
+            continue
+        if event in _BAND_INTENSITY_EVENT_SUPPORT.get(band, frozenset()):
+            continue
+        try:
+            value = float(bands.get(band, 0.0))
+        except (TypeError, ValueError):
+            value = 0.0
+        if value != value:
+            value = 0.0
+        if value < _BAND_ABUNDANCE_FLOOR[band]:
+            return f"{band}_band_below_claim_floor"
+    return None
+
+
+def _band_intensity_guard_summary(state: MusicState, *, event_type: str | None) -> str:
+    bands = getattr(state, "bands", {})
+    if not isinstance(bands, dict):
+        bands = {}
+    values: list[str] = []
+    for band in ("sub", "low", "mid", "high"):
+        try:
+            value = float(bands.get(band, 0.0))
+        except (TypeError, ValueError):
+            value = 0.0
+        if value != value:
+            value = 0.0
+        values.append(f"{band}={value:.2f}")
+    event = str(event_type or "").strip().upper() or "UNKNOWN"
+    return f"event={event}; bands={','.join(values)}"
 
 
 def _starts_option_scaffold(text: str) -> bool:
@@ -3085,6 +3161,15 @@ class DJCoHostAgent(Agent):
                     advice_risky = not live_claim_moves and has_unsupported_no_move_coaching_advice(
                         full_text
                     )
+                    band_intensity_risky = (
+                        _unsupported_band_intensity_reason(
+                            full_text,
+                            live_claim_state,
+                            live_claim_moves,
+                            event_type=ev_tag,
+                        )
+                        is not None
+                    )
                     claim_guard_risky = should_defer_live_claim_text(
                         full_text,
                         live_claim_state,
@@ -3095,7 +3180,12 @@ class DJCoHostAgent(Agent):
                         judge_evidence_line=judge_evidence_line,
                         event_type=ev_tag,
                     )
-                    if source_detail_risky or advice_risky or claim_guard_risky:
+                    if (
+                        source_detail_risky
+                        or advice_risky
+                        or band_intensity_risky
+                        or claim_guard_risky
+                    ):
                         live_claim_defer_stream = True
                     spoken_so_far, _ = strip_emote_tags(full_text, normalize=False)
                     language_matches = english_only_violation_matches(spoken_so_far)
@@ -3412,6 +3502,23 @@ class DJCoHostAgent(Agent):
                         judge_evidence_line=judge_evidence_line,
                         event_type=ev_tag,
                     )
+                    band_intensity_reason = _unsupported_band_intensity_reason(
+                        live_claim_guard.text if live_claim_guard.corrected else full_text,
+                        live_claim_state,
+                        live_claim_moves,
+                        event_type=ev_tag,
+                    )
+                    if band_intensity_reason is not None:
+                        live_claim_guard = LiveClaimGuardResult(
+                            text="",
+                            corrected=True,
+                            policy="band_intensity_not_grounded",
+                            reason=band_intensity_reason,
+                            summary=_band_intensity_guard_summary(
+                                live_claim_state,
+                                event_type=ev_tag,
+                            ),
+                        )
                 except Exception as _e:
                     live_claim_guard = None
                     print(f"[live-claim guard err] {_e}", file=sys.stderr)

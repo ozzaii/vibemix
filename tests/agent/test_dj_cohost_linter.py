@@ -702,6 +702,79 @@ def test_live_claim_guard_allows_broad_audio_listener_read_before_tts(mocker, tm
     playback.push.assert_not_called()
 
 
+def test_live_claim_guard_strips_unsupported_high_band_abundance(mocker, tmp_path) -> None:
+    """Move-less abundance claims must agree with the measured band shares."""
+    registry = EvidenceRegistry()
+    agent, gen, recorder, state, _, tracker, playback = _build_agent_wired(
+        mocker, tmp_path, registry
+    )
+    state.audible = True
+    state.audible_deck = "A"
+    state.bands = {"sub": 0.70, "low": 0.19, "mid": 0.10, "high": 0.01}
+    state.deck_state = DeckState(decks={"A": _deck("OutA", camelot="8A")})
+    mocker.patch("vibemix.agent.dj_cohost.snapshot_wav", return_value=b"FAKEWAV")
+    mocker.patch.object(AICoach, "build_prompt", return_value="EVIDENCE: x")
+    gen.aio.models.generate_content_stream = mocker.AsyncMock(
+        return_value=_async_iter(
+            [
+                (
+                    "That high end is getting busy with that loop; "
+                    "let it roll before you stack anything else."
+                )
+            ]
+        )
+    )
+
+    agent.set_next_event(Event(type="MANUAL", state=state, extra={}))
+    chunks = _drive(agent)
+
+    assert chunks == []
+    kinds = [kind for kind, _ in recorder.events]
+    assert "ai_text" not in kinds
+    guard_log = next(fields for kind, fields in recorder.events if kind == "live_claim_guard")
+    assert guard_log["action"] == "strip"
+    assert guard_log["policy"] == "band_intensity_not_grounded"
+    assert guard_log["reason"] == "high_band_below_claim_floor"
+    assert "high end is getting busy" in guard_log["raw_text"]
+    assert guard_log["corrected_text"] == ""
+    assert "high=0.01" in guard_log["summary"]
+    assert tracker.rate() == 1.0
+    playback.push.assert_not_called()
+
+
+def test_live_claim_guard_allows_supported_high_band_abundance(mocker, tmp_path) -> None:
+    """A cited abundance read is allowed when the current band clears the floor."""
+    registry = EvidenceRegistry()
+    registry.write("ev", "BAND_SHIFT_HIGH", 12.3)
+    agent, gen, recorder, state, _, tracker, playback = _build_agent_wired(
+        mocker, tmp_path, registry
+    )
+    state.audible = True
+    state.audible_deck = "A"
+    state.bands = {"sub": 0.20, "low": 0.22, "mid": 0.28, "high": 0.24}
+    state.deck_state = DeckState(decks={"A": _deck("OutA", camelot="8A")})
+    mocker.patch("vibemix.agent.dj_cohost.snapshot_wav", return_value=b"FAKEWAV")
+    mocker.patch.object(AICoach, "build_prompt", return_value="EVIDENCE: x")
+    gen.aio.models.generate_content_stream = mocker.AsyncMock(
+        return_value=_async_iter(
+            ["The high end is getting busy [ev:BAND_SHIFT_HIGH@12.3]."]
+        )
+    )
+
+    agent.set_next_event(Event(type="TRACK_CHANGE", state=state, extra={}))
+    chunks = _drive(agent)
+
+    assert "".join(chunks).strip() == "The high end is getting busy."
+    kinds = [kind for kind, _ in recorder.events]
+    assert "live_claim_guard" not in kinds
+    assert "citation_strip" not in kinds
+    assert next(f for kind, f in recorder.events if kind == "ai_text")["text"].strip() == (
+        "The high end is getting busy."
+    )
+    assert tracker.rate() == 0.0
+    playback.push.assert_not_called()
+
+
 def test_live_claim_guard_defers_hidden_source_detail_without_move(mocker, tmp_path) -> None:
     """Unsupported source detail should not leak as a speculative head."""
     registry = EvidenceRegistry()
