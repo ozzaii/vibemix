@@ -37,7 +37,7 @@ The builders wire from the exit-maps, prove by-ear/by-eye in the real app (test-
 
 W1 + W2 landed (`FRONTEND-WIRING-EXIT-MAP.md`, `BACKEND-WIRING-EXIT-MAP.md`). The voice root-cause confirmed: engine is env-only and the GUI strips env, so MOSS always wins; fix = `config_store.tts_engine` + `os.environ.setdefault` at `__main__.py:1420` (no `tts_chain.py` edit). Three product calls answered before W3:
 
-1. **Live voice default = Chatterbox-Turbo** (ear-locked). MOSS = never-mute floor when Chatterbox deps/model absent. Packaging bundles mlx-audio + the Chatterbox model/ref + clears licensing; if any cannot ship, MOSS floors automatically.
+1. **MOSS NUKED — finetuned Chatterbox-Turbo cohost is the ONLY voice** (Kaan, "moss nuke sadece cohost finetuned"). Remove MOSS as engine/default/floor across the tree; the live agent renders only the finetuned Chatterbox model (finetuned weights + ref + mlx-audio bundled, licensing cleared). **Platform consequence (Kaan-accepted, macOS-first):** mlx-audio is Apple-only, so Windows + Intel Macs have NO cohost voice once MOSS is gone — they ship voiceless / text-transcript-only as a tracked follow-up (a portable finetuned voice later), NOT a MOSS floor. macOS Apple-Silicon ships with voice now. No MOSS, no cloud TTS, ever, as a fallback.
 2. **Brain access default = hosted Bravoh proxy** (fresh user pastes nothing). Needs live proxy credits + per-client rate limit (external/Kaan dependency). In-GUI key field = advanced BYO-key. Wizard takes the proxy-default shape.
 3. **Streak voice = full Daft Punk Technologic in v1** — but re-bind the streak to a cited EXECUTED transition first (kill the self-applauding suggestion-grade count) so it is grounded before it speaks.
 
