@@ -18,7 +18,10 @@ The #1 ship-blocker = the FRESH-USER CRASH (wizard done -> session boots mode=di
 
 phase('Map')
 
-const maps = await parallel([
+// Two sequential waves of 7 to stay under the server-side burst limit
+// (a single 14-agent fan-out reliably trips it; 11-13 has cleared). Each
+// wave is a barrier; full 14-map coverage preserved.
+const waveA = await parallel([
   () => agent(`MAP 1 — the BRAIN: state/ + agent/. ${CTX}
 Map MusicState (single-writer), refresh.py, event_detector.py (the EventType taxonomy + cooldowns), coach.py / prompt_builder.py (event->prompt cells), evidence_registry.py (citation grounding Inv #2), agent/dj_cohost.py (the live Gemini reaction path + scaffold/linter repair), the in-flight gate. For each: what it does, the data flow, what is REAL vs DARK/orphaned. Output "## MAP1 brain" with file:line anchors + a wired/dark verdict per component.`, { label: 'map:brain', phase: 'Map' }),
   () => agent(`MAP 2 — intel/ (the musical-intelligence primitives, ~16 modules). ${CTX}
@@ -33,6 +36,9 @@ Map ws_bus + session_loop + suggestion service + soak/ttft, audio capture/playba
 Map the DesktopShell, session deck/hero/citation receipt, settings drawer (the shipped BRAIN group key-field + voice picker, 8c6a7b6e), the pill (reasons/cue-confidence/streak), the organism (particle visual), cue-tray (built?), learn surfaces, debrief, wizard, the IPC client + ws bus consumption. Per surface: live data or static/dark? Output "## MAP6 frontend" per-surface wired/dark + file:line.`, { label: 'map:frontend', phase: 'Map' }),
   () => agent(`MAP 7 — WIRED-vs-DARK census (whole tree). ${CTX}
 Use codegraph to enumerate substantial 0-caller functions + computed-but-never-surfaced ws/IPC fields across src/vibemix/** and tauri/ui/src. Distinguish "dark gold" (real value, no live surface) from "dead/legacy". This is the master dark-list. Output "## MAP7 dark-census" a ranked table: symbol | file:line | computed-what | dies-where | shippable-value y/n.`, { label: 'map:dark', phase: 'Map' }),
+])
+
+const waveB = await parallel([
   () => agent(`MAP 8 — the VOICE path end-to-end (vs the MOSS-nuke decision). ${CTX}
 Map the current truth: agent/tts_chain.py engine select (default + env), agent/chatterbox_tts.py (mlx-audio, ref resolver, temp), agent/local_tts.py (MOSS — to be nuked), runtime/config_store.py (is there a tts_engine field yet?), __main__.py:1607/1621 call-sites + :1420 env-seed point, voice_presets, _router_config voice ids, every MOSS reference across the tree. What is wired NOW vs what the decision requires (config-reachable engine, Chatterbox default, MOSS gone, bundled ref). Output "## MAP8 voice" current-vs-required + the exact remaining wires.`, { label: 'map:voice', phase: 'Map' }),
   () => agent(`MAP 9 — DEMOCRATIZATION / proxy client path. ${CTX}
@@ -49,6 +55,7 @@ Read every .planning/packets/2026-06-04/*.md (the exit-maps, WIRE-DRIVE, SHIP-WI
 Step back: given everything, what is the SHORTEST honest path to a shippable v1 (a fresh stranger installs, reaches the funded brain, hears a grounded Chatterbox line, no crash)? Sequence the blockers (fresh-user crash -> voice -> start-gate -> packaging -> keystone capture), name collisions (main()/config_store single-owner), name what is Kaan-only (DMG sign/notarize, by-ear, credit already funded). What is the SINGLE next move. Be the completeness critic: what would we regret NOT mapping? Output "## MAP14 critical-path" the ordered ship path + collisions + the single next move + map-gaps.`, { label: 'map:critic', phase: 'Map' }),
 ])
 
+const maps = [...waveA, ...waveB]
 const M = maps.map((x, i) => x || `(map agent ${i + 1} failed)`).join('\n\n')
 
 phase('Synthesis')
