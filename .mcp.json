@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "vibemix-dev": {
+      "type": "stdio",
+      "command": "uv",
+      "args": ["run", "python", "-m", "vibemix.runtime.dev_mcp_server", "--repo-root", "."]
+    }
+  }
+}
