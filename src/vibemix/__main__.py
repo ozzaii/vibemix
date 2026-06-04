@@ -3665,6 +3665,7 @@ def _build_library_subparsers(parser: argparse.ArgumentParser) -> None:
         action="store_true",
         help="grant Serato/Mixxx Markers2 tag writes into audio files for tag targets",
     )
+    sp_build_set.add_argument("--out", dest="out_path", default=None, help="export path")
     sp_build_set.add_argument(
         "--name", default=None, help="set name (default: derived from the brief)"
     )
@@ -7263,6 +7264,7 @@ def _cmd_library_build_set_codex(args: argparse.Namespace, lib) -> int:
         n_slots=getattr(args, "n_slots", None),
         export=export_target is not None,
         export_target=export_target,
+        out_path=getattr(args, "out_path", None),
         tag_write_granted=tag_write_granted,
         cue=bool(getattr(args, "cue", True)),
     )

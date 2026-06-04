@@ -1173,6 +1173,7 @@ def build_set_prompt(
     n_slots: int | None = None,
     export: bool = True,
     export_target: str | None = None,
+    out_path: str | None = None,
     tag_write_granted: bool = False,
     cue: bool = True,
 ) -> str:
@@ -1192,6 +1193,8 @@ def build_set_prompt(
         hints.append("export requested")
         target = export_target or "rekordbox"
         hints.append(f"export target '{target}' requested; call export_set with target='{target}'")
+        if out_path:
+            hints.append(f"write export to '{out_path}'; call export_set with out_path='{out_path}'")
         if target in {"serato_tags", "mixxx_tags", "all"}:
             if tag_write_granted:
                 hints.append(
@@ -1288,6 +1291,7 @@ def _build_set_auto_crate_timeout_fallback(
     n_slots: int | None,
     export: bool,
     export_target: str | None = None,
+    out_path: str | None = None,
     tag_write_granted: bool = False,
     after_partial_tools: bool = False,
 ) -> CodexCurateResult:
@@ -1301,6 +1305,7 @@ def _build_set_auto_crate_timeout_fallback(
         k=max(24, _infer_slots(brief, n_slots) * 4),
         name=name,
         export=(export_target or "rekordbox") if export else None,
+        out_path=out_path,
         bpm_min=bpm_min,
         bpm_max=bpm_max,
         tag_write_granted=tag_write_granted,
@@ -1351,6 +1356,7 @@ def build_set_with_codex(
     n_slots: int | None = None,
     export: bool = True,
     export_target: str | None = None,
+    out_path: str | None = None,
     tag_write_granted: bool = False,
     cue: bool = True,
     timeout_s: float = BUILD_SET_TIMEOUT_S,
@@ -1419,7 +1425,7 @@ def build_set_with_codex(
 
     with tempfile.TemporaryDirectory(prefix="viber-codex-set-") as td:
         schema_path = str(Path(td) / "schema.json")
-        out_path = str(Path(td) / "out.json")
+        result_path = str(Path(td) / "out.json")
         # Plan 99-04: parallel propagation for set-prep. Same Pitfall-4
         # discipline as curate_with_codex — read INSIDE the `with` block.
         stop_reason_path = str(Path(td) / "stop_reason.json")
@@ -1437,6 +1443,7 @@ def build_set_with_codex(
             n_slots=n_slots,
             export=export,
             export_target=export_target,
+            out_path=out_path,
             tag_write_granted=tag_write_granted,
             cue=cue,
         )
@@ -1445,7 +1452,7 @@ def build_set_with_codex(
             mcp_command=command,
             mcp_args=[*args, "--vibemix-tool-events", tool_events_path],
             schema_path=schema_path,
-            out_path=out_path,
+            out_path=result_path,
             prompt=prompt_text,
             bypass_sandbox=allow_shell,
         )
@@ -1491,6 +1498,7 @@ def build_set_with_codex(
                     n_slots=n_slots,
                     export=export,
                     export_target=export_target,
+                    out_path=out_path,
                     tag_write_granted=tag_write_granted,
                     after_partial_tools=bool(tool_events),
                 )
@@ -1556,7 +1564,7 @@ def build_set_with_codex(
                 pass  # fall through to existing parse logic
 
         try:
-            raw = Path(out_path).read_text(encoding="utf-8").strip()
+            raw = Path(result_path).read_text(encoding="utf-8").strip()
         except OSError:
             raw = ""
         if not raw:

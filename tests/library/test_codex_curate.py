@@ -388,11 +388,13 @@ def test_build_set_prompt_threads_all_carriers_and_tag_permission():
         "dark warehouse",
         export=True,
         export_target="all",
+        out_path="~/Downloads/vibemix-set.xml",
         tag_write_granted=True,
     )
 
     assert "export target 'all' requested" in p
     assert "target='all'" in p
+    assert "out_path='~/Downloads/vibemix-set.xml'" in p
     assert "tag-write permission granted" in p
     assert "tag_write_granted=true" in p
 
@@ -3129,6 +3131,7 @@ def test_build_set_timeout_before_tools_uses_auto_crate_fallback(library, monkey
         assert kwargs["curve"] == "peak_time"
         assert kwargs["n_slots"] == 3
         assert kwargs["export"] == "all"
+        assert kwargs["out_path"] == "/tmp/viber-all.xml"
         assert kwargs["tag_write_granted"] is True
         assert kwargs["bpm_min"] == 128.0
         assert kwargs["bpm_max"] == 138.0
@@ -3162,6 +3165,7 @@ def test_build_set_timeout_before_tools_uses_auto_crate_fallback(library, monkey
         allow_shell=True,
         timeout_s=5,
         export_target="all",
+        out_path="/tmp/viber-all.xml",
         tag_write_granted=True,
         _runner=runner,
     )
@@ -3597,6 +3601,7 @@ def test_build_set_cli_treats_codex_exported_as_success(library, monkeypatch, ca
         assert kwargs["n_slots"] == 3
         assert kwargs["export"] is True
         assert kwargs["export_target"] == "rekordbox"
+        assert kwargs["out_path"] == "/tmp/peak.xml"
         assert kwargs["tag_write_granted"] is False
         return codex_mod.CodexCurateResult(
             theme="dark warehouse",
@@ -3615,6 +3620,7 @@ def test_build_set_cli_treats_codex_exported_as_success(library, monkeypatch, ca
             name=None,
             n_slots=3,
             export="rekordbox",
+            out_path="/tmp/peak.xml",
             write_tags=False,
         ),
         library,
