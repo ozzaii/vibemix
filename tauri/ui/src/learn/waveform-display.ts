@@ -115,6 +115,10 @@ export function WaveformDisplay(host: HTMLElement): WaveformDisplayHandle {
       <canvas class="learn-waveform" data-deck="B"></canvas>
     </div>
   `;
+  // Start hidden: with no audio loaded the strips are empty boxes parked over
+  // the tutor line. CSS reveals the host only once updateWaveforms flags real
+  // data ("partial"/"true"); an idle lesson never shows the dead panels.
+  host.dataset.ready = "false";
   const canvases = new Map<DeckId, HTMLCanvasElement>();
   host.querySelectorAll<HTMLCanvasElement>("canvas[data-deck]").forEach((canvas) => {
     const deck = canvas.dataset.deck as DeckId;
@@ -177,7 +181,10 @@ export function WaveformDisplay(host: HTMLElement): WaveformDisplayHandle {
         };
       }
       cache = next;
-      host.dataset.ready = Object.keys(next).length >= 2 ? "true" : "partial";
+      // 2 decks = "true", 1 = "partial" (both visible); 0 = "false" so the
+      // host hides again when a deck unloads (back to the idle empty state).
+      const loaded = Object.keys(next).length;
+      host.dataset.ready = loaded >= 2 ? "true" : loaded === 1 ? "partial" : "false";
       requestDraw();
     },
     updatePlayhead(payload: PlayheadTickPayload): void {

@@ -256,6 +256,15 @@
   pointer-events: none;
 }
 
+/* Until a deck actually loads audio (ipc.learn.waveform_ready),
+   WaveformDisplay has nothing to draw, so the bordered strips render as two
+   dead black boxes parked over the tutor line. Hide the host until it flags
+   real waveform data ("partial" = one deck, "true" = both decks); reveal it
+   the instant audio arrives. Absent/"false" both stay hidden. */
+.learn-waveform-host:not([data-ready="true"]):not([data-ready="partial"]) {
+  display: none;
+}
+
 .learn-waveforms {
   display: grid;
   gap: 6px;
