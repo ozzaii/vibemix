@@ -187,7 +187,7 @@ def _run_heartbeat_judge(
         session,
         "--events",
         "ALL",
-        "--apply-current-gate",
+        "--describe-bank-census",
         "--concurrency",
         "4",
     ]
@@ -197,7 +197,7 @@ def _run_heartbeat_judge(
         cmd.append("--no-log")
     if out:
         cmd.extend(["--out", out])
-    print("\nRecorded-set current-gate judge:", flush=True)
+    print("\nRecorded-set describe-bank census judge:", flush=True)
     return subprocess.call(cmd)
 
 
@@ -270,7 +270,7 @@ def main() -> int:
     ap.add_argument(
         "--heartbeat-session",
         default=None,
-        help="also run respan_sven_heartbeat_judge.py --apply-current-gate on this recording",
+        help="also run respan_sven_heartbeat_judge.py --describe-bank-census on this recording",
     )
     ap.add_argument("--heartbeat-out", default=None)
     args = ap.parse_args()

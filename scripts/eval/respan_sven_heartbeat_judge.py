@@ -33,6 +33,10 @@ Usage:
 
     # offline (no network) — assemble + print the judge rows, prove the pairing:
     python3 scripts/eval/respan_sven_heartbeat_judge.py --session <dir> --dry-run
+
+    # local no-payload describe-bank census — event type only, no event.extra replay:
+    python3 scripts/eval/respan_sven_heartbeat_judge.py \
+        --session <dir> --events ALL --describe-bank-census --dry-run
 """
 from __future__ import annotations
 
@@ -92,8 +96,14 @@ DIMS = [
 ]
 
 
-def apply_current_gate_replay(rows: list[dict]) -> tuple[list[dict], dict]:
-    """Filter recorded spoken rows through today's deterministic speak gate.
+DESCRIBE_BANK_CENSUS_CAVEAT = (
+    "No recorded event.extra payloads are reconstructed; this is a no-payload "
+    "describe-bank census, not a full live gate replay."
+)
+
+
+def describe_bank_census(rows: list[dict]) -> tuple[list[dict], dict]:
+    """Filter recorded spoken rows through the no-payload describe-bank gate.
 
     This replays the event type from recorded invocation metadata. It does not
     reconstruct old ``event.extra`` payloads, so it is intentionally best for
@@ -106,9 +116,10 @@ def apply_current_gate_replay(rows: list[dict]) -> tuple[list[dict], dict]:
     for row in rows:
         event_type = str(row.get("event") or "")
         decision = decide_speak_gate(Event(event_type, MusicState(), extra={}))
-        row["current_gate"] = {
+        row["describe_bank_census"] = {
             "verdict": decision.verdict,
             "reason": decision.reason,
+            "caveat": DESCRIBE_BANK_CENSUS_CAVEAT,
         }
         if decision.verdict == "speak":
             kept.append(row)
@@ -118,8 +129,9 @@ def apply_current_gate_replay(rows: list[dict]) -> tuple[list[dict], dict]:
     summary = {
         "input_spoken_rows": len(rows),
         "kept_for_judge": len(kept),
-        "silenced_by_current_gate": len(silenced),
+        "silenced_by_describe_bank_census": len(silenced),
         "silenced_by_event": dict(sorted(silenced_by_event.items())),
+        "payload_caveat": DESCRIBE_BANK_CENSUS_CAVEAT,
     }
     return kept, summary
 
@@ -288,9 +300,12 @@ def main() -> int:
     ap.add_argument("--concurrency", type=int, default=4)
     ap.add_argument("--dataset-tag", default="sven-heartbeat-real-set")
     ap.add_argument(
-        "--apply-current-gate",
+        "--describe-bank-census",
         action="store_true",
-        help="score only rows today's speak gate would still allow from recorded metadata",
+        help=(
+            "score only rows the no-payload describe-bank census would still allow; "
+            "does not reconstruct event.extra payloads"
+        ),
     )
     ap.add_argument("--dry-run", action="store_true", help="assemble rows, no network")
     ap.add_argument("--no-log", action="store_true", help="judge but do not log to Respan")
@@ -302,21 +317,25 @@ def main() -> int:
     if not rows:
         print("no rows", file=sys.stderr)
         return 1
-    current_gate_replay = None
-    if args.apply_current_gate:
-        rows, current_gate_replay = apply_current_gate_replay(rows)
+    describe_bank_report = None
+    if args.describe_bank_census:
+        rows, describe_bank_report = describe_bank_census(rows)
         print(
-            "-> current gate replay: "
-            f"{current_gate_replay['silenced_by_current_gate']} silenced, "
-            f"{current_gate_replay['kept_for_judge']} kept",
+            "-> describe-bank census (no event.extra payload replay): "
+            f"{describe_bank_report['silenced_by_describe_bank_census']} silenced, "
+            f"{describe_bank_report['kept_for_judge']} kept",
+            file=sys.stderr,
+        )
+        print(
+            f"-> caveat: {describe_bank_report['payload_caveat']}",
             file=sys.stderr,
         )
         if not rows:
-            print(json.dumps({"current_gate_replay": current_gate_replay}, indent=2))
+            print(json.dumps({"describe_bank_census": describe_bank_report}, indent=2))
             if args.out:
                 args.out.write_text(
                     json.dumps(
-                        {"report": {"current_gate_replay": current_gate_replay}, "rows": []},
+                        {"report": {"describe_bank_census": describe_bank_report}, "rows": []},
                         indent=2,
                         ensure_ascii=False,
                     )
@@ -327,8 +346,8 @@ def main() -> int:
     if args.dry_run:
         for r in rows[:8]:
             print(f"\n[{r['id']}] ({r['event']})\n  EVIDENCE: {r['digest']}\n  LINE: {r['line']}")
-        if current_gate_replay is not None:
-            print(json.dumps({"current_gate_replay": current_gate_replay}, indent=2))
+        if describe_bank_report is not None:
+            print(json.dumps({"describe_bank_census": describe_bank_report}, indent=2))
         print(f"\n(dry-run) {len(rows)} rows ready; no network.", file=sys.stderr)
         return 0
 
@@ -367,8 +386,8 @@ def main() -> int:
                 key=lambda x: (x["friend"] if isinstance(x["friend"], (int, float)) else 9),
             )[:8],
         }
-        if current_gate_replay is not None:
-            report["current_gate_replay"] = current_gate_replay
+        if describe_bank_report is not None:
+            report["describe_bank_census"] = describe_bank_report
         print(json.dumps(report, indent=2, ensure_ascii=False))
         if args.out:
             args.out.write_text(json.dumps({"report": report, "rows": ok}, indent=2, ensure_ascii=False))
