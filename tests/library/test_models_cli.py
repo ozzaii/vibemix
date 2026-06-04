@@ -315,6 +315,34 @@ def test_models_install_cue_target_routes_through_cli(
     assert payload["install"]["results"][0]["id"] == "cue-detr"
 
 
+def test_install_models_chatterbox_target_routes_to_prefetch(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import vibemix.library.model_assets as model_assets
+
+    monkeypatch.setattr(
+        model_assets,
+        "install_chatterbox_model",
+        lambda force=False: {
+            "id": "chatterbox",
+            "installed": True,
+            "path": "/tmp/vibemix-test/chatterbox",
+            "repo": model_assets.CHATTERBOX_MODEL_REPO,
+            "revision": model_assets.CHATTERBOX_MODEL_REVISION,
+            "files": [],
+            "errors": [],
+            "force": force,
+        },
+    )
+
+    payload = model_assets.install_models("chatterbox", force=True)
+
+    assert payload["target"] == "chatterbox"
+    assert payload["ok"] is True
+    assert payload["results"][0]["id"] == "chatterbox"
+    assert payload["results"][0]["force"] is True
+
+
 def test_models_install_failure_exits_nonzero_with_json(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -375,6 +403,17 @@ def test_models_install_required_does_not_require_optional_cue(
             "errors": [],
         },
     )
+    monkeypatch.setattr(
+        model_assets,
+        "install_chatterbox_model",
+        lambda force=False: {
+            "id": "chatterbox",
+            "installed": True,
+            "path": "/tmp/vibemix-test/chatterbox",
+            "files": [],
+            "errors": [],
+        },
+    )
 
     def _unexpected_cue(*, force=False):
         raise AssertionError("required install must not touch optional CUE")
@@ -384,7 +423,7 @@ def test_models_install_required_does_not_require_optional_cue(
     payload = model_assets.install_models("required")
     assert payload["target"] == "required"
     assert payload["ok"] is True
-    assert [result["id"] for result in payload["results"]] == ["clap"]
+    assert [result["id"] for result in payload["results"]] == ["clap", "chatterbox"]
 
 
 def test_install_cue_model_rejects_unverified_hosted_url(
@@ -470,6 +509,17 @@ def test_models_install_all_requires_cue_when_requested(
     )
     monkeypatch.setattr(
         model_assets,
+        "install_chatterbox_model",
+        lambda force=False: {
+            "id": "chatterbox",
+            "installed": True,
+            "path": "/tmp/vibemix-test/chatterbox",
+            "files": [],
+            "errors": [],
+        },
+    )
+    monkeypatch.setattr(
+        model_assets,
         "install_cue_model",
         lambda force=False: {
             "id": "cue-detr",
@@ -482,7 +532,11 @@ def test_models_install_all_requires_cue_when_requested(
 
     payload = model_assets.install_models("all")
     assert payload["ok"] is False
-    assert [result["id"] for result in payload["results"]] == ["clap", "cue-detr"]
+    assert [result["id"] for result in payload["results"]] == [
+        "clap",
+        "chatterbox",
+        "cue-detr",
+    ]
 
 
 @pytest.mark.real_model_status
@@ -544,12 +598,12 @@ def test_install_models_progress_reports_target_and_verified_file(
     (tmp_path / "tiny.bin").write_bytes(data)
     frames: list[dict[str, object]] = []
 
-    payload = model_assets.install_models("required", progress=frames.append)
+    payload = model_assets.install_models("clap", progress=frames.append)
 
     assert payload["ok"] is True
     assert frames == [
         {
-            "target": "required",
+            "target": "clap",
             "id": "clap",
             "n": 1,
             "total": 1,

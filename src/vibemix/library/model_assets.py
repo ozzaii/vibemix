@@ -29,6 +29,39 @@ _CUE_SIZE_ENV = "VIBEMIX_CUE_ONNX_SIZE"
 _PROGRESS_CHUNK_BYTES = 8 * 1024 * 1024
 ModelProgress = Callable[[dict[str, object]], None]
 
+CHATTERBOX_MODEL_ENV = "VIBEMIX_CHATTERBOX_MODEL"
+CHATTERBOX_MODEL_REVISION_ENV = "VIBEMIX_CHATTERBOX_MODEL_REVISION"
+CHATTERBOX_MODEL_REPO = "mlx-community/chatterbox-turbo-8bit"
+CHATTERBOX_MODEL_REVISION = "2f2e21a03863f86a1274d1060dcc188e7cde77e1"
+CHATTERBOX_ALLOW_PATTERNS: tuple[str, ...] = (
+    "*.json",
+    "*.safetensors",
+    "*.py",
+    "*.model",
+    "*.tiktoken",
+    "*.txt",
+    "*.jsonl",
+    "*.yaml",
+    "*.npz",
+    "*.pth",
+)
+CHATTERBOX_REQUIRED_FILES: dict[str, int] = {
+    "added_tokens.json": 418,
+    "conds.safetensors": 164_884,
+    "config.json": 2_565,
+    "merges.txt": 456_318,
+    "model.safetensors": 706_233_417,
+    "model.safetensors.index.json": 252_012,
+    "special_tokens_map.json": 470,
+    "tokenizer_config.json": 3_878,
+    "vocab.json": 999_186,
+}
+_CHATTERBOX_SETUP_HINT = (
+    "Chatterbox voice model is not ready. Connect to the internet and complete "
+    "the first-run voice download before starting a set; offline launches stay "
+    "voiceless instead of downloading mid-set."
+)
+
 
 @dataclass(frozen=True, slots=True)
 class ModelFile:
@@ -320,6 +353,251 @@ def _download_url_to_file(
         raise RuntimeError(f"download failed for {rel_path}: {exc}") from exc
 
 
+def chatterbox_model_name() -> str:
+    """Resolved Chatterbox model repo/path from env, else the pinned product repo."""
+    return os.environ.get(CHATTERBOX_MODEL_ENV, "").strip() or CHATTERBOX_MODEL_REPO
+
+
+def chatterbox_model_revision(model_name: str | None = None) -> str | None:
+    """Resolved Chatterbox HF revision.
+
+    The product repo is pinned to an immutable commit. Custom/local model paths can
+    opt into their own revision with ``VIBEMIX_CHATTERBOX_MODEL_REVISION``.
+    """
+    override = os.environ.get(CHATTERBOX_MODEL_REVISION_ENV, "").strip()
+    if override:
+        return override
+    model = model_name or chatterbox_model_name()
+    return CHATTERBOX_MODEL_REVISION if model == CHATTERBOX_MODEL_REPO else None
+
+
+def _chatterbox_local_model_path(model_name: str) -> Path | None:
+    path = Path(model_name).expanduser()
+    if path.exists():
+        return path
+    # Hugging Face repo ids include "/" too, so only obvious local spellings are
+    # treated as paths when absent.
+    if model_name.startswith(("~", ".", "/")):
+        return path
+    return None
+
+
+def chatterbox_model_snapshot_path(
+    model_name: str | None = None,
+    revision: str | None = None,
+) -> Path | None:
+    """Return the local Chatterbox snapshot directory when it is already cached."""
+    model = model_name or chatterbox_model_name()
+    local = _chatterbox_local_model_path(model)
+    if local is not None and local.exists():
+        return local
+    try:
+        from huggingface_hub import try_to_load_from_cache
+    except Exception:
+        return None
+
+    rev = revision if revision is not None else chatterbox_model_revision(model)
+    cached = try_to_load_from_cache(model, "config.json", revision=rev)
+    if isinstance(cached, str) and Path(cached).is_file():
+        return Path(cached).parent
+    return None
+
+
+def chatterbox_model_cached(
+    model_name: str | None = None,
+    revision: str | None = None,
+) -> bool:
+    """True when the Chatterbox runtime files are on disk already.
+
+    This is intentionally offline-only. Runtime availability must not mean "can
+    download from Hugging Face during the first generated line."
+    """
+    model = model_name or chatterbox_model_name()
+    local = _chatterbox_local_model_path(model)
+    if local is not None and local.exists():
+        return True
+
+    snapshot = chatterbox_model_snapshot_path(model, revision)
+    if snapshot is None:
+        return False
+    return all((snapshot / rel).is_file() for rel in CHATTERBOX_REQUIRED_FILES)
+
+
+def _chatterbox_snapshot_file_results(snapshot: Path, *, status: str) -> list[dict[str, object]]:
+    files: list[dict[str, object]] = []
+    for rel_path, expected_size in CHATTERBOX_REQUIRED_FILES.items():
+        path = snapshot / rel_path
+        size = path.stat().st_size if path.is_file() else 0
+        files.append(
+            {
+                "rel_path": rel_path,
+                "path": str(path),
+                "status": status,
+                "size": size or expected_size,
+                "sha256": _sha256_file(path) if path.is_file() and size <= 16 * 1024 * 1024 else "",
+                "url": f"https://huggingface.co/{CHATTERBOX_MODEL_REPO}/resolve/"
+                f"{CHATTERBOX_MODEL_REVISION}/{rel_path}",
+            }
+        )
+    return files
+
+
+def _snapshot_tqdm_class(progress: ModelProgress | None, *, model_id: str, rel_path: str):
+    """Return a disabled tqdm subclass that optionally mirrors byte progress."""
+    from tqdm.auto import tqdm
+
+    class _ModelAssetTqdm(tqdm):  # type: ignore[misc]
+        def __init__(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+            self._is_bytes = kwargs.get("unit") == "B"
+            self._next_emit_at = 0
+            kwargs["disable"] = True
+            super().__init__(*args, **kwargs)
+            if self._is_bytes:
+                self._emit()
+
+        def _emit(self) -> None:
+            if progress is None:
+                return
+            _notify_progress(
+                progress,
+                {
+                    "id": model_id,
+                    "n": 1,
+                    "total": 1,
+                    "status": "downloading",
+                    "rel_path": rel_path,
+                    "downloaded": int(self.n),
+                    "size": int(self.total or sum(CHATTERBOX_REQUIRED_FILES.values())),
+                },
+            )
+
+        def update(self, n=1):  # type: ignore[no-untyped-def]
+            result = super().update(n)
+            if self._is_bytes and int(self.n) >= self._next_emit_at:
+                self._emit()
+                self._next_emit_at = int(self.n) + _PROGRESS_CHUNK_BYTES
+            return result
+
+        def refresh(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+            result = super().refresh(*args, **kwargs)
+            if getattr(self, "_is_bytes", False):
+                self._emit()
+            return result
+
+    return _ModelAssetTqdm
+
+
+def install_chatterbox_model(
+    *, force: bool = False, progress: ModelProgress | None = None
+) -> dict[str, object]:
+    """Pre-fetch the pinned Chatterbox-Turbo MLX snapshot into the HF cache.
+
+    The model is intentionally not bundled into the DMG. This installer makes
+    the first-run wizard pay the network cost before the live set, so the TTS
+    runtime either starts warm-from-disk or stays honestly muted offline.
+    """
+    model = chatterbox_model_name()
+    revision = chatterbox_model_revision(model)
+    rel = f"{model}@{revision or 'default'}"
+    snapshot = chatterbox_model_snapshot_path(model, revision)
+    files: list[dict[str, object]] = []
+    errors: list[str] = []
+
+    if snapshot is not None and chatterbox_model_cached(model, revision) and not force:
+        _notify_progress(
+            progress,
+            {
+                "id": "chatterbox",
+                "n": 1,
+                "total": 1,
+                "status": "verified",
+                "rel_path": rel,
+                "downloaded": sum(CHATTERBOX_REQUIRED_FILES.values()),
+                "size": sum(CHATTERBOX_REQUIRED_FILES.values()),
+            },
+        )
+        return {
+            "id": "chatterbox",
+            "installed": True,
+            "path": str(snapshot),
+            "repo": model,
+            "revision": revision or "",
+            "files": _chatterbox_snapshot_file_results(snapshot, status="skipped"),
+            "errors": [],
+        }
+
+    try:
+        from huggingface_hub import snapshot_download
+
+        _notify_progress(
+            progress,
+            {
+                "id": "chatterbox",
+                "n": 1,
+                "total": 1,
+                "status": "downloading",
+                "rel_path": rel,
+                "downloaded": 0,
+                "size": sum(CHATTERBOX_REQUIRED_FILES.values()),
+            },
+        )
+        snapshot_path = Path(
+            snapshot_download(
+                model,
+                revision=revision,
+                allow_patterns=list(CHATTERBOX_ALLOW_PATTERNS),
+                force_download=force,
+                tqdm_class=_snapshot_tqdm_class(progress, model_id="chatterbox", rel_path=rel),
+            )
+        )
+        if not chatterbox_model_cached(model, revision):
+            missing = [
+                rel_path
+                for rel_path in CHATTERBOX_REQUIRED_FILES
+                if not (snapshot_path / rel_path).is_file()
+            ]
+            raise RuntimeError(f"snapshot is missing required file(s): {', '.join(missing)}")
+        files = _chatterbox_snapshot_file_results(snapshot_path, status="downloaded")
+        _notify_progress(
+            progress,
+            {
+                "id": "chatterbox",
+                "n": 1,
+                "total": 1,
+                "status": "downloaded",
+                "rel_path": rel,
+                "downloaded": sum(CHATTERBOX_REQUIRED_FILES.values()),
+                "size": sum(CHATTERBOX_REQUIRED_FILES.values()),
+            },
+        )
+        snapshot = snapshot_path
+    except Exception as exc:
+        errors.append(f"{_CHATTERBOX_SETUP_HINT} Details: {exc}")
+        _notify_progress(
+            progress,
+            {
+                "id": "chatterbox",
+                "n": 1,
+                "total": 1,
+                "status": "error",
+                "rel_path": rel,
+                "downloaded": 0,
+                "size": sum(CHATTERBOX_REQUIRED_FILES.values()),
+                "error": errors[-1],
+            },
+        )
+
+    return {
+        "id": "chatterbox",
+        "installed": not errors and snapshot is not None and chatterbox_model_cached(model, revision),
+        "path": str(snapshot or ""),
+        "repo": model,
+        "revision": revision or "",
+        "files": files,
+        "errors": errors,
+    }
+
+
 def _ensure_model_dir(root: Path) -> None:
     """Ensure ``root`` is a real directory, repairing stale cache sentinels.
 
@@ -553,14 +831,14 @@ def install_models(
 ) -> dict[str, object]:
     """Install supported local model assets.
 
-    ``target`` is ``"required"``, ``"clap"``, ``"cue"``, or ``"all"``.
-    ``"required"`` installs the first-run required CLAP snapshot. Chatterbox
-    uses a packaged/reference WAV, not a model-install target. CUE-DETR
-    downloads only when a release/ops build provides an HTTPS artifact URL plus
-    size/SHA pins. Otherwise that target reports an actionable manual setup error.
+    ``target`` is ``"required"``, ``"clap"``, ``"chatterbox"``, ``"cue"``, or
+    ``"all"``. ``"required"`` installs the first-run required CLAP snapshot plus
+    the Chatterbox voice model. CUE-DETR downloads only when a release/ops build
+    provides an HTTPS artifact URL plus size/SHA pins. Otherwise that target
+    reports an actionable manual setup error.
     """
-    if target not in {"required", "clap", "cue", "all"}:
-        raise ValueError("target must be 'required', 'clap', 'cue', or 'all'")
+    if target not in {"required", "clap", "chatterbox", "cue", "all"}:
+        raise ValueError("target must be 'required', 'clap', 'chatterbox', 'cue', or 'all'")
 
     results: list[dict[str, object]] = []
     target_progress: ModelProgress | None = None
@@ -574,6 +852,11 @@ def install_models(
             results.append(install_clap_model(force=force))
         else:
             results.append(install_clap_model(force=force, progress=target_progress))
+    if target in {"required", "chatterbox", "all"}:
+        if target_progress is None:
+            results.append(install_chatterbox_model(force=force))
+        else:
+            results.append(install_chatterbox_model(force=force, progress=target_progress))
     if target in {"cue", "all"}:
         if target_progress is None:
             results.append(install_cue_model(force=force))

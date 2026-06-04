@@ -30,6 +30,14 @@ from livekit.agents._exceptions import APIError
 from livekit.agents.types import DEFAULT_API_CONNECT_OPTIONS, APIConnectOptions
 from livekit.agents.utils import shortuuid
 
+from vibemix.library.model_assets import (
+    CHATTERBOX_ALLOW_PATTERNS,
+    CHATTERBOX_MODEL_REPO,
+    CHATTERBOX_MODEL_REVISION,
+    chatterbox_model_cached,
+    chatterbox_model_revision,
+)
+
 # Chatterbox-Turbo s3gen output rate; mono to match the live sink + FallbackAdapter.
 NATIVE_SR = 24000
 ENGINE_ENV = "VIBEMIX_TTS_ENGINE"
@@ -37,7 +45,7 @@ REF_ENV = "VIBEMIX_CHATTERBOX_REF"
 MODEL_ENV = "VIBEMIX_CHATTERBOX_MODEL"
 TEMP_ENV = "VIBEMIX_CHATTERBOX_TEMP"
 
-_DEFAULT_MODEL = "mlx-community/chatterbox-turbo-8bit"
+_DEFAULT_MODEL = CHATTERBOX_MODEL_REPO
 _DEFAULT_TEMP = 0.4  # Kaan-locked: tags fire as SOUND (not read literally), quality holds
 _DEFAULT_STREAM_INTERVAL = 0.5  # seconds of audio per streamed chunk (low TTFT)
 # Default co-host voice ref = the Kaan-locked "pranker" voice (music-stripped clip,
@@ -74,6 +82,10 @@ def configured_model() -> str:
     return os.environ.get(MODEL_ENV, "").strip() or _DEFAULT_MODEL
 
 
+def configured_model_revision(model_name: str | None = None) -> str | None:
+    return chatterbox_model_revision(model_name or configured_model())
+
+
 def default_ref_path() -> Path:
     return _DEV_REF
 
@@ -93,14 +105,15 @@ def bundled_ref_candidates() -> tuple[Path, ...]:
 
 def resolve_ref_path() -> Path | None:
     """The reference clip to clone. ``VIBEMIX_CHATTERBOX_REF`` overrides; else the
-    cache/bundled pranker ref if present; else ``None`` (engine unavailable)."""
+    bundled/cache pranker ref if present; else ``None`` (engine unavailable)."""
     override = os.environ.get(REF_ENV, "").strip()
     if override:
         candidate = Path(override).expanduser()
         return candidate if candidate.is_file() else None
-    if _DEV_REF.is_file():
-        return _DEV_REF
-    return next((candidate for candidate in bundled_ref_candidates() if candidate.is_file()), None)
+    bundled = next((candidate for candidate in bundled_ref_candidates() if candidate.is_file()), None)
+    if bundled is not None:
+        return bundled
+    return _DEV_REF if _DEV_REF.is_file() else None
 
 
 def engine_selected() -> bool:
@@ -109,10 +122,12 @@ def engine_selected() -> bool:
 
 
 def chatterbox_available() -> bool:
-    """True when Chatterbox can actually render: ``mlx-audio`` importable + a ref clip."""
+    """True when Chatterbox can render without first-line network downloads."""
     if importlib.util.find_spec("mlx_audio") is None:
         return False
-    return resolve_ref_path() is not None
+    if resolve_ref_path() is None:
+        return False
+    return chatterbox_model_cached(configured_model(), configured_model_revision())
 
 
 def chatterbox_unavailable_reason() -> str:
@@ -120,6 +135,11 @@ def chatterbox_unavailable_reason() -> str:
         return "mlx-audio not installed (Chatterbox voice is Apple-only)"
     if resolve_ref_path() is None:
         return f"no reference clip (set {REF_ENV} or place {_DEV_REF})"
+    if not chatterbox_model_cached(configured_model(), configured_model_revision()):
+        return (
+            "Chatterbox model not downloaded. Complete the first-run voice download "
+            f"for {CHATTERBOX_MODEL_REPO}@{CHATTERBOX_MODEL_REVISION} before starting a set."
+        )
     return "unknown"
 
 
@@ -147,11 +167,20 @@ class _MlxChatterboxEngine(ChatterboxEngine):
         self.sample_rate = NATIVE_SR
 
     @classmethod
-    def load(cls, model_name: str, ref_path: str, temperature: float) -> _MlxChatterboxEngine:
+    def load(
+        cls,
+        model_name: str,
+        ref_path: str,
+        temperature: float,
+        revision: str | None = None,
+    ) -> _MlxChatterboxEngine:
         import numpy as np  # noqa: F401 - ensure numpy present for the synth path
         from mlx_audio.tts.utils import load_model
 
-        model = load_model(model_name)
+        kwargs = {"allow_patterns": list(CHATTERBOX_ALLOW_PATTERNS)}
+        if revision:
+            kwargs["revision"] = revision
+        model = load_model(model_name, **kwargs)
         # One-time conditional prime: pay the ref encode once, reuse for every line.
         model.prepare_conditionals(ref_path)
         return cls(model, ref_path, temperature, _DEFAULT_STREAM_INTERVAL)
@@ -190,6 +219,7 @@ class ChatterboxLocalTTS(agents_tts.TTS):
         resolved_ref = ref_path or resolve_ref_path()
         self._ref_path = str(resolved_ref) if resolved_ref is not None else None
         self._model_name = model_name or configured_model()
+        self._model_revision = configured_model_revision(self._model_name)
         self._temperature = temperature if temperature is not None else configured_temperature()
         self._engine: ChatterboxEngine | None = engine
         self._engine_lock = threading.Lock()
@@ -217,7 +247,12 @@ class ChatterboxLocalTTS(agents_tts.TTS):
             if self._engine is None:
                 if self._ref_path is None:
                     raise APIError(f"Chatterbox voice unavailable: {chatterbox_unavailable_reason()}")
-                self._engine = _MlxChatterboxEngine.load(self._model_name, self._ref_path, self._temperature)
+                self._engine = _MlxChatterboxEngine.load(
+                    self._model_name,
+                    self._ref_path,
+                    self._temperature,
+                    revision=self._model_revision,
+                )
         return self._engine
 
     def prewarm(self) -> None:
