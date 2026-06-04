@@ -377,11 +377,7 @@ function mountMockTldrPlayer(totalDurationS: number, regionCount: number): void 
     rail.append(tick);
   }
 
-  const note = document.createElement("p");
-  note.className = "vmx-debrief-tldr-note";
-  note.textContent = "Fault line inspection armed.";
-
-  tldrEl.append(meta, hud, rail, note);
+  tldrEl.append(meta, hud, rail);
 }
 
 function formatMockDuration(totalS: number): string {

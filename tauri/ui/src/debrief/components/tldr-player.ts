@@ -47,10 +47,10 @@ export function mountTldrPlayer(
 
   const hud = document.createElement("div");
   hud.className = "vmx-debrief-tldr-hud";
+  // File-integrity metadata (Format / Hash) is QA tooling, not a DJ's review;
+  // the peak-end moment shows the summary, not the MIME type or the SHA.
   for (const [label, value] of [
     ["Summary", `${Math.round(payload.duration_s)}s`],
-    ["Format", payload.mime_type],
-    ["Hash", shortHash(payload.tldr_sha256)],
   ] as const) {
     const cell = document.createElement("span");
     cell.className = "vmx-debrief-tldr-hud-cell";
