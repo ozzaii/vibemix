@@ -3,15 +3,19 @@ from __future__ import annotations
 
 import subprocess
 import sys
+from types import SimpleNamespace
 
 import pytest
 
+import vibemix.library.anlz_ingest as anlz_ingest
 from vibemix.library.anlz_ingest import (
     AnlzBeatGrid,
+    AnlzDjCue,
     AnlzIndex,
     AnlzTrackMeta,
     anchors_from_anlz,
     beat_to_time,
+    dj_cue_anchors_from_anlz,
     iter_anlz_ext_files,
     map_pssi_kind,
     match_track_to_anlz,
@@ -48,6 +52,7 @@ def _meta(
     ppth_path: str = "/music/a/fixture.wav",
     phrases=(),
     beatgrid: AnlzBeatGrid | None = None,
+    dj_cues: tuple[AnlzDjCue, ...] = (),
 ) -> AnlzTrackMeta:
     return AnlzTrackMeta(
         ext_path="/fixture/ANLZ0000.EXT",  # type: ignore[arg-type]
@@ -56,6 +61,7 @@ def _meta(
         basename_key=ppth_path.rsplit("/", 1)[-1].lower(),
         beatgrid=beatgrid or _grid(),
         phrases=tuple(phrases),
+        dj_cues=dj_cues,
     )
 
 
@@ -107,6 +113,100 @@ def test_low_mood_build_below_default_anchor_floor_drops() -> None:
 
     assert phrases[0].confidence == pytest.approx(0.42)
     assert anchors_from_anlz(_track(), _meta(phrases=phrases), max_cues=4) == []
+
+
+def test_dj_cue_anchors_from_anlz_sidecar_cues() -> None:
+    anchors = dj_cue_anchors_from_anlz(
+        _track(duration_s=180.0),
+        _meta(
+            dj_cues=(
+                AnlzDjCue(
+                    source_tag="PCO2",
+                    name="mix in",
+                    cue_type="hotcue",
+                    number=1,
+                    start_s=0.5,
+                ),
+                AnlzDjCue(
+                    source_tag="PCO2",
+                    name="drop",
+                    cue_type="hotcue",
+                    number=2,
+                    start_s=64.0,
+                    end_s=96.0,
+                ),
+            )
+        ),
+        max_cues=8,
+    )
+
+    assert [anchor.source for anchor in anchors] == ["dj", "dj"]
+    assert [anchor.label for anchor in anchors] == ["intro", "drop"]
+    assert anchors[0].start_s == pytest.approx(0.5)
+    assert anchors[0].end_s == pytest.approx(64.0)
+    assert anchors[1].end_s == pytest.approx(96.0)
+
+
+def test_dj_cues_from_anlz_tags_prefers_pco2_over_pcob() -> None:
+    class FakeAnlz:
+        def getall_tags(self, key):
+            if key == "PCOB":
+                return [
+                    SimpleNamespace(
+                        content={
+                            "cue_type": "hotcue",
+                            "entries": [
+                                {
+                                    "hot_cue": 2,
+                                    "status": "enabled",
+                                    "type": "single",
+                                    "time": 64000,
+                                    "loop_time": -1,
+                                    "comment": "",
+                                }
+                            ],
+                        }
+                    )
+                ]
+            if key == "PCO2":
+                return [
+                    SimpleNamespace(
+                        content={
+                            "type": "hotcue",
+                            "entries": [
+                                {
+                                    "hot_cue": 2,
+                                    "type": 1,
+                                    "time": 64000,
+                                    "loop_time": -1,
+                                    "comment": "drop",
+                                },
+                                {
+                                    "hot_cue": 3,
+                                    "type": 2,
+                                    "time": 128000,
+                                    "loop_time": 144000,
+                                    "comment": "loop",
+                                },
+                            ],
+                        }
+                    )
+                ]
+            return []
+
+    cues = anlz_ingest._dj_cues_from_anlz_tags(FakeAnlz())
+
+    assert len(cues) == 2
+    assert cues[0] == AnlzDjCue(
+        source_tag="PCO2",
+        name="drop",
+        cue_type="hotcue",
+        number=2,
+        start_s=64.0,
+        end_s=None,
+    )
+    assert cues[1].start_s == pytest.approx(128.0)
+    assert cues[1].end_s == pytest.approx(144.0)
 
 
 def test_fill_trims_phrase_end_and_lowers_confidence() -> None:

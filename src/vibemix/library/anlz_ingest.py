@@ -18,6 +18,7 @@ from vibemix.library.rekordbox import TrackEntry
 
 __all__ = [
     "AnlzBeatGrid",
+    "AnlzDjCue",
     "AnlzIndex",
     "AnlzPhrase",
     "AnlzTrackMeta",
@@ -25,6 +26,7 @@ __all__ = [
     "anchors_from_anlz",
     "beat_to_time",
     "build_anlz_index",
+    "dj_cue_anchors_from_anlz",
     "iter_anlz_ext_files",
     "map_pssi_kind",
     "match_track_to_anlz",
@@ -69,6 +71,16 @@ class AnlzPhrase:
 
 
 @dataclass(frozen=True, slots=True)
+class AnlzDjCue:
+    source_tag: str
+    name: str
+    cue_type: str
+    number: int
+    start_s: float
+    end_s: float | None = None
+
+
+@dataclass(frozen=True, slots=True)
 class AnlzTrackMeta:
     ext_path: Path
     dat_path: Path
@@ -76,6 +88,7 @@ class AnlzTrackMeta:
     basename_key: str
     beatgrid: AnlzBeatGrid
     phrases: tuple[AnlzPhrase, ...]
+    dj_cues: tuple[AnlzDjCue, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -157,6 +170,7 @@ def parse_anlz_bundle(ext_path: Path) -> AnlzTrackMeta | None:
         basename_key=_basename_key(ppth_path),
         beatgrid=beatgrid,
         phrases=phrases,
+        dj_cues=_dj_cues_from_anlz_tags(ext_anlz),
     )
 
 
@@ -226,6 +240,46 @@ def anchors_from_anlz(
         )
         if len(anchors) >= max(0, int(max_cues)):
             break
+    return anchors
+
+
+def dj_cue_anchors_from_anlz(
+    track: TrackEntry,
+    meta: AnlzTrackMeta,
+    *,
+    max_cues: int = 8,
+    window_s: float = 80.0,
+) -> list[CueAnchor]:
+    """Convert Rekordbox ANLZ PCOB/PCO2 cue entries into DJ reference anchors.
+
+    PSSI phrase tags are Rekordbox's analysis. PCOB/PCO2 cue-list tags are the
+    DJ-authored memory/hot cues mirrored into the analysis sidecars. Use them
+    only as reference labels for eval/calibration; normal ingest still takes
+    TrackEntry.cues from collection XML first.
+    """
+    duration_s = float(track.duration_s) if track.duration_s else 0.0
+    cues = sorted(meta.dj_cues, key=lambda cue: float(cue.start_s))[: max(0, int(max_cues))]
+    anchors: list[CueAnchor] = []
+    for i, cue in enumerate(cues):
+        start = max(0.0, float(cue.start_s))
+        end = start + float(window_s)
+        if cue.end_s is not None and float(cue.end_s) > start:
+            end = min(end, float(cue.end_s))
+        if i + 1 < len(cues):
+            end = min(end, float(cues[i + 1].start_s))
+        if duration_s > 0.0:
+            end = min(end, duration_s)
+        if end <= start:
+            continue
+        anchors.append(
+            CueAnchor(
+                label=_label_for_dj_cue(cue),
+                start_s=round(start, 6),
+                end_s=round(end, 6),
+                confidence=0.98,
+                source="dj",
+            )
+        )
     return anchors
 
 
@@ -391,6 +445,92 @@ def _container_to_dict(value: Any) -> dict[str, Any]:
         if hasattr(value, key):
             out[key] = getattr(value, key)
     return out
+
+
+def _dj_cues_from_anlz_tags(anlz_file: Any) -> tuple[AnlzDjCue, ...]:
+    cues_by_key: dict[tuple[float, float | None, int], AnlzDjCue] = {}
+    # PCO2 is the richer NXS2 cue-list tag. PCOB carries the same basic facts on
+    # older exports. Parse both and dedupe by time/slot, letting PCO2 win.
+    for tag_key in ("PCOB", "PCO2"):
+        for tag in _get_tags(anlz_file, tag_key):
+            content = getattr(tag, "content", tag)
+            entries = _get_value(content, "entries", ()) or ()
+            tag_type = _enum_name(_get_value(content, "type", _get_value(content, "cue_type", "")))
+            for entry in entries:
+                cue = _dj_cue_from_entry(tag_key, tag_type, entry)
+                if cue is None:
+                    continue
+                key = (cue.start_s, cue.end_s, cue.number)
+                existing = cues_by_key.get(key)
+                if existing is None or (existing.source_tag == "PCOB" and cue.source_tag == "PCO2"):
+                    cues_by_key[key] = cue
+    return tuple(sorted(cues_by_key.values(), key=lambda cue: (cue.start_s, cue.number)))
+
+
+def _dj_cue_from_entry(tag_key: str, tag_type: str, entry: Any) -> AnlzDjCue | None:
+    status = _enum_name(_get_value(entry, "status", "enabled"))
+    if status == "disabled" or status == "0":
+        return None
+    raw_time = _get_value(entry, "time", None)
+    try:
+        time_ms = float(raw_time)
+        start_s = round(time_ms / 1000.0, 6)
+    except (TypeError, ValueError):
+        return None
+    if start_s < 0:
+        return None
+
+    raw_loop_time = _get_value(entry, "loop_time", None)
+    end_s: float | None = None
+    try:
+        loop_time = float(raw_loop_time)
+    except (TypeError, ValueError):
+        loop_time = -1.0
+    if loop_time > time_ms:
+        end_s = round(loop_time / 1000.0, 6)
+
+    try:
+        hot_cue = int(_get_value(entry, "hot_cue", 0) or 0)
+    except (TypeError, ValueError):
+        hot_cue = 0
+    number = hot_cue if hot_cue > 0 else -1
+    entry_type = _enum_name(_get_value(entry, "type", ""))
+    cue_type = "loop" if "loop" in entry_type or end_s is not None else "cue"
+    name = str(_get_value(entry, "comment", "") or "").strip()
+    return AnlzDjCue(
+        source_tag=tag_key,
+        name=name,
+        cue_type=tag_type or cue_type,
+        number=number,
+        start_s=start_s,
+        end_s=end_s,
+    )
+
+
+def _label_for_dj_cue(cue: AnlzDjCue) -> CueLabel:
+    name = cue.name.strip().lower()
+    if "intro" in name or "mix in" in name or "mix-in" in name or "start" in name:
+        return "intro"
+    if "build" in name or "rise" in name:
+        return "build"
+    if "break" in name or "breakdown" in name:
+        return "breakdown"
+    if "outro" in name or "mix out" in name or "mix-out" in name or "end" in name:
+        return "outro"
+    if "drop" in name or "chorus" in name or "hook" in name:
+        return "drop"
+    if cue.number == 0:
+        return "intro"
+    return "drop"
+
+
+def _enum_name(value: Any) -> str:
+    raw = str(value or "").lower()
+    if "'" in raw:
+        parts = raw.split("'")
+        if len(parts) >= 2:
+            return parts[-2].strip().lower()
+    return raw.strip().lower()
 
 
 def _get_value(obj: Any, key: str, default: Any = None) -> Any:

@@ -31,6 +31,7 @@ from vibemix.library.anlz_ingest import (  # noqa: E402
     AnlzIndex,
     anchors_from_anlz,
     build_anlz_index,
+    dj_cue_anchors_from_anlz,
     match_track_to_anlz,
 )
 from vibemix.library.cue_agreement import cue_agreement, weak_labels  # noqa: E402
@@ -78,6 +79,9 @@ def evaluate_anlz_cue_agreement(
     tracks_with_pssi_anchors = 0
     anlz_anchor_count = 0
     dj_reference_tracks = 0
+    cache_dj_reference_tracks = 0
+    sidecar_dj_reference_tracks = 0
+    sidecar_dj_anchor_count = 0
 
     for track_id, track in sorted(tracks.items(), key=lambda item: item[0]):
         meta = match_track_to_anlz(track, anlz_index)
@@ -93,6 +97,15 @@ def evaluate_anlz_cue_agreement(
             first_fill_tracks += 1
 
         dj_anchors = _dj_anchors_for_track(track, max_cues=max_cues)
+        reference_source = "cache"
+        if dj_anchors:
+            cache_dj_reference_tracks += 1
+        else:
+            dj_anchors = dj_cue_anchors_from_anlz(track, meta, max_cues=max_cues)
+            reference_source = "anlz_pcob_pco2"
+            sidecar_dj_anchor_count += len(dj_anchors)
+            if dj_anchors:
+                sidecar_dj_reference_tracks += 1
         if dj_anchors:
             dj_reference_tracks += 1
         result = cue_agreement(dj_anchors, anlz_anchors)
@@ -111,6 +124,7 @@ def evaluate_anlz_cue_agreement(
                     "filepath_basename": Path(track.filepath).name,
                     "anlz_anchor_count": len(anlz_anchors),
                     "dj_anchor_count": len(dj_anchors),
+                    "dj_reference_source": reference_source if dj_anchors else None,
                     "matched": len(result.matched),
                     "dj_only": len(result.dj_only),
                     "anlz_only": len(result.auto_only),
@@ -140,6 +154,9 @@ def evaluate_anlz_cue_agreement(
         "pssi_first_fill_candidate_tracks": first_fill_tracks,
         "cached_cue_source_counts": dict(sorted(_cue_source_counts(tracks.values()).items())),
         "dj_reference_tracks": dj_reference_tracks,
+        "cache_dj_reference_tracks": cache_dj_reference_tracks,
+        "anlz_sidecar_dj_reference_tracks": sidecar_dj_reference_tracks,
+        "anlz_sidecar_dj_anchor_count": sidecar_dj_anchor_count,
         "cue_agreement_scored_tracks": len(scored),
         "cue_agreement_mean_score": round(mean(scored), 6) if scored else None,
         "cue_agreement_mean_abs_offset_s": round(mean(offsets), 6) if offsets else None,
@@ -148,7 +165,7 @@ def evaluate_anlz_cue_agreement(
         "notes": {
             "agreement_score_is_not_fabricated_without_dj_refs": not scored,
             "anlz_first_fill_already_in_current_source": True,
-            "compares": "dj_cues_vs_anlz_pssi_phrase_anchors",
+            "compares": "dj_or_anlz_pcob_pco2_cues_vs_anlz_pssi_phrase_anchors",
         },
         "sample_rows": rows[:40],
     }

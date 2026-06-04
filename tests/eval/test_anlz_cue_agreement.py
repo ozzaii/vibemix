@@ -3,7 +3,13 @@ from __future__ import annotations
 
 from scripts.eval.anlz_cue_agreement import evaluate_anlz_cue_agreement
 
-from vibemix.library.anlz_ingest import AnlzBeatGrid, AnlzIndex, AnlzPhrase, AnlzTrackMeta
+from vibemix.library.anlz_ingest import (
+    AnlzBeatGrid,
+    AnlzDjCue,
+    AnlzIndex,
+    AnlzPhrase,
+    AnlzTrackMeta,
+)
 from vibemix.library.rekordbox import CuePoint, TrackEntry
 
 
@@ -21,7 +27,7 @@ def _track(cues: tuple[CuePoint, ...] = ()) -> TrackEntry:
     )
 
 
-def _index() -> AnlzIndex:
+def _index(*, dj_cues: tuple[AnlzDjCue, ...] = ()) -> AnlzIndex:
     phrase = AnlzPhrase(
         index=0,
         mood=1,
@@ -42,6 +48,7 @@ def _index() -> AnlzIndex:
         basename_key="track one.mp3",
         beatgrid=AnlzBeatGrid(times_s=(0.0,), bpms=(128.0,), beat_in_bar=(1,)),
         phrases=(phrase,),
+        dj_cues=dj_cues,
     )
     return AnlzIndex(by_basename={"track one.mp3": (meta,)})
 
@@ -53,9 +60,37 @@ def test_anlz_cue_agreement_scores_when_dj_reference_exists() -> None:
 
     assert report["status"] == "ok"
     assert report["dj_reference_tracks"] == 1
+    assert report["cache_dj_reference_tracks"] == 1
+    assert report["anlz_sidecar_dj_reference_tracks"] == 0
     assert report["cue_agreement_scored_tracks"] == 1
     assert report["cue_agreement_mean_score"] == 1.0
     assert report["cue_agreement_mean_abs_offset_s"] == 0.5
+
+
+def test_anlz_cue_agreement_scores_sidecar_dj_cues_when_cache_has_none() -> None:
+    report = evaluate_anlz_cue_agreement(
+        {"t1": _track(())},
+        _index(
+            dj_cues=(
+                AnlzDjCue(
+                    source_tag="PCO2",
+                    name="intro",
+                    cue_type="hotcue",
+                    number=1,
+                    start_s=0.5,
+                ),
+            )
+        ),
+    )
+
+    assert report["status"] == "ok"
+    assert report["dj_reference_tracks"] == 1
+    assert report["cache_dj_reference_tracks"] == 0
+    assert report["anlz_sidecar_dj_reference_tracks"] == 1
+    assert report["anlz_sidecar_dj_anchor_count"] == 1
+    assert report["cue_agreement_mean_score"] == 1.0
+    assert report["cue_agreement_mean_abs_offset_s"] == 0.5
+    assert report["sample_rows"][0]["dj_reference_source"] == "anlz_pcob_pco2"
 
 
 def test_anlz_cue_agreement_honest_null_without_dj_reference() -> None:
@@ -64,5 +99,8 @@ def test_anlz_cue_agreement_honest_null_without_dj_reference() -> None:
     assert report["status"] == "honest_null_no_dj_reference_cues"
     assert report["pssi_first_fill_candidate_tracks"] == 1
     assert report["dj_reference_tracks"] == 0
+    assert report["cache_dj_reference_tracks"] == 0
+    assert report["anlz_sidecar_dj_reference_tracks"] == 0
+    assert report["anlz_sidecar_dj_anchor_count"] == 0
     assert report["cue_agreement_mean_score"] is None
     assert report["notes"]["agreement_score_is_not_fabricated_without_dj_refs"] is True
