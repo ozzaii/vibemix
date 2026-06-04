@@ -360,6 +360,7 @@ def test_build_set_prompt_has_set_prep_workflow():
     assert "do not treat that BPM/key range as verified" in p
     assert "min_duration_s=120" in p
     assert "short tools, samples, stingers, or loops" in p
+    assert "actual tool arguments" in p
     assert "do not use <=90s clips as primary set slots" in p
     assert "sequence_set already resolves BPM, key, stored vectors" in p
     assert "get_track_sections" in p
@@ -406,6 +407,7 @@ def test_chat_prompt_threads_history_and_rules():
     assert "metadata_warnings" in p
     assert "do not treat that BPM/key range as verified" in p
     assert "min_duration_s=120" in p
+    assert "actual tool arguments" in p
     assert "do not present <=90s clips as primary set slots" in p
     assert "transition_slate" in p
     assert "compile_musical_context" in p
@@ -1376,6 +1378,22 @@ def test_codex_chat_result_to_dict_prefers_rich_tool_trace():
         {"name": "create_playlist", "arg": "Dark Fuse", "ok": True},
     ]
     assert out["iterations"] == 2
+
+
+def test_direct_discover_pool_trace_surfaces_duration_filter():
+    row = codex_mod._direct_tool_trace_row(
+        "discover_pool",
+        {
+            "filters": {"min_duration_s": 120.0, "max_duration_s": None},
+            "pool": [{"track_id": "t000"}],
+        },
+    )
+
+    assert row == {
+        "name": "discover_pool",
+        "arg": "1 candidates; min_dur=120.0s",
+        "ok": True,
+    }
 
 
 def test_codex_chat_result_to_dict_surfaces_move_grade_receipts():

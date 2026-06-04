@@ -759,6 +759,10 @@ class LibraryToolset:
         k = max(1, min(200, k))
         excl = args.get("exclude_ids")
         exclude_ids = {t for t in excl if isinstance(t, str)} if isinstance(excl, list) else None
+        bpm_min = _opt_float("bpm_min")
+        bpm_max = _opt_float("bpm_max")
+        min_duration_s = _opt_float("min_duration_s")
+        max_duration_s = _opt_float("max_duration_s")
         try:
             pool = discovery.discover_pool(
                 self._store,
@@ -767,10 +771,10 @@ class LibraryToolset:
                 ref_track_ids=ref_track_ids,
                 text_query=text_query,
                 k=k,
-                bpm_min=_opt_float("bpm_min"),
-                bpm_max=_opt_float("bpm_max"),
-                min_duration_s=_opt_float("min_duration_s"),
-                max_duration_s=_opt_float("max_duration_s"),
+                bpm_min=bpm_min,
+                bpm_max=bpm_max,
+                min_duration_s=min_duration_s,
+                max_duration_s=max_duration_s,
                 exclude_ids=exclude_ids,
             )
         except Exception as e:
@@ -782,8 +786,6 @@ class LibraryToolset:
             if score is not None:
                 self.seen_similarity[item.track_id] = score
 
-        bpm_min = _opt_float("bpm_min")
-        bpm_max = _opt_float("bpm_max")
         metadata_warnings: list[dict[str, Any]] = []
         if (bpm_min is not None or bpm_max is not None) and pool:
             unknown_bpm = sum(1 for item in pool if item.bpm is None)
@@ -805,6 +807,12 @@ class LibraryToolset:
                 )
 
         out: dict[str, Any] = {
+            "filters": {
+                "bpm_min": bpm_min,
+                "bpm_max": bpm_max,
+                "min_duration_s": min_duration_s,
+                "max_duration_s": max_duration_s,
+            },
             "pool": [
                 {
                     "track_id": item.track_id,
@@ -1465,6 +1473,12 @@ class LibraryToolset:
             bpm_max = args.get("bpm_max")
             if bpm_min is not None or bpm_max is not None:
                 parts.append(f"bpm={bpm_min or '?'}-{bpm_max or '?'}")
+            min_duration_s = args.get("min_duration_s")
+            max_duration_s = args.get("max_duration_s")
+            if min_duration_s is not None:
+                parts.append(f"min_dur={min_duration_s}s")
+            if max_duration_s is not None:
+                parts.append(f"max_dur={max_duration_s}s")
             if args.get("k") is not None:
                 parts.append(f"k={args.get('k')}")
             return "; ".join(p for p in parts if p)[:160]

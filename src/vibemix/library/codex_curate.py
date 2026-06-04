@@ -1104,8 +1104,9 @@ _BUILD_SET_RULES = (
     "k=15 unless the user asked for a long set; optionally bounded by "
     "bpm/duration). For normal playable sets, pass min_duration_s=120 unless "
     "the DJ explicitly asks for short tools, samples, stingers, or loops; "
-    "do not use <=90s clips as primary set slots. This is the ONLY way to "
-    "introduce track_ids.\n"
+    "put that duration floor in the actual tool arguments, not only in the "
+    "query text; do not use <=90s clips as primary set slots. This is the ONLY "
+    "way to introduce track_ids.\n"
     "2. sequence_set — order the chosen track_ids on the requested energy curve. "
     "Pass ONLY track_ids returned by discover_pool this run. If the DJ asks for "
     "deep cuts / surprise / less obvious picks, pass novelty in the 0..1 range; "
@@ -1699,8 +1700,9 @@ _CHAT_RULES_BLOCK = (
     "get_track_energy per track.\n"
     "4. For normal set/order requests, call discover_pool with "
     "min_duration_s=120 unless the DJ explicitly asks for short tools, "
-    "samples, stingers, or loops; do not present <=90s clips as primary set "
-    "slots.\n"
+    "samples, stingers, or loops; put that duration floor in the actual tool "
+    "arguments, not only in the query text; do not present <=90s clips as "
+    "primary set slots.\n"
     "5. For mix-point or cue-entry advice, use get_track_sections, "
     "transition_slate, compile_musical_context, and smart_hot_cues. Only mention "
     "cue slots, proposal ids, cue ids, candidate ids, or exact timing that "
@@ -4165,6 +4167,14 @@ def _direct_tool_trace_row(name: str, result: dict[str, Any]) -> dict[str, Any]:
         pool = result.get("pool")
         warnings = result.get("metadata_warnings")
         detail = f"{len(pool) if isinstance(pool, list) else 0} candidates"
+        filters = result.get("filters")
+        if isinstance(filters, dict):
+            min_duration_s = filters.get("min_duration_s")
+            max_duration_s = filters.get("max_duration_s")
+            if min_duration_s is not None:
+                detail += f"; min_dur={min_duration_s}s"
+            if max_duration_s is not None:
+                detail += f"; max_dur={max_duration_s}s"
         if isinstance(warnings, list):
             for warning in warnings:
                 if isinstance(warning, dict) and warning.get("field") == "bpm":

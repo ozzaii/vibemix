@@ -227,6 +227,20 @@ def test_discover_pool_marks_unverified_bpm_filter(toolset, library):
     assert f"bpm_unknown={len(out['pool'])}/{len(out['pool'])}" in summary
 
 
+def test_discover_pool_surfaces_duration_filter_in_tool_tape(toolset):
+    out = toolset.discover_pool({"ref_track_ids": ["t000"], "k": 10, "min_duration_s": 120})
+
+    assert out["filters"]["min_duration_s"] == 120.0
+    arg = LibraryToolset._tool_event_arg_summary(
+        "discover_pool",
+        {"ref_track_ids": ["t000"], "k": 10, "min_duration_s": 120},
+    )
+    summary = LibraryToolset._tool_event_summary("discover_pool", out)
+
+    assert "min_dur=120s" in arg
+    assert "track" in summary
+
+
 def test_dispatch_blocks_set_prep_when_library_freshness_is_stale(store, library):
     guarded = LibraryToolset(
         embedder=None,
