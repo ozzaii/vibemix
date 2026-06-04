@@ -40,6 +40,29 @@ def test_load_hand_labels_accepts_nested_tags_and_reports_unknown(tmp_path: Path
     assert loaded["unknown_tags"] == {"instrument": ["laser_harp"]}
 
 
+def test_load_hand_labels_skips_todo_template_rows(tmp_path: Path) -> None:
+    path = tmp_path / "labels.jsonl"
+    path.write_text(
+        json.dumps(
+            {
+                "track_id": "t1",
+                "split": "holdout",
+                "label_status": "todo",
+                "tags": {"mood": [], "texture": [], "instrument": []},
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    loaded = lat.load_hand_labels(path)
+
+    assert loaded["status"] == "empty"
+    assert loaded["pending_rows"] == 1
+    assert loaded["usable_rows"] == 0
+    assert loaded["rows"] == []
+
+
 def test_evaluate_labeled_predictions_measures_precision_recall_and_abstain() -> None:
     rows = [
         lat.HandLabelRow("t1", "eval", {"mood": {"dark"}, "texture": {"raw"}}),
@@ -89,13 +112,21 @@ def test_build_report_missing_labels_is_honest_null(tmp_path: Path, monkeypatch)
     )
     monkeypatch.setattr(lat, "ClapEngine", lambda: _FakeEngine())
 
-    report = lat.build_report(labels_path=tmp_path / "missing.jsonl", max_examples=2)
+    report = lat.build_report(
+        labels_path=tmp_path / "missing.jsonl",
+        label_template_size=1,
+        max_examples=2,
+    )
 
     assert report["status"] == "unproven_no_hand_labels"
     assert report["label_set"]["usable_rows"] == 0
     assert report["comparison"] is None
     assert report["modes"]["template"]["metrics"] is None
     assert report["modes"]["template"]["prediction_summary"]["track_count"] == 1
+    assert report["label_template"]["status"] == "needed"
+    assert report["label_template"]["row_count"] == 1
+    assert report["label_template"]["rows"][0]["label_status"] == "todo"
+    assert report["label_template"]["rows"][0]["split"] == "calibration"
 
 
 def test_build_report_with_labels_scores_template_and_bare(tmp_path: Path, monkeypatch) -> None:
@@ -129,5 +160,28 @@ def test_build_report_with_labels_scores_template_and_bare(tmp_path: Path, monke
 
     assert report["status"] == "measured_small_hand_label_subset"
     assert report["label_set"]["usable_rows"] == 1
+    assert report["label_set"]["min_required_rows"] == 50
     assert report["modes"]["template"]["metrics"]["micro"]["precision"] >= 0.0
     assert report["comparison"]["primary_metric"] == "micro_f1"
+
+
+def test_build_label_template_rows_balances_buckets_and_excludes_labeled_ids() -> None:
+    predictions = {
+        "a1": (
+            AutoTagDecision("mood", "dark", 0.8, None, -1.0, 1.8, 0.2, True, "accepted"),
+            AutoTagDecision("texture", "raw", 0.7, None, -1.0, 1.7, 0.2, True, "accepted"),
+        ),
+        "a2": (
+            AutoTagDecision("mood", "dark", 0.8, None, -1.0, 1.8, 0.2, True, "accepted"),
+            AutoTagDecision("texture", "raw", 0.7, None, -1.0, 1.7, 0.2, True, "accepted"),
+        ),
+        "b1": (
+            AutoTagDecision("mood", "euphoric", 0.8, None, -1.0, 1.8, 0.2, True, "accepted"),
+            AutoTagDecision("texture", "airy", 0.7, None, -1.0, 1.7, 0.2, True, "accepted"),
+        ),
+    }
+
+    rows = lat.build_label_template_rows(predictions, max_rows=3, exclude_track_ids={"a1"})
+
+    assert [row["track_id"] for row in rows] == ["a2", "b1"]
+    assert all(row["label_status"] == "todo" for row in rows)

@@ -59,9 +59,12 @@ from vibemix.library.store import open_store  # noqa: E402
 
 SCHEMA = "library_auto_tags_bench_v1"
 DEFAULT_LABELS_PATH = ROOT / "eval" / "private" / "library" / "auto_tag_labels.jsonl"
+DEFAULT_LABEL_TEMPLATE_SIZE = 64
 DEFAULT_MAX_EXAMPLES = 16
+DEFAULT_MIN_HAND_LABELS = 50
 THRESHOLD_GRID = tuple(round(x / 1000, 3) for x in range(80, 321, 10))
 CATEGORIES: tuple[AutoTagCategory, ...] = ("mood", "texture", "instrument")
+TODO_LABEL_STATUSES = {"draft", "pending", "todo"}
 
 
 @dataclass(frozen=True)
@@ -108,15 +111,21 @@ def load_hand_labels(path: Path) -> dict[str, Any]:
             "status": "missing",
             "path": str(path),
             "rows": [],
+            "pending_rows": 0,
             "usable_rows": 0,
             "unknown_tags": {},
         }
 
     rows: list[HandLabelRow] = []
+    pending_rows = 0
     unknown_tags: dict[str, list[str]] = defaultdict(list)
     for raw in _read_json_rows(path):
         track_id = str(raw.get("track_id", "") or raw.get("id", "")).strip()
         if not track_id:
+            continue
+        label_status = str(raw.get("label_status", raw.get("status", "")) or "").strip().lower()
+        if label_status in TODO_LABEL_STATUSES:
+            pending_rows += 1
             continue
         split = str(raw.get("split", "") or "eval").strip().lower()
         tags_obj = raw.get("tags") if isinstance(raw.get("tags"), Mapping) else raw
@@ -136,6 +145,7 @@ def load_hand_labels(path: Path) -> dict[str, Any]:
         "status": "ok" if rows else "empty",
         "path": str(path),
         "rows": rows,
+        "pending_rows": pending_rows,
         "usable_rows": len(rows),
         "unknown_tags": {
             category: sorted(set(tags)) for category, tags in sorted(unknown_tags.items())
@@ -327,6 +337,78 @@ def _example_predictions(
     return examples
 
 
+def _decision_payload(decision: AutoTagDecision) -> dict[str, Any]:
+    return {
+        "accepted": decision.accepted,
+        "reason": decision.reason,
+        "score": decision.score,
+        "tag": decision.tag,
+        "runner_up_tag": decision.runner_up_tag,
+        "runner_up_score": decision.runner_up_score,
+        "margin": decision.margin,
+        "threshold": decision.threshold,
+    }
+
+
+def build_label_template_rows(
+    predictions: Mapping[str, Sequence[AutoTagDecision]],
+    *,
+    max_rows: int = DEFAULT_LABEL_TEMPLATE_SIZE,
+    exclude_track_ids: set[str] | None = None,
+) -> list[dict[str, Any]]:
+    """Return a diverse TODO label queue, safe to write as JSONL.
+
+    Rows are explicitly marked ``label_status: todo``; ``load_hand_labels`` skips
+    them until the reviewer changes the status. That prevents an empty template
+    from being mistaken for an all-negative hand-label set.
+    """
+    if max_rows <= 0:
+        return []
+    exclude_track_ids = exclude_track_ids or set()
+    buckets: dict[tuple[str, str], list[str]] = defaultdict(list)
+    for track_id, decisions in predictions.items():
+        if track_id in exclude_track_ids:
+            continue
+        accepted = accepted_tags(decisions)
+        mood = sorted(accepted.get("mood", {"mood_unknown"}))[0]
+        texture = sorted(accepted.get("texture", {"texture_unknown"}))[0]
+        buckets[(mood, texture)].append(track_id)
+    for bucket_ids in buckets.values():
+        bucket_ids.sort()
+
+    selected: list[str] = []
+    bucket_keys = sorted(buckets, key=lambda key: (-len(buckets[key]), key))
+    while len(selected) < max_rows:
+        progressed = False
+        for key in bucket_keys:
+            rows = buckets[key]
+            if not rows:
+                continue
+            selected.append(rows.pop(0))
+            progressed = True
+            if len(selected) >= max_rows:
+                break
+        if not progressed:
+            break
+
+    out: list[dict[str, Any]] = []
+    for i, track_id in enumerate(selected):
+        decisions = sorted(predictions[track_id], key=lambda d: d.category)
+        out.append(
+            {
+                "track_id": track_id,
+                "split": "calibration" if i % 5 == 0 else "holdout",
+                "label_status": "todo",
+                "tags": {category: [] for category in CATEGORIES},
+                "prediction_context": {
+                    decision.category: _decision_payload(decision)
+                    for decision in decisions
+                },
+            }
+        )
+    return out
+
+
 def _load_store() -> tuple[list[str], np.ndarray, str, str]:
     store = open_store()
     try:
@@ -341,8 +423,10 @@ def _load_store() -> tuple[list[str], np.ndarray, str, str]:
 def build_report(
     *,
     labels_path: Path = DEFAULT_LABELS_PATH,
+    label_template_size: int = DEFAULT_LABEL_TEMPLATE_SIZE,
     margin: float = DEFAULT_MARGIN,
     max_examples: int = DEFAULT_MAX_EXAMPLES,
+    min_hand_labels: int = DEFAULT_MIN_HAND_LABELS,
 ) -> dict[str, Any]:
     ids, vectors, backend, snapshot = _load_store()
     engine = ClapEngine()
@@ -372,6 +456,7 @@ def build_report(
             margin=margin,
         )
         mode_reports[mode] = {
+            "_predictions": predictions,
             "thresholds": {k: round(v, 6) for k, v in sorted(thresholds.items())},
             "prediction_summary": prediction_summary(predictions),
             "example_predictions": _example_predictions(predictions, max_examples=max_examples),
@@ -390,7 +475,24 @@ def build_report(
             "template_minus_bare": round(template_f1 - bare_f1, 6),
             "template_beats_bare": template_f1 > bare_f1,
         }
-        status = "ok" if len(eval_rows) >= 50 else "measured_small_hand_label_subset"
+        status = (
+            "ok"
+            if len(eval_rows) >= min_hand_labels
+            else "measured_small_hand_label_subset"
+        )
+
+    labeled_ids = {row.track_id for row in rows}
+    template_rows = (
+        build_label_template_rows(
+            mode_reports["template"]["_predictions"],
+            max_rows=label_template_size,
+            exclude_track_ids=labeled_ids,
+        )
+        if len(eval_rows) < min_hand_labels
+        else []
+    )
+    for mode in mode_reports.values():
+        mode.pop("_predictions", None)
 
     return {
         "schema": SCHEMA,
@@ -410,12 +512,21 @@ def build_report(
         "label_set": {
             "path": labels["path"],
             "status": labels["status"],
+            "pending_rows": labels["pending_rows"],
             "usable_rows": labels["usable_rows"],
             "evaluation_rows": len(eval_rows),
             "calibration_rows": len(calibration_rows),
             "calibration_strategy": calibration_strategy if rows else None,
+            "min_required_rows": min_hand_labels,
             "unknown_tags": labels["unknown_tags"],
             "hook": "create eval/private/library/auto_tag_labels.jsonl with track_id + mood/texture/instrument tags",
+        },
+        "label_template": {
+            "status": "needed" if template_rows else "not_needed",
+            "row_count": len(template_rows),
+            "path": None,
+            "rows": template_rows,
+            "safety": "label_status=todo rows are skipped until a reviewer marks them complete",
         },
         "margin": margin,
         "modes": mode_reports,
@@ -442,8 +553,11 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--out", type=Path, default=None)
     parser.add_argument("--labels", type=Path, default=DEFAULT_LABELS_PATH)
+    parser.add_argument("--label-template-size", type=int, default=DEFAULT_LABEL_TEMPLATE_SIZE)
     parser.add_argument("--margin", type=float, default=DEFAULT_MARGIN)
     parser.add_argument("--max-examples", type=int, default=DEFAULT_MAX_EXAMPLES)
+    parser.add_argument("--min-hand-labels", type=int, default=DEFAULT_MIN_HAND_LABELS)
+    parser.add_argument("--no-label-template", action="store_true")
     parser.add_argument("--json", action="store_true")
     parser.add_argument(
         "--require-labels",
@@ -454,11 +568,21 @@ def main(argv: list[str] | None = None) -> int:
 
     report = build_report(
         labels_path=args.labels,
+        label_template_size=(0 if args.no_label_template else args.label_template_size),
         margin=args.margin,
         max_examples=args.max_examples,
+        min_hand_labels=args.min_hand_labels,
     )
     out_path = args.out or default_output_path()
     out_path.parent.mkdir(parents=True, exist_ok=True)
+    template_rows = report["label_template"]["rows"]
+    if template_rows:
+        template_path = out_path.with_name("auto_tag_label_template.jsonl")
+        template_path.write_text(
+            "".join(json.dumps(row, sort_keys=True) + "\n" for row in template_rows),
+            encoding="utf-8",
+        )
+        report["label_template"]["path"] = str(template_path)
     out_path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
     if args.json:
@@ -469,6 +593,7 @@ def main(argv: list[str] | None = None) -> int:
         print(
             f"status={report['status']} embedded_tracks={report['store']['embedded_tracks']} "
             f"labels={report['label_set']['usable_rows']} "
+            f"label_template_rows={report['label_template']['row_count']} "
             f"template_abstention="
             f"{ {k: v['abstention_rate'] for k, v in template['categories'].items()} }"
         )
@@ -479,7 +604,7 @@ def main(argv: list[str] | None = None) -> int:
                 f"{comparison['primary_metric']}={comparison['template_value']} vs "
                 f"{comparison['bare_value']} delta={comparison['template_minus_bare']}"
             )
-    if args.require_labels and report["label_set"]["usable_rows"] == 0:
+    if args.require_labels and report["label_set"]["evaluation_rows"] < args.min_hand_labels:
         return 2
     return 0
 
