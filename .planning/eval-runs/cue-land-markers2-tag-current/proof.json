@@ -1,0 +1,61 @@
+{
+  "path": ".planning/eval-runs/cue-land-markers2-tag-current/markers2-proof-track.mp3",
+  "fixture_copy_removed_after_readback": true,
+  "export_result": {
+    "exported": true,
+    "target": "serato_tags",
+    "path": ".planning/eval-runs/cue-land-markers2-tag-current/markers2-proof-track.mp3",
+    "outputs": {},
+    "tag_receipts": [
+      {
+        "carrier": "serato_tags",
+        "tagged": 1,
+        "cues_total": 2,
+        "skipped": 0,
+        "files": [
+          ".planning/eval-runs/cue-land-markers2-tag-current/markers2-proof-track.mp3"
+        ],
+        "skipped_tracks": []
+      }
+    ],
+    "written": 1,
+    "referenced": 1,
+    "dropped": [],
+    "auto_cues": {
+      "enabled": true,
+      "tracks_attempted": 1,
+      "tracks_cued": 1,
+      "cues_added": 2,
+      "snap_adjusted_count": 2,
+      "snap_max_adjustment_ms": 240.0,
+      "skipped_tracks": 0,
+      "skipped_failed": 0,
+      "proposal_export_ready_count": 2,
+      "proposal_review_count": 0,
+      "proposal_missing_required_count": 1,
+      "proposal_suppressed_count": 2
+    }
+  },
+  "read_back": [
+    {
+      "index": 0,
+      "position_ms": 10000,
+      "name": "VM A IN",
+      "color": [
+        204,
+        0,
+        0
+      ]
+    },
+    {
+      "index": 3,
+      "position_ms": 64500,
+      "name": "VM D DROP",
+      "color": [
+        204,
+        0,
+        0
+      ]
+    }
+  ]
+}

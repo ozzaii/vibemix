@@ -252,6 +252,7 @@ def test_export_set_delegates_target_and_cue_bool(
         "out_path": "/tmp/set.xml",
         "cue": False,
         "target": "both",
+        "tag_write_granted": False,
     }
     assert result == {"exported": True}
 

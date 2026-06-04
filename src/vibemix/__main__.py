@@ -3716,9 +3716,14 @@ def _build_library_subparsers(parser: argparse.ArgumentParser) -> None:
     sp_auto_crate.add_argument("--name", default=None, help="set name")
     sp_auto_crate.add_argument(
         "--export",
-        choices=("rekordbox", "m3u8", "both"),
+        choices=("rekordbox", "m3u8", "both", "serato_tags", "mixxx_tags", "all"),
         default=None,
-        help="also export DJ-software handoff files (rekordbox XML, m3u8, or both)",
+        help="also export DJ-software handoff files (rekordbox XML, m3u8, tags, or all)",
+    )
+    sp_auto_crate.add_argument(
+        "--write-tags",
+        action="store_true",
+        help="grant Serato/Mixxx Markers2 tag writes into audio files for tag targets",
     )
     sp_auto_crate.add_argument("--out", dest="out_path", default=None, help="export path")
     sp_auto_crate.add_argument("--bpm-min", type=float, default=None)
@@ -7361,6 +7366,7 @@ def _cmd_library_auto_crate(args: argparse.Namespace) -> int:
         min_duration_s=getattr(args, "min_duration_s", None),
         max_duration_s=getattr(args, "max_duration_s", None),
         novelty=getattr(args, "novelty", None),
+        tag_write_granted=getattr(args, "write_tags", False),
     )
     out = result.to_dict()
 

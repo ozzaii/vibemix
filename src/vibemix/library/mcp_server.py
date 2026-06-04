@@ -372,11 +372,14 @@ def build_server(toolset: Any) -> Any:
         out_path: str | None = None,
         cue: bool = True,
         target: str = "both",
+        tag_write_granted: bool = False,
     ) -> dict[str, Any]:
         """Export the chosen ordered set to DJ-software handoff files.
 
         Default target "both" writes Rekordbox XML (order + key + BPM +
         VM-stamped auto cues) plus M3U8 (order-only crate for other DJ apps).
+        Serato/Mixxx tag targets require tag_write_granted=True because they
+        mutate audio file tags.
         Every track_id must have come from a prior discovery result. Call once
         when the DJ accepts a set."""
         return toolset.export_set(
@@ -386,6 +389,7 @@ def build_server(toolset: Any) -> Any:
                 "out_path": out_path,
                 "cue": cue,
                 "target": target,
+                "tag_write_granted": tag_write_granted,
             }
         )
 

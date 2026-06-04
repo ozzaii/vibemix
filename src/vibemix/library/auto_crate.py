@@ -85,6 +85,7 @@ def build_auto_crate(
     min_duration_s: float | None = None,
     max_duration_s: float | None = None,
     novelty: float | None = None,
+    tag_write_granted: bool = False,
     toolset: Any | None = None,
 ) -> AutoCrateResult:
     """Build a grounded sequence and persist it as playlist/export artifacts."""
@@ -205,11 +206,12 @@ def build_auto_crate(
         export_path = None
         export_outputs: dict[str, str] = {}
         stop_reason = "created"
-        if export in {"rekordbox", "m3u8", "both"}:
+        if export in {"rekordbox", "m3u8", "both", "serato_tags", "mixxx_tags", "all"}:
             export_args: dict[str, Any] = {
                 "name": result_name,
                 "track_ids": track_ids,
                 "target": export,
+                "tag_write_granted": tag_write_granted,
             }
             if out_path:
                 export_args["out_path"] = out_path

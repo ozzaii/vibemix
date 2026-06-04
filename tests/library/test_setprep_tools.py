@@ -19,8 +19,10 @@ fake store + in-memory library; energy is monkeypatched.
 from __future__ import annotations
 
 import pathlib
+import shutil
 import time
 import xml.etree.ElementTree as ET
+from dataclasses import replace
 from types import SimpleNamespace
 
 import numpy as np
@@ -38,6 +40,8 @@ from vibemix.library.rekordbox import (
 )
 from vibemix.library.staleness import LibraryFreshness
 from vibemix.library.toolset import MAX_INSPECT_CANDIDATES, LibraryToolset
+
+_REAL_MP3 = pathlib.Path(__file__).resolve().parents[1] / "bench" / "data" / "t1_pyrez_darkside.mp3"
 
 # --------------------------------------------------------------------------- #
 # Fixtures — mirror test_discovery.py / test_next_suggestion.py fakes.
@@ -912,6 +916,56 @@ def test_export_set_target_m3u8_writes_order_only_crate(toolset, tmp_path):
     lines = out_m3u8.read_text(encoding="utf-8").splitlines()
     assert lines[0] == "#EXTM3U"
     assert lines[-1] == "/tmp/t000.mp3"
+
+
+def test_export_set_serato_tags_requires_explicit_permission(toolset):
+    toolset.seen.add("t000")
+
+    out = toolset.export_set(
+        {"name": "Tag Write", "track_ids": ["t000"], "target": "serato_tags"}
+    )
+
+    assert "error" in out
+    assert "tag_write_granted=True" in out["error"]
+
+
+@pytest.mark.skipif(not _REAL_MP3.exists(), reason="needs the in-repo test mp3")
+def test_export_set_serato_tags_writes_vm_cues_with_permission(toolset, tmp_path, monkeypatch):
+    pytest.importorskip("mutagen")
+    dst = tmp_path / "track.mp3"
+    shutil.copy(_REAL_MP3, dst)
+    toolset.seen.add("t000")
+    toolset._library.tracks["t000"] = replace(_track("t000", bpm=120.0), filepath=str(dst))
+    monkeypatch.setattr(
+        tool_mod,
+        "sections_for_entry",
+        lambda entry: (
+            _section(f"{entry.track_id}#intro", "intro", 10.21, 32.0),
+            _section(f"{entry.track_id}#drop", "drop", 64.26, 128.0),
+        ),
+    )
+
+    out = toolset.export_set(
+        {
+            "name": "Tag Write",
+            "track_ids": ["t000"],
+            "target": "serato_tags",
+            "tag_write_granted": True,
+        }
+    )
+
+    assert out.get("exported") is True
+    assert out["target"] == "serato_tags"
+    assert out["outputs"] == {}
+    assert out["tag_receipts"][0]["tagged"] == 1
+    assert out["auto_cues"]["snap_adjusted_count"] >= 2
+    from vibemix.library.export_serato import read_serato_cues
+
+    cues = {cue.name: cue for cue in read_serato_cues(dst)}
+    assert "VM A IN" in cues
+    assert "VM D DROP" in cues
+    assert cues["VM A IN"].position_ms == 10000
+    assert cues["VM D DROP"].position_ms == 64500
 
 
 def test_export_set_forwards_rekordbox_cues_and_beatgrid(toolset, tmp_path):

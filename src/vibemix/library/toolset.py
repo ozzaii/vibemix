@@ -973,10 +973,17 @@ class LibraryToolset:
             target = _export_target_arg(args.get("target", args.get("export", "both")))
         except ValueError as exc:
             return {"error": f"export_set: {exc}"}
-        auto_cue_enabled = bool(args.get("cue", args.get("auto_cue", True))) and target in {
-            "rekordbox",
-            "both",
-        }
+        tag_write_granted = bool(args.get("tag_write_granted", args.get("write_tags", False)))
+        if _target_wants_tags(target) and not tag_write_granted:
+            return {
+                "error": (
+                    "export_set: target writes Serato/Mixxx Markers2 tags into audio files; "
+                    "pass tag_write_granted=True after explicit user permission"
+                )
+            }
+        auto_cue_enabled = bool(args.get("cue", args.get("auto_cue", True))) and (
+            _target_wants_rekordbox(target) or _target_wants_tags(target)
+        )
         auto_cue_report: dict[str, Any] = _auto_cue_report(enabled=auto_cue_enabled)
         try:
             from vibemix.library import export_rekordbox
@@ -1028,17 +1035,18 @@ class LibraryToolset:
                 out_path = str(_default_set_export_path(name, suffix=suffix))
             outputs: dict[str, str] = {}
             dropped: list[dict[str, Any]] = []
+            tag_receipts: list[dict[str, Any]] = []
             written = 0
             referenced = len(items)
             result: ExportResult | None = None
-            if target in {"rekordbox", "both"}:
+            if _target_wants_rekordbox(target):
                 xml_path = _with_export_suffix(out_path, ".xml")
                 result = export_rekordbox.export_set(items, name, xml_path, library=self._library)
                 outputs["rekordbox"] = str(result.path)
                 written = result.written
                 referenced = result.referenced
                 dropped.extend(result.dropped)
-            if target in {"m3u8", "both"}:
+            if _target_wants_m3u8(target):
                 from vibemix.library.cue_folder import write_m3u8
 
                 m3u8_path = _with_export_suffix(out_path, ".m3u8")
@@ -1047,7 +1055,25 @@ class LibraryToolset:
                 if result is None:
                     written = len(items)
                     referenced = len(items)
-            if result is None and not outputs:
+            if _target_wants_tags(target):
+                tag_receipt = _write_export_set_markers2_tags(
+                    items,
+                    carrier="mixxx_tags" if target == "mixxx_tags" else "serato_tags",
+                    granted=tag_write_granted,
+                )
+                tag_receipts.append(tag_receipt)
+                if tag_receipt["tagged"] <= 0 and not outputs:
+                    return {
+                        "error": (
+                            "export_set: no Serato/Mixxx tag carrier written; "
+                            f"{tag_receipt['skipped']} track(s) skipped"
+                        ),
+                        "tag_receipts": tag_receipts,
+                    }
+                if result is None and not outputs:
+                    written = int(tag_receipt["tagged"])
+                    referenced = int(tag_receipt["tagged"])
+            if result is None and not outputs and not tag_receipts:
                 return {"error": f"export_set: unsupported target {target!r}"}
         except Exception as e:
             logger.warning("[viber] export_set failed: %s", e)
@@ -1057,12 +1083,21 @@ class LibraryToolset:
         # ``created`` ends a create_playlist run).
         if result is not None:
             self.exported = result
-        primary_path = outputs.get("rekordbox") or outputs.get("m3u8") or str(out_path)
+        primary_path = (
+            outputs.get("rekordbox")
+            or outputs.get("m3u8")
+            or (
+                tag_receipts[0]["files"][0]
+                if tag_receipts and tag_receipts[0].get("files")
+                else str(out_path)
+            )
+        )
         return {
             "exported": True,
             "target": target,
             "path": primary_path,
             "outputs": outputs,
+            "tag_receipts": tag_receipts,
             "written": written,
             "referenced": referenced,
             "dropped": dropped,
@@ -1885,20 +1920,89 @@ def _export_cues_and_grid(entry: Any) -> dict[str, Any]:
     return out
 
 
-def _export_target_arg(raw: Any) -> Literal["rekordbox", "m3u8", "both"]:
+def _export_target_arg(raw: Any) -> str:
     value = str(raw or "both").strip().lower().replace("-", "_")
     aliases = {
+        "all_dj": "all",
         "xml": "rekordbox",
         "rekordbox_xml": "rekordbox",
         "playlist": "m3u8",
         "crate": "m3u8",
-        "all": "both",
         "portable": "both",
+        "serato": "serato_tags",
+        "serato_markers2": "serato_tags",
+        "markers2": "serato_tags",
+        "tags": "serato_tags",
+        "mixxx": "mixxx_tags",
     }
     value = aliases.get(value, value)
-    if value in {"rekordbox", "m3u8", "both"}:
-        return value  # type: ignore[return-value]
-    raise ValueError("target must be one of 'rekordbox', 'm3u8', 'both'")
+    if value in {"rekordbox", "m3u8", "both", "serato_tags", "mixxx_tags", "all"}:
+        return value
+    raise ValueError(
+        "target must be one of 'rekordbox', 'm3u8', 'both', "
+        "'serato_tags', 'mixxx_tags', 'all'"
+    )
+
+
+def _target_wants_rekordbox(target: str) -> bool:
+    return target in {"rekordbox", "both", "all"}
+
+
+def _target_wants_m3u8(target: str) -> bool:
+    return target in {"m3u8", "both", "all"}
+
+
+def _target_wants_tags(target: str) -> bool:
+    return target in {"serato_tags", "mixxx_tags", "all"}
+
+
+def _write_export_set_markers2_tags(
+    items: list[dict[str, Any]],
+    *,
+    carrier: Literal["serato_tags", "mixxx_tags"],
+    granted: bool,
+) -> dict[str, Any]:
+    from vibemix.library.export_serato import marks_to_serato_cues, write_serato_cues
+
+    tagged = 0
+    cues_total = 0
+    files: list[str] = []
+    skipped: list[dict[str, str]] = []
+    for item in items:
+        filepath = str(item.get("filepath") or "")
+        if not filepath:
+            skipped.append({"track_id": str(item.get("track_id") or ""), "reason": "missing filepath"})
+            continue
+        marks = [mark for mark in item.get("cues", ()) or () if isinstance(mark, dict)]
+        if not marks:
+            skipped.append({"track_id": str(item.get("track_id") or ""), "reason": "no cue marks"})
+            continue
+        res = write_serato_cues(
+            filepath,
+            marks_to_serato_cues(marks),
+            merge=True,
+            allow_write=granted,
+        )
+        if res.get("written"):
+            tagged += 1
+            cues_total += int(res.get("cue_count", len(marks)) or 0)
+            files.append(str(res.get("path") or filepath))
+        else:
+            skipped.append(
+                {
+                    "track_id": str(item.get("track_id") or ""),
+                    "filepath": filepath,
+                    "reason": str(res.get("reason") or "not written"),
+                }
+            )
+    return {
+        "carrier": carrier,
+        "tagged": tagged,
+        "cues_total": cues_total,
+        "skipped": len(skipped),
+        "files": files,
+        "skipped_tracks": skipped,
+    }
 
 
 def _default_set_export_path(name: str, *, suffix: str) -> pathlib.Path:
