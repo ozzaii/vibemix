@@ -47,6 +47,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from vibemix.library.cue_provenance import provenance_stamped_cue_name
 from vibemix.state.harmonics import to_classical
 
 __all__ = ["ExportResult", "export_set"]
@@ -300,8 +301,12 @@ def _add_cues(track: Any, cues: Sequence[Mapping[str, Any]] | None) -> None:
                 except (TypeError, ValueError):
                     end_f = None
 
+        name = provenance_stamped_cue_name(cue.get("name"), cue.get("source"))
+        if name is None:
+            continue
+
         track.add_mark(
-            Name=str(cue.get("name") or ""),
+            Name=name,
             Type=cue_type,
             Start=start_f,
             End=end_f,

@@ -6,7 +6,7 @@ DSP is tested over synthetic numpy audio with ``decode_to_mono`` monkeypatched
 so no ffmpeg binary / real audio file is needed. One ``@pytest.mark.integration``
 test exercises the real ffmpeg decode path against a generated WAV.
 
-``detect_cues`` now returns ``list[CueAnchor]`` (``source="auto"``) — labeled,
+``detect_cues`` now returns ``list[CueAnchor]`` (``source="fallback"``) — labeled,
 phrase-snapped, confidence-scored mixable WINDOWS (span cues), not point cues.
 Structure (not energy) drives the labels: ``drop`` = the kick slamming back in
 after a sustained breakdown (the re-entry), ``breakdown`` = the bass-cut that
@@ -209,7 +209,7 @@ def _assert_anchor_contract(anchors: list[CueAnchor]) -> None:
     assert all(isinstance(a, CueAnchor) for a in anchors)
     for a in anchors:
         assert a.label in VALID_LABELS, a.label
-        assert a.source == "auto", a.source
+        assert a.source == "fallback", a.source
         assert 0.0 <= a.confidence <= 1.0, a.confidence
         assert a.start_s < a.end_s, (a.start_s, a.end_s)
         assert (a.end_s - a.start_s) <= 80.0 + 1e-6, (a.start_s, a.end_s)

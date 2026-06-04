@@ -127,6 +127,20 @@ def test_marks_to_serato_cues_maps_index_ms_name_and_color() -> None:
     assert cues[1].color == (230, 40, 40)   # drop = red
 
 
+def test_marks_to_serato_cues_stamps_machine_sources_and_rejects_dj_spoof() -> None:
+    marks = [
+        {"start_s": 5.0, "num": 0, "name": "INTRO", "source": "auto"},
+        {"start_s": 64.0, "num": 1, "name": "DROP", "source": "dj"},
+        {"start_s": 80.0, "num": 2, "name": "VM SPOOF", "source": "dj"},
+    ]
+
+    cues = marks_to_serato_cues(marks)
+
+    assert [c.name for c in cues] == ["VM INTRO", "DROP"]
+    assert cues[0].color == (40, 226, 20)
+    assert cues[1].color == (230, 40, 40)
+
+
 def test_merge_cues_preserves_foreign_index_and_overrides_same() -> None:
     """A DJ's hand-set cue at a pad vibemix doesn't write is preserved; a pad
     vibemix does write is overridden by vibemix's structural cue."""

@@ -33,6 +33,8 @@ import logging
 from dataclasses import dataclass
 from pathlib import Path
 
+from vibemix.library.cue_provenance import provenance_stamped_cue_name
+
 logger = logging.getLogger("vibemix.library")
 
 _HEADER = b"\x01\x01"
@@ -135,10 +137,12 @@ def _name_colors() -> dict[str, tuple[int, int, int]]:
     """Mark-NAME -> RGB, reversed from the cue_export label maps (single source)."""
     from vibemix.library.cue_export import _LABEL_COLORS, _LABEL_TO_MARK_NAME
 
-    return {
-        _LABEL_TO_MARK_NAME[label]: _LABEL_COLORS[label]
-        for label in _LABEL_TO_MARK_NAME
-    }
+    colors = {}
+    for label in _LABEL_TO_MARK_NAME:
+        name = _LABEL_TO_MARK_NAME[label]
+        colors[name] = _LABEL_COLORS[label]
+        colors[f"VM {name}"] = _LABEL_COLORS[label]
+    return colors
 
 
 def marks_to_serato_cues(marks: list[dict]) -> list[SeratoCue]:
@@ -151,7 +155,9 @@ def marks_to_serato_cues(marks: list[dict]) -> list[SeratoCue]:
     colors = _name_colors()
     cues: list[SeratoCue] = []
     for mark in marks:
-        name = str(mark.get("name") or "")
+        name = provenance_stamped_cue_name(mark.get("name"), mark.get("source"))
+        if name is None:
+            continue
         cues.append(
             SeratoCue(
                 index=int(mark.get("num", 0)),

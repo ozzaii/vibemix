@@ -37,6 +37,8 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from vibemix.library.cue_provenance import provenance_stamped_cue_name
+
 __all__ = [
     "cue_anchor_to_mark_kwargs",
     "export_cues",
@@ -81,7 +83,8 @@ def cue_anchor_to_mark_kwargs(cue: Any, num: int) -> dict[str, Any]:
     owns validation.
     """
     label = getattr(cue, "label", None)
-    name = _LABEL_TO_MARK_NAME.get(label, str(label).upper() if label else "CUE")
+    bare_name = _LABEL_TO_MARK_NAME.get(label, str(label).upper() if label else "CUE")
+    name = provenance_stamped_cue_name(bare_name, getattr(cue, "source", "dj")) or "CUE"
     start = float(getattr(cue, "start_s", 0.0) or 0.0)
     return {
         "Name": name,

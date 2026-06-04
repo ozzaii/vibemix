@@ -88,6 +88,7 @@ def anchors_to_marks(
                 "start_s": round(float(anc.start_s), 3),
                 "num": num,
                 "name": name,
+                "source": anc.source,
             }
         )
     return marks

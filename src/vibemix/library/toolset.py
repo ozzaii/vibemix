@@ -1813,6 +1813,7 @@ def _export_cues_and_grid(entry: Any) -> dict[str, Any]:
             "type": getattr(cue, "type", "cue") or "cue",
             "start_s": getattr(cue, "start_s", 0.0),
             "num": getattr(cue, "number", -1),
+            "source": getattr(cue, "source", "dj") or "dj",
         }
         end_s = getattr(cue, "end_s", None)
         if end_s is not None:

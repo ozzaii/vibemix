@@ -21,7 +21,7 @@ from vibemix.intel.transition_scorer import SectionRecord
 from vibemix.library import toolset as tool_mod
 from vibemix.library.create_playlist import create_playlist
 from vibemix.library.rekordbox import CuePoint, RekordboxLibrary, TrackEntry
-from vibemix.library.toolset import LibraryToolset
+from vibemix.library.toolset import LibraryToolset, _export_cues_and_grid
 
 
 def test_local_toolset_import_does_not_load_gemini_sdk() -> None:
@@ -107,6 +107,35 @@ def test_shared_toolset_does_not_dispatch_raw_cue_export_tool(toolset) -> None:
     )
 
     assert out == {"error": "unknown tool 'export_cues'"}
+
+
+def test_export_cues_and_grid_threads_cue_source() -> None:
+    entry = _make_track(
+        "t000",
+        cues=(
+            CuePoint(
+                name="INTRO",
+                type="cue",
+                start_s=8.0,
+                end_s=None,
+                number=0,
+                source="auto",
+                confidence=0.82,
+            ),
+        ),
+    )
+
+    payload = _export_cues_and_grid(entry)
+
+    assert payload["cues"] == [
+        {
+            "name": "INTRO",
+            "type": "cue",
+            "start_s": 8.0,
+            "num": 0,
+            "source": "auto",
+        }
+    ]
 
 
 def _make_track(

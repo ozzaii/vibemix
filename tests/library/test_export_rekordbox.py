@@ -229,6 +229,42 @@ def test_hot_and_memory_cues_written(tmp_path):
     assert float(by_name["LOOP"].attrib["End"]) == pytest.approx(104.0)
 
 
+def test_machine_cue_provenance_is_visible_and_dj_cues_are_preserved(tmp_path):
+    """Auto/ANLZ/fallback cues must not land byte-identical to DJ cues.
+
+    Rekordbox XML has no Source attribute on POSITION_MARK, so the visible
+    carrier provenance is the reserved VM prefix. DJ-authored names stay
+    verbatim unless they try to use that prefix, in which case the mark is
+    rejected instead of masquerading.
+    """
+    out = tmp_path / "set.xml"
+    cues = [
+        {"name": "DROP", "type": "cue", "start_s": 64.5, "num": 0, "source": "dj"},
+        {"name": "INTRO", "type": "cue", "start_s": 8.0, "num": 1, "source": "auto"},
+        {"name": "BUILD", "type": "cue", "start_s": 32.0, "num": 2, "source": "anlz"},
+        {
+            "name": "BREAKDOWN",
+            "type": "cue",
+            "start_s": 96.0,
+            "num": 3,
+            "source": "fallback",
+        },
+        {"name": "VM SPOOF", "type": "cue", "start_s": 128.0, "num": 4, "source": "dj"},
+    ]
+    export_set([_track(cues=cues)], name="S", out_path=out)
+
+    root = _parse(out)
+    marks = _collection_tracks(root)[0].findall("POSITION_MARK")
+    names = [m.attrib["Name"] for m in marks]
+    assert names == ["DROP", "VM INTRO", "VM BUILD", "VM BREAKDOWN"]
+    assert "VM SPOOF" not in names
+    by_name = {m.attrib["Name"]: m for m in marks}
+    assert by_name["DROP"].attrib["Num"] == "0"
+    assert by_name["VM INTRO"].attrib["Num"] == "1"
+    assert by_name["VM BUILD"].attrib["Num"] == "2"
+    assert by_name["VM BREAKDOWN"].attrib["Num"] == "3"
+
+
 # --------------------------------------------------------------------- #
 # Optional metadata: Colour + Rating                                    #
 # --------------------------------------------------------------------- #

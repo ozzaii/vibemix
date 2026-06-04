@@ -81,7 +81,7 @@ def _cue(label: str, start: float, end: float = 0.0) -> CueAnchor:
 def test_mark_kwargs_pure_mapping() -> None:
     kwargs = cue_anchor_to_mark_kwargs(_cue("drop", 64.0, 80.0), num=2)
     assert kwargs == {
-        "Name": "DROP",
+        "Name": "VM DROP",
         "Type": "cue",
         "Start": 64.0,
         "End": None,  # point hot cue, not a loop region
@@ -92,7 +92,7 @@ def test_mark_kwargs_pure_mapping() -> None:
 def test_mark_kwargs_each_label_name() -> None:
     for label, expected in _LABEL_TO_MARK_NAME.items():
         kwargs = cue_anchor_to_mark_kwargs(_cue(label, 1.0), num=0)
-        assert kwargs["Name"] == expected
+        assert kwargs["Name"] == f"VM {expected}"
         assert kwargs["Type"] == "cue"
         assert kwargs["End"] is None
 
@@ -117,7 +117,7 @@ def test_export_maps_each_label_to_name_and_color(tmp_path) -> None:
     assert res["cue_count"] == 5
     assert len(fake.track.marks) == 5
     for mark, cue in zip(fake.track.marks, cues, strict=True):
-        assert mark.kwargs["Name"] == _LABEL_TO_MARK_NAME[cue.label]
+        assert mark.kwargs["Name"] == f"VM {_LABEL_TO_MARK_NAME[cue.label]}"
         r, g, b = _LABEL_COLORS[cue.label]
         assert (mark.Red, mark.Green, mark.Blue) == (r, g, b)
 
@@ -133,7 +133,7 @@ def test_export_num_increments_in_start_order(tmp_path) -> None:
     nums = [m.kwargs["Num"] for m in fake.track.marks]
     names = [m.kwargs["Name"] for m in fake.track.marks]
     assert nums == [0, 1, 2]
-    assert names == ["INTRO", "BUILD", "DROP"]  # sorted by start
+    assert names == ["VM INTRO", "VM BUILD", "VM DROP"]  # sorted by start
 
 
 def test_export_records_add_track_marks_and_save(tmp_path) -> None:
@@ -230,4 +230,4 @@ def test_export_against_real_pyrekordbox(tmp_path) -> None:
     assert len(tracks) == 1
     marks = tracks[0].marks
     assert len(marks) == 3
-    assert [m.Name for m in marks] == ["INTRO", "BUILD", "DROP"]
+    assert [m.Name for m in marks] == ["VM INTRO", "VM BUILD", "VM DROP"]

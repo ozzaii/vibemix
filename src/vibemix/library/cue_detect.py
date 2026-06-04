@@ -2,7 +2,7 @@
 """Offline auto-cue engine — the foundation of "Viber auto-places your hot cues".
 
 This module runs OFFLINE structure analysis on a fully-decoded track and emits
-ordered :class:`CueAnchor` spans (``source="auto"``) at the musically meaningful,
+ordered :class:`CueAnchor` spans (``source="fallback"``) at the musically meaningful,
 mixable regions: ``intro / build / breakdown / drop / outro``. It is the
 "Path 2" analysis layer that lets the cue-anchored embedding strategy
 (``ClapEmbedder`` + ``ingest_folder``) embed phrase-aligned mixable windows
@@ -99,7 +99,7 @@ found in the audio. A steady groove with no breakdown gets intro/outro only.
 # Output
 
 ``detect_cues(audio_path, *, max_cues=N)`` returns up to ``N`` ordered
-:class:`CueAnchor`s (``source="auto"``) with ascending ``start_s``, each carrying
+:class:`CueAnchor`s (``source="fallback"``) with ascending ``start_s``, each carrying
 a ≤80s phrase-aligned mixable window (``start_s`` < ``end_s``) and a [0,1]
 ``confidence``. Empty list on no structure.
 """
@@ -634,7 +634,7 @@ def detect_cues(audio_path: Path, *, max_cues: int = 4) -> list[CueAnchor]:
     Deterministic, pure-DSP, NO network, NO Gemini. Runs the breakdown-driven
     engine pipeline (decode → sub-edge kill/reentry pairs → significant-breakdown
     selection → structural cue building → dance-gate → windows → confidence)
-    documented at module top. Returns ``source="auto"`` anchors with ascending
+    documented at module top. Returns ``source="fallback"`` anchors with ascending
     ``start_s``, each carrying a ≤80s phrase-aligned mixable window and a [0,1]
     confidence.
 
@@ -790,7 +790,7 @@ def detect_cues(audio_path: Path, *, max_cues: int = 4) -> list[CueAnchor]:
                     start_s=round(float(start_s), 3),
                     end_s=round(float(end_s), 3),
                     confidence=round(float(conf), 4),
-                    source="auto",
+                    source="fallback",
                 ),
                 float(priority) - conf,  # lower = keep first
             )

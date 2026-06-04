@@ -49,6 +49,7 @@ def test_anchors_to_marks_assigns_ascending_num_and_label_names() -> None:
     assert [m["num"] for m in marks] == [0, 1, 2]
     assert [m["name"] for m in marks] == ["INTRO", "DROP", "OUTRO"]
     assert [m["start_s"] for m in marks] == [5.0, 64.0, 200.0]
+    assert [m["source"] for m in marks] == ["auto", "auto", "auto"]
     assert all(m["type"] == "cue" for m in marks)
 
 
@@ -128,7 +129,7 @@ def test_cue_folder_output_feeds_export_set(tmp_path: Path) -> None:
     cues = result.tracks[0]["cues"]
     assert [c["name"] for c in cues] == ["INTRO", "BREAKDOWN", "DROP"]
     assert [c["num"] for c in cues] == [0, 1, 2]
-    assert all(set(c) >= {"type", "start_s", "num", "name"} for c in cues)
+    assert all(set(c) >= {"type", "start_s", "num", "name", "source"} for c in cues)
 
     out = tmp_path / "collection.xml"
     res = export_set(result.tracks, "vibemix cues", out)
@@ -257,7 +258,7 @@ def test_tag_folder_serato_writes_cues_into_each_file(tmp_path: Path) -> None:
     assert report["skipped"] == 0
     for name in ("a.mp3", "b.mp3"):
         back = read_serato_cues(tmp_path / name)
-        assert [c.name for c in back] == ["INTRO", "DROP"]
+        assert [c.name for c in back] == ["VM INTRO", "VM DROP"]
 
 
 def test_tag_folder_serato_requires_opt_in(tmp_path: Path) -> None:

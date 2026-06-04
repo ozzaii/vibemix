@@ -2,7 +2,8 @@
 """CueAnchor — the cross-session contract for structural cue points.
 
 This is the single shared seam between the auto-cue *producer* (the offline
-pipeline assembled by :mod:`vibemix.library.cue_engine`, ``source="auto"``), the
+pipeline assembled by :mod:`vibemix.library.cue_engine`, ``source="auto"`` or
+``source="fallback"``), the
 Rekordbox ANLZ structure floor (``source="anlz"``), and the *consumer* (the
 embedding/ingest path that slices <=80s mixable windows and, later, the live
 co-host's "enter on hot cue 2" suggestions). DJ-library cues (Rekordbox/Serato
@@ -35,7 +36,7 @@ from typing import Literal
 __all__ = ["CueAnchor", "CueLabel", "CueSource"]
 
 CueLabel = Literal["intro", "build", "breakdown", "drop", "outro"]
-CueSource = Literal["dj", "anlz", "auto"]
+CueSource = Literal["dj", "anlz", "auto", "fallback"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -47,7 +48,8 @@ class CueAnchor:
     producer's trust in this anchor; consumers gate on it (a low-confidence cue
     falls back to mean-excerpt embedding / is hedged or suppressed in the live
     pill). ``source`` records who placed it: ``"dj"`` (from a DJ library),
-    ``"anlz"`` (Rekordbox offline structure), or ``"auto"`` (this engine).
+    ``"anlz"`` (Rekordbox offline structure), ``"auto"`` (primary detector),
+    or ``"fallback"`` (dep-free heuristic).
     """
 
     label: CueLabel
