@@ -176,12 +176,12 @@ def _probe_midi_count(
     controller_state: Any | None,
     music_state: MusicState | None = None,
 ) -> int | None:
-    """Trusted controller-motion count for the compact status badge.
+    """Connected controller count for the compact status badge.
 
-    A visible/open FLX4 port is only setup presence. The live status badge must
-    answer the product question a DJ cares about mid-set: is controller motion
-    reaching vibemix in a form we can trust? Richer diagnosis still lives in
-    ``deck_mixer.midi_activity`` and Course 3 operator actions.
+    The small badge answers "is a controller connected?" while the adjacent
+    ``midi_activity`` field carries the richer diagnosis (idle/no traffic,
+    unmapped traffic, disconnected). A plugged FLX4 sitting still is connected,
+    not dead.
     """
     if music_state is not None:
         try:
@@ -189,13 +189,13 @@ def _probe_midi_count(
             connected = bool(getattr(music_state, "controller_connected", False))
             if activity == "disconnected":
                 return 0
-            if activity in {"connected_no_midi_traffic", "midi_traffic_unmapped"}:
-                return 0
             messages = max(0, int(getattr(music_state, "controller_midi_messages_seen", 0) or 0))
             if messages > 0:
                 return 1
             if connected:
-                return 0
+                return 1
+            if activity in {"connected_no_midi_traffic", "midi_traffic_unmapped"}:
+                return 1
         except Exception:
             pass
     if controller_state is None:
