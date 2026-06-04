@@ -400,6 +400,67 @@ def test_live_beatmatch_grade_voices_locked_with_resolving_citation(monkeypatch)
     assert _live_grade_payloads(ipc)[-1]["citation"] is None
 
 
+def test_credited_beatmatch_grade_completes_and_loads_next_lesson(monkeypatch) -> None:
+    """A cited locked L2.01 grade credits, completes, snapshots, and opens L2.02."""
+    monkeypatch.setattr("vibemix.learn.progress.save_progress", lambda _progress: None)
+    progress = LearnProgress()
+    _make_beatmatching_competent(progress)
+    registry = EvidenceRegistry()
+    ipc = MagicMock(name="ipc_router")
+    runtime = LessonRuntime(
+        learn_state=LearnState(),
+        midi_mirror=MagicMock(name="midi_mirror"),
+        controller_state=MagicMock(name="controller_state"),
+        ipc_router=ipc,
+        progress_store=progress,
+        evidence_registry=registry,
+        evidence_clock=lambda: 42.4,
+        beatmatch_practice_loader=_locked_beatmatch_snapshot,
+        beatmatch_practice_action_recorder=lambda _lesson_id, _midi: True,
+    )
+    runtime.send(
+        "load",
+        lesson_id="L2.01",
+        course_id="course_2_transitions",
+        controller_id="pioneer_ddj_flx4",
+    )
+    runtime.send("begin")
+
+    consumed = runtime.handle_beatmatch_practice_ack(
+        {"type": "cc", "control": "tempo", "deck": "B", "value": 64, "prev_value": 0}
+    )
+    runtime.send("finish")
+
+    assert consumed is True
+    assert progress.skills["beatmatching"]["live_proof_count"] == 1
+    assert progress.lessons["L2.01"]["completed"] is True
+    assert runtime._learn.current_lesson_id == "L2.02"
+    assert runtime.current_state.id == "awaiting_action"
+    emitted = [call.args[0] for call in ipc.emit.call_args_list if call.args]
+    complete_index = next(
+        index
+        for index, env in enumerate(emitted)
+        if isinstance(env, dict) and env.get("type") == "ipc.learn.complete_lesson"
+    )
+    next_loaded_index = next(
+        index
+        for index, env in enumerate(emitted)
+        if (
+            isinstance(env, dict)
+            and env.get("type") == "ipc.learn.lesson_loaded"
+            and env.get("payload", {}).get("lesson_id") == "L2.02"
+        )
+    )
+    assert complete_index < next_loaded_index
+    snapshots = [
+        env["payload"]["progress"]
+        for env in emitted
+        if isinstance(env, dict) and env.get("type") == "ipc.learn.progress_state"
+    ]
+    assert snapshots[-1]["skills"]["beatmatching"]["live_proof_count"] == 1
+    assert any(row["skill_id"] == "beatmatching" for row in snapshots[-1]["skill_wall"])
+
+
 def test_live_beatmatch_grade_cites_locked_event_before_mastery_credit() -> None:
     """A measured locked grade cites its event even before skill credit unlocks."""
     registry = EvidenceRegistry()

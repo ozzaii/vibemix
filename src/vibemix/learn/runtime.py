@@ -90,7 +90,7 @@ from vibemix.learn.cue_practice import (
     grade_owned_cue_placement_state,
     is_creditable_cue_placement_grade,
 )
-from vibemix.learn.curriculum import CURRICULUM
+from vibemix.learn.curriculum import CURRICULUM, course_lesson_ids
 from vibemix.learn.graduation import (
     GraduationSummary,
     build_graduation_summary,
@@ -578,6 +578,7 @@ class LessonRuntime(StateMachine):
         # ``on_enter_advancing`` fires, so the advance envelope's
         # ``reason`` field carries the right token.
         self._last_was_match: bool = False
+        self._last_completion_can_advance: bool = False
         # WR-04 fix (P92 REVIEW): track the in-flight _finish_when_dwelled
         # task so re-load can cancel it. Without this, a post-completion
         # replay can have a stale finish task wake up ~45 s later and
@@ -1128,6 +1129,7 @@ class LessonRuntime(StateMachine):
     # ------------------------------------------------------------------
     def on_ack_action(self, **kwargs: Any) -> None:
         self._last_was_match = True
+        self._last_completion_can_advance = True
         midi = kwargs.get("midi")
         prehandled_beatmatch_ack = self._beatmatch_practice_ack_prehandled
         self._beatmatch_practice_ack_prehandled = False
@@ -1221,11 +1223,13 @@ class LessonRuntime(StateMachine):
 
     def on_skip(self, **_kwargs: Any) -> None:
         self._last_was_match = False
+        self._last_completion_can_advance = False
 
     def on_observer_complete(
         self, completed: bool = True, **_kwargs: Any
     ) -> None:
         self._last_was_match = completed
+        self._last_completion_can_advance = False
 
     # ------------------------------------------------------------------
     # State-entry callbacks — the sole-writer surface for LearnState
@@ -1555,6 +1559,7 @@ class LessonRuntime(StateMachine):
                     f"[learn.runtime] lesson observer stop failed: {exc!r}",
                     file=sys.stderr,
                 )
+        self._advance_to_next_lesson_if_needed()
 
     # ------------------------------------------------------------------
     # Helpers — tutor + hint emit sites
@@ -1576,6 +1581,41 @@ class LessonRuntime(StateMachine):
 
             print(
                 f"[learn.runtime] mark_started failed: {exc!r}",
+                file=sys.stderr,
+            )
+
+    def _advance_to_next_lesson_if_needed(self) -> None:
+        """Auto-load the next authored lesson after a demonstrated completion."""
+        if not self._last_was_match or not self._last_completion_can_advance:
+            return
+        self._last_completion_can_advance = False
+        course_id = self._learn.current_course_id
+        lesson_id = self._learn.current_lesson_id
+        controller_id = self._learn.current_controller_id
+        if not course_id or not lesson_id or not controller_id:
+            return
+        lesson_ids = course_lesson_ids(course_id)
+        try:
+            index = lesson_ids.index(lesson_id)
+        except ValueError:
+            return
+        next_index = index + 1
+        if next_index >= len(lesson_ids):
+            return
+        next_lesson_id = lesson_ids[next_index]
+        try:
+            self.send(
+                "load",
+                lesson_id=next_lesson_id,
+                course_id=course_id,
+                controller_id=controller_id,
+            )
+            self.send("begin")
+        except Exception as exc:  # pragma: no cover - defensive
+            import sys
+
+            print(
+                f"[learn.runtime] next lesson advance failed: {exc!r}",
                 file=sys.stderr,
             )
 
