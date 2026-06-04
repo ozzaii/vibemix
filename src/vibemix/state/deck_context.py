@@ -320,7 +320,7 @@ _MIXER_LOW_KILL_NEGATION_RE = re.compile(
 _EVIDENCE_TOKEN_RE = re.compile(r"[^A-Za-z0-9_.:+-]+")
 _AUDIO_WINDOW_CONTEXT_REQUIRED_ATOMS: tuple[str, ...] = (
     "P1=master_global_mix",
-    "P1_heard=true",
+    "P1_heard=",
     "timeline=past_action_future",
     "deck_separation=deck_lanes_context",
     "lane_aliases=deck1:A,deck2:B",
@@ -351,7 +351,7 @@ _AUDIO_WINDOW_CONTEXT_FORBIDDEN_ATOMS: tuple[str, ...] = (
 _AUDIO_PART_CONTEXT_REQUIRED_ATOMS: tuple[str, ...] = (
     "P1=live_global_mix",
     "P1_runtime_observed=true",
-    "P1_audience_heard=true",
+    "P1_audience_heard=",
     "P1_deck_audio=global_mix_not_stems",
     "deck1=A",
     "deck2=B",
@@ -541,6 +541,8 @@ def normalize_audio_window_context_text(raw: object, *, max_len: int = 900) -> s
         return None
     if not any(all(atom in text for atom in shape) for shape in _AUDIO_WINDOW_CONTEXT_SHAPES):
         return None
+    if not re.search(r"\bP1_heard=(?:true|false)\b", text):
+        return None
     if "per_deck_audio=deck_pair_parts" in text and not _audio_window_deck_labels_are_valid(
         text
     ):
@@ -568,6 +570,8 @@ def normalize_audio_part_context_text(raw: object, *, max_len: int = 1400) -> st
         max_len=max_len,
     )
     if text is None:
+        return None
+    if not re.search(r"\bP1_audience_heard=(?:true|false)\b", text):
         return None
     if not any(all(atom in text for atom in shape) for shape in _AUDIO_PART_CONTEXT_SHAPES):
         return None
@@ -1442,10 +1446,11 @@ def render_audio_window_context(
         seconds = 6.0
     seconds = max(1.0, min(30.0, seconds))
     pre_end = -1.0 if seconds > 1.0 else 0.0
+    p1_heard = bool(getattr(state, "audible", False))
 
     fields = [
         "P1=master_global_mix",
-        "P1_heard=true",
+        f"P1_heard={'true' if p1_heard else 'false'}",
         "timeline=past_action_future",
         "together_audio=P1_global_mix",
         "decks_together=true",
@@ -1537,6 +1542,7 @@ def render_audio_part_context(
     surface: str = "gemini_parts",
     p1_model_heard: bool = True,
     p1_runtime_observed: bool = True,
+    p1_audience_heard: bool = True,
 ) -> str:
     """Return a strict label contract for Gemini audio Parts.
 
@@ -1558,7 +1564,7 @@ def render_audio_part_context(
         "P1=live_global_mix",
         f"P1_model_heard={'true' if p1_model_heard else 'false'}",
         f"P1_runtime_observed={'true' if p1_runtime_observed else 'false'}",
-        "P1_audience_heard=true",
+        f"P1_audience_heard={'true' if p1_audience_heard else 'false'}",
         f"P1_span=-{seconds:.1f}..0.0",
         f"P1_tokens_est={round(seconds * GEMINI_AUDIO_TOKENS_PER_SECOND)}",
         "P1_deck_audio=global_mix_not_stems",
@@ -1805,7 +1811,7 @@ def render_audio_window_map(
 
     return {
         "p1": "master_global_mix",
-        "p1_heard": True,
+        "p1_heard": bool(getattr(state, "audible", False)),
         "timeline": "past_action_future",
         "together_audio": "P1_global_mix",
         "decks_together": True,

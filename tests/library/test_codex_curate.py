@@ -111,6 +111,62 @@ def test_normalize_live_context_preserves_current_bus_capabilities() -> None:
     assert normalized["live_evidence"]["mix"] == ["transition_block=no_resolved_decks"]
 
 
+def test_normalize_live_context_preserves_silent_audio_window_truth() -> None:
+    normalized = normalize_live_context_for_viber(
+        {
+            **_fresh_live_transport(),
+            "deck": "none",
+            "audible": False,
+            "music": 0.0,
+            "audio_part_context": (
+                "audio_part_context[surface=live_context P1=live_global_mix "
+                "P1_model_heard=false P1_runtime_observed=true P1_audience_heard=false "
+                "P1_span=-6.0..0.0 P1_deck_audio=global_mix_not_stems deck1=A deck2=B "
+                "together_audio=P1 per_deck_audio=not_attached "
+                "duplicate_audio=same_master_not_deck_split "
+                "rule=part_labels_not_outcome_verdict]"
+            ),
+            "audio_window_context": (
+                "audio_window_context[P1=master_global_mix P1_heard=false "
+                "timeline=past_action_future together_audio=P1_global_mix decks_together=true "
+                "deckA_audio=not_attached deckB_audio=not_attached "
+                "per_deck_audio=structured_text_only "
+                "duplicate_audio=same_master_not_deck_split "
+                "deck_separation=deck_lanes_context lane_aliases=deck1:A,deck2:B "
+                "pre=-6.0..-1.0 current=-1.0..0.0 action=-1.0..0.0 "
+                "rule=time_alignment_not_outcome_verdict move_anchor=none "
+                "future_heard=false future=not_attached]"
+            ),
+            "audio_window_map": {
+                "p1": "master_global_mix",
+                "p1_heard": False,
+                "timeline": "past_action_future",
+                "together_audio": "P1_global_mix",
+                "decks_together": True,
+                "deckA_audio": "not_attached",
+                "deckB_audio": "not_attached",
+                "per_deck_audio": "structured_text_only",
+                "duplicate_audio": "same_master_not_deck_split",
+                "deck_separation": "deck_lanes_context",
+                "lane_aliases": "deck1:A,deck2:B",
+                "pre_s": [-6.0, -1.0],
+                "current_s": [-1.0, 0.0],
+                "action_s": [-1.0, 0.0],
+                "move_anchors": [],
+                "future": {"heard": False, "span": "not_attached"},
+                "rule": "time_alignment_not_outcome_verdict",
+            },
+        }
+    )
+
+    assert normalized is not None
+    assert normalized["audio_window_map"]["p1_heard"] is False
+    preview = codex_mod.render_live_context_preview(normalized)
+    assert "P1_audience_heard=false" in preview
+    assert "audio_window_context[P1=master_global_mix P1_heard=false" in preview
+    assert "audio_window_map[P1=master_global_mix heard=false" in preview
+
+
 def _deck_pair_audio_separation_context() -> str:
     return (
         "deck_audio_separation_context[requested_device=BlackHole_16ch "

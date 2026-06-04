@@ -1148,6 +1148,7 @@ async def ws_broadcast(
                     audio_seconds=6.0,
                     surface="live_context",
                     p1_model_heard=False,
+                    p1_audience_heard=bool(getattr(state, "audible", False)),
                 )
                 deck_lanes_context = render_deck_lane_context(state)
                 deck_reference_context = render_deck_reference_context(state)

@@ -2311,7 +2311,6 @@ def _live_audio_window_map(raw: Any) -> dict[str, Any] | None:
         return None
     common_required = {
         "p1": "master_global_mix",
-        "p1_heard": True,
         "timeline": "past_action_future",
         "together_audio": "P1_global_mix",
         "decks_together": True,
@@ -2320,6 +2319,9 @@ def _live_audio_window_map(raw: Any) -> dict[str, Any] | None:
         "rule": "time_alignment_not_outcome_verdict",
     }
     if any(raw.get(key) != expected for key, expected in common_required.items()):
+        return None
+    p1_heard = raw.get("p1_heard")
+    if not isinstance(p1_heard, bool):
         return None
 
     deck_a = raw.get("deckA_audio")
@@ -2392,6 +2394,7 @@ def _live_audio_window_map(raw: Any) -> dict[str, Any] | None:
         return None
     out = {
         **common_required,
+        "p1_heard": p1_heard,
         "deckA_audio": deck_a_out,
         "deckB_audio": deck_b_out,
         "per_deck_audio": per_deck_audio,
@@ -2523,7 +2526,8 @@ def _render_audio_window_map_line(audio_map: Any) -> str | None:
     if not (deck_a_audio and deck_b_audio and per_deck_audio and duplicate_audio):
         return None
     return (
-        "audio_window_map[P1=master_global_mix heard=true old=pre_s "
+        "audio_window_map[P1=master_global_mix "
+        f"heard={'true' if bool(audio_map.get('p1_heard')) else 'false'} old=pre_s "
         f"current=current_s action=action_s future={future_text} "
         f"deckA_audio={deck_a_audio} deckB_audio={deck_b_audio} "
         f"per_deck_audio={per_deck_audio} duplicate_audio={duplicate_audio} anchors="

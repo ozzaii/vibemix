@@ -445,6 +445,20 @@ def test_audio_window_context_anchors_move_inside_master_audio() -> None:
     assert "rule=time_alignment_not_outcome_verdict" in out
 
 
+def test_audio_window_context_marks_controller_only_reference_as_unheard() -> None:
+    state = MusicState(audible=False)
+    state.controller_connected = True
+
+    out = render_audio_window_context(state, [], audio_seconds=6.0)
+    structured = render_audio_window_map(state, [], audio_seconds=6.0)
+
+    assert out is not None
+    assert "P1_heard=false" in out
+    assert normalize_audio_window_context_text(out) == out
+    assert structured is not None
+    assert structured["p1_heard"] is False
+
+
 def test_audio_part_context_labels_parts_without_claiming_deck_stems() -> None:
     out = render_audio_part_context(
         audio_seconds=6.0,
@@ -498,6 +512,20 @@ def test_audio_part_context_can_label_viber_live_context_without_fake_audio_part
     assert "P1_runtime_observed=true" in out
     assert "P1_deck_audio=global_mix_not_stems" in out
     assert "per_deck_audio=not_attached" in out
+    assert "model_audio_tokens_est=0" in out
+    assert normalize_audio_part_context_text(out) == out
+
+
+def test_audio_part_context_can_mark_live_context_unheard_by_audience() -> None:
+    out = render_audio_part_context(
+        audio_seconds=6.0,
+        surface="live_context",
+        p1_model_heard=False,
+        p1_audience_heard=False,
+    )
+
+    assert "P1_model_heard=false" in out
+    assert "P1_audience_heard=false" in out
     assert "model_audio_tokens_est=0" in out
     assert normalize_audio_part_context_text(out) == out
 
