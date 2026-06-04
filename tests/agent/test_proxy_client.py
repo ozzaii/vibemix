@@ -18,6 +18,7 @@ def test_proxy_01_genai_client_carries_base_url_and_bearer():
     ho = c._api_client._http_options
     assert ho.base_url == "https://api.altidus.world"
     assert ho.headers["Authorization"] == "Bearer jwt-x"
+    assert ho.timeout == 120_000
 
 
 def test_proxy_02_trailing_slash_stripped():

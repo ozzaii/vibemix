@@ -43,6 +43,18 @@ from vibemix.agent.local_tts import LocalTTSUnavailable
 _REAL_SLEEP = asyncio.sleep
 
 
+def test_direct_genai_client_sets_request_timeout(mocker):
+    """Direct mode must not leave raw Gemini requests unbounded."""
+    import vibemix.__main__ as main_mod
+
+    client = object()
+    ctor = mocker.patch.object(main_mod.genai, "Client", return_value=client)
+
+    assert main_mod._direct_genai_client("dummy-key") is client
+    assert ctor.call_args.kwargs["api_key"] == "dummy-key"
+    assert ctor.call_args.kwargs["http_options"].timeout == 120_000
+
+
 def test_input_callback_uses_background_audio_processor(monkeypatch):
     """Live input resampling must not run on the CoreAudio callback thread."""
     import vibemix.__main__ as main_mod

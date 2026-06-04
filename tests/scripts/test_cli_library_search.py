@@ -100,14 +100,25 @@ def test_no_client_returns_json_error(
 def test_direct_key_builds_client(monkeypatch: pytest.MonkeyPatch) -> None:
     """Fix 1: a bare GEMINI_API_KEY (no proxy JWT) yields a direct client —
     the local-user path that previously hard-failed with exit 1."""
-    from vibemix.__main__ import _library_genai_client
+    import vibemix.__main__ as main_mod
 
     monkeypatch.setenv("GEMINI_API_KEY", "AIza-test-dummy-key")
     monkeypatch.delenv("VIBEMIX_PROXY_JWT", raising=False)
 
-    client, err = _library_genai_client()
+    calls: list[dict] = []
+    fake_client = object()
+
+    def fake_genai_client(**kwargs):
+        calls.append(kwargs)
+        return fake_client
+
+    monkeypatch.setattr(main_mod.genai, "Client", fake_genai_client)
+
+    client, err = main_mod._library_genai_client()
     assert err is None
-    assert client is not None
+    assert client is fake_client
+    assert calls[0]["api_key"] == "AIza-test-dummy-key"
+    assert calls[0]["http_options"].timeout == 120_000
 
 
 def test_cli_no_library_cache_exits_clean(

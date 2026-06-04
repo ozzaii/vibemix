@@ -149,6 +149,24 @@ class _LazyGenAI:
 
 genai = _LazyGenAI()
 
+_DIRECT_GENAI_CLIENT_TIMEOUT_MS = 120_000
+
+
+def _direct_genai_client(api_key: str):
+    """Build direct Gemini clients with the same request bound as proxy mode.
+
+    The raw ``genai.Client`` path feeds the live co-host and a few library/eval
+    helpers. Without ``HttpOptions.timeout`` a stalled direct Gemini request can
+    leave Sven looking dead indefinitely; proxy mode has always carried the
+    120s bound, so direct mode should match it.
+    """
+    from google.genai import types
+
+    return genai.Client(
+        api_key=api_key,
+        http_options=types.HttpOptions(timeout=_DIRECT_GENAI_CLIENT_TIMEOUT_MS),
+    )
+
 
 def _ensure_context_cache_dep() -> None:
     global GeminiContextCache
@@ -1584,7 +1602,7 @@ async def main() -> None:
     if mode == "direct":
         print("-> mode:  direct (GEMINI_API_KEY from .env)")
         print(f"-> brain: {LLM_MODEL} (thinking=minimal, temp=1.0)")
-        genai_client = genai.Client(api_key=api_key)
+        genai_client = _direct_genai_client(api_key)
         llm_inst = build_llm(api_key, mode="direct")
         tts_inst = _build_tts_chain_or_mute(
             mode="direct",
@@ -4733,8 +4751,8 @@ def _library_genai_client():
     this client. Legacy/eval Gemini helpers and Gemini-based media tools still
     use the direct-first selection:
 
-        1. GEMINI_API_KEY set → DIRECT ``genai.Client(api_key=...)`` — the
-           SAME construction the live session's mode=direct path uses.
+        1. GEMINI_API_KEY set → DIRECT ``genai.Client(..., timeout=120s)`` —
+           the SAME construction the live session's mode=direct path uses.
         2. else VIBEMIX_PROXY_JWT set → proxy client.
         3. else → ``None`` (caller emits the JSON error + exits 1).
 
@@ -4746,7 +4764,7 @@ def _library_genai_client():
     proxy_url = os.environ.get("VIBEMIX_PROXY_BASE_URL", "https://api.altidus.world")
 
     if api_key:
-        return genai.Client(api_key=api_key), None
+        return _direct_genai_client(api_key), None
     if proxy_jwt:
         from vibemix.agent.proxy_client import build_proxy_genai_client
 
