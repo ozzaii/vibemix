@@ -1546,6 +1546,9 @@ def test_viber_live_context_hint_names_wrong_port_owner():
 
 def test_viber_setup_hint_turns_rekordbox_route_hint_into_env(monkeypatch):
     monkeypatch.delenv("VIBEMIX_INPUT_DEVICE", raising=False)
+    # The test pins the factory-default route-doctor branch. Developer/live rigs
+    # may import __main__ with VIBEMIX_INPUT_DEVICE=BlackHole 16ch already set.
+    monkeypatch.setattr(main_mod, "INPUT_DEVICE", "BlackHole 2ch")
     setup_hint = main_mod._viber_setup_hint_from_source_status(
         {
             "rekordbox_deck_routing_hint": {

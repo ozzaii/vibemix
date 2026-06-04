@@ -3,18 +3,32 @@
 
 from __future__ import annotations
 
+import importlib
+
 import vibemix.agent as vagent
+import vibemix.agent.config as config_mod
 from vibemix.agent.config import (
-    INPUT_DEVICE,
     LLM_MODEL,
-    MIC_DEVICE,
     OPENROUTER_LLM_MODEL,
-    OUTPUT_DEVICE,
-    VOICE,
+)
+
+DEVICE_ENV_VARS = (
+    "VIBEMIX_INPUT_DEVICE",
+    "VIBEMIX_OUTPUT_DEVICE",
+    "VIBEMIX_MIC_DEVICE",
 )
 
 
-def test_config_01_constants_pinned() -> None:
+def _reload_factory_defaults(monkeypatch):
+    """Reload agent constants with rig-specific env overrides removed."""
+    for name in DEVICE_ENV_VARS:
+        monkeypatch.delenv(name, raising=False)
+    config = importlib.reload(config_mod)
+    agent = importlib.reload(vagent)
+    return config, agent
+
+
+def test_config_01_constants_pinned(monkeypatch) -> None:
     """CONFIG-01: agent constants are pinned to the current shipped values.
 
     Originally byte-identity to cohost_v4.py was the contract. v4 was
@@ -25,17 +39,20 @@ def test_config_01_constants_pinned() -> None:
     per-machine via the calibration wizard; the strings here are the
     factory values.
     """
-    assert LLM_MODEL == "gemini-3.5-flash"
-    assert OPENROUTER_LLM_MODEL == "google/gemini-3.5-flash"
-    assert VOICE == "Adam"
-    assert INPUT_DEVICE == "BlackHole 2ch"
-    assert OUTPUT_DEVICE == "MacBook Pro Speakers"
-    assert MIC_DEVICE == "MacBook Pro Microphone"
+    config, _agent = _reload_factory_defaults(monkeypatch)
+
+    assert config.LLM_MODEL == "gemini-3.5-flash"
+    assert config.OPENROUTER_LLM_MODEL == "google/gemini-3.5-flash"
+    assert config.VOICE == "Adam"
+    assert config.INPUT_DEVICE == "BlackHole 2ch"
+    assert config.OUTPUT_DEVICE == "MacBook Pro Speakers"
+    assert config.MIC_DEVICE == "MacBook Pro Microphone"
 
 
-def test_pkg_01_imports_from_package_root() -> None:
+def test_pkg_01_imports_from_package_root(monkeypatch) -> None:
     """PKG-01: all the agent-layer constants + persona + build_llm resolve
     from `vibemix.agent`."""
+    config, agent = _reload_factory_defaults(monkeypatch)
     from vibemix.agent import (
         INPUT_DEVICE as p_input,
     )
@@ -58,11 +75,11 @@ def test_pkg_01_imports_from_package_root() -> None:
         build_llm as p_build_llm,
     )
 
-    assert p_llm == LLM_MODEL
-    assert p_voice == VOICE
-    assert p_input == INPUT_DEVICE
-    assert p_out == OUTPUT_DEVICE
-    assert p_mic == MIC_DEVICE
+    assert p_llm == config.LLM_MODEL
+    assert p_voice == config.VOICE
+    assert p_input == config.INPUT_DEVICE == agent.INPUT_DEVICE
+    assert p_out == config.OUTPUT_DEVICE == agent.OUTPUT_DEVICE
+    assert p_mic == config.MIC_DEVICE == agent.MIC_DEVICE
     assert isinstance(p_persona, str)
     assert callable(p_build_llm)
 
