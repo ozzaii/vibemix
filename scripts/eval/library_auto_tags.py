@@ -229,6 +229,10 @@ def _rows_by_split(rows: Sequence[HandLabelRow]) -> tuple[list[HandLabelRow], li
     return list(rows), list(rows), "in_sample_threshold_grid"
 
 
+def _complete_rows(rows: Sequence[HandLabelRow]) -> list[HandLabelRow]:
+    return [row for row in rows if all(category in row.labels for category in CATEGORIES)]
+
+
 def _metric_counts(
     rows: Sequence[HandLabelRow],
     predictions: Mapping[str, Sequence[AutoTagDecision]],
@@ -511,6 +515,8 @@ def build_report(
     labels = load_hand_labels(labels_path)
     rows: list[HandLabelRow] = labels["rows"]
     calibration_rows, eval_rows, calibration_strategy = _rows_by_split(rows)
+    complete_rows = _complete_rows(rows)
+    complete_eval_rows = _complete_rows(eval_rows)
 
     mode_reports: dict[str, Any] = {}
     for mode in ("bare", "template"):
@@ -555,7 +561,7 @@ def build_report(
         }
         status = (
             "ok"
-            if len(eval_rows) >= min_hand_labels
+            if len(complete_eval_rows) >= min_hand_labels
             else "measured_small_hand_label_subset"
         )
 
@@ -566,7 +572,7 @@ def build_report(
             max_rows=label_template_size,
             exclude_track_ids=labeled_ids,
         )
-        if len(eval_rows) < min_hand_labels
+        if len(complete_eval_rows) < min_hand_labels
         else []
     )
     for mode in mode_reports.values():
@@ -592,7 +598,9 @@ def build_report(
             "status": labels["status"],
             "pending_rows": labels["pending_rows"],
             "usable_rows": labels["usable_rows"],
+            "complete_rows": len(complete_rows),
             "evaluation_rows": len(eval_rows),
+            "evaluation_complete_rows": len(complete_eval_rows),
             "calibration_rows": len(calibration_rows),
             "calibration_strategy": calibration_strategy if rows else None,
             "min_required_rows": min_hand_labels,
@@ -701,7 +709,10 @@ def main(argv: list[str] | None = None) -> int:
                 f"{comparison['primary_metric']}={comparison['template_value']} vs "
                 f"{comparison['bare_value']} delta={comparison['template_minus_bare']}"
             )
-    if args.require_labels and report["label_set"]["evaluation_rows"] < args.min_hand_labels:
+    if (
+        args.require_labels
+        and report["label_set"]["evaluation_complete_rows"] < args.min_hand_labels
+    ):
         return 2
     return 0
 

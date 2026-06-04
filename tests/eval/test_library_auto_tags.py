@@ -161,9 +161,50 @@ def test_build_report_with_labels_scores_template_and_bare(tmp_path: Path, monke
 
     assert report["status"] == "measured_small_hand_label_subset"
     assert report["label_set"]["usable_rows"] == 1
+    assert report["label_set"]["complete_rows"] == 1
+    assert report["label_set"]["evaluation_complete_rows"] == 1
     assert report["label_set"]["min_required_rows"] == 50
     assert report["modes"]["template"]["metrics"]["micro"]["precision"] >= 0.0
     assert report["comparison"]["primary_metric"] == "micro_f1"
+
+
+def test_partial_label_rows_do_not_satisfy_complete_row_gate(
+    tmp_path: Path, monkeypatch
+) -> None:
+    labels = tmp_path / "labels.jsonl"
+    labels.write_text(
+        json.dumps({"track_id": "t1", "split": "holdout", "mood": ["dark"]})
+        + "\n"
+        + json.dumps(
+            {
+                "track_id": "t2",
+                "split": "holdout",
+                "mood": ["dark"],
+                "texture": ["raw"],
+                "instrument": [],
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        lat,
+        "_load_store",
+        lambda: (
+            ["t1", "t2"],
+            np.asarray([[1.0, 0.0, 0.0], [1.0, 0.0, 0.0]], dtype=np.float32),
+            "FakeStore",
+            "snap",
+        ),
+    )
+    monkeypatch.setattr(lat, "ClapEngine", lambda: _FakeEngine())
+
+    report = lat.build_report(labels_path=labels, min_hand_labels=2)
+
+    assert report["label_set"]["usable_rows"] == 2
+    assert report["label_set"]["evaluation_rows"] == 2
+    assert report["label_set"]["evaluation_complete_rows"] == 1
+    assert report["status"] == "measured_small_hand_label_subset"
 
 
 def test_build_label_template_rows_balances_buckets_and_excludes_labeled_ids() -> None:
