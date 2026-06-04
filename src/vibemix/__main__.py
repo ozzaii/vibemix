@@ -3868,6 +3868,15 @@ def _build_library_subparsers(parser: argparse.ArgumentParser) -> None:
     sp_export_set.add_argument("set_json", help="path to the JSON set file")
     sp_export_set.add_argument("--out", required=True, help="destination .xml path")
     sp_export_set.add_argument("--name", default="vibemix set", help="playlist name in the XML")
+    sp_export_set.add_argument(
+        "--allow-unvalidated",
+        action="store_true",
+        help=(
+            "advanced: export local file paths even when they are not in the "
+            "current library cache; use for new clips/tracks you want to "
+            "import into Rekordbox"
+        ),
+    )
     sp_export_set.add_argument("--json", action="store_true")
     sp_export_set.set_defaults(func=_cmd_library_export_set)
 
@@ -7407,9 +7416,11 @@ def _cmd_library_export_set(args: argparse.Namespace) -> int:
 
     WR-03 grounding: when a library cache is present, every track is
     re-validated against the live library (by track_id or filepath) and
-    ungrounded entries are DROPPED before export (count reported). Without a
-    cache the export still runs, but prints a clear "advanced/unvalidated"
-    notice — the operator owns the JSON's correctness.
+    ungrounded entries are DROPPED before export (count reported). ``--allow-
+    unvalidated`` is the explicit advanced lane for brand-new local files (for
+    example audition clips) that are intentionally not in the cache yet.
+    Without a cache the export still runs, but prints a clear
+    "advanced/unvalidated" notice — the operator owns the JSON's correctness.
     """
     import json as _json
 
@@ -7444,7 +7455,14 @@ def _cmd_library_export_set(args: argparse.Namespace) -> int:
     ungrounded: list[dict] = []
     lib = RekordboxLibrary()
     if lib.try_load_cache():
-        tracks, ungrounded = _validate_export_tracks_against_library(tracks, lib)
+        if bool(getattr(args, "allow_unvalidated", False)):
+            print(
+                "-> WARNING: --allow-unvalidated set — exporting local files "
+                "without library-cache grounding.",
+                file=sys.stderr,
+            )
+        else:
+            tracks, ungrounded = _validate_export_tracks_against_library(tracks, lib)
         if ungrounded:
             print(
                 f"-> dropped {len(ungrounded)} ungrounded track(s) (not in library)",

@@ -23,7 +23,9 @@ Cardinal facts the tests pin:
 from __future__ import annotations
 
 import xml.etree.ElementTree as ET
+from argparse import Namespace
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -389,6 +391,76 @@ def test_cli_export_set_resolves_by_filepath():
     kept, dropped = _validate_export_tracks_against_library(tracks, lib)
     assert len(kept) == 1
     assert dropped == []
+
+
+def test_cli_export_set_allow_unvalidated_exports_new_local_files(
+    tmp_path, monkeypatch, capsys
+):
+    """The default CLI gate protects grounded set exports, but an explicit
+    advanced flag lets users build a Rekordbox XML for brand-new local files
+    (for example generated cue-listen clips) that are not in the cache yet.
+    """
+    import json
+
+    import vibemix.library as lib_pkg
+    from vibemix.__main__ import _cmd_library_export_set
+    from vibemix.library import export_rekordbox as export_mod
+
+    class FakeLibrary:
+        def __init__(self):
+            self.tracks = {}
+
+        def try_load_cache(self):
+            return True
+
+    captured: dict[str, object] = {}
+
+    def fake_export_set(tracks, name, out_path):
+        captured["tracks"] = tracks
+        captured["name"] = name
+        captured["out_path"] = out_path
+        return SimpleNamespace(path=Path(out_path), written=len(tracks), referenced=len(tracks), dropped=[])
+
+    monkeypatch.setattr(lib_pkg, "RekordboxLibrary", FakeLibrary)
+    monkeypatch.setattr(export_mod, "export_set", fake_export_set)
+
+    set_json = tmp_path / "clips.json"
+    set_json.write_text(
+        json.dumps(
+            {
+                "tracks": [
+                    {
+                        "track_id": "clip-001",
+                        "filepath": str(tmp_path / "new-local-clip.mp3"),
+                        "title": "A_INTRO__cue-8.533s__start-5.533s",
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    code = _cmd_library_export_set(
+        Namespace(
+            set_json=str(set_json),
+            out=str(tmp_path / "clips.xml"),
+            name="Cue Clips",
+            allow_unvalidated=True,
+            json=True,
+        )
+    )
+
+    assert code == 0
+    assert captured["name"] == "Cue Clips"
+    assert captured["out_path"] == str(tmp_path / "clips.xml")
+    assert captured["tracks"] == [
+        {
+            "track_id": "clip-001",
+            "filepath": str(tmp_path / "new-local-clip.mp3"),
+            "title": "A_INTRO__cue-8.533s__start-5.533s",
+        }
+    ]
+    assert "--allow-unvalidated set" in capsys.readouterr().err
 
 
 def test_file_round_trips_through_pyrekordbox(tmp_path):
