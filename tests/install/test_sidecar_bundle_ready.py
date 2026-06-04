@@ -336,6 +336,79 @@ def test_require_chatterbox_ref_accepts_complete_bundled_ref(tmp_path: Path) -> 
     assert str(ref_path) in gate.chatterbox_release_ref_ready(binary.parent)[1]
 
 
+def test_require_chatterbox_source_accepts_pinned_hf_snapshot(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _write_bundle(tmp_path, MAC_TRIPLE)
+
+    class _Response:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_exc):
+            return False
+
+        def read(self) -> bytes:
+            return json.dumps(
+                {
+                    "sha": gate.CHATTERBOX_MODEL_REVISION,
+                    "siblings": [
+                        {"rfilename": rel, "size": size}
+                        for rel, size in gate.CHATTERBOX_REQUIRED_FILES.items()
+                    ],
+                }
+            ).encode("utf-8")
+
+    monkeypatch.setattr(gate, "urlopen", lambda *_args, **_kwargs: _Response())
+
+    status = gate.check_sidecar_bundle_ready(
+        root=tmp_path,
+        triple=MAC_TRIPLE,
+        require_chatterbox_source=True,
+    )
+
+    assert status.ok is True
+
+
+def test_require_chatterbox_source_rejects_missing_hf_file(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _write_bundle(tmp_path, MAC_TRIPLE)
+    files = dict(gate.CHATTERBOX_REQUIRED_FILES)
+    files.pop("model.safetensors")
+
+    class _Response:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_exc):
+            return False
+
+        def read(self) -> bytes:
+            return json.dumps(
+                {
+                    "sha": gate.CHATTERBOX_MODEL_REVISION,
+                    "siblings": [
+                        {"rfilename": rel, "size": size}
+                        for rel, size in files.items()
+                    ],
+                }
+            ).encode("utf-8")
+
+    monkeypatch.setattr(gate, "urlopen", lambda *_args, **_kwargs: _Response())
+
+    status = gate.check_sidecar_bundle_ready(
+        root=tmp_path,
+        triple=MAC_TRIPLE,
+        require_chatterbox_source=True,
+    )
+
+    assert status.ok is False
+    assert "missing model.safetensors" in status.message
+
+
 def test_require_chatterbox_ref_rejects_wrong_sample_rate(
     tmp_path: Path,
 ) -> None:

@@ -17,6 +17,9 @@ import sys
 import wave
 from dataclasses import dataclass
 from pathlib import Path
+from urllib.error import URLError
+from urllib.parse import quote
+from urllib.request import Request, urlopen
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SRC_ROOT = REPO_ROOT / "src"
@@ -31,6 +34,11 @@ from scripts.build_sidecar import (  # noqa: E402
     git_head,
     source_dirty_paths,
     source_fingerprint,
+)
+from vibemix.library.model_assets import (  # noqa: E402
+    CHATTERBOX_MODEL_REPO,
+    CHATTERBOX_MODEL_REVISION,
+    CHATTERBOX_REQUIRED_FILES,
 )
 
 BINARIES_REL = Path("tauri/src-tauri/binaries")
@@ -169,6 +177,71 @@ def chatterbox_release_ref_ready(bundle_dir: Path) -> tuple[bool, str]:
     return _chatterbox_ref_wave_status(ref_path)
 
 
+def chatterbox_release_source_ready() -> tuple[bool, str]:
+    """Return whether the pinned public Chatterbox HF source still resolves."""
+    repo = CHATTERBOX_MODEL_REPO
+    revision = CHATTERBOX_MODEL_REVISION
+    url = (
+        "https://huggingface.co/api/models/"
+        f"{quote(repo, safe='/')}/revision/{quote(revision, safe='')}?blobs=true"
+    )
+    try:
+        req = Request(url, headers={"User-Agent": "vibemix-release-gate/1"})
+        with urlopen(req, timeout=30) as response:  # nosec B310 - fixed HTTPS HF API
+            payload = json.loads(response.read().decode("utf-8"))
+    except (OSError, URLError, TimeoutError, json.JSONDecodeError) as exc:
+        return (
+            False,
+            "Chatterbox HF source check failed. Connect to the internet and verify "
+            f"{repo}@{revision}: {exc}",
+        )
+
+    actual_sha = str(payload.get("sha") or "")
+    if actual_sha != revision:
+        return (
+            False,
+            f"Chatterbox HF revision mismatch: {repo}@{revision} resolved to {actual_sha!r}",
+        )
+
+    siblings = payload.get("siblings")
+    if not isinstance(siblings, list):
+        return (False, f"Chatterbox HF source response has no sibling file list: {repo}")
+    sizes: dict[str, int] = {}
+    for item in siblings:
+        if not isinstance(item, dict):
+            continue
+        name = str(item.get("rfilename") or "")
+        try:
+            size = int(item.get("size") or item.get("lfs", {}).get("size") or 0)
+        except (TypeError, ValueError):
+            size = 0
+        if name:
+            sizes[name] = size
+
+    missing = [rel for rel in CHATTERBOX_REQUIRED_FILES if rel not in sizes]
+    wrong_size = [
+        f"{rel}={sizes.get(rel)} expected {expected}"
+        for rel, expected in CHATTERBOX_REQUIRED_FILES.items()
+        if rel in sizes and sizes[rel] != expected
+    ]
+    if missing or wrong_size:
+        detail = "; ".join(
+            part
+            for part in (
+                f"missing {', '.join(missing)}" if missing else "",
+                f"size mismatch {', '.join(wrong_size)}" if wrong_size else "",
+            )
+            if part
+        )
+        return (False, f"Chatterbox HF source is not the pinned release snapshot: {detail}")
+
+    return (
+        True,
+        f"Chatterbox HF source ready: {repo}@{revision} "
+        f"({len(CHATTERBOX_REQUIRED_FILES)} file(s))",
+    )
+
+
 def _preview_paths(paths: list[str], *, limit: int = 5) -> str:
     preview = ", ".join(paths[:limit])
     extra = "" if len(paths) <= limit else f" (+{len(paths) - limit} more)"
@@ -260,6 +333,7 @@ def check_sidecar_bundle_ready(
     triple: str | None = None,
     min_bytes: int = DEFAULT_MIN_BYTES,
     require_chatterbox_ref: bool = False,
+    require_chatterbox_source: bool = False,
 ) -> SidecarBundleStatus:
     """Check that the Tauri resource tree contains a real sidecar bundle."""
     target_triple = triple or detect_host_triple()
@@ -355,6 +429,10 @@ def check_sidecar_bundle_ready(
         ref_ok, ref_message = chatterbox_release_ref_ready(bundle_dir)
         if not ref_ok:
             return SidecarBundleStatus(False, ref_message, binary)
+    if require_chatterbox_source:
+        source_ok, source_message = chatterbox_release_source_ready()
+        if not source_ok:
+            return SidecarBundleStatus(False, source_message, binary)
 
     return SidecarBundleStatus(True, f"sidecar bundle ready: {binary}", binary)
 
@@ -379,6 +457,14 @@ def main(argv: list[str] | None = None) -> int:
             "16-bit 24000 Hz WAV"
         ),
     )
+    parser.add_argument(
+        "--require-chatterbox-source",
+        action="store_true",
+        help=(
+            "release gate: require the public Chatterbox HF repo and pinned "
+            "revision to resolve"
+        ),
+    )
     parser.add_argument("--quiet", action="store_true", help="print only failures")
     args = parser.parse_args(argv)
 
@@ -388,6 +474,7 @@ def main(argv: list[str] | None = None) -> int:
             triple=args.triple,
             min_bytes=args.min_bytes,
             require_chatterbox_ref=args.require_chatterbox_ref,
+            require_chatterbox_source=args.require_chatterbox_source,
         )
     except RuntimeError as exc:
         print(f"[sidecar-bundle] FAIL: {exc}", file=sys.stderr)

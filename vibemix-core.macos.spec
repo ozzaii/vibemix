@@ -139,17 +139,25 @@ hiddenimports.extend(
     ]
 )
 
-# Local AI + watcher runtime deps. These are lazy-imported by CLAP/CUE/voice and
-# freshness-watcher paths, so PyInstaller can miss native libs/submodules.
+# Local AI + watcher runtime deps. These are lazy-imported by CLAP/CUE/Chatterbox
+# voice and freshness-watcher paths, so PyInstaller can miss native libs/submodules.
 # The build script runs `uv run --extra ai-local ...`; this block makes sure the
-# installed runtime actually lands in the frozen sidecar without bundling
-# Transformers.
+# installed runtime actually lands in the frozen sidecar.
 _LOCAL_AI_SUBMODULES = (
     "av",
+    "hf_xet",
+    "huggingface_hub",
+    "miniaudio",
+    "mlx",
+    "mlx_audio",
+    "mlx_lm",
     "onnxruntime",
     "onnxruntime.capi",
+    "scipy",
     "sentencepiece",
     "tokenizers",
+    "tqdm",
+    "transformers",
     "watchfiles",
 )
 
@@ -170,7 +178,17 @@ for _pkg in _LOCAL_AI_SUBMODULES:
         hiddenimports.extend(_collect_runtime_submodules(_pkg))
     except Exception as exc:  # pragma: no cover — optional local-AI dep drift
         print(f"[spec] collect_submodules({_pkg!r}) skipped: {exc}", file=sys.stderr)
-for _pkg in ("av", "onnxruntime", "sentencepiece", "watchfiles"):
+for _pkg in (
+    "av",
+    "hf_xet",
+    "miniaudio",
+    "mlx",
+    "mlx_audio",
+    "mlx_lm",
+    "onnxruntime",
+    "sentencepiece",
+    "watchfiles",
+):
     try:
         binaries.extend(collect_dynamic_libs(_pkg))
     except Exception as exc:  # pragma: no cover — native-lib packaging drift
@@ -343,8 +361,6 @@ _ANALYSIS_EXCLUDES = [
     "PIL._imagingmorph",
     "PIL._avif",
     "PIL.__main__",
-    "hf_xet",
-    "hf_xet.hf_xet",
     "jsonschema.__main__",
     "jsonschema.cli",
     "opentelemetry.exporter.otlp.proto.grpc",
@@ -352,8 +368,6 @@ _ANALYSIS_EXCLUDES = [
     "opentelemetry.exporter.otlp.proto.grpc.exporter",
     "opentelemetry.exporter.otlp.proto.grpc.metric_exporter",
     "opentelemetry.exporter.otlp.proto.grpc.trace_exporter",
-    "scipy",
-    "transformers",
 ]
 
 # ---------------------------------------------------------------------------

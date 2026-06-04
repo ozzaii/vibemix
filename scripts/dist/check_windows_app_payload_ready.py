@@ -17,6 +17,7 @@ if str(_PROJECT_ROOT) not in sys.path:
 from scripts.dist.check_sidecar_bundle_ready import (  # noqa: E402
     DEFAULT_MIN_BYTES,
     chatterbox_release_ref_ready,
+    chatterbox_release_source_ready,
     learn_exemplar_audio_ready,
 )
 
@@ -32,6 +33,7 @@ class WindowsAppPayloadStatus:
     app_binary: str = ""
     sidecar_binary: str = ""
     chatterbox_ref: str = ""
+    chatterbox_source: str = ""
     smoke_stdout: str = ""
 
     def fail(self, message: str) -> None:
@@ -84,6 +86,7 @@ def check_windows_app_payload_ready(
     triple: str = DEFAULT_TRIPLE,
     min_bytes: int = DEFAULT_MIN_BYTES,
     require_chatterbox_ref: bool = False,
+    require_chatterbox_source: bool = False,
     smoke: str = "none",
     smoke_timeout_s: float = 20.0,
 ) -> WindowsAppPayloadStatus:
@@ -139,6 +142,11 @@ def check_windows_app_payload_ready(
         status.chatterbox_ref = ref_message
         if not ref_ok:
             status.fail(ref_message)
+    if require_chatterbox_source:
+        source_ok, source_message = chatterbox_release_source_ready()
+        status.chatterbox_source = source_message
+        if not source_ok:
+            status.fail(source_message)
 
     if status.ok:
         _run_smoke(sidecar_binary, smoke, smoke_timeout_s, status)
@@ -168,6 +176,11 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="release gate: require the bundled Chatterbox production reference WAV",
     )
+    parser.add_argument(
+        "--require-chatterbox-source",
+        action="store_true",
+        help="release gate: require the public Chatterbox HF repo/revision to resolve",
+    )
     parser.add_argument("--smoke-timeout-s", type=float, default=20.0)
     parser.add_argument("--json", action="store_true", help="print machine-readable status")
     parser.add_argument("--quiet", action="store_true", help="print only failures")
@@ -178,6 +191,7 @@ def main(argv: list[str] | None = None) -> int:
         triple=args.triple,
         min_bytes=args.min_bytes,
         require_chatterbox_ref=args.require_chatterbox_ref,
+        require_chatterbox_source=args.require_chatterbox_source,
         smoke=args.smoke,
         smoke_timeout_s=args.smoke_timeout_s,
     )

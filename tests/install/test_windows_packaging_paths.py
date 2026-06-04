@@ -25,6 +25,7 @@ def test_release_workflow_uses_staged_windows_app_payload() -> None:
     assert "scripts/win/stage_app_payload.ps1" in text
     assert "scripts/dist/check_windows_app_payload_ready.py" in text
     assert "--require-chatterbox-ref" in text
+    assert "--require-chatterbox-source" in text
     assert "VERIFY — Windows app payload sidecar ready" in text
     assert "dist/windows-app/**" in text
     assert "cargo tauri build --no-bundle" in text
@@ -86,6 +87,7 @@ def test_windows_app_payload_verifier_checks_exes_and_internal_tree() -> None:
     assert "placeholder-only" in text
     assert 'handle.read(2) == b"MZ"' in text
     assert "chatterbox_release_ref_ready" in text
+    assert "chatterbox_release_source_ready" in text
 
 
 def test_inno_default_source_dir_matches_staged_payload() -> None:

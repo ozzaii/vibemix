@@ -18,8 +18,21 @@ from vibemix.runtime.wizard import WizardLoop
 from vibemix.ui_bus.messages import WizardDone
 
 
-def test_wizard_done_sets_stop_event(fake_bus: FakeBus) -> None:
+def test_wizard_done_sets_stop_event(fake_bus: FakeBus, monkeypatch) -> None:
     """ipc.wizard.done → stop event set, sidecar will exit cleanly."""
+    import vibemix.library.model_assets as model_assets
+
+    monkeypatch.setattr(
+        model_assets,
+        "install_chatterbox_model",
+        lambda progress=None: {
+            "id": "chatterbox",
+            "installed": True,
+            "path": "/tmp/vibemix-test/chatterbox",
+            "files": [],
+            "errors": [],
+        },
+    )
     loop = WizardLoop(fake_bus)
     loop.register_handlers()
     msg = json.loads(
@@ -32,6 +45,7 @@ def test_wizard_done_sets_stop_event(fake_bus: FakeBus) -> None:
     assert not loop._stop.is_set()
     asyncio.run(fake_bus.handlers["ipc.wizard.done"](msg))
     assert loop._stop.is_set()
+    assert fake_bus.emitted_by_type("ipc.status.tick")[-1]["payload"]["voice"] == "ok"
 
 
 def test_wizard_done_payload_schema_valid() -> None:

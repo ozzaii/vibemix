@@ -396,7 +396,7 @@ def test_assert_no_aiza_leak_raises_on_missing_dir(tmp_path: Path) -> None:
     ["vibemix-core.macos.spec", "vibemix-core.windows.spec"],
 )
 def test_pyinstaller_specs_collect_local_ai_runtime(spec_name: str) -> None:
-    """Lazy CLAP/CUE deps must be explicit in the frozen sidecar specs."""
+    """Lazy local-AI deps must be explicit in the frozen sidecar specs."""
     text = (PROJECT_ROOT / spec_name).read_text(encoding="utf-8")
     required = [
         "_LOCAL_AI_SUBMODULES",
@@ -407,9 +407,20 @@ def test_pyinstaller_specs_collect_local_ai_runtime(spec_name: str) -> None:
         "tokenizers",
         "watchfiles",
         "collect_dynamic_libs",
-        'for _pkg in ("av", "onnxruntime", "sentencepiece", "watchfiles")',
         '"transformers"',
     ]
+    if spec_name == "vibemix-core.macos.spec":
+        required.extend(
+            [
+                "huggingface_hub",
+                "miniaudio",
+                "mlx",
+                "mlx_audio",
+                "mlx_lm",
+                "scipy",
+                "tqdm",
+            ]
+        )
     for token in required:
         assert token in text, f"{spec_name} missing {token}"
     assert "transformers.audio_utils" not in text
@@ -418,7 +429,9 @@ def test_pyinstaller_specs_collect_local_ai_runtime(spec_name: str) -> None:
     assert '    "transformers.models.detr",\n' not in text
     assert '    "transformers.models.roberta",\n' not in text
     assert '"hf_xet"' in text
-    assert '"hf_xet.hf_xet"' in text
+    if spec_name == "vibemix-core.windows.spec":
+        assert 'for _pkg in ("av", "onnxruntime", "sentencepiece", "watchfiles")' in text
+        assert '"hf_xet.hf_xet"' in text
 
 
 @pytest.mark.parametrize(
@@ -592,11 +605,10 @@ def test_pyinstaller_specs_filter_test_fixture_data(spec_name: str) -> None:
     ["vibemix-core.macos.spec", "vibemix-core.windows.spec"],
 )
 def test_pyinstaller_specs_exclude_transformers(spec_name: str) -> None:
-    """CLAP/CUE preprocessing is local; frozen builds should exclude Transformers."""
+    """Windows stays CLAP/CUE-only; macOS bundles Transformers for Chatterbox."""
     text = (PROJECT_ROOT / spec_name).read_text(encoding="utf-8")
     required = [
         '_ANALYSIS_EXCLUDES = [',
-        '"transformers"',
         '"onnxruntime.backend"',
         '"onnxruntime.capi.convert_npz_to_onnx_adapter"',
         '"onnxruntime.datasets"',
@@ -605,6 +617,13 @@ def test_pyinstaller_specs_exclude_transformers(spec_name: str) -> None:
     ]
     for token in required:
         assert token in text, f"{spec_name} missing {token}"
+    excludes = text.split("_ANALYSIS_EXCLUDES = [", 1)[1].split("]\n", 1)[0]
+    if spec_name == "vibemix-core.macos.spec":
+        assert '"transformers"' not in excludes
+        assert '"scipy"' not in excludes
+        assert '"hf_xet"' not in excludes
+    else:
+        assert '"transformers"' in excludes
     assert "_transformers_model_excludes" not in text
 
 

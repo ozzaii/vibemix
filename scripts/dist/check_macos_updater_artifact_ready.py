@@ -69,6 +69,7 @@ def check_macos_updater_artifact_ready(
     triple: str | None = None,
     install_dir: Path | None = None,
     require_chatterbox_ref: bool = False,
+    require_chatterbox_source: bool = False,
     require_developer_id: bool = False,
     developer_team_id: str | None = None,
     smoke: str = "version",
@@ -101,6 +102,7 @@ def check_macos_updater_artifact_ready(
             app,
             triple=triple,
             require_chatterbox_ref=require_chatterbox_ref,
+            require_chatterbox_source=require_chatterbox_source,
             require_developer_id=require_developer_id,
             developer_team_id=developer_team_id,
             smoke=smoke,
@@ -142,6 +144,11 @@ def main(argv: list[str] | None = None) -> int:
         help="release gate: require the bundled Chatterbox production reference WAV",
     )
     parser.add_argument(
+        "--require-chatterbox-source",
+        action="store_true",
+        help="release gate: require the public Chatterbox HF repo/revision to resolve",
+    )
+    parser.add_argument(
         "--require-developer-id",
         action="store_true",
         help=(
@@ -164,6 +171,7 @@ def main(argv: list[str] | None = None) -> int:
         triple=args.triple,
         install_dir=args.install_dir,
         require_chatterbox_ref=args.require_chatterbox_ref,
+        require_chatterbox_source=args.require_chatterbox_source,
         require_developer_id=args.require_developer_id,
         developer_team_id=args.developer_team_id,
         smoke=args.smoke,
