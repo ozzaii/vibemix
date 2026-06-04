@@ -220,3 +220,28 @@ Live app safety check during proof: `ws://127.0.0.1:8765` status ticks showed `g
   - `uv run pytest -q tests/library/test_codex_curate.py::test_chat_timeout_is_interactive tests/library/test_codex_curate.py::test_codex_mcp_tool_timeout_allows_batched_candidate_inspection tests/library/test_codex_curate.py::test_chat_candidate_timeout_fallback_inspects_once tests/library/test_setprep_tools.py::test_inspect_candidates_batches_features_sections_and_energy tests/library/test_setprep_tools.py::test_inspect_candidates_parallelizes_rows tests/library/test_setprep_tools.py::test_inspect_candidates_rejects_unseen_ids_per_row tests/library/test_setprep_tools.py::test_inspect_candidates_caps_large_batches tests/library/test_setprep_tools.py::test_dispatch_gives_batched_candidate_inspection_a_larger_timeout tests/library/test_mcp_server_clarification.py::test_inspect_candidates_delegates_with_dict_packed_args` -> `9 passed`.
   - `uv run ruff check src/vibemix/library/codex_curate.py src/vibemix/library/toolset.py src/vibemix/library/mcp_server.py tests/library/test_codex_curate.py tests/library/test_setprep_tools.py tests/library/test_mcp_server_clarification.py` -> pass.
 - No live app/audio launch was performed in this re-verification; the prior live/CLI artifacts above remain the by-eye proof for the shipped change.
+
+### Fresh CLI Proof — 2026-06-04 (`e3b4d93b`)
+
+Command:
+
+```bash
+VIBEMIX_CODEX_ALLOW_SHELL=1 VIBEMIX_LOCAL_TTS=0 \
+VIBEMIX_OUTPUT_DEVICE='Multi-Output Device' \
+uv run python -m vibemix library chat \
+  "Find a handful of fast hardgroove candidates from my library and inspect their BPM, key, sections, and energy before you answer. Use one candidate inspection batch, keep it concise." \
+  --backend codex --json
+```
+
+Observed tool tape:
+
+```text
+[viber-tool] discover_pool ok fast hardgroove techno driving percussive club tools; bpm=128.0-140.0; min_dur=120.0s; k=8; 8 tracks; bpm_unknown=8/8
+[viber-tool] inspect_candidates ok 8 tracks; 8 candidate inspections
+```
+
+Result: `stop_reason="model_done"`, `iterations=2`, eight candidates inspected in one
+batch, no serial `get_track_features` / `get_track_sections` / `get_track_energy`
+loop, no timeout. Viber also preserved metadata honesty: all eight candidates had unknown
+BPM/key in cache, so the reply refused to claim the requested BPM range was verified and
+told the DJ to re-import or run library ingest from the DJ library/source.
