@@ -87,6 +87,15 @@ authorized observability files are:
 | `src/vibemix/debrief/tldr.py` | Emits debrief TLDR/TTS rows. | Package 1A |
 | `src/vibemix/eval/session_report.py` | Reads global AI-message rows, including Viber `tool_starvation`, to produce repair issues. | Package 1A |
 
+Engine/DSP later adds the deterministic keyless set-prep surface. This is NOT
+another Viber starvation propagation path; it is the terminal result shape for
+the local no-Codex `auto_crate` command, routed through the existing CLI
+dispatch in `__main__.py`.
+
+| File | What it does with `stop_reason` | Plan |
+|---|---|---|
+| `src/vibemix/library/auto_crate.py` | Defines `AutoCrateResult.stop_reason` for keyless deterministic set-prep outcomes (`created`, `exported`, setup/no-pool/no-sequence failures). | Engine/DSP auto_crate front-door |
+
 Any other source file that mentions `stop_reason` (in `src/vibemix/`,
 recursive) still fails the gate. If it is Viber starvation plumbing, route
 through the four-file Phase 99 surface. If it is a new observability producer
@@ -164,6 +173,7 @@ STOP_REASON_WHITELIST: frozenset[str] = frozenset(
         "src/vibemix/debrief/tldr.py",
         "src/vibemix/eval/session_report.py",
         "src/vibemix/learn/observability.py",
+        "src/vibemix/library/auto_crate.py",
         "src/vibemix/library/codex_curate.py",
         "src/vibemix/library/telegram_bridge.py",
         "src/vibemix/library/toolset.py",
@@ -351,6 +361,8 @@ def test_stop_reason_writes_confined_to_toolset() -> None:
       * `src/vibemix/debrief/drills.py` — debrief drill rows
       * `src/vibemix/debrief/tldr.py` — debrief TLDR/TTS rows
       * `src/vibemix/eval/session_report.py` — report consumer
+      * `src/vibemix/library/auto_crate.py` — deterministic keyless set-prep
+        terminal result shape
 
     Why this gate exists: `stop_reason` is the Decision-4 propagation
     surface for Viber terminal run states AND a canonical AI-message
