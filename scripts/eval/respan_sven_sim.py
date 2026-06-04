@@ -38,7 +38,9 @@ from pathlib import Path
 
 import httpx
 
+from vibemix.agent._streaming_pipe import last_balanced_position
 from vibemix.agent.dj_cohost import repair_finished_headphone_line
+from vibemix.agent.tts_sanitizer import model_text_for_tts
 from vibemix.bench.fixtures import fixture_state_for
 from vibemix.llm.model_router import resolve_model
 from vibemix.prompts.matrix import build_system_instruction
@@ -245,6 +247,16 @@ def _judge(evidence: str, line: str, key: str) -> dict:
         return {}
 
 
+def _spoken_line_for_judge(model_line: str) -> str:
+    """Mirror the audience-facing text shape used by the live MOSS path."""
+
+    if not model_line:
+        return ""
+    safe_pos = last_balanced_position(model_line)
+    clipped = model_line[:safe_pos] if safe_pos > 0 else model_line
+    return model_text_for_tts(clipped, normalize=True)
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--gate-only", action="store_true", help="deterministic gate routing, no model")
@@ -300,10 +312,11 @@ def main() -> int:
         user = f"{sc['evidence']}\n\n{sc['task']}"
         _st, line = _chat(persona, user, key)
         raw_line = (line or "").strip()
-        line = repair_finished_headphone_line(raw_line) or ""
+        model_line = repair_finished_headphone_line(raw_line) or ""
+        line = _spoken_line_for_judge(model_line)
         if line:
             scores = _judge(sc["evidence"], line, key)
-        elif raw_line:
+        elif raw_line or model_line:
             scores = {
                 **{dim: 0 for dim in DIMS},
                 "should_speak": False,
@@ -311,7 +324,7 @@ def main() -> int:
             }
         else:
             scores = {}
-        row.update({"line": line, "raw_line": raw_line, "scores": scores})
+        row.update({"line": line, "model_line": model_line, "raw_line": raw_line, "scores": scores})
         sd = "/".join(str(scores.get(d, "-")) for d in DIMS)
         print(f"{sc['name']:<32} {sc['event']:<16} {gate.verdict:<8} {ok:<4} {sd}")
         print(f"    -> {line[:140]}")
