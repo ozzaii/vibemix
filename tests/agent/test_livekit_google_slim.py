@@ -43,13 +43,13 @@ def test_live_factories_do_not_load_cloud_stack() -> None:
         """
 import sys
 from vibemix.agent.llm_factory import build_llm
-from vibemix.agent.local_tts import LocalTTSUnavailable
+from vibemix.agent.chatterbox_tts import ChatterboxUnavailable
 from vibemix.agent.tts_chain import build_tts_chain
 
 build_llm("dummy-key")
 try:
     build_tts_chain()
-except LocalTTSUnavailable:
+except ChatterboxUnavailable:
     pass
 
 assert not [m for m in sys.modules if m.startswith("google.cloud")]

@@ -196,15 +196,15 @@ def test_g7_install_uuid_persists(tmp_path, monkeypatch):
 
 
 def test_g8_direct_mode_phase4_regression_safe(mocker):
-    """G8: build_llm stays direct-compatible; TTS is MOSS-only in every mode."""
+    """G8: build_llm stays direct-compatible; TTS is Chatterbox-only in every mode."""
     from livekit.agents import tts as agents_tts
     from livekit.plugins import google as google_plugin  # noqa: F401
     from livekit.plugins import openai as openai_plugin  # noqa: F401
 
     from vibemix.agent import build_llm, build_tts_chain
 
-    mocker.patch("vibemix.agent.local_tts.local_tts_enabled", return_value=True)
-    fake_moss_cls = mocker.patch("vibemix.agent.local_tts.MossLocalTTS")
+    mocker.patch("vibemix.agent.chatterbox_tts.chatterbox_available", return_value=True)
+    fake_chatterbox_cls = mocker.patch("vibemix.agent.chatterbox_tts.ChatterboxLocalTTS")
     mocker.patch.object(agents_tts.FallbackAdapter, "__init__", return_value=None)
 
     # Direct mode requires only api_key (Phase 4 surface preserved)
@@ -219,7 +219,7 @@ def test_g8_direct_mode_phase4_regression_safe(mocker):
     except (ValueError, TypeError) as e:
         pytest.fail(f"build_tts_chain regression: {e}")
     assert agents_tts.FallbackAdapter.__init__.call_args.kwargs["tts"] == [
-        fake_moss_cls.return_value
+        fake_chatterbox_cls.return_value
     ]
 
     # Proxy LLM still rejects missing args. Proxy TTS no longer needs proxy args:

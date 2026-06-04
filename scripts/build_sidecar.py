@@ -77,7 +77,7 @@ SOURCE_FINGERPRINT_PATHS: tuple[str, ...] = (
     "vibemix-core.windows.spec",
     "rthooks",
     "scripts/build_sidecar.py",
-    "scripts/dist/moss_bundle.py",
+    "scripts/dist/chatterbox_bundle.py",
     "scripts/dist/patch_livekit_agents_init.py",
     "tauri/ui/src/ipc/messages.schema.json",
     "pyproject.toml",

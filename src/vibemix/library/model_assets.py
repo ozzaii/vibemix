@@ -12,9 +12,7 @@ from __future__ import annotations
 
 import hashlib
 import os
-import tarfile
 import tempfile
-import zipfile
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -28,9 +26,6 @@ _CLAP_BASE_URL = "https://huggingface.co/Xenova/larger_clap_music_and_speech/res
 _CUE_URL_ENV = "VIBEMIX_CUE_ONNX_URL"
 _CUE_SHA_ENV = "VIBEMIX_CUE_ONNX_SHA256"
 _CUE_SIZE_ENV = "VIBEMIX_CUE_ONNX_SIZE"
-_MOSS_ARCHIVE_URL_ENV = "VIBEMIX_MOSS_TTS_ARCHIVE_URL"
-_MOSS_ARCHIVE_SHA_ENV = "VIBEMIX_MOSS_TTS_ARCHIVE_SHA256"
-_MOSS_ARCHIVE_SIZE_ENV = "VIBEMIX_MOSS_TTS_ARCHIVE_SIZE"
 _PROGRESS_CHUNK_BYTES = 8 * 1024 * 1024
 ModelProgress = Callable[[dict[str, object]], None]
 
@@ -511,184 +506,6 @@ def install_cue_model(
     }
 
 
-def _archive_member_paths(archive_path: Path) -> list[str]:
-    suffixes = "".join(archive_path.suffixes).lower()
-    if zipfile.is_zipfile(archive_path):
-        with zipfile.ZipFile(archive_path) as zf:
-            return zf.namelist()
-    if suffixes.endswith((".tar", ".tar.gz", ".tgz")) or tarfile.is_tarfile(archive_path):
-        with tarfile.open(archive_path) as tf:
-            return tf.getnames()
-    raise RuntimeError("MOSS TTS archive must be a .zip, .tar, .tar.gz, or .tgz file")
-
-
-def _safe_extract_archive(archive_path: Path, dest_root: Path) -> None:
-    dest_root.mkdir(parents=True, exist_ok=True)
-    root = dest_root.resolve()
-
-    def _check_member(name: str) -> None:
-        target = (root / name).resolve()
-        if not target.is_relative_to(root):
-            raise RuntimeError(f"unsafe path in MOSS archive: {name}")
-
-    for name in _archive_member_paths(archive_path):
-        _check_member(name)
-
-    if zipfile.is_zipfile(archive_path):
-        with zipfile.ZipFile(archive_path) as zf:
-            zf.extractall(root)
-        return
-    with tarfile.open(archive_path) as tf:
-        tf.extractall(root, filter="data")
-
-
-def _moss_archive_config() -> tuple[dict[str, object] | None, list[str]]:
-    url = os.environ.get(_MOSS_ARCHIVE_URL_ENV, "").strip()
-    if not url:
-        return None, []
-
-    errors: list[str] = []
-    if not url.startswith("https://"):
-        errors.append(f"{_MOSS_ARCHIVE_URL_ENV} must be an https:// URL")
-
-    sha = os.environ.get(_MOSS_ARCHIVE_SHA_ENV, "").strip().lower()
-    if len(sha) != 64 or any(c not in "0123456789abcdef" for c in sha):
-        errors.append(f"{_MOSS_ARCHIVE_SHA_ENV} must be a 64-character lowercase SHA-256")
-
-    raw_size = os.environ.get(_MOSS_ARCHIVE_SIZE_ENV, "").strip()
-    try:
-        size = int(raw_size)
-    except ValueError:
-        size = 0
-    if size <= 0:
-        errors.append(f"{_MOSS_ARCHIVE_SIZE_ENV} must be a positive byte count")
-
-    if errors:
-        return None, errors
-    return {"url": url, "sha256": sha, "size": size}, []
-
-
-def moss_model_installable() -> bool:
-    """Whether a release/ops build configured a verified MOSS archive source."""
-    return bool(os.environ.get(_MOSS_ARCHIVE_URL_ENV, "").strip())
-
-
-def install_moss_model(
-    *, force: bool = False, progress: ModelProgress | None = None
-) -> dict[str, object]:
-    """Install or verify the required local MOSS TTS model tree.
-
-    The repo does not ship or guess a public 600MB+ model URL. Release/ops builds
-    can make this one-click by setting archive URL/SHA/size pins; otherwise the
-    installer returns an actionable manual setup error instead of pretending
-    there is a fallback voice.
-    """
-    from vibemix.agent.local_tts import candidate_model_dir
-    from vibemix.agent.local_tts import model_status as moss_model_status
-
-    path = candidate_model_dir().expanduser()
-    root = path.parent
-    status = moss_model_status()
-    files: list[dict[str, object]] = []
-    errors: list[str] = []
-    config, config_errors = _moss_archive_config()
-
-    if bool(status["installed"]) and not force:
-        _notify_progress(
-            progress,
-            {
-                "id": "moss-tts",
-                "n": 1,
-                "total": 1,
-                "status": "verified",
-                "rel_path": path.name,
-                "downloaded": 0,
-                "size": 0,
-            },
-        )
-        files.append(
-            {
-                "rel_path": path.name,
-                "path": str(path),
-                "status": "skipped",
-                "size": 0,
-                "sha256": "",
-                "url": config["url"] if config else "",
-            }
-        )
-    elif config_errors:
-        errors.extend(config_errors)
-    elif config is None:
-        errors.append(
-            "MOSS TTS ONNX is not hosted by default; set VIBEMIX_MOSS_TTS_DIR "
-            "to a complete MOSS-TTS-Nano-100M-ONNX directory, place the model "
-            "under the vibemix cache, or provide VIBEMIX_MOSS_TTS_ARCHIVE_URL "
-            "with VIBEMIX_MOSS_TTS_ARCHIVE_SHA256 and VIBEMIX_MOSS_TTS_ARCHIVE_SIZE."
-        )
-        _notify_progress(
-            progress,
-            {
-                "id": "moss-tts",
-                "n": 1,
-                "total": 1,
-                "status": "error",
-                "rel_path": path.name,
-                "downloaded": 0,
-                "size": 0,
-                "error": errors[-1],
-            },
-        )
-    else:
-        root.mkdir(parents=True, exist_ok=True)
-        with tempfile.TemporaryDirectory(prefix="moss-tts.", dir=root) as tmp_dir:
-            archive_path = Path(tmp_dir) / "moss-tts-onnx.archive"
-            try:
-                if progress is None:
-                    files.append(
-                        _download_url_to_file(
-                            url=config["url"],
-                            dest=archive_path,
-                            expected_size=config["size"],
-                            expected_sha256=config["sha256"],
-                            rel_path=archive_path.name,
-                            model_id="moss-tts",
-                        )
-                    )
-                else:
-                    files.append(
-                        _download_url_to_file(
-                            url=config["url"],
-                            dest=archive_path,
-                            expected_size=config["size"],
-                            expected_sha256=config["sha256"],
-                            rel_path=archive_path.name,
-                            progress=progress,
-                            model_id="moss-tts",
-                            n=1,
-                            total=1,
-                        )
-                    )
-                _safe_extract_archive(archive_path, root)
-                status = moss_model_status()
-                if not bool(status["installed"]):
-                    missing = ", ".join(str(m) for m in status.get("missing", []))
-                    mismatched = ", ".join(str(m) for m in status.get("mismatched", []))
-                    detail = "; ".join(part for part in (missing, mismatched) if part)
-                    errors.append(f"MOSS archive did not produce a usable model tree: {detail}")
-            except RuntimeError as exc:
-                errors.append(str(exc))
-
-    if not errors:
-        status = moss_model_status()
-    return {
-        "id": "moss-tts",
-        "installed": bool(status["installed"]),
-        "path": status["path"],
-        "files": files,
-        "errors": errors,
-    }
-
-
 def cue_model_install_status() -> dict[str, object]:
     """Back-compat name for the CUE install target."""
     return install_cue_model()
@@ -736,14 +553,14 @@ def install_models(
 ) -> dict[str, object]:
     """Install supported local model assets.
 
-    ``target`` is ``"required"``, ``"clap"``, ``"moss"``, ``"cue"``, or
-    ``"all"``. ``"required"`` installs the first-run required CLAP snapshot plus
-    required MOSS TTS model. CUE-DETR downloads only when a release/ops build
-    provides an HTTPS artifact URL plus size/SHA pins. Otherwise that target
-    reports an actionable manual setup error.
+    ``target`` is ``"required"``, ``"clap"``, ``"cue"``, or ``"all"``.
+    ``"required"`` installs the first-run required CLAP snapshot. Chatterbox
+    uses a packaged/reference WAV, not a model-install target. CUE-DETR
+    downloads only when a release/ops build provides an HTTPS artifact URL plus
+    size/SHA pins. Otherwise that target reports an actionable manual setup error.
     """
-    if target not in {"required", "clap", "moss", "cue", "all"}:
-        raise ValueError("target must be 'required', 'clap', 'moss', 'cue', or 'all'")
+    if target not in {"required", "clap", "cue", "all"}:
+        raise ValueError("target must be 'required', 'clap', 'cue', or 'all'")
 
     results: list[dict[str, object]] = []
     target_progress: ModelProgress | None = None
@@ -757,11 +574,6 @@ def install_models(
             results.append(install_clap_model(force=force))
         else:
             results.append(install_clap_model(force=force, progress=target_progress))
-    if target in {"required", "moss", "all"}:
-        if target_progress is None:
-            results.append(install_moss_model(force=force))
-        else:
-            results.append(install_moss_model(force=force, progress=target_progress))
     if target in {"cue", "all"}:
         if target_progress is None:
             results.append(install_cue_model(force=force))
