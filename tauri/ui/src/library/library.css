@@ -941,8 +941,10 @@ body {
 }
 :is(body, .vmx-lib-app)[data-mode="chat"] .vmx-lib-panel:first-child {
   position: absolute;
-  left: clamp(18px, 4vw, 72px);
-  right: clamp(18px, 4vw, 72px);
+  left: 50%;
+  right: auto;
+  transform: translateX(-50%);
+  width: min(760px, calc(100% - 36px));
   bottom: clamp(18px, 3vw, 34px);
   z-index: 8;
   min-height: 0;
@@ -1020,11 +1022,12 @@ body {
 :is(body, .vmx-lib-app)[data-mode="chat"] .vmx-lib-chat-thread {
   display: flex;
   flex-direction: column;
+  align-items: center;
   gap: 18px;
   flex: 1;
   min-height: 0;
   justify-content: flex-end;
-  padding: clamp(26px, 4vw, 64px) clamp(22px, 5vw, 82px) clamp(142px, 18vh, 190px);
+  padding: clamp(26px, 4vw, 64px) clamp(20px, 4vw, 48px) clamp(142px, 18vh, 190px);
   /* A lit recessed display slab (the deck's .vmx-voice material), NOT a flat
      dark box. A soft rose key-light pools at the bottom where Viber's newest
      line sits, so the console reads as currently speaking. */
@@ -1044,6 +1047,15 @@ body {
   position: relative;
   z-index: 1;
   overflow: hidden;
+}
+/* The conversation is a centered column inside the full-width slab. The slab
+   keeps its lit material edge-to-edge; the turns and starters cap to a reading
+   width and center, so a short greeting no longer strands the right half of a
+   wide window (the left-flush-in-a-wide-box "unfinished" read). */
+:is(body, .vmx-lib-app)[data-mode="chat"] .vmx-lib-chat-turn,
+:is(body, .vmx-lib-app)[data-mode="chat"] .vmx-lib-chat-starters {
+  width: 100%;
+  max-width: 720px;
 }
 /* The lit upper seam — a quiet rose hairline catching the slab's machined lip,
    echoing the .vmx-lib-frame::before edge so the console reads as one rack. */
