@@ -22,10 +22,10 @@ import { DJ_VOCAB } from "../src/shell/dj-vocab.js";
 const SRC = join(dirname(fileURLToPath(import.meta.url)), "..", "src");
 
 // The canonical brand fonts (tokens.css @font-face + the --type-* tokens).
-// Instrument Serif is the cohost hero / lead-track-name face (Phase-1b serif
-// slice, now vendored as latin + latin-ext WOFF2); Geist body/mono is the
-// remaining Phase-1b swap and joins this list when it lands.
-const ALLOWED_FONTS = ["Saira", "JetBrains Mono", "Instrument Serif"];
+// Phase-1b landed: Geist (body/UI, --type-display/--type-body) + Geist Mono
+// (numerics/labels, --type-mono) retired Saira + JetBrains Mono; Instrument
+// Serif stays the cohost hero / lead-track-name face. All three are OFL.
+const ALLOWED_FONTS = ["Geist", "Geist Mono", "Instrument Serif"];
 // Generic / platform fonts that signal AI slop if used as a brand face.
 // (system-ui / ui-monospace / sans-serif / monospace are allowed ONLY as the
 // trailing fallback in a stack that starts with a brand font — see the
@@ -103,7 +103,7 @@ describe("design-slop gate — no AI-slop fonts", () => {
     );
     expect(
       offenders,
-      `AI-slop fonts found — use Saira / JetBrains Mono via var(--type-*):\n${offenders
+      `AI-slop fonts found — use Geist / Geist Mono via var(--type-*):\n${offenders
         .map((o) => `  ${o.file}: font-family: ${o.decl}`)
         .join("\n")}`,
     ).toEqual([]);
@@ -120,7 +120,7 @@ describe("design-slop gate — no AI-slop fonts", () => {
     });
     expect(
       offenders,
-      `font stacks must LEAD with Saira / JetBrains Mono or a --type-* token (system-ui only as trailing fallback):\n${offenders
+      `font stacks must LEAD with Geist / Geist Mono or a --type-* token (system-ui only as trailing fallback):\n${offenders
         .map((o) => `  ${o.file}: font-family: ${o.decl}`)
         .join("\n")}`,
     ).toEqual([]);
@@ -128,7 +128,7 @@ describe("design-slop gate — no AI-slop fonts", () => {
 });
 
 describe("design-slop gate — @font-face brand lock", () => {
-  it("declares ONLY Saira + JetBrains Mono as @font-face families", () => {
+  it("declares ONLY Geist + Geist Mono + Instrument Serif as @font-face families", () => {
     const tokens = readFileSync(join(SRC, "tokens.css"), "utf-8");
     const faces = [...tokens.matchAll(/@font-face\s*\{[^}]*?font-family:\s*['"]([^'"]+)['"]/gis)].map(
       (m) => m[1],

@@ -23,10 +23,11 @@
  * --brand* / --gold* / --surface-* / --text-* / --border-*).
  *
  * FOLLOW-UPS (tracked, not done here):
- *   - 1b FONTS: vendor Geist + Geist Mono + Instrument Serif WOFF2 offline,
- *     swap --type-display/--type-body to Geist and wire --type-serif's file.
- *     This pass keeps Saira + JetBrains Mono (already vendored) active; the
- *     hero serif falls back to Georgia until the WOFF2 lands.
+ *   - 1b FONTS: DONE — Geist (body/UI) + Geist Mono (numerics) vendored
+ *     offline and wired to --type-display/--type-body/--type-mono, retiring
+ *     Saira + JetBrains Mono; Instrument Serif (--type-serif) is the vendored
+ *     hero face. (Inline code COMMENTS elsewhere still say "Saira" — cosmetic
+ *     doc debt, non-functional; a follow-up sweep updates them.)
  *   - POLYCHROME: the v5 meter/mood polychrome (green/magenta/blue) is kept
  *     defined so meter + rocker stay intact; collapsing it into rose + gold
  *     per the translation doc is a follow-up. The meter "warm" band now reads
@@ -36,44 +37,35 @@
  * var(--token) exclusively. Only this file is allowed to contain `#xxxxxx`.
  */
 
-/* === type — vendored Saira + JetBrains Mono (Geist/Instrument Serif = 1b) === *
+/* === type — vendored Geist + Geist Mono + Instrument Serif (OFL) === *
  * SHA-256 attestations in LICENSE-3RD-PARTY.md. The tozpembe target type is
  * Geist Sans (body/UI) + Geist Mono (labels/numerics) + Instrument Serif
  * (cohost hero + lead track names). Instrument Serif is now vendored (the
  * hero serif slice of Phase 1b), so --type-serif resolves in-face instead of
- * the Georgia fallback; --type-display/--type-body still resolve to the
- * vendored Saira until the Geist body/mono swap (remaining Phase-1b slice). */
+ * the Georgia fallback; --type-display/--type-body resolve to the vendored
+ * Geist, with --type-mono on Geist Mono (Phase-1b body/mono swap, landed). */
 
-/* Saira — variable axes (wdth + wght). Single file, all weights+widths. */
+/* Geist — variable weight axis (Vercel, OFL). The Phase-1b body/UI face that
+ * retires Saira. Geist has no width axis, so the existing
+ * `font-variation-settings: "wdth" N` calls normalize to regular width; the
+ * "wght" axis still applies, so weights are unchanged. */
 @font-face {
-  font-family: 'Saira';
-  src: url('/fonts/Saira-VariableFont_wdth,wght.woff2') format('woff2-variations'),
-       url('/fonts/Saira-VariableFont_wdth,wght.woff2') format('woff2');
-  font-weight: 300 800;
-  font-stretch: 75% 125%;
+  font-family: 'Geist';
+  src: url('/fonts/Geist-Variable.woff2') format('woff2-variations'),
+       url('/fonts/Geist-Variable.woff2') format('woff2');
+  font-weight: 100 900;
   font-style: normal;
   font-display: swap;
 }
 
-/* JetBrains Mono — three weights as static WOFF2 (variable axis not needed for numerics) */
+/* Geist Mono — variable weight axis (Vercel, OFL). Numerics + LED/console
+ * labels, retiring the three static JetBrains Mono weights with one variable
+ * file. */
 @font-face {
-  font-family: 'JetBrains Mono';
-  src: url('/fonts/JetBrainsMono-Regular.woff2') format('woff2');
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: 'JetBrains Mono';
-  src: url('/fonts/JetBrainsMono-Medium.woff2') format('woff2');
-  font-weight: 500;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: 'JetBrains Mono';
-  src: url('/fonts/JetBrainsMono-SemiBold.woff2') format('woff2');
-  font-weight: 600;
+  font-family: 'Geist Mono';
+  src: url('/fonts/GeistMono-Variable.woff2') format('woff2-variations'),
+       url('/fonts/GeistMono-Variable.woff2') format('woff2');
+  font-weight: 100 900;
   font-style: normal;
   font-display: swap;
 }
@@ -338,9 +330,9 @@
     var(--lg-depth);
 
   /* --- Type --- (Geist/Instrument Serif swap = Phase 1b) */
-  --type-display: 'Saira', system-ui, sans-serif;
-  --type-body:    'Saira', system-ui, sans-serif;
-  --type-mono:    'JetBrains Mono', ui-monospace, monospace;
+  --type-display: 'Geist', system-ui, sans-serif;
+  --type-body:    'Geist', system-ui, sans-serif;
+  --type-mono:    'Geist Mono', ui-monospace, monospace;
   --type-serif:   'Instrument Serif', Georgia, serif;  /* cohost hero + lead track names */
   --type-step-0: 11px;
   --type-step-1: 13px;

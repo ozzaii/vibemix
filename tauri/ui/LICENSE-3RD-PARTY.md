@@ -1,7 +1,7 @@
 # Third-Party Fonts — Vendored Under Their Respective Licenses
 
-vibemix ships 6 WOFF2 fonts bundled under `tauri/ui/public/fonts/` (1 Saira
-variable + 3 JetBrains Mono static + 2 Instrument Serif static subsets).
+vibemix ships 4 WOFF2 fonts bundled under `tauri/ui/public/fonts/` (1 Geist
+variable + 1 Geist Mono variable + 2 Instrument Serif static subsets).
 Vendoring them locally (rather than
 fetching from Google Fonts at runtime) is a hard requirement so the wizard
 renders correctly on first launch when the user has no network — and so
@@ -11,64 +11,41 @@ Each entry below records source, license, and SHA-256 of the WOFF2 we ship.
 Vendor swaps MUST update the SHA here in the same PR (Phase 18 codesign chain
 + the UI-checker (Phase 14) re-verification depend on stable hashes).
 
-Phase 14 Wave 5 (commit landing this file change) replaced the four legacy
-families used in the FL-Studio retro-tactile prototype — Workbench, DM Mono,
-DSEG7 Classic, Caveat — with two CDJ-Whisper-v5 families: Saira (variable
-width + weight) for chrome, JetBrains Mono (three static weights) for
-numerics. The legacy WOFF2 files were deleted in the same commit.
+Phase-1b (this file change) retired the CDJ-Whisper-v5 chrome faces — Saira
+(variable width + weight) and the three static JetBrains Mono weights — for
+the Forged-Obsidian-Chrome target faces: Geist (variable weight) for body/UI
+and Geist Mono (variable weight) for numerics + LED/console labels. The Saira
+and JetBrains Mono WOFF2 files were deleted in the same commit. Instrument
+Serif (the cohost hero) is unchanged.
 
 ---
 
-## Saira — Variable (`wdth` 75–125, `wght` 300–800)
+## Geist — Variable (`wght` 100–900)
 
-- **File:** `tauri/ui/public/fonts/Saira-VariableFont_wdth,wght.woff2`
-- **Source:** Google Fonts — https://fonts.google.com/specimen/Saira
-- **Subset shipped:** latin (`U+0000-00FF`)
+- **File:** `tauri/ui/public/fonts/Geist-Variable.woff2`
+- **Source:** Vercel Geist — https://github.com/vercel/geist-font (npm `geist`)
+- **Subset shipped:** full upstream variable font (latin + extended)
 - **License:** SIL Open Font License 1.1 (OFL)
-- **Designer:** Héctor Gómez (Omnibus-Type)
-- **SHA-256:** `d5f1ee1ce85a2f6611d76bcd98738132f4706b099dc167f02c2093a1ec5eb975`
-- **Use in vibemix:** Primary display + body font for chrome text (wordmark,
-  step headings, button labels, panel headers, settings groups). Variable
-  axes drive UI-SPEC §Typography weight + width pairings (`"wdth" 85, "wght" 700`
-  on the wordmark; `"wdth" 100, "wght" 400` on body prose; `"wdth" 85, "wght" 600`
-  on labels). Single-file variable font replaces the multi-weight static
-  Workbench + DM Mono pair from the FL-Studio prototype.
+- **Designer:** Vercel, in collaboration with basement.studio
+- **SHA-256:** `a369fcf5628ea2aa4e1b9e2ec6a5b3624e365bda588e1f0f2f12b564f728fbb8`
+- **Use in vibemix:** Primary display + body face for chrome text (wordmark,
+  step headings, button labels, panel headers, settings groups), resolving
+  `--type-display` + `--type-body`. Geist has a weight axis only (no width
+  axis), so the legacy `font-variation-settings: "wdth" N` calls normalize to
+  regular width while `"wght" N` still applies. Retires the Saira variable face.
 
-## JetBrains Mono — Regular (400)
+## Geist Mono — Variable (`wght` 100–900)
 
-- **File:** `tauri/ui/public/fonts/JetBrainsMono-Regular.woff2`
-- **Source:** Google Fonts — https://fonts.google.com/specimen/JetBrains+Mono
-- **Subset shipped:** latin (`U+0000-00FF`)
+- **File:** `tauri/ui/public/fonts/GeistMono-Variable.woff2`
+- **Source:** Vercel Geist — https://github.com/vercel/geist-font (npm `geist`)
+- **Subset shipped:** full upstream variable font (latin + extended)
 - **License:** SIL Open Font License 1.1 (OFL)
-- **Designer:** JetBrains (Philipp Nurullin, Konstantin Bulenkov)
-- **SHA-256:** `14425ba9c695763c1547f48a206b7aa60350a33ae23de09f0407877f3fcd89eb`
-- **Use in vibemix:** Default monospace for numerics, sample rate readouts,
-  countdown timers, transcript timestamps, and any LED/console-style chrome
-  text. Replaces DSEG7 Classic Bold's 7-segment LCD role (mock specs JetBrains
-  Mono semibold + amber glow as the production numeric face).
-
-## JetBrains Mono — Medium (500)
-
-- **File:** `tauri/ui/public/fonts/JetBrainsMono-Medium.woff2`
-- **Source:** Google Fonts — https://fonts.google.com/specimen/JetBrains+Mono
-- **Subset shipped:** latin (`U+0000-00FF`)
-- **License:** SIL Open Font License 1.1 (OFL)
-- **Designer:** JetBrains (Philipp Nurullin, Konstantin Bulenkov)
-- **SHA-256:** `cb182feeed4d798ff6961d3c79f7026279448fca0676438aaecb21f3fc39553a`
-- **Use in vibemix:** Selected option / picked device name in dropdowns; the
-  weight 500 hop from Regular signals selection without changing typeface.
-
-## JetBrains Mono — SemiBold (600)
-
-- **File:** `tauri/ui/public/fonts/JetBrainsMono-SemiBold.woff2`
-- **Source:** Google Fonts — https://fonts.google.com/specimen/JetBrains+Mono
-- **Subset shipped:** latin (`U+0000-00FF`)
-- **License:** SIL Open Font License 1.1 (OFL)
-- **Designer:** JetBrains (Philipp Nurullin, Konstantin Bulenkov)
-- **SHA-256:** `400c6bfda18d5d14acad1c15d6dcb9f8e13c015e7286317e0b9a482539bef147`
-- **Use in vibemix:** Large numeric readouts (sample rate display, BPM,
-  countdown timers) where the semibold mass reads as a chunky LED segment
-  while keeping JetBrains Mono's clean letterforms.
+- **Designer:** Vercel, in collaboration with basement.studio
+- **SHA-256:** `fba8f577f38a2bbcbe818efa6348dd58f36303a10b8737c42fefad275be563ab`
+- **Use in vibemix:** Default monospace resolving `--type-mono` — numerics,
+  sample-rate readouts, countdown timers, transcript timestamps, and any
+  LED/console-style chrome. One variable file retires the three static
+  JetBrains Mono weights (400/500/600 now come off the weight axis).
 
 ## Instrument Serif — Regular (400), latin subset
 
@@ -137,15 +114,14 @@ numerics. The legacy WOFF2 files were deleted in the same commit.
 
 ## SIL Open Font License 1.1 — Summary
 
-All six vendored fonts ship under the SIL Open Font License 1.1. The OFL
+All four vendored fonts ship under the SIL Open Font License 1.1. The OFL
 permits redistribution as part of a software product so long as the font
 files themselves are not sold as a standalone product and the font name is
 not changed. Both conditions hold here:
 
 1. Fonts ship as part of the vibemix application — not sold separately.
-2. Filenames preserve upstream family names (`Saira-VariableFont_wdth,wght`,
-   `JetBrainsMono-Regular`, `JetBrainsMono-Medium`, `JetBrainsMono-SemiBold`,
-   `InstrumentSerif-Latin`, `InstrumentSerif-Latin-Ext`).
+2. Filenames preserve upstream family names (`Geist-Variable`,
+   `GeistMono-Variable`, `InstrumentSerif-Latin`, `InstrumentSerif-Latin-Ext`).
 
 Full OFL 1.1 text: https://scripts.sil.org/OFL_web
 
