@@ -53,6 +53,7 @@ import numpy as np
 from vibemix.library._cosine import EMBEDDING_DIM
 from vibemix.library.key_estimator import estimate_key
 from vibemix.library.rekordbox import RekordboxLibrary, TrackEntry, _CacheBlob
+from vibemix.library.tempo_estimator import estimate_bpm
 
 logger = logging.getLogger(__name__)
 
@@ -103,6 +104,8 @@ class IngestReport:
     cue_agreement_offset_count: int = 0
     key_estimated_tracks: int = 0
     key_estimation_failed: int = 0
+    bpm_estimated_tracks: int = 0
+    bpm_estimation_failed: int = 0
 
     def as_dict(self) -> dict:
         mean_score = (
@@ -133,6 +136,10 @@ class IngestReport:
             "key_estimation": {
                 "estimated": self.key_estimated_tracks,
                 "failed": self.key_estimation_failed,
+            },
+            "bpm_estimation": {
+                "estimated": self.bpm_estimated_tracks,
+                "failed": self.bpm_estimation_failed,
             },
             "cost_estimate_eur": round(self.cost_estimate_eur, 6),
             "failures": [
@@ -331,6 +338,7 @@ def ingest_folder(
     embed_strategy: str | None = None,
     compute_band_shares: bool = False,
     compute_key: bool = True,
+    compute_bpm: bool = True,
 ) -> IngestReport:
     """Walk ``root``, embed each supported audio file, persist to ``store``.
 
@@ -357,6 +365,9 @@ def ingest_folder(
             Default False keeps legacy callers byte-identical (Plan 93-06).
         compute_key: when True, estimate a missing musical key offline with a
             pure-numpy K-S estimator. Existing key tags are never clobbered.
+        compute_bpm: when True, estimate missing BPM offline with the same
+            kick-band autocorrelation used by the cue engine. Existing source
+            BPM is never clobbered.
 
     Returns:
         :class:`IngestReport`.
@@ -397,6 +408,13 @@ def ingest_folder(
                 report.key_estimated_tracks += 1
             else:
                 report.key_estimation_failed += 1
+        if compute_bpm and (not entry.bpm or entry.bpm <= 0.0):
+            bpm_est = estimate_bpm(path)
+            if bpm_est is not None:
+                entry = replace(entry, bpm=bpm_est.bpm, bpm_source=bpm_est.source)
+                report.bpm_estimated_tracks += 1
+            else:
+                report.bpm_estimation_failed += 1
 
         # Resumable accounting — was this content already embedded?
         try:

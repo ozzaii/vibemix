@@ -43,6 +43,7 @@ def _entry(
     filepath: str = "",
     genre: str = "",
     key_source: str = "",
+    bpm_source: str = "",
 ) -> TrackEntry:
     return TrackEntry(
         track_id=track_id,
@@ -56,6 +57,7 @@ def _entry(
         filepath=filepath,
         genre=genre,
         key_source=key_source,
+        bpm_source=bpm_source,
     )
 
 
@@ -450,6 +452,43 @@ def test_audio_estimated_key_does_not_become_live_deck_proof():
     assert decks["A"].track_id == "1"
     assert decks["A"].key is None
     assert decks["A"].camelot is None
+
+
+def test_audio_estimated_bpm_does_not_become_live_deck_proof():
+    """Offline BPM can score Viber sets, but it is not a citable live deck tag."""
+    lib = _lib(
+        _entry(
+            "1",
+            "Strobe",
+            artist="Deadmau5",
+            bpm=138.0,
+            bpm_source="kick_ac",
+        )
+    )
+    p = DeckPoller(
+        library=lib,
+        controller=_FakeActivityController(
+            _ctrl_snap(vol_a=0, vol_b=0, xfader=64, connected=True),
+            {
+                "connected": True,
+                "messages_seen_total": 0,
+                "events_seen_total": 0,
+                "moves_seen_total": 0,
+            },
+        ),
+        track_info=_FakeTrackInfo(
+            "Deadmau5 - Strobe",
+            client_bundle_id="com.pioneerdj.rekordbox",
+            position_sec=12.0,
+            playback_rate=1.0,
+        ),
+    )
+
+    p.poll_once()
+
+    decks = p.snapshot()
+    assert decks["A"].track_id == "1"
+    assert decks["A"].bpm == 0.0
 
 
 def test_nowplaying_playback_fallback_requires_active_position():

@@ -36,6 +36,7 @@ from vibemix.library.index_numpy import NumpyStore
 from vibemix.library.key_estimator import KeyEstimate
 from vibemix.library.rekordbox import RekordboxLibrary
 from vibemix.library.store import LibraryStore
+from vibemix.library.tempo_estimator import BpmEstimate
 
 # ─── Fixtures ────────────────────────────────────────────────────────────────
 
@@ -83,6 +84,7 @@ def _isolate_cache(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         RekordboxLibrary, "CACHE_PATH", tmp_path / "library.pkl"
     )
+    monkeypatch.setattr("vibemix.library.folder_ingest.estimate_bpm", lambda _path: None)
 
 
 def _const_probe(_dur: float = 120.0):
@@ -275,6 +277,58 @@ def test_folder_ingest_estimates_missing_key_into_cache(
     assert entry.key == "Am"
     assert entry.camelot == "8A"
     assert entry.key_source == "numpy_ks"
+
+
+def test_folder_ingest_estimates_missing_bpm_into_cache(
+    tmp_path: Path, numpy_store: LibraryStore, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    music = tmp_path / "music"
+    _touch(music / "driving.wav")
+
+    monkeypatch.setattr(
+        "vibemix.library.folder_ingest.estimate_bpm",
+        lambda _path: BpmEstimate(bpm=138.0, confidence=2.4),
+    )
+
+    report = ingest_folder(music, FakeEmbedder(), numpy_store, probe=_const_probe())
+
+    assert report.bpm_estimated_tracks == 1
+    assert report.bpm_estimation_failed == 0
+    lib = RekordboxLibrary()
+    assert lib.try_load_cache() is True
+    entry = next(iter(lib.tracks.values()))
+    assert entry.bpm == 138.0
+    assert entry.bpm_source == "kick_ac"
+
+
+def test_folder_ingest_no_bpm_flag_skips_estimator(
+    tmp_path: Path, numpy_store: LibraryStore, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    music = tmp_path / "music"
+    _touch(music / "plain.wav")
+    calls: list[Path] = []
+
+    def _fake_estimate(path: Path):
+        calls.append(path)
+        return BpmEstimate(bpm=128.0, confidence=2.0)
+
+    monkeypatch.setattr("vibemix.library.folder_ingest.estimate_bpm", _fake_estimate)
+
+    report = ingest_folder(
+        music,
+        FakeEmbedder(),
+        numpy_store,
+        probe=_const_probe(),
+        compute_bpm=False,
+    )
+
+    assert calls == []
+    assert report.bpm_estimated_tracks == 0
+    lib = RekordboxLibrary()
+    assert lib.try_load_cache() is True
+    entry = next(iter(lib.tracks.values()))
+    assert entry.bpm == 0.0
+    assert entry.bpm_source == ""
 
 
 def test_folder_ingest_no_key_flag_skips_estimator(

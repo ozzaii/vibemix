@@ -209,6 +209,28 @@ def _make_keyless_collection_xml(tmp_path: Path) -> Path:
     return xml_path
 
 
+def _make_bpmless_collection_xml(tmp_path: Path) -> Path:
+    audio_dir = tmp_path / "audio-bpmless"
+    audio_dir.mkdir(exist_ok=True)
+    f = audio_dir / "bpmless.mp3"
+    f.write_bytes(b"FAKE-AUDIO-BPMLESS" * 8)
+    loc = "file://localhost" + urllib.parse.quote(str(f.resolve()))
+    xml = (
+        "<?xml version='1.0' encoding='utf-8'?>\n"
+        '<DJ_PLAYLISTS Version="1.0.0">\n'
+        '  <PRODUCT Name="vibemix" Version="1.0.0" Company="vibemix-test" />\n'
+        '  <COLLECTION Entries="1">\n'
+        f'    <TRACK Location="{loc}" TrackID="1" Name="Bpmless" '
+        'Artist="Artist" Album="Album" Tonality="Am" TotalTime="200" />\n'
+        "  </COLLECTION>\n"
+        '  <PLAYLISTS>\n    <NODE Name="ROOT" Type="0" Count="0" />\n  </PLAYLISTS>\n'
+        "</DJ_PLAYLISTS>\n"
+    )
+    xml_path = tmp_path / "collection-bpmless.xml"
+    xml_path.write_text(xml, encoding="utf-8")
+    return xml_path
+
+
 def _open_cache(tmp_path: Path) -> sqlite3.Connection:
     """An injectable content-hash cache (in-memory-ish; tmp file is fine)."""
     return sqlite3.connect(str(tmp_path / "clap_embeddings.db"))
@@ -264,6 +286,32 @@ def test_ingest_source_estimates_missing_key(isolated_cache, tmp_path, monkeypat
     assert entry.key_source == "numpy_ks"
 
 
+def test_ingest_source_estimates_missing_bpm(isolated_cache, tmp_path, monkeypatch):
+    from vibemix.library.ingest import ingest_source
+    from vibemix.library.sources.rekordbox import RekordboxSource
+    from vibemix.library.tempo_estimator import BpmEstimate
+
+    xml_path = _make_bpmless_collection_xml(tmp_path)
+    monkeypatch.setattr(
+        "vibemix.library.ingest.estimate_bpm",
+        lambda _path: BpmEstimate(bpm=132.0, confidence=2.0),
+    )
+
+    report = ingest_source(
+        RekordboxSource(xml_path=str(xml_path)),
+        embedder=FakeClapEmbedder(),
+        store=_DimAgnosticStore(),
+        cache=_open_cache(tmp_path),
+    )
+
+    assert report.bpm_estimated_tracks == 1
+    lib = RekordboxLibrary()
+    assert lib.try_load_cache() is True
+    entry = next(iter(lib.tracks.values()))
+    assert entry.bpm == 132.0
+    assert entry.bpm_source == "kick_ac"
+
+
 def test_ingest_source_preserves_existing_tag(isolated_cache, tmp_path, monkeypatch):
     from vibemix.library.ingest import ingest_source
     from vibemix.library.key_estimator import KeyEstimate
@@ -277,6 +325,11 @@ def test_ingest_source_preserves_existing_tag(isolated_cache, tmp_path, monkeypa
         return KeyEstimate(camelot="9A", musical="Em", confidence=0.3)
 
     monkeypatch.setattr("vibemix.library.ingest.estimate_key", _fake_estimate)
+    bpm_calls: list[Path] = []
+    monkeypatch.setattr(
+        "vibemix.library.ingest.estimate_bpm",
+        lambda path: bpm_calls.append(path),
+    )
 
     report = ingest_source(
         RekordboxSource(xml_path=str(xml_path)),
@@ -286,6 +339,7 @@ def test_ingest_source_preserves_existing_tag(isolated_cache, tmp_path, monkeypa
     )
 
     assert calls == []
+    assert bpm_calls == []
     assert report.key_estimated_tracks == 0
     lib = RekordboxLibrary()
     assert lib.try_load_cache() is True

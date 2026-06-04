@@ -269,15 +269,17 @@ class DeckPoller:
         lock batch (RESEARCH §Code Examples). ``bpm`` comes from source metadata
         (``AverageBpm``), NOT audio autocorrelation.
         """
-        # Audio-estimated folder/catalog keys improve offline next-song/Viber
-        # scoring, but they are not live deck proof. Keep them out of DeckTrack
-        # so Sven does not receive an estimated key as a citable deck fact.
+        # Audio-estimated folder/catalog metadata improves offline next-song/Viber
+        # scoring, but it is not live deck proof. Keep it out of DeckTrack so
+        # Sven does not receive estimated key/BPM as citable deck facts.
         key_source = str(getattr(entry, "key_source", "") or "")
+        bpm_source = str(getattr(entry, "bpm_source", "") or "")
         raw_key = None if key_source == "numpy_ks" else entry.key or None
+        bpm = 0.0 if bpm_source == "kick_ac" else float(entry.bpm or 0.0)
         return DeckTrack(
             title=entry.title or None,
             track_id=entry.track_id or None,
-            bpm=float(entry.bpm or 0.0),
+            bpm=bpm,
             key=raw_key,
             genre=entry.genre or None,
             camelot=None,  # normalized by _tick_once via harmonics.to_camelot

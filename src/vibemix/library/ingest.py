@@ -65,6 +65,7 @@ from vibemix.library.section_vectors import (
     put_section_vector,
     section_vector_cached,
 )
+from vibemix.library.tempo_estimator import estimate_bpm
 
 logger = logging.getLogger(__name__)
 
@@ -766,6 +767,7 @@ def ingest_source(
     anlz_index: object | None = None,
     cue_agreement_calibration: bool = False,
     compute_key: bool = True,
+    compute_bpm: bool = True,
 ) -> IngestReport:
     """Detect → iter → CLAP embed → store one source, resumably + honestly.
 
@@ -789,6 +791,8 @@ def ingest_source(
             This is telemetry only; it never changes cached cues or vectors.
         compute_key: when True, estimate missing keys from local audio files.
             Existing library/DJ tags win and are never clobbered.
+        compute_bpm: when True, estimate missing BPM from local audio files.
+            Existing library/DJ BPM tags win and are never clobbered.
 
     Returns:
         :class:`~vibemix.library.folder_ingest.IngestReport` (same shape).
@@ -841,12 +845,24 @@ def ingest_source(
                     report.key_estimated_tracks += 1
                 else:
                     report.key_estimation_failed += 1
+            working_metadata_track = working_key_track
+            if compute_bpm and (not working_metadata_track.bpm or working_metadata_track.bpm <= 0.0):
+                bpm_est = estimate_bpm(local)
+                if bpm_est is not None:
+                    working_metadata_track = replace(
+                        working_metadata_track,
+                        bpm=bpm_est.bpm,
+                        bpm_source=bpm_est.source,
+                    )
+                    report.bpm_estimated_tracks += 1
+                else:
+                    report.bpm_estimation_failed += 1
 
             # Resumable: content-hash cache probe.
             try:
-                anlz_meta = _match_anlz_for_cache(working_key_track, anlz_index)
+                anlz_meta = _match_anlz_for_cache(working_metadata_track, anlz_index)
                 strategy_tag = _cue_strategy_tag_for_anlz(anlz_meta)
-                working_track = _materialize_anlz_cues(working_key_track, anlz_meta)
+                working_track = _materialize_anlz_cues(working_metadata_track, anlz_meta)
                 if cue_agreement_calibration:
                     _record_cue_agreement_calibration(report, working_track, local)
                 precomputed_anchors: list[CueAnchor] | None = None
