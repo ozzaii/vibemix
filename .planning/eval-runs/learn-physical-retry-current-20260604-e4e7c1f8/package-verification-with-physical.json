@@ -1,0 +1,3735 @@
+{
+  "completion_blockers": [
+    "full Learn frontend quality gate is missing or failing",
+    "launched Tauri Learn smoke is missing or failing",
+    "Course 3 routed-audio count-in proof is not strictly proven"
+  ],
+  "completion_matrix": {
+    "requirements": [
+      {
+        "blockers": [],
+        "category": "deterministic",
+        "evidence": {
+          "beginner_course_ids": [
+            "course_1_anatomy",
+            "course_2_transitions",
+            "course_3_play_mode"
+          ],
+          "beginner_lessons": 36,
+          "copy_truthfulness_contract": {
+            "ok": true,
+            "unsupported_auto_open_phrases": [
+              "debrief opens",
+              "debrief will open",
+              "opens automatically",
+              "open automatically",
+              "should have opened automatically",
+              "the debrief is open"
+            ],
+            "unsupported_debrief_auto_open_claims": []
+          },
+          "flow_contract_summary": {
+            "backstage_lenses": [
+              "controller_state",
+              "cue_section_lookahead",
+              "debrief",
+              "dj_profile",
+              "evidence_registry",
+              "library_exemplars",
+              "library_suggestions",
+              "live_audio",
+              "prepared_pool",
+              "recital_observer",
+              "recovery_drill",
+              "session_recording",
+              "session_state"
+            ],
+            "beginner_flows_ok": true,
+            "beginner_lessons": 36,
+            "failing_lesson_ids": [],
+            "hint_grounding_contract": {
+              "cited_hint_turn_count": 228,
+              "failing_lesson_ids": [],
+              "grounded_hint_turn_count": 228,
+              "hint_turn_count": 228,
+              "ok": true
+            },
+            "input_surface_step_counts": {
+              "hardware+screen": 32,
+              "screen": 44
+            },
+            "input_surfaces": [
+              "hardware",
+              "screen"
+            ],
+            "min_hint_count": 3,
+            "observable_control_count": 18,
+            "prompt_contract": {
+              "exempt_step_ids": [
+                "L1.01.beat.3"
+              ],
+              "failing_lesson_ids": [],
+              "inline_lists_forbidden": true,
+              "max_chars": 150,
+              "max_sentences": 2,
+              "max_words": 24,
+              "observed_max_chars": 115,
+              "observed_max_sentences": 2,
+              "observed_max_words": 23,
+              "ok": true,
+              "single_line": true
+            },
+            "teaching_grounding_contract": {
+              "cited_teaching_turn_count": 76,
+              "failing_lesson_ids": [],
+              "grounded_teaching_turn_count": 76,
+              "ok": true,
+              "teaching_turn_count": 76
+            },
+            "total_steps": 76,
+            "verification_kind_counts": {
+              "button_press": 51,
+              "cc_delta": 25
+            }
+          },
+          "frontend_projection": {
+            "checked": false,
+            "path": null,
+            "up_to_date": null
+          },
+          "transcript_inventory": {
+            "declared_count": 37,
+            "duplicate_paths": [],
+            "fixture_count": 37,
+            "missing_paths": [],
+            "ok": true,
+            "orphan_paths": [],
+            "root": "/Users/ozai/projects/dj-set-ai/src/vibemix/learn/transcripts"
+          },
+          "unlock_gate_contract": {
+            "missing_lock_reason_course_ids": [],
+            "ok": true,
+            "progress_model": "src/vibemix/learn/progress.py:LearnProgress",
+            "supported_unlock_gates": [
+              "course_2_unlocked",
+              "course_3_unlocked"
+            ],
+            "unsupported_unlock_gates": [],
+            "used_unlock_gates": [
+              "course_2_unlocked",
+              "course_3_unlocked"
+            ]
+          }
+        },
+        "id": "curriculum_36_lesson_contract",
+        "next_actions": [],
+        "release_gate": true,
+        "requirement": "All 36 beginner lessons are present, canonical, hand-authored, and compile through the Learn curriculum audit.",
+        "status": "proven"
+      },
+      {
+        "blockers": [],
+        "category": "deterministic",
+        "evidence": {
+          "declared_capabilities": [
+            "controller_state",
+            "cue_section_lookahead",
+            "debrief",
+            "dj_profile",
+            "evidence_registry",
+            "library_exemplars",
+            "library_suggestions",
+            "live_audio",
+            "on_screen_deck",
+            "prepared_pool",
+            "recital_observer",
+            "recovery_drill",
+            "session_recording",
+            "session_state"
+          ],
+          "frontstage_modes": [
+            "legacy_demo",
+            "live_play_mode",
+            "practice_booth"
+          ],
+          "rule": "COURSE_REGISTRY capabilities must cover every compiled backstage lens and input surface used by its lesson flows."
+        },
+        "id": "capability_reuse_contract",
+        "next_actions": [],
+        "release_gate": true,
+        "requirement": "Course metadata declares the existing vibemix coded powers used by compiled lesson flows.",
+        "status": "proven"
+      },
+      {
+        "blockers": [],
+        "category": "curriculum",
+        "evidence": {
+          "blockers": [],
+          "canonical_id_contract": {
+            "course_id_pattern": "course_<number>_<slug>",
+            "lesson_id_pattern": "L<number>.<two digits>",
+            "rule": "Future course-pack lesson IDs must match the numeric course prefix and be contiguous from .01.",
+            "starter_template": "scripts/validate_learn_course_pack.py --init-template"
+          },
+          "capability_contract": {
+            "capabilities": [
+              "controller_state",
+              "cue_section_lookahead",
+              "debrief",
+              "dj_profile",
+              "evidence_registry",
+              "library_exemplars",
+              "library_suggestions",
+              "live_audio",
+              "on_screen_deck",
+              "prepared_pool",
+              "recital_observer",
+              "recovery_drill",
+              "session_recording",
+              "session_state"
+            ],
+            "frontstage_modes": [
+              "legacy_demo",
+              "live_play_mode",
+              "practice_booth"
+            ],
+            "rule": "COURSE_REGISTRY capabilities must cover every compiled backstage lens and input surface used by its lesson flows."
+          },
+          "copy_truthfulness_contract": {
+            "rule": "Draft course-pack transcript copy must not promise automatic debrief opening unless a runtime command and frontend invoke path are added to the Learn contract.",
+            "unsupported_auto_open_phrases": [
+              "debrief opens",
+              "debrief will open",
+              "opens automatically",
+              "open automatically",
+              "should have opened automatically",
+              "the debrief is open"
+            ]
+          },
+          "draft_validator": {
+            "cli": "uv run python scripts/validate_learn_course_pack.py <course-pack.json>",
+            "function": "vibemix.learn.course_pack.validate_course_pack_draft",
+            "result_fields": [
+              "ok",
+              "lesson_count",
+              "step_count",
+              "flow_preview",
+              "observed_capabilities",
+              "required_progress_fields",
+              "integration_plan",
+              "prompt_contract",
+              "teaching_grounding_contract",
+              "hint_grounding_contract",
+              "authoring_contract",
+              "copy_truthfulness",
+              "errors"
+            ],
+            "rule": "Future courses are validated against CourseMeta, LessonMeta, transcript metadata, hint floors, observed capabilities, and the canonical structured-flow compiler before global tables or fixture files are edited.",
+            "template_cli": "uv run python scripts/validate_learn_course_pack.py --init-template <dir> --course-number 4 --slug <slug>"
+          },
+          "flow_contract": {
+            "beginner_gate": "every beginner lesson must compile to at least one step",
+            "compiler": "vibemix.learn.lesson_flow.build_lesson_flow",
+            "prompt_contract": {
+              "inline_lists_forbidden": true,
+              "max_chars": 150,
+              "max_sentences": 2,
+              "max_words": 24,
+              "single_line": true
+            },
+            "teaching_loop_contract": {
+              "hint_turns": "the first three adaptive hints must plan through plan_hint_turn, remain grounded, and carry citations",
+              "teaching_turns": "every compiled step must plan through plan_teaching_turn, remain grounded, and carry a citation"
+            },
+            "verification": "each step must expose one calm frontstage prompt, observable controls, deterministic input surfaces, and at least three adaptive hints"
+          },
+          "frontend_contract": {
+            "check_command": "uv run python scripts/export_learn_curriculum_meta.py --check",
+            "generated_by": "scripts/export_learn_curriculum_meta.py",
+            "manual_frontend_edits": "forbidden"
+          },
+          "new_course_contract": [
+            "preflight the draft with validate_course_pack_draft before merging",
+            "add COURSE_REGISTRY metadata",
+            "keep course_id and lesson_id numbering canonical and contiguous",
+            "declare frontstage_mode and capabilities for every coded seam",
+            "add matching COURSE_FRAMES entry",
+            "add LessonMeta rows pointing at transcript JSON fixtures",
+            "keep lesson_id, title, and system_instruction_addendum byte-aligned",
+            "make every beginner lesson compile through build_lesson_flow",
+            "keep course capabilities covering every compiled backstage lens",
+            "keep learner-facing copy truthful about runtime-owned actions",
+            "run codegen:learn so the frontend projection stays generated"
+          ],
+          "ok": true,
+          "prompt_contract": {
+            "inline_lists_forbidden": true,
+            "max_chars": 150,
+            "max_sentences": 2,
+            "max_words": 24,
+            "single_line": true
+          },
+          "python_entry_names": [
+            "COURSE_REGISTRY",
+            "COURSE_FRAMES",
+            "CURRICULUM"
+          ],
+          "source_of_truth": {
+            "draft_preflight": "src/vibemix/learn/course_pack.py",
+            "draft_preflight_cli": "scripts/validate_learn_course_pack.py",
+            "frontend_projection": "tauri/ui/src/learn/lesson/curriculum-meta.ts",
+            "python_curriculum": "src/vibemix/learn/curriculum.py",
+            "transcript_root": "src/vibemix/learn/transcripts/"
+          },
+          "starter_template_contract": {
+            "copy_rules": [
+              "cite the observable control on every teaching and hint turn",
+              "do not promise automatic debrief opening"
+            ],
+            "default_input_surfaces": [
+              "hardware",
+              "screen"
+            ],
+            "frontstage": "one prompt, one action, one grounded response",
+            "post_merge_commands": [
+              "uv run python scripts/export_learn_curriculum_meta.py --check",
+              "uv run pytest -q tests/learn/test_course_pack.py",
+              "uv run python scripts/run_learn_perfection_package.py --out /tmp/vibemix-live-learn-proof/learn-perfection-package-current.json"
+            ],
+            "prompt_limits": {
+              "inline_lists_forbidden": true,
+              "max_chars": 150,
+              "max_sentences": 2,
+              "max_words": 24,
+              "single_line": true
+            },
+            "required_hint_count": 3,
+            "starter_expected_action": {
+              "control": "cue",
+              "deck": "A",
+              "direction": "down",
+              "type": "button"
+            },
+            "writes_manifest_authoring_contract": true
+          },
+          "teaching_loop_contract": {
+            "hint_turns": "the first three adaptive hints must plan through plan_hint_turn, remain grounded, and carry citations",
+            "teaching_turns": "every compiled step must plan through plan_teaching_turn, remain grounded, and carry a citation"
+          },
+          "transcript_inventory_contract": "every transcript JSON under src/vibemix/learn/transcripts is claimed by exactly one LessonMeta row, and every LessonMeta transcript_path exists",
+          "transcript_required_fields": [
+            "lesson_id",
+            "title",
+            "system_instruction_addendum",
+            "tutor_speak",
+            "expected_action",
+            "hints"
+          ],
+          "unlock_gate_contract": {
+            "progress_model": "src/vibemix/learn/progress.py:LearnProgress",
+            "rule": "CourseMeta.unlock_gate must be null or a boolean persisted by LearnProgress.to_dict(); adding a new locked course requires a progress-schema field and generated frontend projection.",
+            "supported_unlock_gates": [
+              "course_2_unlocked",
+              "course_3_unlocked"
+            ]
+          },
+          "verification_commands": [
+            "uv run python scripts/audit_learn_curriculum.py",
+            "uv run python scripts/export_learn_curriculum_meta.py --check",
+            "uv run python scripts/validate_learn_course_pack.py <course-pack.json>",
+            "uv run pytest -q tests/learn/test_course_pack.py",
+            "uv run pytest -q tests/learn/test_curriculum_audit.py",
+            "uv run pytest -q tests/learn/test_lesson_flow_contract.py",
+            "npm --prefix tauri/ui test -- tests/learn/test_curriculum_meta.spec.ts"
+          ]
+        },
+        "id": "future_course_extension_contract",
+        "next_actions": [],
+        "release_gate": true,
+        "requirement": "Adding future Learn courses has a machine-checked source map, registry/transcript contract, generated frontend projection, unlock-gate rule, and verification command set.",
+        "status": "proven"
+      },
+      {
+        "blockers": [],
+        "category": "deterministic",
+        "evidence": {
+          "commands": [
+            {
+              "command": "uv run ruff check src/vibemix/learn scripts/audit_learn_curriculum.py scripts/audition_learn_exemplars.py scripts/export_learn_curriculum_meta.py scripts/learn_live_readiness.py scripts/run_learn_desktop_quality.py scripts/run_learn_frontend_quality.py scripts/run_learn_live_proof.py scripts/run_learn_perfection_package.py scripts/run_learn_python_quality.py scripts/validate_learn_course_pack.py scripts/validate_learn_live_proof.py scripts/verify_learn_package.py tests/learn src/vibemix/state/refresh.py tests/state/test_refresh.py",
+              "duration_s": 0.094,
+              "name": "learn_ruff",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "command": "uv run python scripts/export_learn_curriculum_meta.py --check",
+              "duration_s": 0.352,
+              "name": "learn_codegen_check",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "command": "bash scripts/release/check_no_hardcoded_model.sh",
+              "duration_s": 1.428,
+              "name": "learn_model_router_guard",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "command": "uv run pytest -q tests/learn/test_all_lessons_runtime_path.py",
+              "duration_s": 2.658,
+              "name": "learn_all_lessons_runtime_pytest",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "command": "uv run pytest -q tests/learn/test_teaching_loop.py",
+              "duration_s": 1.322,
+              "name": "learn_teaching_loop_pytest",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "command": "uv run pytest -q tests/learn/test_adaptive_coaching_runtime_contract.py",
+              "duration_s": 1.249,
+              "name": "learn_adaptive_coaching_pytest",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "command": "uv run pytest -q tests/learn/test_auto_master_finder_contract.py",
+              "duration_s": 0.461,
+              "name": "learn_auto_master_finder_pytest",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "command": "uv run pytest -q tests/state/test_refresh.py::test_tick_course3_live_uses_dj_cue_sections_for_phrase_anchor tests/state/test_refresh.py::test_tick_course3_mix_uses_unambiguous_title_match_for_phrase_anchor tests/state/test_refresh.py::test_tick_course3_mix_refuses_ambiguous_title_match_for_phrase_anchor",
+              "duration_s": 0.45,
+              "name": "learn_course3_mix_anchor_pytest",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "command": "uv run pytest -q tests/learn/test_course_pack.py",
+              "duration_s": 1.169,
+              "name": "learn_course_pack_pytest",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "command": "uv run pytest -q tests/learn",
+              "duration_s": 23.02,
+              "name": "learn_pytest",
+              "passed": true,
+              "returncode": 0
+            }
+          ],
+          "path": "/tmp/vibemix-live-learn-proof/learn-python-quality-current.json",
+          "required_commands": [
+            "learn_adaptive_coaching_pytest",
+            "learn_all_lessons_runtime_pytest",
+            "learn_auto_master_finder_pytest",
+            "learn_codegen_check",
+            "learn_course3_mix_anchor_pytest",
+            "learn_course_pack_pytest",
+            "learn_model_router_guard",
+            "learn_pytest",
+            "learn_ruff",
+            "learn_teaching_loop_pytest"
+          ]
+        },
+        "id": "python_quality_suite",
+        "next_actions": [
+          "uv run python scripts/run_learn_python_quality.py --out /tmp/vibemix-live-learn-proof/learn-python-quality-current.json"
+        ],
+        "release_gate": true,
+        "requirement": "The Learn Python quality pass has run Ruff, curriculum codegen check, the model-router literal guard, all-lesson runtime traversal, targeted adaptive coaching proof, auto-master finder proof, Course 3 mix-anchor proof, and the deterministic Learn pytest suite.",
+        "status": "proven"
+      },
+      {
+        "blockers": [],
+        "category": "runtime_path",
+        "evidence": {
+          "commands": [
+            {
+              "command": "uv run ruff check src/vibemix/learn scripts/audit_learn_curriculum.py scripts/audition_learn_exemplars.py scripts/export_learn_curriculum_meta.py scripts/learn_live_readiness.py scripts/run_learn_desktop_quality.py scripts/run_learn_frontend_quality.py scripts/run_learn_live_proof.py scripts/run_learn_perfection_package.py scripts/run_learn_python_quality.py scripts/validate_learn_course_pack.py scripts/validate_learn_live_proof.py scripts/verify_learn_package.py tests/learn src/vibemix/state/refresh.py tests/state/test_refresh.py",
+              "duration_s": 0.094,
+              "name": "learn_ruff",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "command": "uv run python scripts/export_learn_curriculum_meta.py --check",
+              "duration_s": 0.352,
+              "name": "learn_codegen_check",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "command": "bash scripts/release/check_no_hardcoded_model.sh",
+              "duration_s": 1.428,
+              "name": "learn_model_router_guard",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "command": "uv run pytest -q tests/learn/test_all_lessons_runtime_path.py",
+              "duration_s": 2.658,
+              "name": "learn_all_lessons_runtime_pytest",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "command": "uv run pytest -q tests/learn/test_teaching_loop.py",
+              "duration_s": 1.322,
+              "name": "learn_teaching_loop_pytest",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "command": "uv run pytest -q tests/learn/test_adaptive_coaching_runtime_contract.py",
+              "duration_s": 1.249,
+              "name": "learn_adaptive_coaching_pytest",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "command": "uv run pytest -q tests/learn/test_auto_master_finder_contract.py",
+              "duration_s": 0.461,
+              "name": "learn_auto_master_finder_pytest",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "command": "uv run pytest -q tests/state/test_refresh.py::test_tick_course3_live_uses_dj_cue_sections_for_phrase_anchor tests/state/test_refresh.py::test_tick_course3_mix_uses_unambiguous_title_match_for_phrase_anchor tests/state/test_refresh.py::test_tick_course3_mix_refuses_ambiguous_title_match_for_phrase_anchor",
+              "duration_s": 0.45,
+              "name": "learn_course3_mix_anchor_pytest",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "command": "uv run pytest -q tests/learn/test_course_pack.py",
+              "duration_s": 1.169,
+              "name": "learn_course_pack_pytest",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "command": "uv run pytest -q tests/learn",
+              "duration_s": 23.02,
+              "name": "learn_pytest",
+              "passed": true,
+              "returncode": 0
+            }
+          ],
+          "covered_tests": [
+            "tests/learn/test_all_lessons_runtime_path.py"
+          ],
+          "lesson_count": 36,
+          "observer_lessons": [
+            "L1.14",
+            "L1.16",
+            "L2.14"
+          ],
+          "path": "/tmp/vibemix-live-learn-proof/learn-python-quality-current.json",
+          "required_command": "learn_all_lessons_runtime_pytest",
+          "runtime_path": [
+            "ipc.learn.start_lesson",
+            "ipc.learn.ack",
+            "ipc.learn.complete_lesson",
+            "LearnProgress persistence"
+          ]
+        },
+        "id": "all_lessons_runtime_contract",
+        "next_actions": [
+          "uv run python scripts/run_learn_python_quality.py --out /tmp/vibemix-live-learn-proof/learn-python-quality-current.json"
+        ],
+        "release_gate": true,
+        "requirement": "Every beginner lesson starts through the same IPC runtime path the UI uses, receives canonical action shapes, reaches LessonRuntime.completed, and persists completed progress.",
+        "status": "proven"
+      },
+      {
+        "blockers": [],
+        "category": "teaching_loop",
+        "evidence": {
+          "commands": [
+            {
+              "command": "uv run ruff check src/vibemix/learn scripts/audit_learn_curriculum.py scripts/audition_learn_exemplars.py scripts/export_learn_curriculum_meta.py scripts/learn_live_readiness.py scripts/run_learn_desktop_quality.py scripts/run_learn_frontend_quality.py scripts/run_learn_live_proof.py scripts/run_learn_perfection_package.py scripts/run_learn_python_quality.py scripts/validate_learn_course_pack.py scripts/validate_learn_live_proof.py scripts/verify_learn_package.py tests/learn src/vibemix/state/refresh.py tests/state/test_refresh.py",
+              "duration_s": 0.094,
+              "name": "learn_ruff",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "command": "uv run python scripts/export_learn_curriculum_meta.py --check",
+              "duration_s": 0.352,
+              "name": "learn_codegen_check",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "command": "bash scripts/release/check_no_hardcoded_model.sh",
+              "duration_s": 1.428,
+              "name": "learn_model_router_guard",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "command": "uv run pytest -q tests/learn/test_all_lessons_runtime_path.py",
+              "duration_s": 2.658,
+              "name": "learn_all_lessons_runtime_pytest",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "command": "uv run pytest -q tests/learn/test_teaching_loop.py",
+              "duration_s": 1.322,
+              "name": "learn_teaching_loop_pytest",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "command": "uv run pytest -q tests/learn/test_adaptive_coaching_runtime_contract.py",
+              "duration_s": 1.249,
+              "name": "learn_adaptive_coaching_pytest",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "command": "uv run pytest -q tests/learn/test_auto_master_finder_contract.py",
+              "duration_s": 0.461,
+              "name": "learn_auto_master_finder_pytest",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "command": "uv run pytest -q tests/state/test_refresh.py::test_tick_course3_live_uses_dj_cue_sections_for_phrase_anchor tests/state/test_refresh.py::test_tick_course3_mix_uses_unambiguous_title_match_for_phrase_anchor tests/state/test_refresh.py::test_tick_course3_mix_refuses_ambiguous_title_match_for_phrase_anchor",
+              "duration_s": 0.45,
+              "name": "learn_course3_mix_anchor_pytest",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "command": "uv run pytest -q tests/learn/test_course_pack.py",
+              "duration_s": 1.169,
+              "name": "learn_course_pack_pytest",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "command": "uv run pytest -q tests/learn",
+              "duration_s": 23.02,
+              "name": "learn_pytest",
+              "passed": true,
+              "returncode": 0
+            }
+          ],
+          "covered_tests": [
+            "tests/learn/test_teaching_loop.py"
+          ],
+          "hint_grounding_contract": {
+            "cited_hint_turn_count": 228,
+            "failing_lesson_ids": [],
+            "grounded_hint_turn_count": 228,
+            "hint_turn_count": 228,
+            "ok": true
+          },
+          "model_router_guard": true,
+          "path": "/tmp/vibemix-live-learn-proof/learn-python-quality-current.json",
+          "required_command": "learn_teaching_loop_pytest",
+          "stages": [
+            "observe",
+            "decide",
+            "teach",
+            "verify",
+            "adapt"
+          ],
+          "teaching_grounding_contract": {
+            "cited_teaching_turn_count": 76,
+            "failing_lesson_ids": [],
+            "grounded_teaching_turn_count": 76,
+            "ok": true,
+            "teaching_turn_count": 76
+          }
+        },
+        "id": "teaching_loop_contract",
+        "next_actions": [
+          "uv run python scripts/run_learn_python_quality.py --out /tmp/vibemix-live-learn-proof/learn-python-quality-current.json"
+        ],
+        "release_gate": true,
+        "requirement": "The Learn backstage loop proves observe, decide, teach, verify, and adapt turns through model_router and deterministic verification metadata.",
+        "status": "proven"
+      },
+      {
+        "blockers": [],
+        "category": "teaching_loop",
+        "evidence": {
+          "citation_sources": [
+            "midi",
+            "screen"
+          ],
+          "commands": [
+            {
+              "command": "uv run ruff check src/vibemix/learn scripts/audit_learn_curriculum.py scripts/audition_learn_exemplars.py scripts/export_learn_curriculum_meta.py scripts/learn_live_readiness.py scripts/run_learn_desktop_quality.py scripts/run_learn_frontend_quality.py scripts/run_learn_live_proof.py scripts/run_learn_perfection_package.py scripts/run_learn_python_quality.py scripts/validate_learn_course_pack.py scripts/validate_learn_live_proof.py scripts/verify_learn_package.py tests/learn src/vibemix/state/refresh.py tests/state/test_refresh.py",
+              "duration_s": 0.094,
+              "name": "learn_ruff",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "command": "uv run python scripts/export_learn_curriculum_meta.py --check",
+              "duration_s": 0.352,
+              "name": "learn_codegen_check",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "command": "bash scripts/release/check_no_hardcoded_model.sh",
+              "duration_s": 1.428,
+              "name": "learn_model_router_guard",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "command": "uv run pytest -q tests/learn/test_all_lessons_runtime_path.py",
+              "duration_s": 2.658,
+              "name": "learn_all_lessons_runtime_pytest",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "command": "uv run pytest -q tests/learn/test_teaching_loop.py",
+              "duration_s": 1.322,
+              "name": "learn_teaching_loop_pytest",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "command": "uv run pytest -q tests/learn/test_adaptive_coaching_runtime_contract.py",
+              "duration_s": 1.249,
+              "name": "learn_adaptive_coaching_pytest",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "command": "uv run pytest -q tests/learn/test_auto_master_finder_contract.py",
+              "duration_s": 0.461,
+              "name": "learn_auto_master_finder_pytest",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "command": "uv run pytest -q tests/state/test_refresh.py::test_tick_course3_live_uses_dj_cue_sections_for_phrase_anchor tests/state/test_refresh.py::test_tick_course3_mix_uses_unambiguous_title_match_for_phrase_anchor tests/state/test_refresh.py::test_tick_course3_mix_refuses_ambiguous_title_match_for_phrase_anchor",
+              "duration_s": 0.45,
+              "name": "learn_course3_mix_anchor_pytest",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "command": "uv run pytest -q tests/learn/test_course_pack.py",
+              "duration_s": 1.169,
+              "name": "learn_course_pack_pytest",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "command": "uv run pytest -q tests/learn",
+              "duration_s": 23.02,
+              "name": "learn_pytest",
+              "passed": true,
+              "returncode": 0
+            }
+          ],
+          "covered_tests": [
+            "tests/learn/test_adaptive_coaching_runtime_contract.py"
+          ],
+          "path": "/tmp/vibemix-live-learn-proof/learn-python-quality-current.json",
+          "required_command": "learn_adaptive_coaching_pytest",
+          "runtime_behaviors": [
+            "timed hint strike emits teaching_loop.turn_kind=hint",
+            "wrong screen control emits teaching_loop.turn_kind=adapt without advancing",
+            "small MIDI movement writes registry-backed midi/screen citations",
+            "unfinished lesson strike count persists to LearnProgress"
+          ]
+        },
+        "id": "adaptive_coaching_runtime_contract",
+        "next_actions": [
+          "uv run python scripts/run_learn_python_quality.py --out /tmp/vibemix-live-learn-proof/learn-python-quality-current.json"
+        ],
+        "release_gate": true,
+        "requirement": "The Learn runtime emits grounded adaptive coaching for timed hints and wrong actions: hints stay on the active step, wrong screen or MIDI actions do not advance, citations point to the observed and expected controls, and strike counts persist.",
+        "status": "proven"
+      },
+      {
+        "blockers": [],
+        "category": "live_proof",
+        "evidence": {
+          "commands": [
+            {
+              "command": "uv run ruff check src/vibemix/learn scripts/audit_learn_curriculum.py scripts/audition_learn_exemplars.py scripts/export_learn_curriculum_meta.py scripts/learn_live_readiness.py scripts/run_learn_desktop_quality.py scripts/run_learn_frontend_quality.py scripts/run_learn_live_proof.py scripts/run_learn_perfection_package.py scripts/run_learn_python_quality.py scripts/validate_learn_course_pack.py scripts/validate_learn_live_proof.py scripts/verify_learn_package.py tests/learn src/vibemix/state/refresh.py tests/state/test_refresh.py",
+              "duration_s": 0.094,
+              "name": "learn_ruff",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "command": "uv run python scripts/export_learn_curriculum_meta.py --check",
+              "duration_s": 0.352,
+              "name": "learn_codegen_check",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "command": "bash scripts/release/check_no_hardcoded_model.sh",
+              "duration_s": 1.428,
+              "name": "learn_model_router_guard",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "command": "uv run pytest -q tests/learn/test_all_lessons_runtime_path.py",
+              "duration_s": 2.658,
+              "name": "learn_all_lessons_runtime_pytest",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "command": "uv run pytest -q tests/learn/test_teaching_loop.py",
+              "duration_s": 1.322,
+              "name": "learn_teaching_loop_pytest",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "command": "uv run pytest -q tests/learn/test_adaptive_coaching_runtime_contract.py",
+              "duration_s": 1.249,
+              "name": "learn_adaptive_coaching_pytest",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "command": "uv run pytest -q tests/learn/test_auto_master_finder_contract.py",
+              "duration_s": 0.461,
+              "name": "learn_auto_master_finder_pytest",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "command": "uv run pytest -q tests/state/test_refresh.py::test_tick_course3_live_uses_dj_cue_sections_for_phrase_anchor tests/state/test_refresh.py::test_tick_course3_mix_uses_unambiguous_title_match_for_phrase_anchor tests/state/test_refresh.py::test_tick_course3_mix_refuses_ambiguous_title_match_for_phrase_anchor",
+              "duration_s": 0.45,
+              "name": "learn_course3_mix_anchor_pytest",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "command": "uv run pytest -q tests/learn/test_course_pack.py",
+              "duration_s": 1.169,
+              "name": "learn_course_pack_pytest",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "command": "uv run pytest -q tests/learn",
+              "duration_s": 23.02,
+              "name": "learn_pytest",
+              "passed": true,
+              "returncode": 0
+            }
+          ],
+          "covered_tests": [
+            "tests/learn/test_auto_master_finder_contract.py"
+          ],
+          "finder_claims": [
+            "live capture candidates include ranked source/reason evidence",
+            "saved Rekordbox routes remain marked when unsampled",
+            "rate-mismatched fallbacks are rejected before app startup"
+          ],
+          "path": "/tmp/vibemix-live-learn-proof/learn-python-quality-current.json",
+          "required_command": "learn_auto_master_finder_pytest"
+        },
+        "id": "course3_auto_master_finder_contract",
+        "next_actions": [
+          "uv run python scripts/run_learn_python_quality.py --out /tmp/vibemix-live-learn-proof/learn-python-quality-current.json"
+        ],
+        "release_gate": true,
+        "requirement": "Course 3 auto-master readiness resolves one safe capture input from live signal, saved Rekordbox route, macOS output route, and 48 kHz loopback fallbacks while exposing ranked candidate evidence and rejecting sample-rate mismatches before startup.",
+        "status": "proven"
+      },
+      {
+        "blockers": [],
+        "category": "live_proof",
+        "evidence": {
+          "anchor_policy": [
+            "single-deck Course 3 anchors still require DJ-authored cue sections",
+            "mix-state anchors require an exact unambiguous Now Playing title match",
+            "ambiguous duplicate deck titles keep next_phrase_cue_id null"
+          ],
+          "commands": [
+            {
+              "command": "uv run ruff check src/vibemix/learn scripts/audit_learn_curriculum.py scripts/audition_learn_exemplars.py scripts/export_learn_curriculum_meta.py scripts/learn_live_readiness.py scripts/run_learn_desktop_quality.py scripts/run_learn_frontend_quality.py scripts/run_learn_live_proof.py scripts/run_learn_perfection_package.py scripts/run_learn_python_quality.py scripts/validate_learn_course_pack.py scripts/validate_learn_live_proof.py scripts/verify_learn_package.py tests/learn src/vibemix/state/refresh.py tests/state/test_refresh.py",
+              "duration_s": 0.094,
+              "name": "learn_ruff",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "command": "uv run python scripts/export_learn_curriculum_meta.py --check",
+              "duration_s": 0.352,
+              "name": "learn_codegen_check",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "command": "bash scripts/release/check_no_hardcoded_model.sh",
+              "duration_s": 1.428,
+              "name": "learn_model_router_guard",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "command": "uv run pytest -q tests/learn/test_all_lessons_runtime_path.py",
+              "duration_s": 2.658,
+              "name": "learn_all_lessons_runtime_pytest",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "command": "uv run pytest -q tests/learn/test_teaching_loop.py",
+              "duration_s": 1.322,
+              "name": "learn_teaching_loop_pytest",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "command": "uv run pytest -q tests/learn/test_adaptive_coaching_runtime_contract.py",
+              "duration_s": 1.249,
+              "name": "learn_adaptive_coaching_pytest",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "command": "uv run pytest -q tests/learn/test_auto_master_finder_contract.py",
+              "duration_s": 0.461,
+              "name": "learn_auto_master_finder_pytest",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "command": "uv run pytest -q tests/state/test_refresh.py::test_tick_course3_live_uses_dj_cue_sections_for_phrase_anchor tests/state/test_refresh.py::test_tick_course3_mix_uses_unambiguous_title_match_for_phrase_anchor tests/state/test_refresh.py::test_tick_course3_mix_refuses_ambiguous_title_match_for_phrase_anchor",
+              "duration_s": 0.45,
+              "name": "learn_course3_mix_anchor_pytest",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "command": "uv run pytest -q tests/learn/test_course_pack.py",
+              "duration_s": 1.169,
+              "name": "learn_course_pack_pytest",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "command": "uv run pytest -q tests/learn",
+              "duration_s": 23.02,
+              "name": "learn_pytest",
+              "passed": true,
+              "returncode": 0
+            }
+          ],
+          "covered_tests": [
+            "tests/state/test_refresh.py::test_tick_course3_live_uses_dj_cue_sections_for_phrase_anchor",
+            "tests/state/test_refresh.py::test_tick_course3_mix_uses_unambiguous_title_match_for_phrase_anchor",
+            "tests/state/test_refresh.py::test_tick_course3_mix_refuses_ambiguous_title_match_for_phrase_anchor"
+          ],
+          "path": "/tmp/vibemix-live-learn-proof/learn-python-quality-current.json",
+          "required_command": "learn_course3_mix_anchor_pytest"
+        },
+        "id": "course3_mix_count_in_anchor_contract",
+        "next_actions": [
+          "uv run python scripts/run_learn_python_quality.py --out /tmp/vibemix-live-learn-proof/learn-python-quality-current.json"
+        ],
+        "release_gate": true,
+        "requirement": "Course 3 count-in anchors work during a real two-deck mix only when Now Playing title identity exactly and unambiguously matches one citable deck row, preserving abstention for ambiguous titles.",
+        "status": "proven"
+      },
+      {
+        "blockers": [],
+        "category": "session_seams",
+        "evidence": {
+          "commands": [
+            {
+              "command": "uv run ruff check src/vibemix/learn scripts/audit_learn_curriculum.py scripts/audition_learn_exemplars.py scripts/export_learn_curriculum_meta.py scripts/learn_live_readiness.py scripts/run_learn_desktop_quality.py scripts/run_learn_frontend_quality.py scripts/run_learn_live_proof.py scripts/run_learn_perfection_package.py scripts/run_learn_python_quality.py scripts/validate_learn_course_pack.py scripts/validate_learn_live_proof.py scripts/verify_learn_package.py tests/learn src/vibemix/state/refresh.py tests/state/test_refresh.py",
+              "duration_s": 0.094,
+              "name": "learn_ruff",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "command": "uv run python scripts/export_learn_curriculum_meta.py --check",
+              "duration_s": 0.352,
+              "name": "learn_codegen_check",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "command": "bash scripts/release/check_no_hardcoded_model.sh",
+              "duration_s": 1.428,
+              "name": "learn_model_router_guard",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "command": "uv run pytest -q tests/learn/test_all_lessons_runtime_path.py",
+              "duration_s": 2.658,
+              "name": "learn_all_lessons_runtime_pytest",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "command": "uv run pytest -q tests/learn/test_teaching_loop.py",
+              "duration_s": 1.322,
+              "name": "learn_teaching_loop_pytest",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "command": "uv run pytest -q tests/learn/test_adaptive_coaching_runtime_contract.py",
+              "duration_s": 1.249,
+              "name": "learn_adaptive_coaching_pytest",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "command": "uv run pytest -q tests/learn/test_auto_master_finder_contract.py",
+              "duration_s": 0.461,
+              "name": "learn_auto_master_finder_pytest",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "command": "uv run pytest -q tests/state/test_refresh.py::test_tick_course3_live_uses_dj_cue_sections_for_phrase_anchor tests/state/test_refresh.py::test_tick_course3_mix_uses_unambiguous_title_match_for_phrase_anchor tests/state/test_refresh.py::test_tick_course3_mix_refuses_ambiguous_title_match_for_phrase_anchor",
+              "duration_s": 0.45,
+              "name": "learn_course3_mix_anchor_pytest",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "command": "uv run pytest -q tests/learn/test_course_pack.py",
+              "duration_s": 1.169,
+              "name": "learn_course_pack_pytest",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "command": "uv run pytest -q tests/learn",
+              "duration_s": 23.02,
+              "name": "learn_pytest",
+              "passed": true,
+              "returncode": 0
+            }
+          ],
+          "covered_tests": [
+            "tests/learn/test_runtime_evidence_grounding.py",
+            "tests/learn/test_session_debrief_integration.py",
+            "tests/learn/test_graduation.py"
+          ],
+          "graduation_practice_summary": "the L3.06 graduation handoff can fold persisted hardware/screen practice-source memory into one grounded status line without adding a dashboard",
+          "path": "/tmp/vibemix-live-learn-proof/learn-python-quality-current.json",
+          "required_command": "learn_pytest",
+          "session_events": [
+            "learn_lesson_loaded",
+            "learn_tutor_speak",
+            "learn_action_observed",
+            "learn_lesson_completed"
+          ]
+        },
+        "id": "session_debrief_profile_contract",
+        "next_actions": [
+          "uv run python scripts/run_learn_python_quality.py --out /tmp/vibemix-live-learn-proof/learn-python-quality-current.json"
+        ],
+        "release_gate": true,
+        "requirement": "Learn reuses the existing session/debrief/profile seams by logging lesson milestones to events.jsonl and making those events consumable by debrief critique/profile write-back paths.",
+        "status": "proven"
+      },
+      {
+        "blockers": [
+          "frontend quality command rows failed: learn_browser_booth_playwright, learn_e2e",
+          "passed is not true"
+        ],
+        "category": "deterministic",
+        "evidence": {
+          "commands": [
+            {
+              "command": "npm --prefix tauri/ui test -- tests/learn/test_beginner_path_contract.spec.ts tests/session/render-loop-actions.spec.ts tests/shell/shell.spec.ts",
+              "duration_s": 1.663,
+              "name": "learn_app_entry_vitest",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "command": "npm --prefix tauri/ui test -- tests/learn/test_practice_booth_shell.spec.ts tests/learn/test_tutor_speak_sr_announcement.spec.ts",
+              "duration_s": 1.562,
+              "name": "learn_frontstage_simplicity_vitest",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "command": "npm --prefix tauri/ui test -- tests/learn/test_learn_window_label.spec.ts",
+              "duration_s": 0.806,
+              "name": "learn_tauri_window_vitest",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "command": "npm --prefix tauri/ui test -- tests/learn/test_progress_list.spec.ts tests/learn/test_curriculum_meta.spec.ts tests/learn/test_hud_progress_dots_keyboard.spec.ts",
+              "duration_s": 1.144,
+              "name": "learn_choice_replay_vitest",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "command": "npm --prefix tauri/ui test -- tests/learn",
+              "duration_s": 3.304,
+              "name": "learn_vitest",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "command": "npm --prefix tauri/ui run build",
+              "duration_s": 4.022,
+              "name": "learn_build",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "command": "npm --prefix tauri/ui run test:e2e:learn -- tests/learn/browser-axe.pw.ts tests/learn/browser-responsive.pw.ts tests/learn/browser-contrast.pw.ts tests/learn/browser-python-beginner-path.pw.ts",
+              "duration_s": 39.96,
+              "name": "learn_browser_booth_playwright",
+              "passed": false,
+              "returncode": 1
+            },
+            {
+              "command": "npm --prefix tauri/ui run test:e2e:learn",
+              "duration_s": 40.91,
+              "name": "learn_e2e",
+              "passed": false,
+              "returncode": 1
+            }
+          ],
+          "path": ".planning/eval-runs/learn-quality-current-20260604-054a6638/frontend-quality.json",
+          "required_commands": [
+            "learn_app_entry_vitest",
+            "learn_browser_booth_playwright",
+            "learn_build",
+            "learn_choice_replay_vitest",
+            "learn_e2e",
+            "learn_frontstage_simplicity_vitest",
+            "learn_tauri_window_vitest",
+            "learn_vitest"
+          ]
+        },
+        "id": "frontend_quality_suite",
+        "next_actions": [
+          "uv run python scripts/run_learn_frontend_quality.py --out /tmp/vibemix-live-learn-proof/learn-frontend-quality-current.json"
+        ],
+        "release_gate": true,
+        "requirement": "The Learn frontend quality pass has run app-entry, frontstage simplicity, Tauri-window registration, choice/replay, Vitest Learn coverage, production build, focused browser booth quality, and broad browser Learn e2e.",
+        "status": "not_proven"
+      },
+      {
+        "blockers": [
+          "frontend quality command rows failed: learn_browser_booth_playwright, learn_e2e",
+          "passed is not true"
+        ],
+        "category": "practice_booth_ux",
+        "evidence": {
+          "action_receipts": "matched learner actions render a compact receipt naming the control gesture, known input source, and action count; the same receipt is announced through the tutor live region",
+          "adaptive_retry_primer": "unfinished lessons with persisted hint strikes keep the booth one-action simple while surfacing a compact hint-ready retry cue and moving exact hint counts into aria/title text",
+          "chooser_disclosure_control": "the optional lesson chooser is a real disclosure control with aria-controls and aria-expanded state, closes on Escape or lesson pick, and restores focus when the user dismisses it",
+          "commands": [
+            {
+              "command": "npm --prefix tauri/ui test -- tests/learn/test_beginner_path_contract.spec.ts tests/session/render-loop-actions.spec.ts tests/shell/shell.spec.ts",
+              "duration_s": 1.663,
+              "name": "learn_app_entry_vitest",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "command": "npm --prefix tauri/ui test -- tests/learn/test_practice_booth_shell.spec.ts tests/learn/test_tutor_speak_sr_announcement.spec.ts",
+              "duration_s": 1.562,
+              "name": "learn_frontstage_simplicity_vitest",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "command": "npm --prefix tauri/ui test -- tests/learn/test_learn_window_label.spec.ts",
+              "duration_s": 0.806,
+              "name": "learn_tauri_window_vitest",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "command": "npm --prefix tauri/ui test -- tests/learn/test_progress_list.spec.ts tests/learn/test_curriculum_meta.spec.ts tests/learn/test_hud_progress_dots_keyboard.spec.ts",
+              "duration_s": 1.144,
+              "name": "learn_choice_replay_vitest",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "command": "npm --prefix tauri/ui test -- tests/learn",
+              "duration_s": 3.304,
+              "name": "learn_vitest",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "command": "npm --prefix tauri/ui run build",
+              "duration_s": 4.022,
+              "name": "learn_build",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "command": "npm --prefix tauri/ui run test:e2e:learn -- tests/learn/browser-axe.pw.ts tests/learn/browser-responsive.pw.ts tests/learn/browser-contrast.pw.ts tests/learn/browser-python-beginner-path.pw.ts",
+              "duration_s": 39.96,
+              "name": "learn_browser_booth_playwright",
+              "passed": false,
+              "returncode": 1
+            },
+            {
+              "command": "npm --prefix tauri/ui run test:e2e:learn",
+              "duration_s": 40.91,
+              "name": "learn_e2e",
+              "passed": false,
+              "returncode": 1
+            }
+          ],
+          "completion_reward": "completed lessons return to the one-action booth with a short visible pass reward that distinguishes clean vs hint-recovered completions, names the matched hardware/screen source when known, and carries an accessible next-practice label pointing at the refreshed recommendation",
+          "covered_tests": [
+            "tests/learn/test_practice_booth_shell.spec.ts",
+            "tests/learn/test_tutor_speak_sr_announcement.spec.ts"
+          ],
+          "frontstage_default": "primary recommended action plus opt-in chooser",
+          "hardware_unavailable": "controller disconnect leaves the booth on the on-screen deck, keeps the lesson map opt-in, and repaints the active lesson highlight after mid-lesson remounts",
+          "in_progress_recommendation": "started-but-unfinished recommended lessons are labeled retry on the primary booth action while still restarting through the deterministic fresh lesson path",
+          "path": ".planning/eval-runs/learn-quality-current-20260604-054a6638/frontend-quality.json",
+          "practice_source_memory": "MIDI/controller and on-screen deck actions are persisted as backstage hardware/screen practice-source counts in LearnProgress, giving future coaching/profile logic real learner data without adding frontstage chrome",
+          "required_command": "learn_frontstage_simplicity_vitest",
+          "screen_fallback_action_label": "when a required control is not represented in the active controller SVG, the one fallback screen-action button keeps the deterministic ACK path and names the exact fallback action in aria/title text"
+        },
+        "id": "frontstage_simplicity_contract",
+        "next_actions": [
+          "uv run python scripts/run_learn_frontend_quality.py --out /tmp/vibemix-live-learn-proof/learn-frontend-quality-current.json"
+        ],
+        "release_gate": true,
+        "requirement": "The default Learn surface is a calm practice booth: one primary recommended action, the lesson map hidden by default, and progress snapshots or controller unplug events do not turn the frontstage into a syllabus wall.",
+        "status": "not_proven"
+      },
+      {
+        "blockers": [
+          "frontend quality command rows failed: learn_browser_booth_playwright, learn_e2e",
+          "passed is not true"
+        ],
+        "category": "practice_booth_ux",
+        "evidence": {
+          "commands": [
+            {
+              "command": "npm --prefix tauri/ui test -- tests/learn/test_beginner_path_contract.spec.ts tests/session/render-loop-actions.spec.ts tests/shell/shell.spec.ts",
+              "duration_s": 1.663,
+              "name": "learn_app_entry_vitest",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "command": "npm --prefix tauri/ui test -- tests/learn/test_practice_booth_shell.spec.ts tests/learn/test_tutor_speak_sr_announcement.spec.ts",
+              "duration_s": 1.562,
+              "name": "learn_frontstage_simplicity_vitest",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "command": "npm --prefix tauri/ui test -- tests/learn/test_learn_window_label.spec.ts",
+              "duration_s": 0.806,
+              "name": "learn_tauri_window_vitest",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "command": "npm --prefix tauri/ui test -- tests/learn/test_progress_list.spec.ts tests/learn/test_curriculum_meta.spec.ts tests/learn/test_hud_progress_dots_keyboard.spec.ts",
+              "duration_s": 1.144,
+              "name": "learn_choice_replay_vitest",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "command": "npm --prefix tauri/ui test -- tests/learn",
+              "duration_s": 3.304,
+              "name": "learn_vitest",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "command": "npm --prefix tauri/ui run build",
+              "duration_s": 4.022,
+              "name": "learn_build",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "command": "npm --prefix tauri/ui run test:e2e:learn -- tests/learn/browser-axe.pw.ts tests/learn/browser-responsive.pw.ts tests/learn/browser-contrast.pw.ts tests/learn/browser-python-beginner-path.pw.ts",
+              "duration_s": 39.96,
+              "name": "learn_browser_booth_playwright",
+              "passed": false,
+              "returncode": 1
+            },
+            {
+              "command": "npm --prefix tauri/ui run test:e2e:learn",
+              "duration_s": 40.91,
+              "name": "learn_e2e",
+              "passed": false,
+              "returncode": 1
+            }
+          ],
+          "covered_tests": [
+            "tests/learn/test_progress_list.spec.ts",
+            "tests/learn/test_curriculum_meta.spec.ts",
+            "tests/learn/test_hud_progress_dots_keyboard.spec.ts"
+          ],
+          "hud_replay_affordance": "completed HUD progress dots announce press-to-replay, current dots announce the current step, and pending dots announce the prerequisite lock",
+          "path": ".planning/eval-runs/learn-quality-current-20260604-054a6638/frontend-quality.json",
+          "progress_list_affordance": "completed lesson-map rows announce press-to-replay, in-progress rows announce retry, and locked rows keep the exact lock reason in aria/title text",
+          "required_command": "learn_choice_replay_vitest"
+        },
+        "id": "lesson_choice_replay_contract",
+        "next_actions": [
+          "uv run python scripts/run_learn_frontend_quality.py --out /tmp/vibemix-live-learn-proof/learn-frontend-quality-current.json"
+        ],
+        "release_gate": true,
+        "requirement": "The optional Learn lesson map proves opt-in lesson choice, locked-course handling, and completed-lesson replay without replacing the recommended path.",
+        "status": "not_proven"
+      },
+      {
+        "blockers": [
+          "frontend quality command rows failed: learn_browser_booth_playwright, learn_e2e",
+          "passed is not true"
+        ],
+        "category": "practice_booth_ux",
+        "evidence": {
+          "browser_claims": [
+            "no critical or serious WCAG axe violations",
+            "narrow first paint has no shell overflow and keeps booth controls visible",
+            "tutor dock and cue highlights clear computed contrast thresholds",
+            "recommended L1.01 completes through Tauri forwarder and direct WebSocket fallback",
+            "wrong on-screen EQ move reaches the Python sidecar, renders a grounded citation chip, and recovers to lesson completion"
+          ],
+          "commands": [
+            {
+              "command": "npm --prefix tauri/ui test -- tests/learn/test_beginner_path_contract.spec.ts tests/session/render-loop-actions.spec.ts tests/shell/shell.spec.ts",
+              "duration_s": 1.663,
+              "name": "learn_app_entry_vitest",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "command": "npm --prefix tauri/ui test -- tests/learn/test_practice_booth_shell.spec.ts tests/learn/test_tutor_speak_sr_announcement.spec.ts",
+              "duration_s": 1.562,
+              "name": "learn_frontstage_simplicity_vitest",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "command": "npm --prefix tauri/ui test -- tests/learn/test_learn_window_label.spec.ts",
+              "duration_s": 0.806,
+              "name": "learn_tauri_window_vitest",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "command": "npm --prefix tauri/ui test -- tests/learn/test_progress_list.spec.ts tests/learn/test_curriculum_meta.spec.ts tests/learn/test_hud_progress_dots_keyboard.spec.ts",
+              "duration_s": 1.144,
+              "name": "learn_choice_replay_vitest",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "command": "npm --prefix tauri/ui test -- tests/learn",
+              "duration_s": 3.304,
+              "name": "learn_vitest",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "command": "npm --prefix tauri/ui run build",
+              "duration_s": 4.022,
+              "name": "learn_build",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "command": "npm --prefix tauri/ui run test:e2e:learn -- tests/learn/browser-axe.pw.ts tests/learn/browser-responsive.pw.ts tests/learn/browser-contrast.pw.ts tests/learn/browser-python-beginner-path.pw.ts",
+              "duration_s": 39.96,
+              "name": "learn_browser_booth_playwright",
+              "passed": false,
+              "returncode": 1
+            },
+            {
+              "command": "npm --prefix tauri/ui run test:e2e:learn",
+              "duration_s": 40.91,
+              "name": "learn_e2e",
+              "passed": false,
+              "returncode": 1
+            }
+          ],
+          "covered_tests": [
+            "tauri/ui/tests/learn/browser-axe.pw.ts",
+            "tauri/ui/tests/learn/browser-responsive.pw.ts",
+            "tauri/ui/tests/learn/browser-contrast.pw.ts",
+            "tauri/ui/tests/learn/browser-python-beginner-path.pw.ts"
+          ],
+          "path": ".planning/eval-runs/learn-quality-current-20260604-054a6638/frontend-quality.json",
+          "required_command": "learn_browser_booth_playwright"
+        },
+        "id": "browser_practice_booth_quality_contract",
+        "next_actions": [
+          "uv run python scripts/run_learn_frontend_quality.py --out /tmp/vibemix-live-learn-proof/learn-frontend-quality-current.json"
+        ],
+        "release_gate": true,
+        "requirement": "The browser-rendered Learn booth proves accessible, responsive, high-contrast practice UX and completes the recommended L1.01 path through both the Tauri-style forwarder and direct browser WebSocket fallback against the Python Learn harness.",
+        "status": "not_proven"
+      },
+      {
+        "blockers": [
+          "frontend quality command rows failed: learn_browser_booth_playwright, learn_e2e",
+          "passed is not true"
+        ],
+        "category": "app_integration",
+        "evidence": {
+          "commands": [
+            {
+              "command": "npm --prefix tauri/ui test -- tests/learn/test_beginner_path_contract.spec.ts tests/session/render-loop-actions.spec.ts tests/shell/shell.spec.ts",
+              "duration_s": 1.663,
+              "name": "learn_app_entry_vitest",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "command": "npm --prefix tauri/ui test -- tests/learn/test_practice_booth_shell.spec.ts tests/learn/test_tutor_speak_sr_announcement.spec.ts",
+              "duration_s": 1.562,
+              "name": "learn_frontstage_simplicity_vitest",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "command": "npm --prefix tauri/ui test -- tests/learn/test_learn_window_label.spec.ts",
+              "duration_s": 0.806,
+              "name": "learn_tauri_window_vitest",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "command": "npm --prefix tauri/ui test -- tests/learn/test_progress_list.spec.ts tests/learn/test_curriculum_meta.spec.ts tests/learn/test_hud_progress_dots_keyboard.spec.ts",
+              "duration_s": 1.144,
+              "name": "learn_choice_replay_vitest",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "command": "npm --prefix tauri/ui test -- tests/learn",
+              "duration_s": 3.304,
+              "name": "learn_vitest",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "command": "npm --prefix tauri/ui run build",
+              "duration_s": 4.022,
+              "name": "learn_build",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "command": "npm --prefix tauri/ui run test:e2e:learn -- tests/learn/browser-axe.pw.ts tests/learn/browser-responsive.pw.ts tests/learn/browser-contrast.pw.ts tests/learn/browser-python-beginner-path.pw.ts",
+              "duration_s": 39.96,
+              "name": "learn_browser_booth_playwright",
+              "passed": false,
+              "returncode": 1
+            },
+            {
+              "command": "npm --prefix tauri/ui run test:e2e:learn",
+              "duration_s": 40.91,
+              "name": "learn_e2e",
+              "passed": false,
+              "returncode": 1
+            }
+          ],
+          "covered_tests": [
+            "tests/learn/test_beginner_path_contract.spec.ts",
+            "tests/session/render-loop-actions.spec.ts",
+            "tests/shell/shell.spec.ts"
+          ],
+          "path": ".planning/eval-runs/learn-quality-current-20260604-054a6638/frontend-quality.json",
+          "required_command": "learn_app_entry_vitest"
+        },
+        "id": "app_entry_contract",
+        "next_actions": [
+          "uv run python scripts/run_learn_frontend_quality.py --out /tmp/vibemix-live-learn-proof/learn-frontend-quality-current.json"
+        ],
+        "release_gate": true,
+        "requirement": "The main app shell exposes Learn as a normal user path: the mode picker opens the Learn window, the command palette can jump to Learn, and the first recommended action can start from that entry.",
+        "status": "not_proven"
+      },
+      {
+        "blockers": [
+          "frontend quality command rows failed: learn_browser_booth_playwright, learn_e2e",
+          "passed is not true"
+        ],
+        "category": "app_integration",
+        "evidence": {
+          "commands": {
+            "desktop": [
+              {
+                "command": "npm --prefix tauri/ui run build",
+                "duration_s": 4.072,
+                "name": "learn_tauri_frontend_dist_build",
+                "passed": true,
+                "returncode": 0
+              },
+              {
+                "command": "cargo fmt --manifest-path tauri/src-tauri/Cargo.toml --all -- --check",
+                "duration_s": 0.299,
+                "name": "learn_cargo_fmt",
+                "passed": true,
+                "returncode": 0
+              },
+              {
+                "command": "cargo check --manifest-path tauri/src-tauri/Cargo.toml",
+                "duration_s": 10.092,
+                "name": "learn_cargo_check",
+                "passed": true,
+                "returncode": 0
+              },
+              {
+                "command": "cargo test --manifest-path tauri/src-tauri/Cargo.toml learn_window",
+                "duration_s": 7.175,
+                "name": "learn_cargo_learn_window_test",
+                "passed": true,
+                "returncode": 0
+              },
+              {
+                "command": "cargo test --manifest-path tauri/src-tauri/Cargo.toml sidecar_audio_env_defaults",
+                "duration_s": 4.461,
+                "name": "learn_cargo_sidecar_audio_test",
+                "passed": true,
+                "returncode": 0
+              }
+            ],
+            "frontend": [
+              {
+                "command": "npm --prefix tauri/ui test -- tests/learn/test_beginner_path_contract.spec.ts tests/session/render-loop-actions.spec.ts tests/shell/shell.spec.ts",
+                "duration_s": 1.663,
+                "name": "learn_app_entry_vitest",
+                "passed": true,
+                "returncode": 0
+              },
+              {
+                "command": "npm --prefix tauri/ui test -- tests/learn/test_practice_booth_shell.spec.ts tests/learn/test_tutor_speak_sr_announcement.spec.ts",
+                "duration_s": 1.562,
+                "name": "learn_frontstage_simplicity_vitest",
+                "passed": true,
+                "returncode": 0
+              },
+              {
+                "command": "npm --prefix tauri/ui test -- tests/learn/test_learn_window_label.spec.ts",
+                "duration_s": 0.806,
+                "name": "learn_tauri_window_vitest",
+                "passed": true,
+                "returncode": 0
+              },
+              {
+                "command": "npm --prefix tauri/ui test -- tests/learn/test_progress_list.spec.ts tests/learn/test_curriculum_meta.spec.ts tests/learn/test_hud_progress_dots_keyboard.spec.ts",
+                "duration_s": 1.144,
+                "name": "learn_choice_replay_vitest",
+                "passed": true,
+                "returncode": 0
+              },
+              {
+                "command": "npm --prefix tauri/ui test -- tests/learn",
+                "duration_s": 3.304,
+                "name": "learn_vitest",
+                "passed": true,
+                "returncode": 0
+              },
+              {
+                "command": "npm --prefix tauri/ui run build",
+                "duration_s": 4.022,
+                "name": "learn_build",
+                "passed": true,
+                "returncode": 0
+              },
+              {
+                "command": "npm --prefix tauri/ui run test:e2e:learn -- tests/learn/browser-axe.pw.ts tests/learn/browser-responsive.pw.ts tests/learn/browser-contrast.pw.ts tests/learn/browser-python-beginner-path.pw.ts",
+                "duration_s": 39.96,
+                "name": "learn_browser_booth_playwright",
+                "passed": false,
+                "returncode": 1
+              },
+              {
+                "command": "npm --prefix tauri/ui run test:e2e:learn",
+                "duration_s": 40.91,
+                "name": "learn_e2e",
+                "passed": false,
+                "returncode": 1
+              }
+            ]
+          },
+          "covered_tests": [
+            "tauri/ui/tests/learn/test_learn_window_label.spec.ts",
+            "tauri/src-tauri/src/learn_window.rs::tests"
+          ],
+          "desktop_path": ".planning/eval-runs/learn-quality-current-20260604-054a6638/desktop-quality.json",
+          "frontend_path": ".planning/eval-runs/learn-quality-current-20260604-054a6638/frontend-quality.json",
+          "required_desktop_command": "learn_cargo_learn_window_test",
+          "required_frontend_command": "learn_tauri_window_vitest",
+          "webview_url": "learn.html",
+          "window_label": "learn"
+        },
+        "id": "tauri_learn_window_contract",
+        "next_actions": [
+          "uv run python scripts/run_learn_frontend_quality.py --out /tmp/vibemix-live-learn-proof/learn-frontend-quality-current.json",
+          "uv run python scripts/run_learn_desktop_quality.py --out /tmp/vibemix-live-learn-proof/learn-desktop-quality-current.json"
+        ],
+        "release_gate": true,
+        "requirement": "The desktop app registers the Learn Tauri command, scopes the learn window in capabilities, uses the single lowercase `learn` window label, and loads the bundled `learn.html` surface without launching a second Python process.",
+        "status": "not_proven"
+      },
+      {
+        "blockers": [],
+        "category": "app_integration",
+        "evidence": {
+          "commands": [
+            {
+              "command": "npm --prefix tauri/ui run build",
+              "duration_s": 4.072,
+              "name": "learn_tauri_frontend_dist_build",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "command": "cargo fmt --manifest-path tauri/src-tauri/Cargo.toml --all -- --check",
+              "duration_s": 0.299,
+              "name": "learn_cargo_fmt",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "command": "cargo check --manifest-path tauri/src-tauri/Cargo.toml",
+              "duration_s": 10.092,
+              "name": "learn_cargo_check",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "command": "cargo test --manifest-path tauri/src-tauri/Cargo.toml learn_window",
+              "duration_s": 7.175,
+              "name": "learn_cargo_learn_window_test",
+              "passed": true,
+              "returncode": 0
+            },
+            {
+              "command": "cargo test --manifest-path tauri/src-tauri/Cargo.toml sidecar_audio_env_defaults",
+              "duration_s": 4.461,
+              "name": "learn_cargo_sidecar_audio_test",
+              "passed": true,
+              "returncode": 0
+            }
+          ],
+          "path": ".planning/eval-runs/learn-quality-current-20260604-054a6638/desktop-quality.json",
+          "required_commands": [
+            "learn_cargo_check",
+            "learn_cargo_fmt",
+            "learn_cargo_learn_window_test",
+            "learn_cargo_sidecar_audio_test",
+            "learn_tauri_frontend_dist_build"
+          ]
+        },
+        "id": "desktop_shell_quality",
+        "next_actions": [
+          "uv run python scripts/run_learn_desktop_quality.py --out /tmp/vibemix-live-learn-proof/learn-desktop-quality-current.json"
+        ],
+        "release_gate": true,
+        "requirement": "The Learn desktop shell quality pass has run Rust formatting, Cargo check, and sidecar auto-master wiring tests for the Tauri app wrapper.",
+        "status": "proven"
+      },
+      {
+        "blockers": [
+          "passed is not true",
+          "quality_ok is not true",
+          "quality failures are present"
+        ],
+        "category": "app_integration",
+        "evidence": {
+          "completed_lesson_id": "L1.01",
+          "path": ".planning/eval-runs/learn-tauri-smoke-current-20260604-054a6638/tauri-smoke-failed.json",
+          "quality_check_count": 19,
+          "quality_ok": false
+        },
+        "id": "launched_tauri_practice_booth",
+        "next_actions": [
+          "npm --prefix tauri/ui run test:e2e:learn:tauri"
+        ],
+        "release_gate": true,
+        "requirement": "The real Tauri Learn webview, Rust bridge, Python socket, and practice-booth quality checks pass together.",
+        "status": "not_proven"
+      },
+      {
+        "blockers": [],
+        "category": "live_proof",
+        "evidence": {
+          "path": ".planning/eval-runs/learn-screen-path-current-20260604-16a547dd/proof.json",
+          "status": "passed"
+        },
+        "id": "on_screen_deck_path",
+        "next_actions": [
+          "uv run python scripts/run_learn_live_proof.py --start-app"
+        ],
+        "release_gate": true,
+        "requirement": "A beginner can use the on-screen deck path and complete a Learn lesson through deterministic socket/progress evidence.",
+        "status": "proven"
+      },
+      {
+        "blockers": [],
+        "category": "live_proof",
+        "evidence": {
+          "diagnosis": {
+            "code": "physical_l1_07_proven",
+            "message": "L1.07 loaded, left jog was observed, ACK was sent, and advance was seen.",
+            "operator_action": {
+              "prompt": "Physical L1.07 proof is complete.",
+              "steps": []
+            }
+          },
+          "operator_commands": {
+            "list_controller": "uv run python scripts/sniff_controller.py --list",
+            "manual_action": "Physical L1.07 proof is complete.",
+            "operator_action": {
+              "prompt": "Physical L1.07 proof is complete.",
+              "steps": []
+            },
+            "physical_connection_doctor": {
+              "hardware_connection": {
+                "bluetooth_midi_matches": [],
+                "bluetooth_midi_only": false,
+                "controller_hardware_ready": true
+              },
+              "next_step": "Nudge the left jog wheel during the active L1.07 proof window.",
+              "ok": true,
+              "operator_steps": [
+                "Nudge the left jog wheel during the active L1.07 proof window."
+              ],
+              "proof_command": "uv run python scripts/run_learn_live_proof.py --start-app --no-screen --physical --wait-physical-seconds 30 --physical-seconds 40 --say-physical-prompts --auto-master-input --out /tmp/vibemix-live-learn-proof/proof-physical-ddj-current.json",
+              "readiness_command": "uv run python scripts/learn_live_readiness.py --require physical --out /tmp/vibemix-live-learn-proof/learn-physical-readiness-current.json",
+              "status": "ready",
+              "uses_spoken_prompt": true
+            },
+            "proof": "uv run python scripts/run_learn_live_proof.py --start-app --no-screen --physical --wait-physical-seconds 30 --physical-seconds 40 --say-physical-prompts --auto-master-input --out /tmp/vibemix-live-learn-proof/proof-physical-ddj-current.json",
+            "readiness": "uv run python scripts/learn_live_readiness.py --require physical --out /tmp/vibemix-live-learn-proof/learn-physical-readiness-current.json",
+            "verify": "uv run python scripts/verify_learn_package.py --out /tmp/vibemix-live-learn-proof/learn-package-verification-current.json"
+          },
+          "path": ".planning/eval-runs/learn-physical-retry-current-20260604-e4e7c1f8/physical-proof.json",
+          "physical_connection_doctor": {
+            "hardware_connection": {
+              "bluetooth_midi_matches": [],
+              "bluetooth_midi_only": false,
+              "controller_hardware_ready": true
+            },
+            "next_step": "Nudge the left jog wheel during the active L1.07 proof window.",
+            "ok": true,
+            "operator_steps": [
+              "Nudge the left jog wheel during the active L1.07 proof window."
+            ],
+            "proof_command": "uv run python scripts/run_learn_live_proof.py --start-app --no-screen --physical --wait-physical-seconds 30 --physical-seconds 40 --say-physical-prompts --auto-master-input --out /tmp/vibemix-live-learn-proof/proof-physical-ddj-current.json",
+            "readiness_command": "uv run python scripts/learn_live_readiness.py --require physical --out /tmp/vibemix-live-learn-proof/learn-physical-readiness-current.json",
+            "status": "ready",
+            "uses_spoken_prompt": true
+          },
+          "readiness_status": null,
+          "status": "passed"
+        },
+        "id": "physical_controller_path",
+        "next_actions": [
+          "uv run python scripts/run_learn_live_proof.py --start-app --no-screen --physical --wait-physical-seconds 30 --physical-seconds 40 --say-physical-prompts --auto-master-input --out /tmp/vibemix-live-learn-proof/proof-physical-ddj-current.json"
+        ],
+        "release_gate": true,
+        "requirement": "A beginner can move a physical controller and complete a mapped Learn action through deterministic evidence.",
+        "status": "proven"
+      },
+      {
+        "blockers": [
+          "course3_probe skipped: --course3 not set",
+          "schema_version is not 1",
+          "stages object missing",
+          "course3_probe did not pass",
+          "course3_probe.result.passed is not true",
+          "course3 proof saw no lens frames",
+          "course3 proof did not see active Course 3",
+          "course3 proof did not see count-in evidence",
+          "course3 proof has no last_lens object"
+        ],
+        "category": "live_proof",
+        "evidence": {
+          "course3_route_doctor": null,
+          "diagnosis": {
+            "code": "course3_audio_context_incomplete",
+            "message": "Course 3 audio context is not proven yet.",
+            "next_action": "Run readiness with live context and audio diagnostics enabled.",
+            "severity": "unknown"
+          },
+          "path": null,
+          "playback_nudge": {
+            "reason": "--course3 not set",
+            "status": "skipped"
+          },
+          "probe_operator_action": null,
+          "readiness_status": null,
+          "route_plan": {
+            "auto_master_fallback_candidate": null,
+            "auto_master_fallback_device": null,
+            "auto_master_fallback_rejected_reason": null,
+            "auto_master_fallback_source": null,
+            "auto_master_input": false,
+            "input_device": null
+          },
+          "status": "failed"
+        },
+        "id": "course3_live_audio_play_mode",
+        "next_actions": [
+          "uv run python scripts/run_learn_live_proof.py --start-app --no-screen --course3 --seed-course3-unlocked --auto-master-input --nudge-rekordbox-playback --require-count-in --say-course3-prompts --wait-loopback-signal-seconds 30 --wait-capture-signal-seconds 30 --wait-course3-seconds 120 --course3-context-seconds 5 --loopback-signal-seconds 2 --loopback-self-test-seconds 1 --capture-matrix-seconds 2 --out /tmp/vibemix-live-learn-proof/proof-course3-auto-master-current.json"
+        ],
+        "release_gate": true,
+        "requirement": "Course 3 live play mode proves routed master audio, citable deck context, and next-phrase count-in evidence.",
+        "status": "not_proven"
+      },
+      {
+        "blockers": [],
+        "category": "human_ear_pass",
+        "evidence": {
+          "bank_fingerprint": {
+            "algorithm": "sha256-canonical-json-v1",
+            "digest": "34e7aafe568b2e8badecb75fd28e0a8bd710f4fd1b1f2d84e7ff4a78584096e9",
+            "manifest_sha256": "8d8ae0dd1e418babb900dc70c3335829eae27629e9f8b5e6591721c435decd58",
+            "track_count": 4
+          },
+          "diagnosis": {
+            "code": "technical_and_ear_pass_approved",
+            "message": "Packaged exemplar WAV integrity and human ear-pass are approved.",
+            "next_action": "keep approval artifact with release evidence",
+            "severity": "approved"
+          },
+          "operator_action": {
+            "prompt": "Choose an audible output, listen to the four EQ exemplar loops, then approve or replace them.",
+            "recommended_output_devices": [],
+            "steps": [
+              "uv run python scripts/audition_learn_exemplars.py --list-devices",
+              "uv run python scripts/audition_learn_exemplars.py --play --device-index <output-device-index> --say-prompts --out /tmp/vibemix-live-learn-proof/learn-exemplar-audition-current.json",
+              "uv run python scripts/audition_learn_exemplars.py --approve-ear-pass --approved-by <name> --audition /tmp/vibemix-live-learn-proof/learn-exemplar-audition-current.json --approval-out /tmp/vibemix-live-learn-proof/learn-exemplar-ear-pass-current.json",
+              "uv run python scripts/verify_learn_package.py --out /tmp/vibemix-live-learn-proof/learn-package-verification-current.json"
+            ]
+          },
+          "release_ready": true,
+          "technical_passed": true,
+          "track_count": 4
+        },
+        "id": "packaged_eq_exemplar_ear_pass",
+        "next_actions": [
+          "uv run python scripts/audition_learn_exemplars.py --play --device-index <output-device-index> --say-prompts --out /tmp/vibemix-live-learn-proof/learn-exemplar-audition-current.json",
+          "uv run python scripts/audition_learn_exemplars.py --approve-ear-pass --approved-by <name> --audition /tmp/vibemix-live-learn-proof/learn-exemplar-audition-current.json --approval-out /tmp/vibemix-live-learn-proof/learn-exemplar-ear-pass-current.json"
+        ],
+        "release_gate": true,
+        "requirement": "The packaged EQ exemplar bank passes technical integrity and human ear-pass for the beginner teaching experience.",
+        "status": "proven"
+      }
+    ],
+    "schema_version": 1,
+    "summary": {
+      "not_proven": 8,
+      "proven": 14,
+      "release_gate_proven": 14,
+      "release_gate_total": 22,
+      "release_ready": false,
+      "total": 22
+    }
+  },
+  "deferred_external_blocker_ids": [
+    "course3_live_audio_play_mode"
+  ],
+  "deferred_external_blockers": [
+    {
+      "blocker": "Course 3 routed-audio count-in proof is not strictly proven",
+      "id": "course3_live_audio_play_mode",
+      "status": "failed"
+    }
+  ],
+  "generated_at": "2026-06-04T15:05:57.336758+00:00",
+  "internal_blocker_ids": [
+    "unclassified_completion_blocker"
+  ],
+  "internal_blockers": [
+    {
+      "blocker": "full Learn frontend quality gate is missing or failing",
+      "id": "unclassified_completion_blocker",
+      "status": "unclassified"
+    },
+    {
+      "blocker": "launched Tauri Learn smoke is missing or failing",
+      "id": "unclassified_completion_blocker",
+      "status": "unclassified"
+    }
+  ],
+  "next_actions": [
+    "run scripts/run_learn_frontend_quality.py, then refresh verify_learn_package.py",
+    "run npm --prefix tauri/ui run test:e2e:learn:tauri",
+    "Run readiness with live context and audio diagnostics enabled."
+  ],
+  "non_external_ready": false,
+  "non_external_ready_rule": "Non-external readiness ignores only the currently deferred human ear-pass and Course 3 routed-audio proof; every other blocker still keeps the package incomplete.",
+  "objective_audit": {
+    "objectives": [
+      {
+        "blockers": [],
+        "blocking_row_ids": [],
+        "evidence_row_ids": [
+          "curriculum_36_lesson_contract",
+          "all_lessons_runtime_contract",
+          "python_quality_suite"
+        ],
+        "id": "full_36_lesson_beginner_module",
+        "missing_row_ids": [],
+        "next_actions": [],
+        "objective": "All 36 beginner lessons are real structured flows with canonical ids, deterministic verification, adaptive hints, progress, and runtime traversal.",
+        "proven_row_ids": [
+          "curriculum_36_lesson_contract",
+          "all_lessons_runtime_contract",
+          "python_quality_suite"
+        ],
+        "status": "proven"
+      },
+      {
+        "blockers": [
+          "frontend quality command rows failed: learn_browser_booth_playwright, learn_e2e",
+          "passed is not true"
+        ],
+        "blocking_row_ids": [
+          "frontstage_simplicity_contract",
+          "lesson_choice_replay_contract",
+          "browser_practice_booth_quality_contract"
+        ],
+        "evidence_row_ids": [
+          "frontstage_simplicity_contract",
+          "lesson_choice_replay_contract",
+          "browser_practice_booth_quality_contract",
+          "curriculum_36_lesson_contract"
+        ],
+        "id": "simple_practice_booth_no_syllabus_wall",
+        "missing_row_ids": [],
+        "next_actions": [
+          "uv run python scripts/run_learn_frontend_quality.py --out /tmp/vibemix-live-learn-proof/learn-frontend-quality-current.json"
+        ],
+        "objective": "The user sees a calm practice booth with one clear prompt, one action, opt-in lesson choice, replay support, and no default syllabus wall.",
+        "proven_row_ids": [
+          "curriculum_36_lesson_contract"
+        ],
+        "status": "not_proven"
+      },
+      {
+        "blockers": [
+          "frontend quality command rows failed: learn_browser_booth_playwright, learn_e2e",
+          "passed is not true"
+        ],
+        "blocking_row_ids": [
+          "browser_practice_booth_quality_contract"
+        ],
+        "evidence_row_ids": [
+          "physical_controller_path",
+          "on_screen_deck_path",
+          "browser_practice_booth_quality_contract"
+        ],
+        "id": "physical_or_on_screen_practice_paths",
+        "missing_row_ids": [],
+        "next_actions": [
+          "uv run python scripts/run_learn_frontend_quality.py --out /tmp/vibemix-live-learn-proof/learn-frontend-quality-current.json"
+        ],
+        "objective": "A beginner can practice with either a physical controller or the on-screen deck, with deterministic proof for both paths.",
+        "proven_row_ids": [
+          "physical_controller_path",
+          "on_screen_deck_path"
+        ],
+        "status": "not_proven"
+      },
+      {
+        "blockers": [],
+        "blocking_row_ids": [],
+        "evidence_row_ids": [
+          "teaching_loop_contract",
+          "adaptive_coaching_runtime_contract",
+          "session_debrief_profile_contract"
+        ],
+        "id": "grounded_adaptive_teaching_loop",
+        "missing_row_ids": [],
+        "next_actions": [],
+        "objective": "The backstage loop observes, decides, teaches, verifies, and adapts with grounded evidence instead of generic coaching.",
+        "proven_row_ids": [
+          "teaching_loop_contract",
+          "adaptive_coaching_runtime_contract",
+          "session_debrief_profile_contract"
+        ],
+        "status": "proven"
+      },
+      {
+        "blockers": [
+          "frontend quality command rows failed: learn_browser_booth_playwright, learn_e2e",
+          "passed is not true"
+        ],
+        "blocking_row_ids": [
+          "tauri_learn_window_contract"
+        ],
+        "evidence_row_ids": [
+          "capability_reuse_contract",
+          "teaching_loop_contract",
+          "course3_auto_master_finder_contract",
+          "course3_mix_count_in_anchor_contract",
+          "session_debrief_profile_contract",
+          "tauri_learn_window_contract"
+        ],
+        "id": "existing_coded_power_reuse",
+        "missing_row_ids": [],
+        "next_actions": [
+          "uv run python scripts/run_learn_frontend_quality.py --out /tmp/vibemix-live-learn-proof/learn-frontend-quality-current.json",
+          "uv run python scripts/run_learn_desktop_quality.py --out /tmp/vibemix-live-learn-proof/learn-desktop-quality-current.json"
+        ],
+        "objective": "Learn reuses vibemix controller state, live audio, evidence registry, library/cue/section intelligence, model routing, IPC/socket, session, debrief, and profile seams.",
+        "proven_row_ids": [
+          "capability_reuse_contract",
+          "teaching_loop_contract",
+          "course3_auto_master_finder_contract",
+          "course3_mix_count_in_anchor_contract",
+          "session_debrief_profile_contract"
+        ],
+        "status": "not_proven"
+      },
+      {
+        "blockers": [
+          "course3_probe skipped: --course3 not set",
+          "schema_version is not 1",
+          "stages object missing",
+          "course3_probe did not pass",
+          "course3_probe.result.passed is not true",
+          "course3 proof saw no lens frames",
+          "course3 proof did not see active Course 3",
+          "course3 proof did not see count-in evidence",
+          "course3 proof has no last_lens object"
+        ],
+        "blocking_row_ids": [
+          "course3_live_audio_play_mode"
+        ],
+        "evidence_row_ids": [
+          "course3_auto_master_finder_contract",
+          "course3_mix_count_in_anchor_contract",
+          "course3_live_audio_play_mode"
+        ],
+        "id": "course3_live_play_mode",
+        "missing_row_ids": [],
+        "next_actions": [
+          "uv run python scripts/run_learn_live_proof.py --start-app --no-screen --course3 --seed-course3-unlocked --auto-master-input --nudge-rekordbox-playback --require-count-in --say-course3-prompts --wait-loopback-signal-seconds 30 --wait-capture-signal-seconds 30 --wait-course3-seconds 120 --course3-context-seconds 5 --loopback-signal-seconds 2 --loopback-self-test-seconds 1 --capture-matrix-seconds 2 --out /tmp/vibemix-live-learn-proof/proof-course3-auto-master-current.json"
+        ],
+        "objective": "Course 3 live play mode proves routed master audio, citable deck context, and grounded next-phrase count-ins.",
+        "proven_row_ids": [
+          "course3_auto_master_finder_contract",
+          "course3_mix_count_in_anchor_contract"
+        ],
+        "status": "not_proven"
+      },
+      {
+        "blockers": [],
+        "blocking_row_ids": [],
+        "evidence_row_ids": [
+          "future_course_extension_contract"
+        ],
+        "id": "future_course_extensibility",
+        "missing_row_ids": [],
+        "next_actions": [],
+        "objective": "New courses can be integrated through a machine-checked course-pack preflight, generated projection, prompt contract, truthfulness checks, and merge plan.",
+        "proven_row_ids": [
+          "future_course_extension_contract"
+        ],
+        "status": "proven"
+      },
+      {
+        "blockers": [
+          "frontend quality command rows failed: learn_browser_booth_playwright, learn_e2e",
+          "passed is not true",
+          "quality_ok is not true",
+          "quality failures are present"
+        ],
+        "blocking_row_ids": [
+          "app_entry_contract",
+          "tauri_learn_window_contract",
+          "frontend_quality_suite",
+          "launched_tauri_practice_booth"
+        ],
+        "evidence_row_ids": [
+          "app_entry_contract",
+          "tauri_learn_window_contract",
+          "frontend_quality_suite",
+          "desktop_shell_quality",
+          "launched_tauri_practice_booth"
+        ],
+        "id": "app_wiring_and_quality",
+        "missing_row_ids": [],
+        "next_actions": [
+          "uv run python scripts/run_learn_frontend_quality.py --out /tmp/vibemix-live-learn-proof/learn-frontend-quality-current.json",
+          "uv run python scripts/run_learn_desktop_quality.py --out /tmp/vibemix-live-learn-proof/learn-desktop-quality-current.json",
+          "npm --prefix tauri/ui run test:e2e:learn:tauri"
+        ],
+        "objective": "The Learn module is wired into the app and passes frontend, desktop, launched Tauri, and consolidated quality gates.",
+        "proven_row_ids": [
+          "desktop_shell_quality"
+        ],
+        "status": "not_proven"
+      },
+      {
+        "blockers": [],
+        "blocking_row_ids": [],
+        "evidence_row_ids": [
+          "packaged_eq_exemplar_ear_pass"
+        ],
+        "id": "audible_example_quality",
+        "missing_row_ids": [],
+        "next_actions": [],
+        "objective": "Packaged EQ examples are technically valid and human ear-passed for the beginner teaching experience.",
+        "proven_row_ids": [
+          "packaged_eq_exemplar_ear_pass"
+        ],
+        "status": "proven"
+      }
+    ],
+    "schema_version": 1,
+    "summary": {
+      "blocking_objective_ids": [
+        "simple_practice_booth_no_syllabus_wall",
+        "physical_or_on_screen_practice_paths",
+        "existing_coded_power_reuse",
+        "course3_live_play_mode",
+        "app_wiring_and_quality"
+      ],
+      "not_proven": 5,
+      "proven": 4,
+      "release_ready": false,
+      "total": 9
+    }
+  },
+  "passed": false,
+  "proof_dir": "/tmp/vibemix-live-learn-proof",
+  "release_blocker_recipe": [
+    {
+      "blocker": "Course 3 routed-audio count-in proof is not strictly proven",
+      "commands": {
+        "proof": "uv run python scripts/run_learn_live_proof.py --start-app --no-screen --course3 --seed-course3-unlocked --auto-master-input --nudge-rekordbox-playback --require-count-in --say-course3-prompts --wait-loopback-signal-seconds 30 --wait-capture-signal-seconds 30 --wait-course3-seconds 120 --course3-context-seconds 5 --loopback-signal-seconds 2 --loopback-self-test-seconds 1 --capture-matrix-seconds 2 --out /tmp/vibemix-live-learn-proof/proof-course3-auto-master-current.json",
+        "readiness": "uv run python scripts/learn_live_readiness.py --require course3 --live-context-seconds 5 --loopback-signal-seconds 2 --loopback-self-test-seconds 1 --capture-matrix-seconds 2 --out /tmp/vibemix-live-learn-proof/learn-course3-readiness-current.json",
+        "verify": "uv run python scripts/verify_learn_package.py --out /tmp/vibemix-live-learn-proof/learn-package-verification-current.json"
+      },
+      "course3_route_doctor": null,
+      "current_fallback_candidate": {
+        "live_signal": false,
+        "name": null,
+        "reason": "no_usable_capture_input",
+        "sample_rate": null,
+        "source": null
+      },
+      "current_selected_input": null,
+      "diagnosis": {
+        "code": "course3_audio_context_incomplete",
+        "message": "Course 3 audio context is not proven yet.",
+        "next_action": "Run readiness with live context and audio diagnostics enabled.",
+        "severity": "unknown"
+      },
+      "id": "course3_live_audio_play_mode",
+      "manual_action": "Run readiness with live context and audio diagnostics enabled.",
+      "operator_action": {
+        "prompt": "Run readiness with live context and audio diagnostics enabled.",
+        "route": "a 48000Hz BlackHole or loopback input",
+        "steps": [
+          "Stop unrelated browser/system audio so deck attribution can point at Rekordbox.",
+          "Route Rekordbox master/output audio to a 48000Hz BlackHole or loopback input.",
+          "Load and play a real Rekordbox library track.",
+          "Raise the playing channel fader and master until loopback capture has signal.",
+          "Rerun the Course 3 proof command; it will speak the route/playback moment."
+        ]
+      },
+      "operator_steps": [
+        "Stop unrelated browser/system audio so deck attribution can point at Rekordbox.",
+        "Route Rekordbox master/output audio to a 48000Hz BlackHole or loopback input.",
+        "Load and play a real Rekordbox library track.",
+        "Raise the playing channel fader and master until loopback capture has signal.",
+        "Rerun the Course 3 proof command; it will speak the route/playback moment."
+      ],
+      "path": null,
+      "playback_nudge": {
+        "reason": "--course3 not set",
+        "status": "skipped"
+      },
+      "probe_operator_action": null,
+      "readiness_status": null,
+      "route_plan": {
+        "auto_master_fallback_candidate": null,
+        "auto_master_fallback_device": null,
+        "auto_master_fallback_rejected_reason": null,
+        "auto_master_fallback_source": null,
+        "auto_master_input": false,
+        "input_device": null
+      },
+      "status": "failed"
+    }
+  ],
+  "release_gate_cue_card": {
+    "gate_count": 1,
+    "gates": [
+      {
+        "current_rekordbox_route": null,
+        "diagnosis_code": "course3_audio_context_incomplete",
+        "first_step": "Stop unrelated browser/system audio so deck attribution can point at Rekordbox.",
+        "id": "course3_live_audio_play_mode",
+        "prompt": "Run readiness with live context and audio diagnostics enabled.",
+        "recommended_output_device": null,
+        "route": "a 48000Hz BlackHole or loopback input",
+        "route_mismatch": false,
+        "run_command": "uv run python scripts/run_learn_live_proof.py --start-app --no-screen --course3 --seed-course3-unlocked --auto-master-input --nudge-rekordbox-playback --require-count-in --say-course3-prompts --wait-loopback-signal-seconds 30 --wait-capture-signal-seconds 30 --wait-course3-seconds 120 --course3-context-seconds 5 --loopback-signal-seconds 2 --loopback-self-test-seconds 1 --capture-matrix-seconds 2 --out /tmp/vibemix-live-learn-proof/proof-course3-auto-master-current.json",
+        "spoken_prompt_enabled": true,
+        "status": "failed",
+        "step_count": 5,
+        "target_capture_route": "a 48000Hz BlackHole or loopback input",
+        "verify_command": "uv run python scripts/verify_learn_package.py --out /tmp/vibemix-live-learn-proof/learn-package-verification-current.json"
+      }
+    ],
+    "headline": "Learn still has internal blockers before release proof can finish.",
+    "non_external_ready": false,
+    "primary_next_action": "run scripts/run_learn_frontend_quality.py, then refresh verify_learn_package.py",
+    "release_ready": false,
+    "schema_version": 1,
+    "status": "needs_internal_work"
+  },
+  "release_ready": false,
+  "schema_version": 1,
+  "sections": {
+    "curriculum": {
+      "beginner_course_ids": [
+        "course_1_anatomy",
+        "course_2_transitions",
+        "course_3_play_mode"
+      ],
+      "beginner_lessons": 36,
+      "copy_truthfulness_contract": {
+        "ok": true,
+        "unsupported_auto_open_phrases": [
+          "debrief opens",
+          "debrief will open",
+          "opens automatically",
+          "open automatically",
+          "should have opened automatically",
+          "the debrief is open"
+        ],
+        "unsupported_debrief_auto_open_claims": []
+      },
+      "course_pack_contract": {
+        "canonical_id_contract": {
+          "course_id_pattern": "course_<number>_<slug>",
+          "lesson_id_pattern": "L<number>.<two digits>",
+          "rule": "Future course-pack lesson IDs must match the numeric course prefix and be contiguous from .01.",
+          "starter_template": "scripts/validate_learn_course_pack.py --init-template"
+        },
+        "capability_contract": {
+          "capabilities": [
+            "controller_state",
+            "cue_section_lookahead",
+            "debrief",
+            "dj_profile",
+            "evidence_registry",
+            "library_exemplars",
+            "library_suggestions",
+            "live_audio",
+            "on_screen_deck",
+            "prepared_pool",
+            "recital_observer",
+            "recovery_drill",
+            "session_recording",
+            "session_state"
+          ],
+          "frontstage_modes": [
+            "legacy_demo",
+            "live_play_mode",
+            "practice_booth"
+          ],
+          "rule": "COURSE_REGISTRY capabilities must cover every compiled backstage lens and input surface used by its lesson flows."
+        },
+        "copy_truthfulness_contract": {
+          "rule": "Draft course-pack transcript copy must not promise automatic debrief opening unless a runtime command and frontend invoke path are added to the Learn contract.",
+          "unsupported_auto_open_phrases": [
+            "debrief opens",
+            "debrief will open",
+            "opens automatically",
+            "open automatically",
+            "should have opened automatically",
+            "the debrief is open"
+          ]
+        },
+        "draft_validator": {
+          "cli": "uv run python scripts/validate_learn_course_pack.py <course-pack.json>",
+          "function": "vibemix.learn.course_pack.validate_course_pack_draft",
+          "result_fields": [
+            "ok",
+            "lesson_count",
+            "step_count",
+            "flow_preview",
+            "observed_capabilities",
+            "required_progress_fields",
+            "integration_plan",
+            "prompt_contract",
+            "teaching_grounding_contract",
+            "hint_grounding_contract",
+            "authoring_contract",
+            "copy_truthfulness",
+            "errors"
+          ],
+          "rule": "Future courses are validated against CourseMeta, LessonMeta, transcript metadata, hint floors, observed capabilities, and the canonical structured-flow compiler before global tables or fixture files are edited.",
+          "template_cli": "uv run python scripts/validate_learn_course_pack.py --init-template <dir> --course-number 4 --slug <slug>"
+        },
+        "flow_contract": {
+          "beginner_gate": "every beginner lesson must compile to at least one step",
+          "compiler": "vibemix.learn.lesson_flow.build_lesson_flow",
+          "prompt_contract": {
+            "inline_lists_forbidden": true,
+            "max_chars": 150,
+            "max_sentences": 2,
+            "max_words": 24,
+            "single_line": true
+          },
+          "teaching_loop_contract": {
+            "hint_turns": "the first three adaptive hints must plan through plan_hint_turn, remain grounded, and carry citations",
+            "teaching_turns": "every compiled step must plan through plan_teaching_turn, remain grounded, and carry a citation"
+          },
+          "verification": "each step must expose one calm frontstage prompt, observable controls, deterministic input surfaces, and at least three adaptive hints"
+        },
+        "frontend_contract": {
+          "check_command": "uv run python scripts/export_learn_curriculum_meta.py --check",
+          "generated_by": "scripts/export_learn_curriculum_meta.py",
+          "manual_frontend_edits": "forbidden"
+        },
+        "python_entries": [
+          {
+            "name": "COURSE_REGISTRY",
+            "required_fields": [
+              "label",
+              "hud_label",
+              "unlock_gate",
+              "lock_reason",
+              "beginner",
+              "frontstage_mode",
+              "capabilities"
+            ]
+          },
+          {
+            "name": "COURSE_FRAMES",
+            "required_fields": [
+              "course_id",
+              "course_context_text"
+            ],
+            "rule": "keys must exactly match COURSE_REGISTRY"
+          },
+          {
+            "name": "CURRICULUM",
+            "required_fields": [
+              "lesson_id",
+              "title",
+              "course_id",
+              "system_instruction_addendum",
+              "transcript_path"
+            ]
+          }
+        ],
+        "schema_version": 1,
+        "source_of_truth": {
+          "draft_preflight": "src/vibemix/learn/course_pack.py",
+          "draft_preflight_cli": "scripts/validate_learn_course_pack.py",
+          "frontend_projection": "tauri/ui/src/learn/lesson/curriculum-meta.ts",
+          "python_curriculum": "src/vibemix/learn/curriculum.py",
+          "transcript_root": "src/vibemix/learn/transcripts/"
+        },
+        "starter_template_contract": {
+          "copy_rules": [
+            "cite the observable control on every teaching and hint turn",
+            "do not promise automatic debrief opening"
+          ],
+          "default_input_surfaces": [
+            "hardware",
+            "screen"
+          ],
+          "frontstage": "one prompt, one action, one grounded response",
+          "post_merge_commands": [
+            "uv run python scripts/export_learn_curriculum_meta.py --check",
+            "uv run pytest -q tests/learn/test_course_pack.py",
+            "uv run python scripts/run_learn_perfection_package.py --out /tmp/vibemix-live-learn-proof/learn-perfection-package-current.json"
+          ],
+          "prompt_limits": {
+            "inline_lists_forbidden": true,
+            "max_chars": 150,
+            "max_sentences": 2,
+            "max_words": 24,
+            "single_line": true
+          },
+          "required_hint_count": 3,
+          "starter_expected_action": {
+            "control": "cue",
+            "deck": "A",
+            "direction": "down",
+            "type": "button"
+          },
+          "writes_manifest_authoring_contract": true
+        },
+        "transcript_inventory_contract": "every transcript JSON under src/vibemix/learn/transcripts is claimed by exactly one LessonMeta row, and every LessonMeta transcript_path exists",
+        "transcript_required_fields": [
+          "lesson_id",
+          "title",
+          "system_instruction_addendum",
+          "tutor_speak",
+          "expected_action",
+          "hints"
+        ],
+        "unlock_gate_contract": {
+          "progress_model": "src/vibemix/learn/progress.py:LearnProgress",
+          "rule": "CourseMeta.unlock_gate must be null or a boolean persisted by LearnProgress.to_dict(); adding a new locked course requires a progress-schema field and generated frontend projection.",
+          "supported_unlock_gates": [
+            "course_2_unlocked",
+            "course_3_unlocked"
+          ]
+        },
+        "verification_commands": [
+          "uv run python scripts/audit_learn_curriculum.py",
+          "uv run python scripts/export_learn_curriculum_meta.py --check",
+          "uv run python scripts/validate_learn_course_pack.py <course-pack.json>",
+          "uv run pytest -q tests/learn/test_course_pack.py",
+          "uv run pytest -q tests/learn/test_curriculum_audit.py",
+          "uv run pytest -q tests/learn/test_lesson_flow_contract.py",
+          "npm --prefix tauri/ui test -- tests/learn/test_curriculum_meta.spec.ts"
+        ]
+      },
+      "errors": [],
+      "flow_contract_summary": {
+        "backstage_lenses": [
+          "controller_state",
+          "cue_section_lookahead",
+          "debrief",
+          "dj_profile",
+          "evidence_registry",
+          "library_exemplars",
+          "library_suggestions",
+          "live_audio",
+          "prepared_pool",
+          "recital_observer",
+          "recovery_drill",
+          "session_recording",
+          "session_state"
+        ],
+        "beginner_flows_ok": true,
+        "beginner_lessons": 36,
+        "failing_lesson_ids": [],
+        "hint_grounding_contract": {
+          "cited_hint_turn_count": 228,
+          "failing_lesson_ids": [],
+          "grounded_hint_turn_count": 228,
+          "hint_turn_count": 228,
+          "ok": true
+        },
+        "input_surface_step_counts": {
+          "hardware+screen": 32,
+          "screen": 44
+        },
+        "input_surfaces": [
+          "hardware",
+          "screen"
+        ],
+        "min_hint_count": 3,
+        "observable_control_count": 18,
+        "prompt_contract": {
+          "exempt_step_ids": [
+            "L1.01.beat.3"
+          ],
+          "failing_lesson_ids": [],
+          "inline_lists_forbidden": true,
+          "max_chars": 150,
+          "max_sentences": 2,
+          "max_words": 24,
+          "observed_max_chars": 115,
+          "observed_max_sentences": 2,
+          "observed_max_words": 23,
+          "ok": true,
+          "single_line": true
+        },
+        "teaching_grounding_contract": {
+          "cited_teaching_turn_count": 76,
+          "failing_lesson_ids": [],
+          "grounded_teaching_turn_count": 76,
+          "ok": true,
+          "teaching_turn_count": 76
+        },
+        "total_steps": 76,
+        "verification_kind_counts": {
+          "button_press": 51,
+          "cc_delta": 25
+        }
+      },
+      "frontend_projection": {
+        "checked": false,
+        "path": null,
+        "up_to_date": null
+      },
+      "new_course_contract": [
+        "preflight the draft with validate_course_pack_draft before merging",
+        "add COURSE_REGISTRY metadata",
+        "keep course_id and lesson_id numbering canonical and contiguous",
+        "declare frontstage_mode and capabilities for every coded seam",
+        "add matching COURSE_FRAMES entry",
+        "add LessonMeta rows pointing at transcript JSON fixtures",
+        "keep lesson_id, title, and system_instruction_addendum byte-aligned",
+        "make every beginner lesson compile through build_lesson_flow",
+        "keep course capabilities covering every compiled backstage lens",
+        "keep learner-facing copy truthful about runtime-owned actions",
+        "run codegen:learn so the frontend projection stays generated"
+      ],
+      "passed": true,
+      "transcript_inventory": {
+        "declared_count": 37,
+        "duplicate_paths": [],
+        "fixture_count": 37,
+        "missing_paths": [],
+        "ok": true,
+        "orphan_paths": [],
+        "root": "/Users/ozai/projects/dj-set-ai/src/vibemix/learn/transcripts"
+      },
+      "unlock_gate_contract": {
+        "missing_lock_reason_course_ids": [],
+        "ok": true,
+        "progress_model": "src/vibemix/learn/progress.py:LearnProgress",
+        "supported_unlock_gates": [
+          "course_2_unlocked",
+          "course_3_unlocked"
+        ],
+        "unsupported_unlock_gates": [],
+        "used_unlock_gates": [
+          "course_2_unlocked",
+          "course_3_unlocked"
+        ]
+      },
+      "warnings": []
+    },
+    "desktop_quality": {
+      "commands": [
+        {
+          "command": "npm --prefix tauri/ui run build",
+          "duration_s": 4.072,
+          "name": "learn_tauri_frontend_dist_build",
+          "passed": true,
+          "returncode": 0
+        },
+        {
+          "command": "cargo fmt --manifest-path tauri/src-tauri/Cargo.toml --all -- --check",
+          "duration_s": 0.299,
+          "name": "learn_cargo_fmt",
+          "passed": true,
+          "returncode": 0
+        },
+        {
+          "command": "cargo check --manifest-path tauri/src-tauri/Cargo.toml",
+          "duration_s": 10.092,
+          "name": "learn_cargo_check",
+          "passed": true,
+          "returncode": 0
+        },
+        {
+          "command": "cargo test --manifest-path tauri/src-tauri/Cargo.toml learn_window",
+          "duration_s": 7.175,
+          "name": "learn_cargo_learn_window_test",
+          "passed": true,
+          "returncode": 0
+        },
+        {
+          "command": "cargo test --manifest-path tauri/src-tauri/Cargo.toml sidecar_audio_env_defaults",
+          "duration_s": 4.461,
+          "name": "learn_cargo_sidecar_audio_test",
+          "passed": true,
+          "returncode": 0
+        }
+      ],
+      "errors": [],
+      "generated_at": "2026-06-04T14:42:35.787300+00:00",
+      "operator_commands": {
+        "run": "uv run python scripts/run_learn_desktop_quality.py --out /tmp/vibemix-live-learn-proof/learn-desktop-quality-current.json",
+        "verify": "uv run python scripts/verify_learn_package.py --out /tmp/vibemix-live-learn-proof/learn-package-verification-current.json"
+      },
+      "passed": true,
+      "path": ".planning/eval-runs/learn-quality-current-20260604-054a6638/desktop-quality.json",
+      "required_commands": [
+        "learn_cargo_check",
+        "learn_cargo_fmt",
+        "learn_cargo_learn_window_test",
+        "learn_cargo_sidecar_audio_test",
+        "learn_tauri_frontend_dist_build"
+      ],
+      "status": "passed"
+    },
+    "exemplars": {
+      "approval_path": ".planning/eval-runs/learn-exemplar-playback-current-20260604-45e96150/ear-pass-approval.json",
+      "bank_fingerprint": {
+        "algorithm": "sha256-canonical-json-v1",
+        "digest": "34e7aafe568b2e8badecb75fd28e0a8bd710f4fd1b1f2d84e7ff4a78584096e9",
+        "manifest_sha256": "8d8ae0dd1e418babb900dc70c3335829eae27629e9f8b5e6591721c435decd58",
+        "track_count": 4
+      },
+      "diagnosis": {
+        "code": "technical_and_ear_pass_approved",
+        "message": "Packaged exemplar WAV integrity and human ear-pass are approved.",
+        "next_action": "keep approval artifact with release evidence",
+        "severity": "approved"
+      },
+      "human_ear_pass": {
+        "approved": true,
+        "artifact": {
+          "approved": true,
+          "approved_at": "2026-06-04T14:56:48.021888+00:00",
+          "approved_by": "Kaan \u00d6zkan",
+          "bank_dir": "/Users/ozai/projects/dj-set-ai/src/vibemix/learn/assets/band_exemplars",
+          "bank_fingerprint": {
+            "algorithm": "sha256-canonical-json-v1",
+            "digest": "34e7aafe568b2e8badecb75fd28e0a8bd710f4fd1b1f2d84e7ff4a78584096e9",
+            "manifest_sha256": "8d8ae0dd1e418babb900dc70c3335829eae27629e9f8b5e6591721c435decd58",
+            "track_count": 4
+          },
+          "notes": "",
+          "proof": "learn_exemplar_ear_pass",
+          "schema_version": 1,
+          "tracks": [
+            {
+              "band": "high",
+              "rel": "high/vibemix_internal_high_hat_air.wav",
+              "sha256": "7dcec4764229732452c409e7bcf218fa7ff806652ae169250a663cc988fb1beb",
+              "title": "High Hat Air Practice Loop"
+            },
+            {
+              "band": "low",
+              "rel": "low/vibemix_internal_low_bass_gate.wav",
+              "sha256": "c8aa0d1c75996f986792620315045497ddccbee2211ecdf0757bea066055879d",
+              "title": "Low Bass Gate Practice Loop"
+            },
+            {
+              "band": "mid",
+              "rel": "mid/vibemix_internal_mid_chord_body.wav",
+              "sha256": "035366690293506dc06bcd00b7661037613ed4be1a5adfa84a3e190c272bbbfe",
+              "title": "Mid Chord Body Practice Loop"
+            },
+            {
+              "band": "sub",
+              "rel": "sub/vibemix_internal_sub_pulse.wav",
+              "sha256": "fef218a73244062893143e2ceb00e332c4c8e08d99e49e66de558407c08e73c5",
+              "title": "Sub Pulse Practice Loop"
+            }
+          ]
+        },
+        "errors": [],
+        "path": ".planning/eval-runs/learn-exemplar-playback-current-20260604-45e96150/ear-pass-approval.json"
+      },
+      "human_ear_pass_required": false,
+      "operator_action": {
+        "prompt": "Choose an audible output, listen to the four EQ exemplar loops, then approve or replace them.",
+        "recommended_output_devices": [],
+        "steps": [
+          "uv run python scripts/audition_learn_exemplars.py --list-devices",
+          "uv run python scripts/audition_learn_exemplars.py --play --device-index <output-device-index> --say-prompts --out /tmp/vibemix-live-learn-proof/learn-exemplar-audition-current.json",
+          "uv run python scripts/audition_learn_exemplars.py --approve-ear-pass --approved-by <name> --audition /tmp/vibemix-live-learn-proof/learn-exemplar-audition-current.json --approval-out /tmp/vibemix-live-learn-proof/learn-exemplar-ear-pass-current.json",
+          "uv run python scripts/verify_learn_package.py --out /tmp/vibemix-live-learn-proof/learn-package-verification-current.json"
+        ]
+      },
+      "operator_commands": {
+        "approve": "uv run python scripts/audition_learn_exemplars.py --approve-ear-pass --approved-by <name> --audition /tmp/vibemix-live-learn-proof/learn-exemplar-audition-current.json --approval-out /tmp/vibemix-live-learn-proof/learn-exemplar-ear-pass-current.json",
+        "list_output_devices": "uv run python scripts/audition_learn_exemplars.py --list-devices",
+        "play": "uv run python scripts/audition_learn_exemplars.py --play --device-index <output-device-index> --say-prompts --out /tmp/vibemix-live-learn-proof/learn-exemplar-audition-current.json",
+        "verify": "uv run python scripts/verify_learn_package.py --out /tmp/vibemix-live-learn-proof/learn-package-verification-current.json"
+      },
+      "output_device_error": null,
+      "output_devices": null,
+      "release_ready": true,
+      "technical_failures": [],
+      "technical_passed": true,
+      "track_count": 4
+    },
+    "frontend_quality": {
+      "commands": [
+        {
+          "command": "npm --prefix tauri/ui test -- tests/learn/test_beginner_path_contract.spec.ts tests/session/render-loop-actions.spec.ts tests/shell/shell.spec.ts",
+          "duration_s": 1.663,
+          "name": "learn_app_entry_vitest",
+          "passed": true,
+          "returncode": 0
+        },
+        {
+          "command": "npm --prefix tauri/ui test -- tests/learn/test_practice_booth_shell.spec.ts tests/learn/test_tutor_speak_sr_announcement.spec.ts",
+          "duration_s": 1.562,
+          "name": "learn_frontstage_simplicity_vitest",
+          "passed": true,
+          "returncode": 0
+        },
+        {
+          "command": "npm --prefix tauri/ui test -- tests/learn/test_learn_window_label.spec.ts",
+          "duration_s": 0.806,
+          "name": "learn_tauri_window_vitest",
+          "passed": true,
+          "returncode": 0
+        },
+        {
+          "command": "npm --prefix tauri/ui test -- tests/learn/test_progress_list.spec.ts tests/learn/test_curriculum_meta.spec.ts tests/learn/test_hud_progress_dots_keyboard.spec.ts",
+          "duration_s": 1.144,
+          "name": "learn_choice_replay_vitest",
+          "passed": true,
+          "returncode": 0
+        },
+        {
+          "command": "npm --prefix tauri/ui test -- tests/learn",
+          "duration_s": 3.304,
+          "name": "learn_vitest",
+          "passed": true,
+          "returncode": 0
+        },
+        {
+          "command": "npm --prefix tauri/ui run build",
+          "duration_s": 4.022,
+          "name": "learn_build",
+          "passed": true,
+          "returncode": 0
+        },
+        {
+          "command": "npm --prefix tauri/ui run test:e2e:learn -- tests/learn/browser-axe.pw.ts tests/learn/browser-responsive.pw.ts tests/learn/browser-contrast.pw.ts tests/learn/browser-python-beginner-path.pw.ts",
+          "duration_s": 39.96,
+          "name": "learn_browser_booth_playwright",
+          "passed": false,
+          "returncode": 1
+        },
+        {
+          "command": "npm --prefix tauri/ui run test:e2e:learn",
+          "duration_s": 40.91,
+          "name": "learn_e2e",
+          "passed": false,
+          "returncode": 1
+        }
+      ],
+      "errors": [
+        "frontend quality command rows failed: learn_browser_booth_playwright, learn_e2e",
+        "passed is not true"
+      ],
+      "generated_at": "2026-06-04T14:41:50.711637+00:00",
+      "operator_commands": {
+        "run": "uv run python scripts/run_learn_frontend_quality.py --out /tmp/vibemix-live-learn-proof/learn-frontend-quality-current.json",
+        "verify": "uv run python scripts/verify_learn_package.py --out /tmp/vibemix-live-learn-proof/learn-package-verification-current.json"
+      },
+      "passed": false,
+      "path": ".planning/eval-runs/learn-quality-current-20260604-054a6638/frontend-quality.json",
+      "required_commands": [
+        "learn_app_entry_vitest",
+        "learn_browser_booth_playwright",
+        "learn_build",
+        "learn_choice_replay_vitest",
+        "learn_e2e",
+        "learn_frontstage_simplicity_vitest",
+        "learn_tauri_window_vitest",
+        "learn_vitest"
+      ],
+      "status": "failed"
+    },
+    "launched_tauri_smoke": {
+      "completed_lesson_id": "L1.01",
+      "errors": [
+        "passed is not true",
+        "quality_ok is not true",
+        "quality failures are present"
+      ],
+      "l101_completed": true,
+      "passed": false,
+      "path": ".planning/eval-runs/learn-tauri-smoke-current-20260604-054a6638/tauri-smoke-failed.json",
+      "quality_check_count": 19,
+      "quality_ok": false,
+      "status": "failed"
+    },
+    "live_proofs": {
+      "course3": {
+        "attempts": [
+          {
+            "auto_master_recommendation": {
+              "candidates": [
+                {
+                  "dj_capture": true,
+                  "expected_sample_rate": 48000,
+                  "live_signal": false,
+                  "loopback": false,
+                  "name": "DDJ-FLX4",
+                  "rank": 1,
+                  "rate_ok": true,
+                  "reasons": [
+                    "saved_rekordbox_route",
+                    "unsampled_route"
+                  ],
+                  "sample_rate": 48000,
+                  "sampled": false,
+                  "signal": false,
+                  "source": "rekordbox_audio_settings",
+                  "sources": [
+                    "rekordbox_audio_settings"
+                  ]
+                },
+                {
+                  "dj_capture": false,
+                  "expected_sample_rate": 48000,
+                  "live_signal": false,
+                  "loopback": false,
+                  "name": "MacBook Pro Speakers (eqMac)",
+                  "rank": 2,
+                  "rate_ok": false,
+                  "reasons": [
+                    "macos_output_route",
+                    "unsampled_route"
+                  ],
+                  "sample_rate": null,
+                  "sampled": false,
+                  "signal": false,
+                  "source": "macos_output_route",
+                  "sources": [
+                    "macos_output_route"
+                  ]
+                }
+              ],
+              "device_name": null,
+              "expected_sample_rate": 48000,
+              "live_signal": false,
+              "next_action": "Connect or create a 48000Hz loopback master capture input.",
+              "ok": false,
+              "reason": "no_usable_capture_input",
+              "sample_rate": null,
+              "source": null,
+              "status": "no_candidate"
+            },
+            "diagnosis": {
+              "code": "course3_audio_context_incomplete",
+              "message": "Course 3 audio context is not proven yet.",
+              "next_action": "Run readiness with live context and audio diagnostics enabled.",
+              "severity": "unknown"
+            },
+            "path": ".planning/eval-runs/learn-screen-path-current-20260604-16a547dd/proof.json",
+            "physical_connection_doctor": null,
+            "playback_nudge": {
+              "reason": "--course3 not set",
+              "status": "skipped"
+            },
+            "probe_operator_action": null,
+            "route_plan": {
+              "auto_master_fallback_candidate": null,
+              "auto_master_fallback_device": null,
+              "auto_master_fallback_rejected_reason": null,
+              "auto_master_fallback_source": null,
+              "auto_master_input": false,
+              "input_device": null
+            },
+            "strict_errors": [
+              "course3_probe skipped: --course3 not set"
+            ],
+            "strict_valid": false,
+            "unavailable_errors": [
+              "course3_probe skipped: --course3 not set"
+            ],
+            "unavailable_valid": false
+          },
+          {
+            "auto_master_recommendation": null,
+            "diagnosis": null,
+            "path": ".planning/eval-runs/learn-course1-head-proof-current-20260604-2a0d93ee/summary.json",
+            "physical_connection_doctor": null,
+            "playback_nudge": null,
+            "probe_operator_action": null,
+            "route_plan": null,
+            "strict_errors": [
+              "schema_version is not 1",
+              "stages object missing",
+              "course3_probe did not pass",
+              "course3_probe.result.passed is not true",
+              "course3 proof saw no lens frames",
+              "course3 proof did not see active Course 3",
+              "course3 proof did not see count-in evidence",
+              "course3 proof has no last_lens object"
+            ],
+            "strict_valid": false,
+            "unavailable_errors": [
+              "schema_version is not 1",
+              "stages object missing",
+              "course3_probe did not pass",
+              "course3_probe.result.passed is not true",
+              "course3 proof saw no lens frames",
+              "course3 proof did not see active Course 3",
+              "course3 proof did not see count-in evidence",
+              "course3 proof has no last_lens object"
+            ],
+            "unavailable_valid": false
+          },
+          {
+            "auto_master_recommendation": null,
+            "diagnosis": null,
+            "path": ".planning/eval-runs/learn-l210-cue-playhead-proof-20260604-5a7bdb05/summary.json",
+            "physical_connection_doctor": null,
+            "playback_nudge": null,
+            "probe_operator_action": null,
+            "route_plan": null,
+            "strict_errors": [
+              "schema_version is not 1",
+              "stages object missing",
+              "course3_probe did not pass",
+              "course3_probe.result.passed is not true",
+              "course3 proof saw no lens frames",
+              "course3 proof did not see active Course 3",
+              "course3 proof did not see count-in evidence",
+              "course3 proof has no last_lens object"
+            ],
+            "strict_valid": false,
+            "unavailable_errors": [
+              "schema_version is not 1",
+              "stages object missing",
+              "course3_probe did not pass",
+              "course3_probe.result.passed is not true",
+              "course3 proof saw no lens frames",
+              "course3 proof did not see active Course 3",
+              "course3 proof did not see count-in evidence",
+              "course3 proof has no last_lens object"
+            ],
+            "unavailable_valid": false
+          },
+          {
+            "auto_master_recommendation": null,
+            "diagnosis": null,
+            "path": ".planning/eval-runs/learn-l109-master-vol-audio-proof-20260604-9a52eb03/summary.json",
+            "physical_connection_doctor": null,
+            "playback_nudge": null,
+            "probe_operator_action": null,
+            "route_plan": null,
+            "strict_errors": [
+              "schema_version is not 1",
+              "stages object missing",
+              "course3_probe did not pass",
+              "course3_probe.result.passed is not true",
+              "course3 proof saw no lens frames",
+              "course3 proof did not see active Course 3",
+              "course3 proof did not see count-in evidence",
+              "course3 proof has no last_lens object"
+            ],
+            "strict_valid": false,
+            "unavailable_errors": [
+              "schema_version is not 1",
+              "stages object missing",
+              "course3_probe did not pass",
+              "course3_probe.result.passed is not true",
+              "course3 proof saw no lens frames",
+              "course3 proof did not see active Course 3",
+              "course3 proof did not see count-in evidence",
+              "course3 proof has no last_lens object"
+            ],
+            "unavailable_valid": false
+          },
+          {
+            "auto_master_recommendation": null,
+            "diagnosis": null,
+            "path": ".planning/eval-runs/learn-l211-harmonic-practice-proof-20260604-47982741/summary.json",
+            "physical_connection_doctor": null,
+            "playback_nudge": null,
+            "probe_operator_action": null,
+            "route_plan": null,
+            "strict_errors": [
+              "schema_version is not 1",
+              "stages object missing",
+              "course3_probe did not pass",
+              "course3_probe.result.passed is not true",
+              "course3 proof saw no lens frames",
+              "course3 proof did not see active Course 3",
+              "course3 proof did not see count-in evidence",
+              "course3 proof has no last_lens object"
+            ],
+            "strict_valid": false,
+            "unavailable_errors": [
+              "schema_version is not 1",
+              "stages object missing",
+              "course3_probe did not pass",
+              "course3_probe.result.passed is not true",
+              "course3 proof saw no lens frames",
+              "course3 proof did not see active Course 3",
+              "course3 proof did not see count-in evidence",
+              "course3 proof has no last_lens object"
+            ],
+            "unavailable_valid": false
+          },
+          {
+            "auto_master_recommendation": {
+              "candidates": [
+                {
+                  "dj_capture": false,
+                  "expected_sample_rate": 48000,
+                  "live_signal": false,
+                  "loopback": false,
+                  "name": "Multi-Output Device",
+                  "rank": 1,
+                  "rate_ok": true,
+                  "reasons": [
+                    "saved_rekordbox_route",
+                    "unsampled_route"
+                  ],
+                  "sample_rate": 48000,
+                  "sampled": false,
+                  "signal": false,
+                  "source": "rekordbox_audio_settings",
+                  "sources": [
+                    "rekordbox_audio_settings"
+                  ]
+                },
+                {
+                  "dj_capture": false,
+                  "expected_sample_rate": 48000,
+                  "live_signal": false,
+                  "loopback": false,
+                  "name": "MacBook Pro Speakers (eqMac)",
+                  "rank": 2,
+                  "rate_ok": false,
+                  "reasons": [
+                    "macos_output_route",
+                    "unsampled_route"
+                  ],
+                  "sample_rate": null,
+                  "sampled": false,
+                  "signal": false,
+                  "source": "macos_output_route",
+                  "sources": [
+                    "macos_output_route"
+                  ]
+                }
+              ],
+              "device_name": null,
+              "expected_sample_rate": 48000,
+              "live_signal": false,
+              "next_action": "Connect or create a 48000Hz loopback master capture input.",
+              "ok": false,
+              "reason": "no_usable_capture_input",
+              "sample_rate": null,
+              "source": null,
+              "status": "no_candidate"
+            },
+            "diagnosis": {
+              "code": "course3_audio_context_incomplete",
+              "message": "Course 3 audio context is not proven yet.",
+              "next_action": "Run readiness with live context and audio diagnostics enabled.",
+              "severity": "unknown"
+            },
+            "path": ".planning/eval-runs/learn-physical-retry-current-20260604-e4e7c1f8/physical-proof.json",
+            "physical_connection_doctor": null,
+            "playback_nudge": {
+              "reason": "--course3 not set",
+              "status": "skipped"
+            },
+            "probe_operator_action": null,
+            "route_plan": {
+              "auto_master_fallback_candidate": null,
+              "auto_master_fallback_device": null,
+              "auto_master_fallback_rejected_reason": null,
+              "auto_master_fallback_source": null,
+              "auto_master_input": true,
+              "input_device": null,
+              "selected_input": {
+                "live_signal": true,
+                "name": "BlackHole 2ch",
+                "reason": "live_signal",
+                "sample_rate": 48000
+              }
+            },
+            "strict_errors": [
+              "course3_probe skipped: --course3 not set"
+            ],
+            "strict_valid": false,
+            "unavailable_errors": [
+              "course3_probe skipped: --course3 not set"
+            ],
+            "unavailable_valid": false
+          }
+        ],
+        "auto_master_recommendation": {
+          "candidates": [
+            {
+              "dj_capture": true,
+              "expected_sample_rate": 48000,
+              "live_signal": false,
+              "loopback": false,
+              "name": "DDJ-FLX4",
+              "rank": 1,
+              "rate_ok": true,
+              "reasons": [
+                "saved_rekordbox_route",
+                "unsampled_route"
+              ],
+              "sample_rate": 48000,
+              "sampled": false,
+              "signal": false,
+              "source": "rekordbox_audio_settings",
+              "sources": [
+                "rekordbox_audio_settings"
+              ]
+            },
+            {
+              "dj_capture": false,
+              "expected_sample_rate": 48000,
+              "live_signal": false,
+              "loopback": false,
+              "name": "MacBook Pro Speakers (eqMac)",
+              "rank": 2,
+              "rate_ok": false,
+              "reasons": [
+                "macos_output_route",
+                "unsampled_route"
+              ],
+              "sample_rate": null,
+              "sampled": false,
+              "signal": false,
+              "source": "macos_output_route",
+              "sources": [
+                "macos_output_route"
+              ]
+            }
+          ],
+          "device_name": null,
+          "expected_sample_rate": 48000,
+          "live_signal": false,
+          "next_action": "Connect or create a 48000Hz loopback master capture input.",
+          "ok": false,
+          "reason": "no_usable_capture_input",
+          "sample_rate": null,
+          "source": null,
+          "status": "no_candidate"
+        },
+        "blockers": [
+          "course3_probe skipped: --course3 not set",
+          "schema_version is not 1",
+          "stages object missing",
+          "course3_probe did not pass",
+          "course3_probe.result.passed is not true",
+          "course3 proof saw no lens frames",
+          "course3 proof did not see active Course 3",
+          "course3 proof did not see count-in evidence",
+          "course3 proof has no last_lens object"
+        ],
+        "diagnosis": {
+          "code": "course3_audio_context_incomplete",
+          "message": "Course 3 audio context is not proven yet.",
+          "next_action": "Run readiness with live context and audio diagnostics enabled.",
+          "severity": "unknown"
+        },
+        "operator_commands": {
+          "current_fallback_candidate": {
+            "live_signal": false,
+            "name": null,
+            "reason": "no_usable_capture_input",
+            "sample_rate": null,
+            "source": null
+          },
+          "current_selected_input": null,
+          "manual_action": "Run readiness with live context and audio diagnostics enabled.",
+          "operator_action": {
+            "prompt": "Run readiness with live context and audio diagnostics enabled.",
+            "route": "a 48000Hz BlackHole or loopback input",
+            "steps": [
+              "Stop unrelated browser/system audio so deck attribution can point at Rekordbox.",
+              "Route Rekordbox master/output audio to a 48000Hz BlackHole or loopback input.",
+              "Load and play a real Rekordbox library track.",
+              "Raise the playing channel fader and master until loopback capture has signal.",
+              "Rerun the Course 3 proof command; it will speak the route/playback moment."
+            ]
+          },
+          "proof": "uv run python scripts/run_learn_live_proof.py --start-app --no-screen --course3 --seed-course3-unlocked --auto-master-input --nudge-rekordbox-playback --require-count-in --say-course3-prompts --wait-loopback-signal-seconds 30 --wait-capture-signal-seconds 30 --wait-course3-seconds 120 --course3-context-seconds 5 --loopback-signal-seconds 2 --loopback-self-test-seconds 1 --capture-matrix-seconds 2 --out /tmp/vibemix-live-learn-proof/proof-course3-auto-master-current.json",
+          "readiness": "uv run python scripts/learn_live_readiness.py --require course3 --live-context-seconds 5 --loopback-signal-seconds 2 --loopback-self-test-seconds 1 --capture-matrix-seconds 2 --out /tmp/vibemix-live-learn-proof/learn-course3-readiness-current.json",
+          "verify": "uv run python scripts/verify_learn_package.py --out /tmp/vibemix-live-learn-proof/learn-package-verification-current.json"
+        },
+        "passed": false,
+        "path": null,
+        "physical_connection_doctor": null,
+        "playback_nudge": {
+          "reason": "--course3 not set",
+          "status": "skipped"
+        },
+        "probe_operator_action": null,
+        "route_plan": {
+          "auto_master_fallback_candidate": null,
+          "auto_master_fallback_device": null,
+          "auto_master_fallback_rejected_reason": null,
+          "auto_master_fallback_source": null,
+          "auto_master_input": false,
+          "input_device": null
+        },
+        "status": "failed"
+      },
+      "physical": {
+        "attempts": [
+          {
+            "auto_master_recommendation": null,
+            "diagnosis": null,
+            "path": ".planning/eval-runs/learn-screen-path-current-20260604-16a547dd/proof.json",
+            "physical_connection_doctor": null,
+            "playback_nudge": null,
+            "probe_operator_action": null,
+            "route_plan": null,
+            "strict_errors": [
+              "physical_probe skipped: --physical not set"
+            ],
+            "strict_valid": false,
+            "unavailable_errors": [
+              "physical_probe skipped: --physical not set"
+            ],
+            "unavailable_valid": false
+          },
+          {
+            "auto_master_recommendation": null,
+            "diagnosis": null,
+            "path": ".planning/eval-runs/learn-course1-head-proof-current-20260604-2a0d93ee/summary.json",
+            "physical_connection_doctor": null,
+            "playback_nudge": null,
+            "probe_operator_action": null,
+            "route_plan": null,
+            "strict_errors": [
+              "schema_version is not 1",
+              "stages object missing",
+              "physical_probe did not pass",
+              "physical_probe.result.passed is not true",
+              "physical proof lesson_id is not L1.07",
+              "physical proof control_id is not jog:A",
+              "physical proof did not load the lesson",
+              "physical proof did not see the jog position",
+              "physical proof did not send ACK",
+              "physical proof did not see advance"
+            ],
+            "strict_valid": false,
+            "unavailable_errors": [
+              "schema_version is not 1",
+              "stages object missing",
+              "physical_probe did not pass",
+              "physical_probe.result.passed is not true",
+              "physical proof lesson_id is not L1.07",
+              "physical proof control_id is not jog:A",
+              "physical proof did not load the lesson",
+              "physical proof did not see the jog position",
+              "physical proof did not send ACK",
+              "physical proof did not see advance"
+            ],
+            "unavailable_valid": false
+          },
+          {
+            "auto_master_recommendation": null,
+            "diagnosis": null,
+            "path": ".planning/eval-runs/learn-l210-cue-playhead-proof-20260604-5a7bdb05/summary.json",
+            "physical_connection_doctor": null,
+            "playback_nudge": null,
+            "probe_operator_action": null,
+            "route_plan": null,
+            "strict_errors": [
+              "schema_version is not 1",
+              "stages object missing",
+              "physical_probe did not pass",
+              "physical_probe.result.passed is not true",
+              "physical proof lesson_id is not L1.07",
+              "physical proof control_id is not jog:A",
+              "physical proof did not load the lesson",
+              "physical proof did not see the jog position",
+              "physical proof did not send ACK",
+              "physical proof did not see advance"
+            ],
+            "strict_valid": false,
+            "unavailable_errors": [
+              "schema_version is not 1",
+              "stages object missing",
+              "physical_probe did not pass",
+              "physical_probe.result.passed is not true",
+              "physical proof lesson_id is not L1.07",
+              "physical proof control_id is not jog:A",
+              "physical proof did not load the lesson",
+              "physical proof did not see the jog position",
+              "physical proof did not send ACK",
+              "physical proof did not see advance"
+            ],
+            "unavailable_valid": false
+          },
+          {
+            "auto_master_recommendation": null,
+            "diagnosis": null,
+            "path": ".planning/eval-runs/learn-l109-master-vol-audio-proof-20260604-9a52eb03/summary.json",
+            "physical_connection_doctor": null,
+            "playback_nudge": null,
+            "probe_operator_action": null,
+            "route_plan": null,
+            "strict_errors": [
+              "schema_version is not 1",
+              "stages object missing",
+              "physical_probe did not pass",
+              "physical_probe.result.passed is not true",
+              "physical proof lesson_id is not L1.07",
+              "physical proof control_id is not jog:A",
+              "physical proof did not load the lesson",
+              "physical proof did not see the jog position",
+              "physical proof did not send ACK",
+              "physical proof did not see advance"
+            ],
+            "strict_valid": false,
+            "unavailable_errors": [
+              "schema_version is not 1",
+              "stages object missing",
+              "physical_probe did not pass",
+              "physical_probe.result.passed is not true",
+              "physical proof lesson_id is not L1.07",
+              "physical proof control_id is not jog:A",
+              "physical proof did not load the lesson",
+              "physical proof did not see the jog position",
+              "physical proof did not send ACK",
+              "physical proof did not see advance"
+            ],
+            "unavailable_valid": false
+          },
+          {
+            "auto_master_recommendation": null,
+            "diagnosis": null,
+            "path": ".planning/eval-runs/learn-l211-harmonic-practice-proof-20260604-47982741/summary.json",
+            "physical_connection_doctor": null,
+            "playback_nudge": null,
+            "probe_operator_action": null,
+            "route_plan": null,
+            "strict_errors": [
+              "schema_version is not 1",
+              "stages object missing",
+              "physical_probe did not pass",
+              "physical_probe.result.passed is not true",
+              "physical proof lesson_id is not L1.07",
+              "physical proof control_id is not jog:A",
+              "physical proof did not load the lesson",
+              "physical proof did not see the jog position",
+              "physical proof did not send ACK",
+              "physical proof did not see advance"
+            ],
+            "strict_valid": false,
+            "unavailable_errors": [
+              "schema_version is not 1",
+              "stages object missing",
+              "physical_probe did not pass",
+              "physical_probe.result.passed is not true",
+              "physical proof lesson_id is not L1.07",
+              "physical proof control_id is not jog:A",
+              "physical proof did not load the lesson",
+              "physical proof did not see the jog position",
+              "physical proof did not send ACK",
+              "physical proof did not see advance"
+            ],
+            "unavailable_valid": false
+          },
+          {
+            "auto_master_recommendation": null,
+            "diagnosis": {
+              "code": "physical_l1_07_proven",
+              "message": "L1.07 loaded, left jog was observed, ACK was sent, and advance was seen.",
+              "operator_action": {
+                "prompt": "Physical L1.07 proof is complete.",
+                "steps": []
+              }
+            },
+            "path": ".planning/eval-runs/learn-physical-retry-current-20260604-e4e7c1f8/physical-proof.json",
+            "physical_connection_doctor": {
+              "hardware_connection": {
+                "bluetooth_midi_matches": [],
+                "bluetooth_midi_only": false,
+                "controller_hardware_ready": true
+              },
+              "next_step": "Nudge the left jog wheel during the active L1.07 proof window.",
+              "ok": true,
+              "operator_steps": [
+                "Nudge the left jog wheel during the active L1.07 proof window."
+              ],
+              "proof_command": "uv run python scripts/run_learn_live_proof.py --start-app --no-screen --physical --wait-physical-seconds 30 --physical-seconds 40 --say-physical-prompts --auto-master-input --out /tmp/vibemix-live-learn-proof/proof-physical-ddj-current.json",
+              "readiness_command": "uv run python scripts/learn_live_readiness.py --require physical --out /tmp/vibemix-live-learn-proof/learn-physical-readiness-current.json",
+              "status": "ready",
+              "uses_spoken_prompt": true
+            },
+            "playback_nudge": null,
+            "probe_operator_action": null,
+            "route_plan": null,
+            "strict_errors": [],
+            "strict_valid": true,
+            "unavailable_errors": [],
+            "unavailable_valid": true
+          }
+        ],
+        "auto_master_recommendation": null,
+        "blockers": [],
+        "diagnosis": {
+          "code": "physical_l1_07_proven",
+          "message": "L1.07 loaded, left jog was observed, ACK was sent, and advance was seen.",
+          "operator_action": {
+            "prompt": "Physical L1.07 proof is complete.",
+            "steps": []
+          }
+        },
+        "operator_commands": {
+          "list_controller": "uv run python scripts/sniff_controller.py --list",
+          "manual_action": "Physical L1.07 proof is complete.",
+          "operator_action": {
+            "prompt": "Physical L1.07 proof is complete.",
+            "steps": []
+          },
+          "physical_connection_doctor": {
+            "hardware_connection": {
+              "bluetooth_midi_matches": [],
+              "bluetooth_midi_only": false,
+              "controller_hardware_ready": true
+            },
+            "next_step": "Nudge the left jog wheel during the active L1.07 proof window.",
+            "ok": true,
+            "operator_steps": [
+              "Nudge the left jog wheel during the active L1.07 proof window."
+            ],
+            "proof_command": "uv run python scripts/run_learn_live_proof.py --start-app --no-screen --physical --wait-physical-seconds 30 --physical-seconds 40 --say-physical-prompts --auto-master-input --out /tmp/vibemix-live-learn-proof/proof-physical-ddj-current.json",
+            "readiness_command": "uv run python scripts/learn_live_readiness.py --require physical --out /tmp/vibemix-live-learn-proof/learn-physical-readiness-current.json",
+            "status": "ready",
+            "uses_spoken_prompt": true
+          },
+          "proof": "uv run python scripts/run_learn_live_proof.py --start-app --no-screen --physical --wait-physical-seconds 30 --physical-seconds 40 --say-physical-prompts --auto-master-input --out /tmp/vibemix-live-learn-proof/proof-physical-ddj-current.json",
+          "readiness": "uv run python scripts/learn_live_readiness.py --require physical --out /tmp/vibemix-live-learn-proof/learn-physical-readiness-current.json",
+          "verify": "uv run python scripts/verify_learn_package.py --out /tmp/vibemix-live-learn-proof/learn-package-verification-current.json"
+        },
+        "passed": true,
+        "path": ".planning/eval-runs/learn-physical-retry-current-20260604-e4e7c1f8/physical-proof.json",
+        "physical_connection_doctor": {
+          "hardware_connection": {
+            "bluetooth_midi_matches": [],
+            "bluetooth_midi_only": false,
+            "controller_hardware_ready": true
+          },
+          "next_step": "Nudge the left jog wheel during the active L1.07 proof window.",
+          "ok": true,
+          "operator_steps": [
+            "Nudge the left jog wheel during the active L1.07 proof window."
+          ],
+          "proof_command": "uv run python scripts/run_learn_live_proof.py --start-app --no-screen --physical --wait-physical-seconds 30 --physical-seconds 40 --say-physical-prompts --auto-master-input --out /tmp/vibemix-live-learn-proof/proof-physical-ddj-current.json",
+          "readiness_command": "uv run python scripts/learn_live_readiness.py --require physical --out /tmp/vibemix-live-learn-proof/learn-physical-readiness-current.json",
+          "status": "ready",
+          "uses_spoken_prompt": true
+        },
+        "playback_nudge": null,
+        "probe_operator_action": null,
+        "route_plan": null,
+        "status": "passed"
+      },
+      "screen": {
+        "attempts": [
+          {
+            "auto_master_recommendation": null,
+            "diagnosis": null,
+            "path": ".planning/eval-runs/learn-screen-path-current-20260604-16a547dd/proof.json",
+            "physical_connection_doctor": null,
+            "playback_nudge": null,
+            "probe_operator_action": null,
+            "route_plan": null,
+            "strict_errors": [],
+            "strict_valid": true,
+            "unavailable_errors": [],
+            "unavailable_valid": true
+          },
+          {
+            "auto_master_recommendation": null,
+            "diagnosis": null,
+            "path": ".planning/eval-runs/learn-course1-head-proof-current-20260604-2a0d93ee/summary.json",
+            "physical_connection_doctor": null,
+            "playback_nudge": null,
+            "probe_operator_action": null,
+            "route_plan": null,
+            "strict_errors": [
+              "schema_version is not 1",
+              "stages object missing",
+              "screen_probe did not pass",
+              "screen_probe.result.passed is not true",
+              "screen proof sent fewer than 4 ACKs",
+              "screen proof saw fewer than 4 advances",
+              "screen proof did not see completion",
+              "screen proof did not see completed progress",
+              "progress_file stage did not pass",
+              "progress_file does not show L1.01 completed"
+            ],
+            "strict_valid": false,
+            "unavailable_errors": [
+              "schema_version is not 1",
+              "stages object missing",
+              "screen_probe did not pass",
+              "screen_probe.result.passed is not true",
+              "screen proof sent fewer than 4 ACKs",
+              "screen proof saw fewer than 4 advances",
+              "screen proof did not see completion",
+              "screen proof did not see completed progress",
+              "progress_file stage did not pass",
+              "progress_file does not show L1.01 completed"
+            ],
+            "unavailable_valid": false
+          },
+          {
+            "auto_master_recommendation": null,
+            "diagnosis": null,
+            "path": ".planning/eval-runs/learn-l210-cue-playhead-proof-20260604-5a7bdb05/summary.json",
+            "physical_connection_doctor": null,
+            "playback_nudge": null,
+            "probe_operator_action": null,
+            "route_plan": null,
+            "strict_errors": [
+              "schema_version is not 1",
+              "stages object missing",
+              "screen_probe did not pass",
+              "screen_probe.result.passed is not true",
+              "screen proof sent fewer than 4 ACKs",
+              "screen proof saw fewer than 4 advances",
+              "screen proof did not see completion",
+              "screen proof did not see completed progress",
+              "progress_file stage did not pass",
+              "progress_file does not show L1.01 completed"
+            ],
+            "strict_valid": false,
+            "unavailable_errors": [
+              "schema_version is not 1",
+              "stages object missing",
+              "screen_probe did not pass",
+              "screen_probe.result.passed is not true",
+              "screen proof sent fewer than 4 ACKs",
+              "screen proof saw fewer than 4 advances",
+              "screen proof did not see completion",
+              "screen proof did not see completed progress",
+              "progress_file stage did not pass",
+              "progress_file does not show L1.01 completed"
+            ],
+            "unavailable_valid": false
+          },
+          {
+            "auto_master_recommendation": null,
+            "diagnosis": null,
+            "path": ".planning/eval-runs/learn-l109-master-vol-audio-proof-20260604-9a52eb03/summary.json",
+            "physical_connection_doctor": null,
+            "playback_nudge": null,
+            "probe_operator_action": null,
+            "route_plan": null,
+            "strict_errors": [
+              "schema_version is not 1",
+              "stages object missing",
+              "screen_probe did not pass",
+              "screen_probe.result.passed is not true",
+              "screen proof sent fewer than 4 ACKs",
+              "screen proof saw fewer than 4 advances",
+              "screen proof did not see completion",
+              "screen proof did not see completed progress",
+              "progress_file stage did not pass",
+              "progress_file does not show L1.01 completed"
+            ],
+            "strict_valid": false,
+            "unavailable_errors": [
+              "schema_version is not 1",
+              "stages object missing",
+              "screen_probe did not pass",
+              "screen_probe.result.passed is not true",
+              "screen proof sent fewer than 4 ACKs",
+              "screen proof saw fewer than 4 advances",
+              "screen proof did not see completion",
+              "screen proof did not see completed progress",
+              "progress_file stage did not pass",
+              "progress_file does not show L1.01 completed"
+            ],
+            "unavailable_valid": false
+          },
+          {
+            "auto_master_recommendation": null,
+            "diagnosis": null,
+            "path": ".planning/eval-runs/learn-l211-harmonic-practice-proof-20260604-47982741/summary.json",
+            "physical_connection_doctor": null,
+            "playback_nudge": null,
+            "probe_operator_action": null,
+            "route_plan": null,
+            "strict_errors": [
+              "schema_version is not 1",
+              "stages object missing",
+              "screen_probe did not pass",
+              "screen_probe.result.passed is not true",
+              "screen proof sent fewer than 4 ACKs",
+              "screen proof saw fewer than 4 advances",
+              "screen proof did not see completion",
+              "screen proof did not see completed progress",
+              "progress_file stage did not pass",
+              "progress_file does not show L1.01 completed"
+            ],
+            "strict_valid": false,
+            "unavailable_errors": [
+              "schema_version is not 1",
+              "stages object missing",
+              "screen_probe did not pass",
+              "screen_probe.result.passed is not true",
+              "screen proof sent fewer than 4 ACKs",
+              "screen proof saw fewer than 4 advances",
+              "screen proof did not see completion",
+              "screen proof did not see completed progress",
+              "progress_file stage did not pass",
+              "progress_file does not show L1.01 completed"
+            ],
+            "unavailable_valid": false
+          },
+          {
+            "auto_master_recommendation": null,
+            "diagnosis": null,
+            "path": ".planning/eval-runs/learn-physical-retry-current-20260604-e4e7c1f8/physical-proof.json",
+            "physical_connection_doctor": null,
+            "playback_nudge": null,
+            "probe_operator_action": null,
+            "route_plan": null,
+            "strict_errors": [
+              "screen_probe did not pass",
+              "screen_probe.result.passed is not true",
+              "screen proof sent fewer than 4 ACKs",
+              "screen proof saw fewer than 4 advances",
+              "screen proof did not see completion",
+              "screen proof did not see completed progress",
+              "progress_file stage did not pass",
+              "progress_file does not show L1.01 completed"
+            ],
+            "strict_valid": false,
+            "unavailable_errors": [
+              "screen_probe did not pass",
+              "screen_probe.result.passed is not true",
+              "screen proof sent fewer than 4 ACKs",
+              "screen proof saw fewer than 4 advances",
+              "screen proof did not see completion",
+              "screen proof did not see completed progress",
+              "progress_file stage did not pass",
+              "progress_file does not show L1.01 completed"
+            ],
+            "unavailable_valid": false
+          }
+        ],
+        "auto_master_recommendation": null,
+        "blockers": [],
+        "diagnosis": null,
+        "passed": true,
+        "path": ".planning/eval-runs/learn-screen-path-current-20260604-16a547dd/proof.json",
+        "physical_connection_doctor": null,
+        "playback_nudge": null,
+        "probe_operator_action": null,
+        "route_plan": null,
+        "status": "passed"
+      }
+    },
+    "python_quality": {
+      "commands": [
+        {
+          "command": "uv run ruff check src/vibemix/learn scripts/audit_learn_curriculum.py scripts/audition_learn_exemplars.py scripts/export_learn_curriculum_meta.py scripts/learn_live_readiness.py scripts/run_learn_desktop_quality.py scripts/run_learn_frontend_quality.py scripts/run_learn_live_proof.py scripts/run_learn_perfection_package.py scripts/run_learn_python_quality.py scripts/validate_learn_course_pack.py scripts/validate_learn_live_proof.py scripts/verify_learn_package.py tests/learn src/vibemix/state/refresh.py tests/state/test_refresh.py",
+          "duration_s": 0.094,
+          "name": "learn_ruff",
+          "passed": true,
+          "returncode": 0
+        },
+        {
+          "command": "uv run python scripts/export_learn_curriculum_meta.py --check",
+          "duration_s": 0.352,
+          "name": "learn_codegen_check",
+          "passed": true,
+          "returncode": 0
+        },
+        {
+          "command": "bash scripts/release/check_no_hardcoded_model.sh",
+          "duration_s": 1.428,
+          "name": "learn_model_router_guard",
+          "passed": true,
+          "returncode": 0
+        },
+        {
+          "command": "uv run pytest -q tests/learn/test_all_lessons_runtime_path.py",
+          "duration_s": 2.658,
+          "name": "learn_all_lessons_runtime_pytest",
+          "passed": true,
+          "returncode": 0
+        },
+        {
+          "command": "uv run pytest -q tests/learn/test_teaching_loop.py",
+          "duration_s": 1.322,
+          "name": "learn_teaching_loop_pytest",
+          "passed": true,
+          "returncode": 0
+        },
+        {
+          "command": "uv run pytest -q tests/learn/test_adaptive_coaching_runtime_contract.py",
+          "duration_s": 1.249,
+          "name": "learn_adaptive_coaching_pytest",
+          "passed": true,
+          "returncode": 0
+        },
+        {
+          "command": "uv run pytest -q tests/learn/test_auto_master_finder_contract.py",
+          "duration_s": 0.461,
+          "name": "learn_auto_master_finder_pytest",
+          "passed": true,
+          "returncode": 0
+        },
+        {
+          "command": "uv run pytest -q tests/state/test_refresh.py::test_tick_course3_live_uses_dj_cue_sections_for_phrase_anchor tests/state/test_refresh.py::test_tick_course3_mix_uses_unambiguous_title_match_for_phrase_anchor tests/state/test_refresh.py::test_tick_course3_mix_refuses_ambiguous_title_match_for_phrase_anchor",
+          "duration_s": 0.45,
+          "name": "learn_course3_mix_anchor_pytest",
+          "passed": true,
+          "returncode": 0
+        },
+        {
+          "command": "uv run pytest -q tests/learn/test_course_pack.py",
+          "duration_s": 1.169,
+          "name": "learn_course_pack_pytest",
+          "passed": true,
+          "returncode": 0
+        },
+        {
+          "command": "uv run pytest -q tests/learn",
+          "duration_s": 23.02,
+          "name": "learn_pytest",
+          "passed": true,
+          "returncode": 0
+        }
+      ],
+      "errors": [],
+      "generated_at": "2026-06-04T12:20:15.387800+00:00",
+      "operator_commands": {
+        "run": "uv run python scripts/run_learn_python_quality.py --out /tmp/vibemix-live-learn-proof/learn-python-quality-current.json",
+        "verify": "uv run python scripts/verify_learn_package.py --out /tmp/vibemix-live-learn-proof/learn-package-verification-current.json"
+      },
+      "passed": true,
+      "path": "/tmp/vibemix-live-learn-proof/learn-python-quality-current.json",
+      "required_commands": [
+        "learn_adaptive_coaching_pytest",
+        "learn_all_lessons_runtime_pytest",
+        "learn_auto_master_finder_pytest",
+        "learn_codegen_check",
+        "learn_course3_mix_anchor_pytest",
+        "learn_course_pack_pytest",
+        "learn_model_router_guard",
+        "learn_pytest",
+        "learn_ruff",
+        "learn_teaching_loop_pytest"
+      ],
+      "status": "passed"
+    }
+  },
+  "technical_passed": false
+}
