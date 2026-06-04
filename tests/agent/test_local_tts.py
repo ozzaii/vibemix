@@ -19,6 +19,7 @@ from vibemix.agent.local_tts import (
     LocalTTSUnavailable,
     MossEngine,
     MossLocalTTS,
+    _OrtCpuEngine,
     _read_native_sample_rate,
     build_local_tts_adapter,
     candidate_model_dir,
@@ -276,6 +277,16 @@ class _FakeEngine(MossEngine):
             on_pcm(pcm16_mono_le(np.full(self._spc, 0.1, dtype=np.float32)))
 
 
+class _RetargetableEngine(_FakeEngine):
+    def __init__(self, sample_rate=24000, chunks=1, samples_per_chunk=10):
+        super().__init__(sample_rate=sample_rate, chunks=chunks, samples_per_chunk=samples_per_chunk)
+        self.voice_prompts: list[str] = []
+
+    def set_voice_prompt(self, voice: str) -> str:
+        self.voice_prompts.append(voice)
+        return voice
+
+
 class _BoomEngine(MossEngine):
     sample_rate = 24000
 
@@ -346,6 +357,23 @@ def test_set_voice_rebuilds_engine_on_next_synthesis(monkeypatch, tmp_path):
     assert loaded == ["Bella"]
 
 
+def test_set_voice_retargets_warm_engine_without_reload(monkeypatch, tmp_path):
+    warm = _RetargetableEngine(sample_rate=24000)
+
+    def load(_model_dir, voice, _thread_count):
+        raise AssertionError(f"warm voice swap reloaded engine for {voice}")
+
+    monkeypatch.setattr("vibemix.agent.local_tts._OrtCpuEngine.load", load)
+    tts = MossLocalTTS(model_dir=tmp_path, voice="Adam", engine=warm, sample_rate=24000)
+
+    tts.synthesize_pcm("first", lambda _pcm: None)
+    tts.set_voice("Bella")
+    tts.synthesize_pcm("second", lambda _pcm: None)
+
+    assert tts._engine is warm
+    assert warm.voice_prompts == ["Bella"]
+
+
 def test_set_voice_normalizes_retired_cloud_voice_ids(monkeypatch, tmp_path):
     loaded: list[str] = []
 
@@ -365,6 +393,45 @@ def test_set_voice_normalizes_retired_cloud_voice_ids(monkeypatch, tmp_path):
     tts.synthesize_pcm("legacy", lambda _pcm: None)
 
     assert loaded == ["Adam"]
+
+
+def test_set_voice_retargets_warm_engine_with_normalized_cloud_voice(monkeypatch, tmp_path):
+    warm = _RetargetableEngine(sample_rate=24000)
+
+    def load(_model_dir, voice, _thread_count):
+        raise AssertionError(f"warm voice swap reloaded engine for {voice}")
+
+    monkeypatch.setattr("vibemix.agent.local_tts._OrtCpuEngine.load", load)
+    tts = MossLocalTTS(model_dir=tmp_path, voice="Bella", engine=warm, sample_rate=24000)
+
+    tts.set_voice("kore")
+    tts.synthesize_pcm("legacy", lambda _pcm: None)
+
+    assert tts._engine is warm
+    assert warm.voice_prompts == ["Adam"]
+
+
+def test_ort_cpu_engine_set_voice_prompt_swaps_prompt_codes():
+    class _Runtime:
+        def list_builtin_voices(self):
+            return [
+                {"voice": "Adam", "prompt_audio_codes": [[1, 2], [3, 4]]},
+                {"voice": "Bella", "prompt_audio_codes": [[5, 6], [7, 8]]},
+            ]
+
+    engine = _OrtCpuEngine(
+        _Runtime(),
+        sp=object(),
+        sample_rate=48000,
+        prompt_audio_codes=[[1, 2], [3, 4]],
+        voice_name="Adam",
+    )
+
+    resolved = engine.set_voice_prompt("Bella")
+
+    assert resolved == "Bella"
+    assert engine.voice_name == "Bella"
+    assert engine._prompt_audio_codes == [[5, 6], [7, 8]]
 
 
 # ---------------- guarded real-model integration ----------------

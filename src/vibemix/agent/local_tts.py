@@ -330,6 +330,20 @@ class _OrtCpuEngine(MossEngine):
         rt.warmup()  # build/JIT the ORT graphs so the first real synth is warm
         return cls(rt, sp, sample_rate, prompt_codes, row.get("voice", voice))
 
+    def set_voice_prompt(self, voice: str) -> str:
+        """Retarget the warm runtime to a different builtin voice prompt.
+
+        The ONNX sessions, tokenizer, codec streaming session, and warm graph
+        state are independent of the selected builtin prompt. A live voice
+        picker change only needs to swap the prompt audio codes consumed by the
+        next request rows; reloading the 728 MB runtime would stall Sven.
+        """
+        voices = self._rt.list_builtin_voices()
+        row = select_moss_voice_row(voices, voice, fallback=_DEFAULT_VOICE)
+        self._prompt_audio_codes = [list(code_row) for code_row in row["prompt_audio_codes"]]
+        self.voice_name = str(row.get("voice") or voice)
+        return self.voice_name
+
     def synthesize(self, text: str, on_pcm: Callable[[bytes], None]) -> None:
         # Mirrors the proven bench streaming decode (ort_cpu_runtime path): generate
         # audio frames autoregressively, decode them through the streaming codec
@@ -436,14 +450,19 @@ class MossLocalTTS(agents_tts.TTS):
         return self._engine
 
     def set_voice(self, voice: str) -> None:
-        """Switch the live MOSS voice; the next synthesis rebuilds the engine."""
+        """Switch the live MOSS voice without reloading an already-warm engine."""
         normalized = normalize_stored_voice(voice)
         with self._synth_lock:
             with self._engine_lock:
                 if self._voice == normalized:
                     return
                 self._voice = normalized
-                self._engine = None
+                engine = self._engine
+                retarget = getattr(engine, "set_voice_prompt", None) if engine is not None else None
+                if callable(retarget):
+                    retarget(normalized)
+                else:
+                    self._engine = None
 
     def prewarm(self) -> None:
         """Kick the (~728 MB) engine load in the background so reaction #1 is warm."""
