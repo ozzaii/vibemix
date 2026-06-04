@@ -858,7 +858,9 @@ const LAYOUT_CSS = `
   @media (prefers-reduced-motion: reduce) {
     .vmx-now[data-arrived="true"] { animation: none; }
     .vmx-receipt[data-arrived="true"] .vmx-receipt__rule { animation: none; transform: scaleX(1); }
-    .vmx-receipt[data-arrived="true"] .vmx-cite { animation: none; }
+    /* Without the ignite animation the chip would stay at its keyframe start
+       (opacity 0) and vanish for reduced-motion users; pin it visible. */
+    .vmx-receipt[data-arrived="true"] .vmx-cite { animation: none; opacity: 1; }
     .vmx-session[data-mode="silent"] .vmx-fmeter__fill { animation: none; }
   }
   @media (max-width: 780px) {
@@ -1085,6 +1087,10 @@ export function mountSessionLayout(
   const now = document.createElement("p");
   now.className = "vmx-now";
   now.dataset.wire = "session.now-line";
+  // The co-host's spoken line. It updated silently before, so screen-reader
+  // users never heard the co-host; announce each new line politely.
+  now.setAttribute("aria-live", "polite");
+  now.setAttribute("aria-atomic", "true");
   const receipt = document.createElement("div");
   receipt.className = "vmx-receipt";
   receipt.hidden = true;
