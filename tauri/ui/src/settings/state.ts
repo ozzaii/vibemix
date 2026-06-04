@@ -5,9 +5,6 @@
  *   - `open`               — is the slide-over visible right now?
  *   - `hotkeyCaptureMode`  — true while the user is rebinding the
  *                            push-to-mute combo (we swallow keydowns).
- *   - `pendingGenreReload` — true for ~250ms after a genre change while
- *                            the sidecar reloads its profile; drives the
- *                            "RELOADING PROFILE…" overlay.
  *   - `confirmDialog`      — null or the id of the modal confirm
  *                            currently open ("re-run-calibration" only
  *                            for Phase 12).
@@ -46,7 +43,6 @@ export interface RecordingsSlice {
 export interface SettingsUIState {
   open: boolean;
   hotkeyCaptureMode: boolean;
-  pendingGenreReload: boolean;
   confirmDialog: null | "re-run-calibration";
   recordings: RecordingsSlice;
 }
@@ -66,7 +62,6 @@ function makeDefault(): SettingsUIState {
   return {
     open: false,
     hotkeyCaptureMode: false,
-    pendingGenreReload: false,
     confirmDialog: null,
     recordings: makeDefaultRecordings(),
   };

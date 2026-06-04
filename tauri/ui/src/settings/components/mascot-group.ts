@@ -187,7 +187,7 @@ function buildMascotGroup(): MascotGroupHandle {
   visRow.className = "vmx-mascot-row";
   const visLabel = document.createElement("div");
   visLabel.className = "vmx-mascot-row__label";
-  visLabel.textContent = "ENABLE (EXPERIMENTAL)";
+  visLabel.textContent = "ENABLE";
   visRow.append(visLabel);
 
   const visRocker = renderRocker({

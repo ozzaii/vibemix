@@ -98,16 +98,8 @@ const CSS = `
     align-items: center;
     gap: 11px;
   }
-  .vmx-settings-group__header > span:first-child::before {
-    content: "";
-    width: 4px;
-    height: 4px;
-    border-radius: 50%;
-    background: var(--brand);
-    box-shadow: 0 0 6px var(--brand-50);
-    flex-shrink: 0;
-  }
-  /* The header floor hairline — bright at its rose origin, fading across. */
+  /* The header floor hairline — a quiet warm-white seam, no rose dot per header
+     (12+ simultaneous brand dots read as decoration, not signal). */
   .vmx-settings-group__header::after {
     content: "";
     position: absolute;

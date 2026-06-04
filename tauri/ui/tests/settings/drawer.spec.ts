@@ -101,10 +101,18 @@ describe("mountSettingsDrawer", () => {
     ).toBe(1);
   });
 
-  it("mounts citation diagnostics inside the drawer", () => {
+  it("gates citation diagnostics to dev builds (shipped builds strip it)", () => {
+    // The DIAGNOSTICS group (slop ratio / stripped rate / bypass) is internal
+    // anti-slop telemetry, gated on import.meta.env.DEV: present in dev (vitest
+    // runs in dev mode), stripped from the shipped drawer a paying user sees.
     mountSettingsDrawer(document.body);
-    expect(document.querySelector(".vmx-citation-diag")).not.toBeNull();
-    expect(document.body.textContent).toContain("DIAGNOSTICS");
+    if (import.meta.env.DEV) {
+      expect(document.querySelector(".vmx-citation-diag")).not.toBeNull();
+      expect(document.body.textContent).toContain("DIAGNOSTICS");
+    } else {
+      expect(document.querySelector(".vmx-citation-diag")).toBeNull();
+      expect(document.body.textContent).not.toContain("DIAGNOSTICS");
+    }
   });
 
   it("exposes transfer anchors for the drawer shell", () => {

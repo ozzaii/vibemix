@@ -345,34 +345,6 @@ const CSS = `
     border-radius: 3px;
   }
   .vmx-settings-drawer__body::-webkit-scrollbar-thumb:hover { background: var(--amber-40); }
-  .vmx-settings-drawer__genre-wrap {
-    position: relative;
-  }
-  .vmx-settings-drawer__reload-overlay {
-    position: absolute;
-    inset: 0;
-    display: none;
-    align-items: center;
-    justify-content: center;
-    background: linear-gradient(180deg, rgba(255, 165, 223, 0.09) 0%, rgba(255, 165, 223, 0.025) 100%);
-    border: 1px solid var(--amber-40);
-    border-radius: var(--rad-sm);
-    font-family: var(--type-display);
-    font-variation-settings: "wdth" 85, "wght" 600;
-    font-size: 10px;
-    letter-spacing: 0.28em;
-    text-transform: uppercase;
-    color: var(--amber);
-    text-shadow: 0 0 4px var(--amber-22);
-    z-index: 2;
-    transition: opacity 250ms ease-out;
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.06),
-      inset 0 0 14px var(--amber-22);
-  }
-  .vmx-settings-drawer__reload-overlay[data-shown="true"] {
-    display: flex;
-  }
   .vmx-settings-drawer__btn {
     position: relative;
     overflow: hidden;
@@ -591,7 +563,6 @@ const CSS = `
     max-width: 100%;
     color: var(--text-primary);
     font-family: var(--type-display);
-    font-variation-settings: "wdth" 84, "wght" 650;
     font-size: 15px;
     line-height: 1.18;
     white-space: normal;
@@ -661,7 +632,6 @@ const CSS = `
   .vmx-settings-trust__value {
     color: var(--text-primary);
     font-family: var(--type-display);
-    font-variation-settings: "wdth" 88, "wght" 600;
     font-size: 13px;
     line-height: 1.15;
   }
@@ -1361,23 +1331,11 @@ function renderDrawerBody(body: HTMLElement, modalSlot: HTMLElement): void {
         autoPill: false,
         options: GENRE_OPTIONS.map((g) => ({ id: g, label: g })),
         onChange: (id) => {
-          setSettingsUIState({ pendingGenreReload: true });
           void sendSettingsField("genre", id);
-          // Overlay auto-dismisses after 250ms — sidecar profile reloads
-          // are fast (we're not waiting for a confirmation; the live
-          // session keeps rendering through this).
-          window.setTimeout(() => {
-            setSettingsUIState({ pendingGenreReload: false });
-          }, 250);
         },
       }),
     ),
   );
-  const overlay = document.createElement("div");
-  overlay.className = "vmx-settings-drawer__reload-overlay";
-  overlay.dataset.shown = ui.pendingGenreReload ? "true" : "false";
-  overlay.textContent = "RELOADING PROFILE…";
-  genreWrap.append(overlay);
   personaBody.append(genreWrap);
 
   // Skill rocker (2026-05-25) — persona level (beginner/intermediate/pro).
@@ -1629,15 +1587,20 @@ function renderDrawerBody(body: HTMLElement, modalSlot: HTMLElement): void {
   // Anti-slop telemetry from ipc.session.citation. The handle subscribes to
   // the component-local diagnostics store and updates in place, so the 0.5Hz
   // co-host telemetry stream does not rebuild the entire drawer.
-  const citationDiagnostics = mountCitationDiagnostics();
-  bodyDisposers.push(() => citationDiagnostics.dispose());
-  body.append(
-    renderSettingsGroup({
-      header: "DIAGNOSTICS",
-      badge: "LIVE",
-      children: citationDiagnostics.root,
-    }),
-  );
+  // Anti-slop citation telemetry (slop ratio / stripped rate / bypass) is a dev
+  // instrument, not a paying-user control. Shipped builds strip this branch via
+  // import.meta.env.DEV; dev builds keep it for tuning.
+  if (import.meta.env.DEV) {
+    const citationDiagnostics = mountCitationDiagnostics();
+    bodyDisposers.push(() => citationDiagnostics.dispose());
+    body.append(
+      renderSettingsGroup({
+        header: "DIAGNOSTICS",
+        badge: "LIVE",
+        children: citationDiagnostics.root,
+      }),
+    );
+  }
 
   // --- CALIBRATION ----------------------------------------------------------
   const calibrationBody = document.createElement("div");
