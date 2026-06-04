@@ -1,0 +1,111 @@
+{
+  "track_ids": [
+    "folder:d4d053a5d76c4d89",
+    "folder:10f1cd31ec06163d",
+    "folder:ec117d7d7ddf1aa0"
+  ],
+  "elapsed_s": 15.252,
+  "cache_loaded": true,
+  "export_result": {
+    "exported": true,
+    "target": "both",
+    "path": "/Users/ozai/Music/vibemix/cues/viber-auto-cue-proof.xml",
+    "outputs": {
+      "rekordbox": "/Users/ozai/Music/vibemix/cues/viber-auto-cue-proof.xml",
+      "m3u8": "/Users/ozai/Music/vibemix/cues/viber-auto-cue-proof.m3u8"
+    },
+    "written": 3,
+    "referenced": 3,
+    "dropped": [],
+    "auto_cues": {
+      "enabled": true,
+      "tracks_attempted": 3,
+      "tracks_cued": 3,
+      "cues_added": 5,
+      "snap_adjusted_count": 5,
+      "snap_max_adjustment_ms": 147.924,
+      "skipped_tracks": 0,
+      "skipped_failed": 0,
+      "proposal_export_ready_count": 5,
+      "proposal_review_count": 5,
+      "proposal_missing_required_count": 3,
+      "proposal_suppressed_count": 6
+    }
+  },
+  "xml_path": "/Users/ozai/Music/vibemix/cues/viber-auto-cue-proof.xml",
+  "m3u8_path": "/Users/ozai/Music/vibemix/cues/viber-auto-cue-proof.m3u8",
+  "m3u8_exists": true,
+  "m3u8_track_line_count": 3,
+  "track_count": 3,
+  "position_mark_count": 5,
+  "vm_mark_count": 5,
+  "vm_beat_residual_max_ms": 0.000481,
+  "vm_beat_residuals_ms": [
+    0.000435,
+    0.000435,
+    0.000481,
+    0.000336,
+    0.000397
+  ],
+  "marks": [
+    {
+      "track": "07 - Imperio - Atlantis (DJ Dado Mix) (1)",
+      "name": "VM D DROP",
+      "num": "3",
+      "type": "0",
+      "start": "108.26087",
+      "tempo_bpm": 138.0,
+      "tempo_inizio": 0.0,
+      "beat_residual_ms": 0.000435
+    },
+    {
+      "track": "07 - Imperio - Atlantis (DJ Dado Mix)",
+      "name": "VM D DROP",
+      "num": "3",
+      "type": "0",
+      "start": "108.26087",
+      "tempo_bpm": 138.0,
+      "tempo_inizio": 0.0,
+      "beat_residual_ms": 0.000435
+    },
+    {
+      "track": "A Dam Will Always Divide (Lew E Asks The Dust Remix) (1)",
+      "name": "VM A IN",
+      "num": "0",
+      "type": "0",
+      "start": "47.175573",
+      "tempo_bpm": 131.0,
+      "tempo_inizio": 0.0,
+      "beat_residual_ms": 0.000481
+    },
+    {
+      "track": "A Dam Will Always Divide (Lew E Asks The Dust Remix) (1)",
+      "name": "VM B GROOVE",
+      "num": "1",
+      "type": "0",
+      "start": "62.290076",
+      "tempo_bpm": 131.0,
+      "tempo_inizio": 0.0,
+      "beat_residual_ms": 0.000336
+    },
+    {
+      "track": "A Dam Will Always Divide (Lew E Asks The Dust Remix) (1)",
+      "name": "VM D DROP",
+      "num": "3",
+      "type": "0",
+      "start": "117.251908",
+      "tempo_bpm": 131.0,
+      "tempo_inizio": 0.0,
+      "beat_residual_ms": 0.000397
+    }
+  ],
+  "m3u8_preview": [
+    "#EXTM3U",
+    "#EXTINF:-1,07 - Imperio - Atlantis (DJ Dado Mix) (1)",
+    "/Users/ozai/Downloads/Music/07 - Imperio - Atlantis (DJ Dado Mix) (1).mp3",
+    "#EXTINF:-1,07 - Imperio - Atlantis (DJ Dado Mix)",
+    "/Users/ozai/Downloads/Music/07 - Imperio - Atlantis (DJ Dado Mix).mp3",
+    "#EXTINF:-1,A Dam Will Always Divide (Lew E Asks The Dust Remix) (1)",
+    "/Users/ozai/Downloads/Music/A Dam Will Always Divide (Lew E Asks The Dust Remix) (1).mp3"
+  ]
+}

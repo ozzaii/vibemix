@@ -880,9 +880,38 @@ def test_export_set_default_path_is_visible_music_cue_folder(toolset, tmp_path, 
     out = toolset.export_set({"name": "Peak Set!", "track_ids": ["t000"], "cue": False})
 
     expected = tmp_path / "Music" / "vibemix" / "cues" / "peak-set.xml"
+    expected_m3u8 = tmp_path / "Music" / "vibemix" / "cues" / "peak-set.m3u8"
     assert out.get("exported") is True
+    assert out["target"] == "both"
     assert out["path"] == str(expected)
+    assert out["outputs"] == {"rekordbox": str(expected), "m3u8": str(expected_m3u8)}
     assert expected.exists()
+    assert expected_m3u8.exists()
+
+
+def test_export_set_target_m3u8_writes_order_only_crate(toolset, tmp_path):
+    toolset.seen.add("t000")
+    out_m3u8 = tmp_path / "crate.m3u8"
+
+    out = toolset.export_set(
+        {
+            "name": "Portable Crate",
+            "track_ids": ["t000"],
+            "out_path": str(out_m3u8),
+            "target": "m3u8",
+        }
+    )
+
+    assert out.get("exported") is True
+    assert out["target"] == "m3u8"
+    assert out["auto_cues"]["enabled"] is False
+    assert out["auto_cues"]["tracks_attempted"] == 0
+    assert out["path"] == str(out_m3u8)
+    assert out["outputs"] == {"m3u8": str(out_m3u8)}
+    assert out["written"] == 1
+    lines = out_m3u8.read_text(encoding="utf-8").splitlines()
+    assert lines[0] == "#EXTM3U"
+    assert lines[-1] == "/tmp/t000.mp3"
 
 
 def test_export_set_forwards_rekordbox_cues_and_beatgrid(toolset, tmp_path):

@@ -89,7 +89,7 @@ def test_auto_crate_builds_grounded_playlist_and_export(toolset, tmp_path):
         n_slots=3,
         k=6,
         name="Fast Hardgroove",
-        export="rekordbox",
+        export="both",
         out_path=str(tmp_path / "fast.xml"),
         toolset=toolset,
     )
@@ -101,7 +101,12 @@ def test_auto_crate_builds_grounded_playlist_and_export(toolset, tmp_path):
     assert Path(result.playlist["m3u_path"]).exists()
     assert Path(result.playlist["json_path"]).exists()
     assert result.export_path == str(tmp_path / "fast.xml")
+    assert result.export_outputs == {
+        "rekordbox": str(tmp_path / "fast.xml"),
+        "m3u8": str(tmp_path / "fast.m3u8"),
+    }
     assert Path(result.export_path).exists()
+    assert Path(result.export_outputs["m3u8"]).exists()
     assert [row["name"] for row in result.tool_trace] == [
         "discover_pool",
         "sequence_set",
@@ -209,7 +214,7 @@ def test_cli_auto_crate_passes_refs_and_args(monkeypatch, capsys):
             n_slots=4,
             k=12,
             name="CLI Fast",
-            export="rekordbox",
+            export="both",
             out_path="/tmp/cli.xml",
             bpm_min=124.0,
             bpm_max=130.0,
@@ -224,6 +229,7 @@ def test_cli_auto_crate_passes_refs_and_args(monkeypatch, capsys):
     assert rc == 0
     assert seen["ref_track_ids"] == ["t000", "t001", "t002"]
     assert seen["curve"] == "peak_time"
+    assert seen["export"] == "both"
     assert seen["novelty"] == 0.25
     assert json.loads(captured.out)["stop_reason"] == "exported"
     assert "auto-crate 'CLI Fast'" in captured.err

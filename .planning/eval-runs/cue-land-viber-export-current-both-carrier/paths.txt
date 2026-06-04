@@ -1,0 +1,2 @@
+rekordbox=/Users/ozai/Music/vibemix/cues/viber-auto-cue-proof.xml
+m3u8=/Users/ozai/Music/vibemix/cues/viber-auto-cue-proof.m3u8

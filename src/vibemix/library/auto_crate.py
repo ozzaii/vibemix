@@ -37,6 +37,7 @@ class AutoCrateResult:
     rationale: str = ""
     playlist: dict[str, Any] | None = None
     export_path: str | None = None
+    export_outputs: dict[str, str] = field(default_factory=dict)
     sequence: dict[str, Any] | None = None
     transition_receipts: list[dict[str, Any]] = field(default_factory=list)
     metadata_warnings: list[dict[str, Any]] = field(default_factory=list)
@@ -202,9 +203,14 @@ def build_auto_crate(
             )
 
         export_path = None
+        export_outputs: dict[str, str] = {}
         stop_reason = "created"
-        if export == "rekordbox":
-            export_args: dict[str, Any] = {"name": result_name, "track_ids": track_ids}
+        if export in {"rekordbox", "m3u8", "both"}:
+            export_args: dict[str, Any] = {
+                "name": result_name,
+                "track_ids": track_ids,
+                "target": export,
+            }
             if out_path:
                 export_args["out_path"] = out_path
             exported = _call_tool(toolset, "export_set", export_args, trace)
@@ -213,6 +219,11 @@ def build_auto_crate(
                     "export_error", str(error), result_name, curve, slots, clean_query, refs, trace
                 )
             export_path = str(exported.get("path") or "") or None
+            export_outputs = {
+                str(key): str(value)
+                for key, value in (exported.get("outputs") or {}).items()
+                if isinstance(key, str) and isinstance(value, str)
+            }
             stop_reason = "exported" if export_path else "created"
 
         warnings = discovered.get("metadata_warnings")
@@ -234,6 +245,7 @@ def build_auto_crate(
             ),
             playlist={k: playlist[k] for k in playlist if k != "created"},
             export_path=export_path,
+            export_outputs=export_outputs,
             sequence=candidate,
             transition_receipts=receipts,
             metadata_warnings=metadata_warnings,

@@ -35,6 +35,7 @@ import json
 import logging
 import math
 import os
+import pathlib
 import re
 import threading
 from collections.abc import Callable
@@ -968,7 +969,14 @@ class LibraryToolset:
                     f"search_vibe/discover_pool this run (invented): {invented}."
                 )
             }
-        auto_cue_enabled = bool(args.get("cue", args.get("auto_cue", True)))
+        try:
+            target = _export_target_arg(args.get("target", args.get("export", "both")))
+        except ValueError as exc:
+            return {"error": f"export_set: {exc}"}
+        auto_cue_enabled = bool(args.get("cue", args.get("auto_cue", True))) and target in {
+            "rekordbox",
+            "both",
+        }
         auto_cue_report: dict[str, Any] = _auto_cue_report(enabled=auto_cue_enabled)
         try:
             from vibemix.library import export_rekordbox
@@ -1016,31 +1024,48 @@ class LibraryToolset:
                 return {"error": "export_set: no track resolved in the library"}
             out_path = args.get("out_path")
             if not (isinstance(out_path, str) and out_path.strip()):
-                from pathlib import Path as _Path
+                suffix = ".m3u8" if target == "m3u8" else ".xml"
+                out_path = str(_default_set_export_path(name, suffix=suffix))
+            outputs: dict[str, str] = {}
+            dropped: list[dict[str, Any]] = []
+            written = 0
+            referenced = len(items)
+            result: ExportResult | None = None
+            if target in {"rekordbox", "both"}:
+                xml_path = _with_export_suffix(out_path, ".xml")
+                result = export_rekordbox.export_set(items, name, xml_path, library=self._library)
+                outputs["rekordbox"] = str(result.path)
+                written = result.written
+                referenced = result.referenced
+                dropped.extend(result.dropped)
+            if target in {"m3u8", "both"}:
+                from vibemix.library.cue_folder import write_m3u8
 
-                slug = (
-                    "".join(
-                        ch if ch.isalnum() or ch in "-_" else "-" for ch in name.strip().lower()
-                    ).strip("-")
-                    or "set"
-                )
-                out_path = str(_Path.home() / "Music" / "vibemix" / "cues" / f"{slug}.xml")
-            result: ExportResult = export_rekordbox.export_set(
-                items, name, out_path, library=self._library
-            )
+                m3u8_path = _with_export_suffix(out_path, ".m3u8")
+                write_m3u8(items, m3u8_path)
+                outputs["m3u8"] = str(m3u8_path)
+                if result is None:
+                    written = len(items)
+                    referenced = len(items)
+            if result is None and not outputs:
+                return {"error": f"export_set: unsupported target {target!r}"}
         except Exception as e:
             logger.warning("[viber] export_set failed: %s", e)
             return {"error": f"export_set failed: {type(e).__name__}: {e}"}
         # BL-02: record the export so the agent loop can break with a terminal
         # "exported" stop_reason and carry the path into the result (mirrors how
         # ``created`` ends a create_playlist run).
-        self.exported = result
+        if result is not None:
+            self.exported = result
+        primary_path = outputs.get("rekordbox") or outputs.get("m3u8") or str(out_path)
         return {
             "exported": True,
-            "path": str(result.path),
-            "written": result.written,
-            "referenced": result.referenced,
-            "dropped": result.dropped,
+            "target": target,
+            "path": primary_path,
+            "outputs": outputs,
+            "written": written,
+            "referenced": referenced,
+            "dropped": dropped,
             "auto_cues": auto_cue_report,
         }
 
@@ -1858,6 +1883,37 @@ def _export_cues_and_grid(entry: Any) -> dict[str, Any]:
         out["beatgrid"] = {"bpm": entry.bpm}
 
     return out
+
+
+def _export_target_arg(raw: Any) -> Literal["rekordbox", "m3u8", "both"]:
+    value = str(raw or "both").strip().lower().replace("-", "_")
+    aliases = {
+        "xml": "rekordbox",
+        "rekordbox_xml": "rekordbox",
+        "playlist": "m3u8",
+        "crate": "m3u8",
+        "all": "both",
+        "portable": "both",
+    }
+    value = aliases.get(value, value)
+    if value in {"rekordbox", "m3u8", "both"}:
+        return value  # type: ignore[return-value]
+    raise ValueError("target must be one of 'rekordbox', 'm3u8', 'both'")
+
+
+def _default_set_export_path(name: str, *, suffix: str) -> pathlib.Path:
+    slug = (
+        "".join(ch if ch.isalnum() or ch in "-_" else "-" for ch in name.strip().lower()).strip(
+            "-"
+        )
+        or "set"
+    )
+    return pathlib.Path.home() / "Music" / "vibemix" / "cues" / f"{slug}{suffix}"
+
+
+def _with_export_suffix(path: str | pathlib.Path, suffix: str) -> pathlib.Path:
+    out = pathlib.Path(path)
+    return out if out.suffix.lower() == suffix else out.with_suffix(suffix)
 
 
 _MACHINE_CUE_SOURCES = {"auto", "anlz", "fallback"}

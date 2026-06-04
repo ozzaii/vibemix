@@ -232,17 +232,26 @@ def test_inspect_candidates_delegates_with_dict_packed_args(
     assert result == {"candidates": [{"track_id": "t001"}, {"track_id": "t002"}]}
 
 
-def test_export_set_delegates_cue_bool(fake_toolset: _FakeToolset, server: Any) -> None:
+def test_export_set_delegates_target_and_cue_bool(
+    fake_toolset: _FakeToolset, server: Any
+) -> None:
     tool = server._tool_manager.get_tool("export_set")
     assert tool is not None
 
-    result = tool.fn(name="Set", track_ids=["t001", "t002"], out_path="/tmp/set.xml", cue=False)
+    result = tool.fn(
+        name="Set",
+        track_ids=["t001", "t002"],
+        out_path="/tmp/set.xml",
+        cue=False,
+        target="both",
+    )
 
     assert fake_toolset.recorded_export_set_args == {
         "name": "Set",
         "track_ids": ["t001", "t002"],
         "out_path": "/tmp/set.xml",
         "cue": False,
+        "target": "both",
     }
     assert result == {"exported": True}
 

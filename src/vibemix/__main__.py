@@ -3716,9 +3716,9 @@ def _build_library_subparsers(parser: argparse.ArgumentParser) -> None:
     sp_auto_crate.add_argument("--name", default=None, help="set name")
     sp_auto_crate.add_argument(
         "--export",
-        choices=("rekordbox",),
+        choices=("rekordbox", "m3u8", "both"),
         default=None,
-        help="also export a Rekordbox XML",
+        help="also export DJ-software handoff files (rekordbox XML, m3u8, or both)",
     )
     sp_auto_crate.add_argument("--out", dest="out_path", default=None, help="export path")
     sp_auto_crate.add_argument("--bpm-min", type=float, default=None)
