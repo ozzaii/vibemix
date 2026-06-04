@@ -27,6 +27,7 @@ def test_genre_bpm_bands_constant_shape() -> None:
         "house",
         "techno",
         "psytrance",
+        "drum_and_bass",
         "hard_tek",
         "unknown",
     }
@@ -46,6 +47,7 @@ def test_genre_bpm_bands_values_match_context_d04() -> None:
     assert GENRE_BPM_BANDS["house"] == (118.0, 128.0)
     assert GENRE_BPM_BANDS["techno"] == (128.0, 138.0)
     assert GENRE_BPM_BANDS["psytrance"] == (138.0, 150.0)
+    assert GENRE_BPM_BANDS["drum_and_bass"] == (165.0, BPM_VALID_MAX)
     # hard_tek upper bound MUST equal BPM_VALID_MAX so genre router shares
     # the autocorr-noise-reject ceiling (anti-hallucination).
     assert GENRE_BPM_BANDS["hard_tek"][0] == 140.0
