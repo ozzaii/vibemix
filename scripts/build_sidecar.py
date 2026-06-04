@@ -35,12 +35,15 @@ Anti-pattern guards built in:
 from __future__ import annotations
 
 import argparse
+import hashlib
+import json
 import os
 import re
 import shutil
 import stat
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 # ---------------------------------------------------------------------------
@@ -66,6 +69,84 @@ _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 # Where Tauri's bundle.resources lookup expects per-triple sidecar bundles.
 _TAURI_BINARIES_DIR = _PROJECT_ROOT / "tauri" / "src-tauri" / "binaries"
+BUILD_MANIFEST_NAME = "vibemix-build.json"
+BUILD_MANIFEST_SCHEMA = "vibemix_sidecar_build_v1"
+SOURCE_FINGERPRINT_PATHS: tuple[str, ...] = (
+    "src/vibemix",
+    "vibemix-core.macos.spec",
+    "vibemix-core.windows.spec",
+    "rthooks",
+    "scripts/build_sidecar.py",
+    "scripts/dist/moss_bundle.py",
+    "scripts/dist/patch_livekit_agents_init.py",
+    "tauri/ui/src/ipc/messages.schema.json",
+    "pyproject.toml",
+    "uv.lock",
+)
+
+
+def _git_text(args: list[str], *, root: Path = _PROJECT_ROOT) -> str:
+    return subprocess.check_output(["git", *args], cwd=root, text=True).strip()
+
+
+def git_head(*, root: Path = _PROJECT_ROOT) -> str:
+    """Return the source commit this sidecar is being frozen from."""
+    return _git_text(["rev-parse", "HEAD"], root=root)
+
+
+def source_dirty_paths(*, root: Path = _PROJECT_ROOT) -> list[str]:
+    """Return dirty tracked/untracked runtime-package inputs, not planning noise."""
+    raw = _git_text(["status", "--porcelain", "--", *SOURCE_FINGERPRINT_PATHS], root=root)
+    return [line.rstrip() for line in raw.splitlines() if line.strip()]
+
+
+def _fingerprint_files(*, root: Path = _PROJECT_ROOT) -> list[str]:
+    raw = subprocess.check_output(
+        ["git", "ls-files", "-z", "--", *SOURCE_FINGERPRINT_PATHS],
+        cwd=root,
+    )
+    files = [part.decode("utf-8") for part in raw.split(b"\0") if part]
+    if not files:
+        raise RuntimeError("no tracked source files matched SOURCE_FINGERPRINT_PATHS")
+    return sorted(files)
+
+
+def source_fingerprint(*, root: Path = _PROJECT_ROOT) -> str:
+    """Hash the current working-tree bytes that feed the frozen sidecar.
+
+    Git HEAD alone is not enough: the old package can remain structurally valid
+    after a Python-only runtime fix. This fingerprint reads the working tree for
+    the runtime/package input paths so the readiness checker catches stale frozen
+    sidecars even when the IPC schema did not change.
+    """
+    h = hashlib.sha256()
+    for rel in _fingerprint_files(root=root):
+        path = root / rel
+        h.update(rel.encode("utf-8"))
+        h.update(b"\0")
+        h.update(path.read_bytes())
+        h.update(b"\0")
+    return h.hexdigest()
+
+
+def build_manifest_payload(*, root: Path = _PROJECT_ROOT, triple: str) -> dict[str, object]:
+    return {
+        "schema": BUILD_MANIFEST_SCHEMA,
+        "git_head": git_head(root=root),
+        "source_fingerprint": source_fingerprint(root=root),
+        "source_dirty": source_dirty_paths(root=root),
+        "source_fingerprint_paths": list(SOURCE_FINGERPRINT_PATHS),
+        "triple": triple,
+        "built_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+    }
+
+
+def write_build_manifest(bundle_dir: Path, *, triple: str, root: Path = _PROJECT_ROOT) -> Path:
+    """Write the source-freshness manifest into the installed sidecar bundle."""
+    manifest_path = bundle_dir / BUILD_MANIFEST_NAME
+    payload = build_manifest_payload(root=root, triple=triple)
+    manifest_path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
+    return manifest_path
 
 
 # ---------------------------------------------------------------------------
@@ -464,6 +545,7 @@ def build_and_install(
 
     installed = install_into_tauri_binaries(onedir, triple, exe_suffix=suffix)
     bundle_dir = installed.parent
+    write_build_manifest(bundle_dir, triple=triple)
 
     # Plan 27-06 / REC-09: assert single-arch BEFORE the AIza scan so a
     # lipo-merged broken bundle is rejected with a clearer error.

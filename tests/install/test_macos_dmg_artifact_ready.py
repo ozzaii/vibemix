@@ -10,11 +10,21 @@ import subprocess
 from pathlib import Path
 
 import pytest
+from scripts.dist import check_macos_app_bundle_ready as app_gate
 from scripts.dist import check_macos_dmg_artifact_ready as gate
 from scripts.dist.check_sidecar_bundle_ready import LEARN_EXEMPLAR_WAVS
 
 MAC_TRIPLE = "aarch64-apple-darwin"
 HDIUTIL = shutil.which("hdiutil")
+
+
+@pytest.fixture(autouse=True)
+def _ready_source_manifest(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        app_gate,
+        "sidecar_build_manifest_ready",
+        lambda *_args, **_kwargs: (True, "sidecar source manifest ready"),
+    )
 
 
 def _write_learn_exemplar_wavs(sidecar_dir: Path) -> None:

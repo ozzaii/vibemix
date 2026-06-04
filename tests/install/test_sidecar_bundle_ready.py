@@ -8,10 +8,24 @@ import os
 import stat
 from pathlib import Path
 
+import pytest
 from scripts.dist import check_sidecar_bundle_ready as gate
 
 MAC_TRIPLE = "aarch64-apple-darwin"
 WIN_TRIPLE = "x86_64-pc-windows-msvc"
+SOURCE_HEAD = "abc123"
+SOURCE_FINGERPRINT = "f" * 64
+
+
+@pytest.fixture(autouse=True)
+def _stable_source_manifest(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(gate, "git_head", lambda *, root=gate.REPO_ROOT: SOURCE_HEAD)
+    monkeypatch.setattr(
+        gate,
+        "source_fingerprint",
+        lambda *, root=gate.REPO_ROOT: SOURCE_FINGERPRINT,
+    )
+    monkeypatch.setattr(gate, "source_dirty_paths", lambda *, root=gate.REPO_ROOT: [])
 
 
 def _bundle_dir(root: Path, triple: str) -> Path:
@@ -25,6 +39,33 @@ def _write_learn_exemplar_wavs(bundle: Path) -> None:
         path.write_bytes(b"wav")
 
 
+def _write_source_manifest(
+    bundle: Path,
+    triple: str,
+    *,
+    git_head: str = SOURCE_HEAD,
+    source_fingerprint: str = SOURCE_FINGERPRINT,
+    source_dirty: list[str] | None = None,
+    schema: str = gate.BUILD_MANIFEST_SCHEMA,
+) -> None:
+    (bundle / gate.BUILD_MANIFEST_NAME).write_text(
+        json.dumps(
+            {
+                "schema": schema,
+                "git_head": git_head,
+                "source_fingerprint": source_fingerprint,
+                "source_dirty": source_dirty or [],
+                "source_fingerprint_paths": ["src/vibemix"],
+                "triple": triple,
+                "built_at": "2026-06-04T00:00:00Z",
+            },
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+
 def _write_bundle(
     root: Path,
     triple: str,
@@ -33,6 +74,7 @@ def _write_bundle(
     executable: bool = True,
     bundled_schema: str | None = None,
     learn_wavs: bool = True,
+    source_manifest: bool = True,
 ) -> Path:
     bundle = _bundle_dir(root, triple)
     bundle.mkdir(parents=True)
@@ -52,6 +94,8 @@ def _write_bundle(
             binary.chmod(mode | stat.S_IXUSR)
         else:
             binary.chmod(mode & ~stat.S_IXUSR & ~stat.S_IXGRP & ~stat.S_IXOTH)
+    if source_manifest:
+        _write_source_manifest(bundle, triple)
     return binary
 
 
@@ -141,6 +185,57 @@ def test_stale_embedded_ipc_schema_fails_with_rebuild_action(tmp_path: Path) -> 
     assert status.ok is False
     assert "IPC schema is stale" in status.message
     assert "scripts/build_sidecar.py" in status.message
+
+
+def test_missing_source_manifest_fails_with_rebuild_action(tmp_path: Path) -> None:
+    _write_bundle(tmp_path, MAC_TRIPLE, source_manifest=False)
+
+    status = gate.check_sidecar_bundle_ready(root=tmp_path, triple=MAC_TRIPLE)
+
+    assert status.ok is False
+    assert "source manifest missing" in status.message
+    assert "scripts/build_sidecar.py" in status.message
+
+
+def test_stale_source_manifest_fingerprint_fails(tmp_path: Path) -> None:
+    binary = _write_bundle(tmp_path, MAC_TRIPLE)
+    _write_source_manifest(binary.parent, MAC_TRIPLE, source_fingerprint="0" * 64)
+
+    status = gate.check_sidecar_bundle_ready(root=tmp_path, triple=MAC_TRIPLE)
+
+    assert status.ok is False
+    assert "fingerprint is stale" in status.message
+
+
+def test_dirty_runtime_source_after_freeze_fails(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _write_bundle(tmp_path, MAC_TRIPLE)
+    monkeypatch.setattr(
+        gate,
+        "source_dirty_paths",
+        lambda *, root=gate.REPO_ROOT: [" M src/vibemix/library/codex_curate.py"],
+    )
+
+    status = gate.check_sidecar_bundle_ready(root=tmp_path, triple=MAC_TRIPLE)
+
+    assert status.ok is False
+    assert "runtime-package source is dirty" in status.message
+    assert "codex_curate.py" in status.message
+
+
+def test_source_manifest_built_from_dirty_source_fails(tmp_path: Path) -> None:
+    binary = _write_bundle(tmp_path, MAC_TRIPLE)
+    _write_source_manifest(
+        binary.parent,
+        MAC_TRIPLE,
+        source_dirty=[" M scripts/build_sidecar.py"],
+    )
+
+    status = gate.check_sidecar_bundle_ready(root=tmp_path, triple=MAC_TRIPLE)
+
+    assert status.ok is False
+    assert "built from dirty runtime-package source" in status.message
 
 
 def test_missing_embedded_ipc_schema_fails_when_source_schema_exists(tmp_path: Path) -> None:

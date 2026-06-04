@@ -17,6 +17,7 @@ not in this unit test suite (per 11-02-PLAN.md task 2 item 4).
 from __future__ import annotations
 
 import ast
+import json
 import os
 import re
 import shutil
@@ -263,6 +264,45 @@ def test_install_into_tauri_binaries_windows_suffix(
 
     assert renamed.name == f"vibemix-core-{triple}.exe"
     assert renamed.is_file()
+
+
+def test_build_and_install_writes_source_manifest_before_aiza_scan(
+    tmp_path: Path,
+    fake_onedir: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Frozen sidecars must carry a source-freshness manifest before leak scan."""
+    fake_target_root = tmp_path / "tauri" / "src-tauri" / "binaries"
+    monkeypatch.setattr(build_sidecar, "_TAURI_BINARIES_DIR", fake_target_root)
+    monkeypatch.setattr(build_sidecar, "run_pyinstaller", lambda *_args, **_kwargs: fake_onedir)
+    monkeypatch.setattr(build_sidecar, "git_head", lambda *, root=build_sidecar._PROJECT_ROOT: "head")
+    monkeypatch.setattr(
+        build_sidecar,
+        "source_fingerprint",
+        lambda *, root=build_sidecar._PROJECT_ROOT: "f" * 64,
+    )
+    monkeypatch.setattr(build_sidecar, "source_dirty_paths", lambda *, root=build_sidecar._PROJECT_ROOT: [])
+
+    scanned_manifest_presence: list[bool] = []
+
+    def record_scan(bundle_dir: Path) -> None:
+        scanned_manifest_presence.append(
+            (bundle_dir / build_sidecar.BUILD_MANIFEST_NAME).is_file()
+        )
+
+    monkeypatch.setattr(build_sidecar, "assert_no_aiza_leak", record_scan)
+
+    triple = "aarch64-apple-darwin"
+    installed = build_sidecar.build_and_install(tmp_path / "vibemix-core.macos.spec", triple=triple)
+
+    manifest = installed.parent / build_sidecar.BUILD_MANIFEST_NAME
+    payload = json.loads(manifest.read_text(encoding="utf-8"))
+    assert payload["schema"] == build_sidecar.BUILD_MANIFEST_SCHEMA
+    assert payload["git_head"] == "head"
+    assert payload["source_fingerprint"] == "f" * 64
+    assert payload["source_dirty"] == []
+    assert payload["triple"] == triple
+    assert scanned_manifest_presence == [True]
 
 
 def test_install_into_tauri_binaries_raises_on_missing_source(

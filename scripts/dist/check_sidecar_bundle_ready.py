@@ -19,8 +19,18 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SRC_ROOT = REPO_ROOT / "src"
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
+
+from scripts.build_sidecar import (  # noqa: E402
+    BUILD_MANIFEST_NAME,
+    BUILD_MANIFEST_SCHEMA,
+    git_head,
+    source_dirty_paths,
+    source_fingerprint,
+)
 
 BINARIES_REL = Path("tauri/src-tauri/binaries")
 IPC_SCHEMA_REL = Path("tauri/ui/src/ipc/messages.schema.json")
@@ -296,6 +306,91 @@ def moss_release_source_ready(bundle_dir: Path) -> tuple[bool, str]:
     )
 
 
+def _preview_paths(paths: list[str], *, limit: int = 5) -> str:
+    preview = ", ".join(paths[:limit])
+    extra = "" if len(paths) <= limit else f" (+{len(paths) - limit} more)"
+    return preview + extra
+
+
+def sidecar_build_manifest_ready(
+    bundle_dir: Path,
+    *,
+    root: Path = REPO_ROOT,
+    expected_triple: str | None = None,
+) -> tuple[bool, str]:
+    """Return whether the frozen sidecar was built from the current source bytes."""
+    manifest_path = bundle_dir / BUILD_MANIFEST_NAME
+    build_cmd = build_command_for_triple(expected_triple or detect_host_triple())
+
+    if not manifest_path.is_file():
+        return (
+            False,
+            f"sidecar source manifest missing: {manifest_path}. Run `{build_cmd}`.",
+        )
+
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return (
+            False,
+            f"sidecar source manifest unreadable: {manifest_path}: {exc}. Run `{build_cmd}`.",
+        )
+
+    if manifest.get("schema") != BUILD_MANIFEST_SCHEMA:
+        return (
+            False,
+            f"sidecar source manifest schema is stale: {manifest_path}. Run `{build_cmd}`.",
+        )
+
+    if expected_triple and manifest.get("triple") != expected_triple:
+        return (
+            False,
+            "sidecar source manifest triple mismatch: "
+            f"{manifest.get('triple')!r} != {expected_triple!r}. Run `{build_cmd}`.",
+        )
+
+    recorded_dirty = manifest.get("source_dirty")
+    if recorded_dirty:
+        dirty = recorded_dirty if isinstance(recorded_dirty, list) else [str(recorded_dirty)]
+        return (
+            False,
+            "sidecar was built from dirty runtime-package source: "
+            f"{_preview_paths([str(path) for path in dirty])}. Commit/rebuild via `{build_cmd}`.",
+        )
+
+    try:
+        current_dirty = source_dirty_paths(root=root)
+        current_head = git_head(root=root)
+        current_fingerprint = source_fingerprint(root=root)
+    except Exception as exc:
+        return (
+            False,
+            f"could not compute current sidecar source fingerprint: {exc}. Run `{build_cmd}`.",
+        )
+
+    if current_dirty:
+        return (
+            False,
+            "runtime-package source is dirty after the sidecar was frozen: "
+            f"{_preview_paths(current_dirty)}. Commit/rebuild via `{build_cmd}`.",
+        )
+
+    if manifest.get("git_head") != current_head:
+        return (
+            False,
+            "sidecar source manifest git_head is stale: "
+            f"{manifest.get('git_head')!r} != {current_head!r}. Run `{build_cmd}`.",
+        )
+
+    if manifest.get("source_fingerprint") != current_fingerprint:
+        return (
+            False,
+            f"sidecar source manifest fingerprint is stale: {manifest_path}. Run `{build_cmd}`.",
+        )
+
+    return (True, f"sidecar source manifest ready: {manifest_path}")
+
+
 def check_sidecar_bundle_ready(
     *,
     root: Path = REPO_ROOT,
@@ -384,6 +479,14 @@ def check_sidecar_bundle_ready(
                 f"bundled IPC schema is stale: {bundled_schema}. Run `{build_cmd}`.",
                 binary,
             )
+
+    manifest_ok, manifest_message = sidecar_build_manifest_ready(
+        bundle_dir,
+        root=root,
+        expected_triple=target_triple,
+    )
+    if not manifest_ok:
+        return SidecarBundleStatus(False, manifest_message, binary)
 
     if require_moss_source:
         moss_ok, moss_message = moss_release_source_ready(bundle_dir)

@@ -21,6 +21,7 @@ from scripts.dist.check_sidecar_bundle_ready import (  # noqa: E402
     exe_suffix_for_triple,
     learn_exemplar_audio_ready,
     moss_release_source_ready,
+    sidecar_build_manifest_ready,
 )
 from scripts.dist.repair_macos_app_sidecar_symlinks import DYLIB_DIRS  # noqa: E402
 
@@ -237,6 +238,13 @@ def check_macos_app_bundle_ready(
     exemplar_ok, exemplar_message = learn_exemplar_audio_ready(bundle_dir)
     if not exemplar_ok:
         status.fail(exemplar_message)
+    manifest_ok, manifest_message = sidecar_build_manifest_ready(
+        bundle_dir,
+        root=_PROJECT_ROOT,
+        expected_triple=target_triple,
+    )
+    if not manifest_ok:
+        status.fail(manifest_message)
     if require_moss_source:
         moss_ok, moss_message = moss_release_source_ready(bundle_dir)
         status.moss_source = moss_message

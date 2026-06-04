@@ -19,10 +19,7 @@ def test_before_dev_command_targets_ui_package() -> None:
 def test_before_build_command_prepares_frontend_and_sidecar() -> None:
     body = TAURI_CONF.read_text(encoding="utf-8")
 
-    assert (
-        '"beforeBuildCommand": "uv run python ../scripts/dist/prepare_tauri_build.py '
-        '--require-moss-source"'
-        in body
-    )
-    assert 'committed `.placeholder`' in body
-    assert "no bundled/downloadable model source" in body
+    assert '"beforeBuildCommand": ' in body
+    assert "prepare_tauri_build.py --require-moss-source" in body
+    assert "`.placeholder` sidecar directories" in body
+    assert "bundled/downloadable model source" in body

@@ -8,10 +8,20 @@ import stat
 import subprocess
 from pathlib import Path
 
+import pytest
 from scripts.dist import check_macos_app_bundle_ready as gate
 from scripts.dist.check_sidecar_bundle_ready import LEARN_EXEMPLAR_WAVS
 
 MAC_TRIPLE = "aarch64-apple-darwin"
+
+
+@pytest.fixture(autouse=True)
+def _ready_source_manifest(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        gate,
+        "sidecar_build_manifest_ready",
+        lambda *_args, **_kwargs: (True, "sidecar source manifest ready"),
+    )
 
 
 def _write_learn_exemplar_wavs(sidecar_dir: Path) -> None:
@@ -164,6 +174,25 @@ def test_missing_learn_exemplar_wavs_fail(tmp_path: Path) -> None:
 
     assert status.ok is False
     assert any("Learn exemplar WAV bank missing" in error for error in status.errors)
+
+
+def test_stale_source_manifest_fails(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    app = _fake_app(tmp_path)
+    monkeypatch.setattr(
+        gate,
+        "sidecar_build_manifest_ready",
+        lambda *_args, **_kwargs: (False, "sidecar source manifest fingerprint is stale"),
+    )
+
+    status = gate.check_macos_app_bundle_ready(
+        app,
+        triple=MAC_TRIPLE,
+        min_bytes=1,
+        smoke="none",
+    )
+
+    assert status.ok is False
+    assert any("source manifest fingerprint is stale" in error for error in status.errors)
 
 
 def test_require_moss_source_fails_without_bundle_or_archive(
