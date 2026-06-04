@@ -331,8 +331,7 @@
 #shell-root[data-collapsed="true"] .sb-label,
 #shell-root[data-collapsed="true"] .sb-kbd,
 #shell-root[data-collapsed="true"] .sb-wordmark,
-#shell-root[data-collapsed="true"] .sb-brand .sb-ear,
-#shell-root[data-collapsed="true"] .sb-cohost-label { display: none; }
+#shell-root[data-collapsed="true"] .sb-brand .sb-ear { display: none; }
 #shell-root[data-collapsed="true"] .sb-monogram { display: block; }
 /* Not-live, the collapsed monogram inherits the breath the ear had — the lone
  * sign-of-life on the rail. Steadies when live (deck tail cursor takes over). */
@@ -866,7 +865,7 @@
   font-size: 11px;
   letter-spacing: 0.2em;
   text-transform: uppercase;
-  color: var(--brand);
+  color: var(--text-muted);
   border-bottom: 1px solid var(--border-subtle);
 }
 .panel-body {
@@ -1051,17 +1050,6 @@
     linear-gradient(180deg, rgba(255, 255, 255, 0.045), transparent),
     rgba(255, 255, 255, 0.018);
 }
-.palette-title {
-  color: var(--text-primary);
-  font-family: var(--type-display);
-  font-size: 18px;
-  line-height: 1.1;
-}
-.palette-subtitle {
-  margin-top: 4px;
-  color: var(--text-muted);
-  font-size: 12px;
-}
 /* One quiet inline status run, NOT a 4-up identical-card grid (banned). The cells
  * lose their borders/fills and read as label:value pairs spaced along one line;
  * tone now lights the value, not a bordered box (impeccable layout). */
@@ -1069,7 +1057,6 @@
   display: flex;
   flex-wrap: wrap;
   gap: 4px var(--sp-4);
-  margin-top: var(--sp-2);
 }
 .palette-summary-cell {
   min-width: 0;
@@ -1250,8 +1237,7 @@
   #shell-root .sb-label,
   #shell-root .sb-kbd,
   #shell-root .sb-wordmark,
-  #shell-root .sb-brand .sb-ear,
-  #shell-root .sb-cohost-label {
+  #shell-root .sb-brand .sb-ear {
     display: none;
   }
   #shell-root .sb-monogram {

@@ -102,12 +102,23 @@ export function voiceReadinessBadgeModel(
   };
 }
 
-function renderBadge(element: HTMLElement, model: VoiceReadinessBadgeModel): void {
+function renderBadge(
+  element: HTMLElement,
+  separator: HTMLElement,
+  model: VoiceReadinessBadgeModel,
+): void {
   element.dataset.state = model.state;
   element.title = model.title;
   element.setAttribute("aria-label", model.title);
   const label = element.querySelector<HTMLElement>(".voice-readiness-label");
   if (label) label.textContent = model.label;
+  // "unknown" is the pre-load / backend-hiccup state. It stays honest in
+  // dataset.state + title (for AT and dev), but it must not paint a "voice
+  // unknown" chip that reads as broken from frame zero: a stable indeterminate
+  // state shows no chrome (the separator hides with it so nothing dangles).
+  const hidden = model.state === "unknown";
+  element.hidden = hidden;
+  separator.hidden = hidden;
 }
 
 export function mountVoiceReadinessBadge(
@@ -137,7 +148,7 @@ export function mountVoiceReadinessBadge(
   badge.innerHTML =
     '<span class="voice-readiness-dot" aria-hidden="true"></span>' +
     '<span class="voice-readiness-label">voice unknown</span>';
-  renderBadge(badge, voiceReadinessBadgeModel(null));
+  renderBadge(badge, separator, voiceReadinessBadgeModel(null));
   footer.append(separator, badge);
 
   let disposed = false;
@@ -149,6 +160,7 @@ export function mountVoiceReadinessBadge(
     if (!disposed) {
       renderBadge(
         badge,
+        separator,
         voiceReadinessBadgeModel(latestModels, latestError, latestRuntimeVoice),
       );
     }

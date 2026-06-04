@@ -156,12 +156,6 @@ function buildPaletteSummary(store: ShellStore): readonly PaletteSummaryCell[] {
       value: sentenceCase(model.activation),
       tone: model.activation === "live" ? "ok" : "muted",
     },
-    {
-      label: "Bus",
-      value: model.connection === "connected" ? "Connected" : sentenceCase(model.connection),
-      tone: model.connection === "connected" ? "ok" : "warn",
-    },
-    { label: "Proof", value: model.panelOpen ? "Open" : "Closed", tone: model.panelOpen ? "ok" : "muted" },
   ];
 }
 

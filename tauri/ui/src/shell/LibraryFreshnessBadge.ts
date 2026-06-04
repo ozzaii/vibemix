@@ -114,12 +114,23 @@ export function libraryFreshnessBadgeModel(
   };
 }
 
-function renderBadge(element: HTMLElement, model: LibraryFreshnessBadgeModel): void {
+function renderBadge(
+  element: HTMLElement,
+  separator: HTMLElement,
+  model: LibraryFreshnessBadgeModel,
+): void {
   element.dataset.state = model.state;
   element.title = model.title;
   element.setAttribute("aria-label", model.title);
   const label = element.querySelector<HTMLElement>(".library-freshness-label");
   if (label) label.textContent = model.label;
+  // "unknown" is the pre-load / backend-hiccup state. It stays honest in
+  // dataset.state + title (for AT and dev), but it must not paint a "library
+  // unknown" chip that reads as broken from frame zero: a stable indeterminate
+  // state shows no chrome (the separator hides with it so nothing dangles).
+  const hidden = model.state === "unknown";
+  element.hidden = hidden;
+  separator.hidden = hidden;
 }
 
 export function mountLibraryFreshnessBadge(
@@ -148,16 +159,16 @@ export function mountLibraryFreshnessBadge(
   badge.innerHTML =
     '<span class="library-freshness-dot" aria-hidden="true"></span>' +
     '<span class="library-freshness-label">library unknown</span>';
-  renderBadge(badge, libraryFreshnessBadgeModel(null));
+  renderBadge(badge, separator, libraryFreshnessBadgeModel(null));
   footer.append(separator, badge);
 
   let disposed = false;
   const refresh = async (): Promise<void> => {
     try {
       const stats = await getStats();
-      if (!disposed) renderBadge(badge, libraryFreshnessBadgeModel(stats));
+      if (!disposed) renderBadge(badge, separator, libraryFreshnessBadgeModel(stats));
     } catch (err) {
-      if (!disposed) renderBadge(badge, libraryFreshnessBadgeModel(null, err));
+      if (!disposed) renderBadge(badge, separator, libraryFreshnessBadgeModel(null, err));
     }
   };
 

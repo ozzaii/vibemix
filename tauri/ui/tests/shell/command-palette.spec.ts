@@ -55,10 +55,10 @@ describe("command palette — accelerators teach the shortcuts", () => {
     expect(summary.textContent).toContain("Deck");
     expect(summary.textContent).toContain("State");
     expect(summary.textContent).toContain("Live");
-    expect(summary.textContent).toContain("Bus");
-    expect(summary.textContent).toContain("Connected");
-    expect(summary.textContent).toContain("Proof");
-    expect(summary.textContent).toContain("Open");
+    // Bus (connection) and Proof (panel open/closed) were dev-dashboard telemetry
+    // on palette open; only navigational context (Surface, State) remains.
+    expect(summary.textContent).not.toContain("Bus");
+    expect(summary.textContent).not.toContain("Proof");
   });
 
   it("groups navigation above controls and marks the current surface", () => {

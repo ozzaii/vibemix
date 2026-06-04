@@ -63,10 +63,11 @@ export function createSidebar(store: ShellStore): HTMLElement {
 
   const foot = document.createElement("div");
   foot.className = "sb-foot";
+  // A static lit rose dot: the sidebar's sign-of-life that the co-host is awake.
+  // No caps label — the dot carries the state; the word read as a false control.
   foot.innerHTML =
-    '<div class="sb-cohost" data-wire="shell.cohost-pill">' +
+    '<div class="sb-cohost" data-wire="shell.cohost-pill" aria-label="Co-host">' +
     '<span class="sb-ear" aria-hidden="true"></span>' +
-    '<span class="sb-cohost-label">co-host</span>' +
     "</div>";
 
   sidebar.append(collapse, brand, nav, foot);

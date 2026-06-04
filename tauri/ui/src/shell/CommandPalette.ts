@@ -112,9 +112,8 @@ export function createCommandPalette(
 
   const header = document.createElement("div");
   header.className = "palette-head";
-  header.innerHTML =
-    `<div class="palette-title">Command deck</div>` +
-    `<div class="palette-subtitle">Jump surfaces, inspect state, or run a local control.</div>`;
+  // No title or subtitle: the input placeholder self-labels, and a heading on a
+  // command palette is defensive chrome (Raycast / Linear ship none).
 
   const summary = document.createElement("div");
   summary.className = "palette-summary";

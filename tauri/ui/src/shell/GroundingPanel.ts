@@ -10,11 +10,11 @@ export function createGroundingPanel(store: ShellStore): HTMLElement {
   const aside = document.createElement("aside");
   aside.className = "shell-panel";
   aside.setAttribute("data-wire", "shell.panel");
-  aside.setAttribute("aria-label", "Grounding");
+  aside.setAttribute("aria-label", "Receipts");
 
   const head = document.createElement("div");
   head.className = "panel-head";
-  head.textContent = "Grounding";
+  head.textContent = "Receipts";
 
   const body = document.createElement("div");
   body.className = "panel-body";
