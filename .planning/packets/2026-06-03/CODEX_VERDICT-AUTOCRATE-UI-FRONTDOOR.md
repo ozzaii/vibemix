@@ -54,3 +54,36 @@ Result:
 - This packet intentionally did not add a UI button or decide the O7/O10 product framing.
 - `vibemix-dev which_handler library_auto_crate` does not match because this is a Tauri
   invoke command, not a websocket `ipc.*` message.
+
+---
+
+# CODEX VERDICT — AUTOCRATE UI FRONTDOOR
+
+Item: `AUTOCRATE-UI-FRONTDOOR`
+
+SHA: `da54627f feat(library-ui): route build tab through AutoCrate`
+
+## Result
+
+Build tab now uses the keyless `library_auto_crate` Rust command through
+`libraryBuildSet`/`libraryAutoCrate`, so a DJ can build and export a Rekordbox set
+without Codex login or the old chat timeout path. Existing render tests keep the
+`libraryBuildSet` import name, but production invoke now sends:
+
+`library_auto_crate { query, curve, nSlots }`
+
+## Proof
+
+- UI focused gate: `npm --prefix tauri/ui test -- src/library/api.test.ts src/library/build.test.ts src/library/folded-mount.test.ts` -> `71 passed`.
+- UI full gate: `npm --prefix tauri/ui test` -> `157 passed`, `1557 passed | 1 todo`.
+- UI build gate: `npm --prefix tauri/ui run build` -> Vite build passed.
+- Rust command-shape gate: `cargo test --manifest-path tauri/src-tauri/Cargo.toml maps_auto_crate_result_shape` -> passed.
+- Real backend artifact: `VIBEMIX_LOCAL_TTS=0 uv run python -m vibemix library auto-crate "peak-time psytrance hardgroove" --curve peak_time --n-slots 4 --export rekordbox --json` returned `stop_reason:"exported"` and wrote `/Users/ozai/.cache/vibemix/sets/peak-time-psytrance-hardgroove.xml` (1.2K).
+
+## Notes
+
+The packet expected the Rust command to be missing; HEAD already had
+`library_auto_crate` registered. The remaining dark gap was the UI command seam
+and stale Build-tab failure copy.
+
+No live Sven/MOSS output was enabled during verification (`VIBEMIX_LOCAL_TTS=0`).
