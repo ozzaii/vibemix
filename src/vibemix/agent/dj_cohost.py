@@ -151,6 +151,55 @@ _OPTION_B_SPLIT_RE = re.compile(
     r"(?:^|\s)(?:[-*]\s*)?(?:option\s+b\s*[:.)-]|b[).:])\s*",
     re.IGNORECASE,
 )
+_FINISHED_LINE_META_PREFIX_RE = re.compile(
+    r"^\s*(?:"
+    r"check\s+constraints\b|"
+    r"formulate\b|"
+    r"(?:[-*]\s*)?\*?\s*draft\s*\d+\b|"
+    r"\d+\s*(?:and\s*)?(?:<=|<|>=|>)\s*\d+\s*words?\b|"
+    r"\d+\s*,\s*(?:<=|<|>=|>)?\s*\d+\s*words?\b|"
+    r"\d+\s*words?\)"
+    r")",
+    re.IGNORECASE,
+)
+_PARTIAL_FINISHED_LINE_META_PREFIX_RE = re.compile(
+    r"^\s*(?:\d{1,2}\s*(?:$|,|and\b|words?\b|\))|check\s*(?:$|c)|formulate\s*$|"
+    r"(?:[-*]\s*)?\*?\s*draft\s*(?:$|\d*))",
+    re.IGNORECASE,
+)
+_QUOTED_FINISHED_LINE_RE = re.compile(r'"(?P<body>[^"\n]{8,220})(?:"|$)')
+_CHECK_CONSTRAINTS_PREFIX_RE = re.compile(
+    r"^\s*(?:[-*]\s*)?(?:\*+\s*)?check\s+constraints\s*[:.)*-]*\s*",
+    re.IGNORECASE,
+)
+_FORMULATE_PREFIX_RE = re.compile(
+    r"^\s*(?:[-*]\s*)?(?:\*+\s*)?formulate\s*[:.)*-]*\s*",
+    re.IGNORECASE,
+)
+_DRAFT_PREFIX_RE = re.compile(
+    r"^\s*(?:[-*]\s*)?(?:\*+\s*)?draft\s*\d+\s*(?:\*+\s*)?[:.)-]*\s*",
+    re.IGNORECASE,
+)
+_WORD_COUNT_PREFIX_RE = re.compile(
+    r"^\s*(?:[-*]\s*)?(?:\*+\s*)?(?:"
+    r"\d+\s*(?:and\s*)?(?:<=|<|>=|>)\s*\d+\s*words?\??|"
+    r"\d+\s*,\s*(?:<=|<|>=|>)?\s*\d+\s*words?\)?\??|"
+    r"\d+\s*words?\)"
+    r")\s*(?:yes\s*\([^)]*\)\.?)?\s*(?:[:.)*-]|\*)*\s*",
+    re.IGNORECASE,
+)
+_SPEAKER_PREFIX_RE = re.compile(r"^\s*(?:sven|you)\s*[:.)-]\s*", re.IGNORECASE)
+_META_LINE_RESIDUE_RE = re.compile(
+    r"(?:<=|>=|<\s*\d+\s*words|\b\d+\s*words?\b|\bconstraints?\b|\bdraft\b|"
+    r"\bformulate\b|\bjson\b|\bshould_speak\b|\bfriend_not_narrator\b|"
+    r"\bgrounded_not_fabricated\b)",
+    re.IGNORECASE,
+)
+_PACKET_FRAGMENT_PREFIX_RE = re.compile(
+    r"^\s*(?:`?[a-z_][a-z0-9_:-]*=\S+|[+-]?\d+(?:\.\d+)?`\s*,\s*`[a-z_][a-z0-9_:-]*=)",
+    re.IGNORECASE,
+)
+_PARTIAL_PACKET_FRAGMENT_PREFIX_RE = re.compile(r"^\s*(?:`|[+-]?\d+\.\d*)")
 
 # Events where the screen Part is ALWAYS skipped, even if a screen frame is
 # available. This is independent from the audio window size: MIX_MOVE needs
@@ -202,6 +251,86 @@ def _repair_option_scaffold_line(text: str) -> str | None:
     if len(body.split()) < 2:
         return None
     return body
+
+
+def _starts_finished_line_meta_scaffold(text: str) -> bool:
+    return bool(_FINISHED_LINE_META_PREFIX_RE.match(text or ""))
+
+
+def _could_be_finished_line_meta_scaffold(text: str) -> bool:
+    if _starts_finished_line_meta_scaffold(text):
+        return True
+    stripped = (text or "").strip()
+    if not stripped:
+        return False
+    lowered = stripped.lower()
+    return (
+        "check constraints".startswith(lowered)
+        or "formulate".startswith(lowered)
+        or bool(_PARTIAL_FINISHED_LINE_META_PREFIX_RE.match(stripped))
+    )
+
+
+def _starts_unspoken_packet_fragment(text: str) -> bool:
+    return bool(_PACKET_FRAGMENT_PREFIX_RE.match(text or ""))
+
+
+def _could_be_unspoken_packet_fragment(text: str) -> bool:
+    return _starts_unspoken_packet_fragment(text) or bool(
+        _PARTIAL_PACKET_FRAGMENT_PREFIX_RE.match((text or "").strip())
+    )
+
+
+def repair_finished_headphone_line(text: str) -> str | None:
+    """Strip model-authored drafting wrappers without inventing a replacement."""
+
+    stripped = (text or "").strip()
+    if not stripped:
+        return None
+    if _starts_unspoken_packet_fragment(stripped):
+        return None
+    if _starts_option_scaffold(stripped):
+        return _repair_option_scaffold_line(stripped)
+    if not _starts_finished_line_meta_scaffold(stripped):
+        return stripped
+
+    joined = " ".join(part.strip() for part in stripped.splitlines() if part.strip())
+    for match in _QUOTED_FINISHED_LINE_RE.finditer(joined):
+        candidate = _clean_finished_line_candidate(match.group("body"))
+        if candidate:
+            return candidate
+
+    candidate = joined
+    for _ in range(6):
+        before = candidate
+        candidate = _CHECK_CONSTRAINTS_PREFIX_RE.sub("", candidate, count=1)
+        candidate = _FORMULATE_PREFIX_RE.sub("", candidate, count=1)
+        candidate = _WORD_COUNT_PREFIX_RE.sub("", candidate, count=1)
+        candidate = _DRAFT_PREFIX_RE.sub("", candidate, count=1)
+        if candidate == before:
+            break
+    return _clean_finished_line_candidate(candidate)
+
+
+def _clean_finished_line_candidate(text: str) -> str | None:
+    candidate = " ".join(part.strip() for part in (text or "").splitlines() if part.strip())
+    candidate = candidate.strip(" \t\r\n-*:_\"'`")
+    candidate = _SPEAKER_PREFIX_RE.sub("", candidate).strip(" \t\r\n-*:_\"'`")
+    if not candidate:
+        return None
+    first_sentence = re.split(r"(?<=[.!?])\s+", candidate, maxsplit=1)[0].strip()
+    if first_sentence:
+        candidate = first_sentence
+    candidate = candidate.strip(" \t\r\n-*:_\"'`")
+    if not candidate or len(candidate.split()) < 2:
+        return None
+    if _starts_option_scaffold(candidate) or _starts_finished_line_meta_scaffold(candidate):
+        return None
+    if re.match(r"^(?:yes|no)\b", candidate, re.IGNORECASE):
+        return None
+    if _META_LINE_RESIDUE_RE.search(candidate):
+        return None
+    return candidate
 
 # Env-var names — public contract, surfaced in CLI / Settings UI in Phase 11/12.
 ENV_SKILL_LEVEL = "VIBEMIX_SKILL_LEVEL"
@@ -2888,6 +3017,10 @@ class DJCoHostAgent(Agent):
                         language_defer_stream = True
                     if guard_option_scaffold and _starts_option_scaffold(full_text):
                         continue
+                    if _could_be_finished_line_meta_scaffold(full_text):
+                        continue
+                    if _could_be_unspoken_packet_fragment(full_text):
+                        continue
                     if live_claim_defer_stream:
                         continue
                     if language_defer_stream:
@@ -3009,6 +3142,8 @@ class DJCoHostAgent(Agent):
             elapsed = time.time() - t_start
             stripped = full_text.strip()
             option_scaffold_suppressed = False
+            line_scaffold_suppressed = False
+            packet_fragment_suppressed = False
             if guard_option_scaffold and _starts_option_scaffold(full_text):
                 repaired = _repair_option_scaffold_line(full_text)
                 if repaired:
@@ -3028,6 +3163,27 @@ class DJCoHostAgent(Agent):
                         pass
                 else:
                     option_scaffold_suppressed = True
+            elif _starts_finished_line_meta_scaffold(full_text):
+                repaired = repair_finished_headphone_line(full_text)
+                if repaired:
+                    raw_line_scaffold_text = full_text
+                    full_text = repaired
+                    buffered_chunks = [full_text]
+                    stripped = full_text.strip()
+                    try:
+                        self._recorder.log_event(
+                            "line_scaffold_repaired",
+                            event=ev_tag,
+                            raw_text=raw_line_scaffold_text,
+                            repaired_text=full_text,
+                            latency_s=round(elapsed, 2),
+                        )
+                    except Exception:
+                        pass
+                else:
+                    line_scaffold_suppressed = True
+            elif _starts_unspoken_packet_fragment(full_text):
+                packet_fragment_suppressed = True
 
             # ---- Plan 18-04: citation-count telemetry ----
             # Count citations in the FULL response text BEFORE the suppression
@@ -3072,6 +3228,10 @@ class DJCoHostAgent(Agent):
             slop_matches: list[str] = []
             if option_scaffold_suppressed:
                 suppression = "option_scaffold"
+            elif line_scaffold_suppressed:
+                suppression = "line_scaffold"
+            elif packet_fragment_suppressed:
+                suppression = "packet_fragment"
             elif stripped == SILENCE_TOKEN or stripped.startswith(SILENCE_TOKEN):
                 suppression = "silence"
             else:
@@ -3203,6 +3363,26 @@ class DJCoHostAgent(Agent):
                 print("[ai_text] <option scaffold suppressed>", flush=True)
                 if head_yielded:
                     _push_silence_pad_and_cancel("option_scaffold")
+            elif suppression == "line_scaffold":
+                self._recorder.log_event(
+                    "line_scaffold_suppressed",
+                    event=ev_tag,
+                    response_chars=len(full_text),
+                    latency_s=round(elapsed, 2),
+                )
+                print("[ai_text] <line scaffold suppressed>", flush=True)
+                if head_yielded:
+                    _push_silence_pad_and_cancel("line_scaffold")
+            elif suppression == "packet_fragment":
+                self._recorder.log_event(
+                    "packet_fragment_suppressed",
+                    event=ev_tag,
+                    response_chars=len(full_text),
+                    latency_s=round(elapsed, 2),
+                )
+                print("[ai_text] <packet fragment suppressed>", flush=True)
+                if head_yielded:
+                    _push_silence_pad_and_cancel("packet_fragment")
             elif suppression == "non_english":
                 self._recorder.log_event(
                     "non_english_suppressed",

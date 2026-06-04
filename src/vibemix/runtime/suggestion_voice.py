@@ -17,7 +17,10 @@ if TYPE_CHECKING:  # pragma: no cover - typing only
     from vibemix.state.evidence_registry import EvidenceRegistry
 
 _CITATION_BODY_RE = re.compile(r"^[^\s,\]]+$")
-_VOICE_EVENT_TYPES = frozenset({"TRACK_CHANGE", "TRANSITION_OPPORTUNITY"})
+_VOICE_EVENT_TYPES = frozenset({"PHASE", "TRACK_CHANGE", "TRANSITION_OPPORTUNITY"})
+_CUE_LOOKAHEAD_EVENT_TYPES = frozenset({"PHASE", "TRACK_CHANGE"})
+_CUE_LOOKAHEAD_CONFIDENCE_FLOOR = 0.7
+_CUE_LOOKAHEAD_MAX_ETA_S = 64.0
 _TEXT_ESCAPE = str.maketrans({"[": "(", "]": ")", "\n": " ", "\r": " ", "|": "/"})
 
 
@@ -26,6 +29,7 @@ def build_next_suggestion_voice_line(
     *,
     event_type: str,
     evidence_registry: EvidenceRegistry | None,
+    state: Any | None = None,
 ) -> str | None:
     """Return a citable prompt receipt for a current suggestion.
 
@@ -37,8 +41,14 @@ def build_next_suggestion_voice_line(
 
     if event_type not in _VOICE_EVENT_TYPES:
         return None
-    if suggestion is None or evidence_registry is None:
+    if evidence_registry is None:
         return None
+    if suggestion is None:
+        return _build_cue_lookahead_voice_line(
+            state,
+            event_type=event_type,
+            evidence_registry=evidence_registry,
+        )
 
     track_id = _clean_citation_body(suggestion.get("track_id"))
     if track_id is None:
@@ -69,6 +79,38 @@ def build_next_suggestion_voice_line(
         f"{section_clause}Hand it as one nudge if it fits the live sound. "
         f"Copy these citations exactly: {cite_tail}. Do not say it is loaded "
         "or playing; it is not a proven transition unless deck/live evidence says so."
+    )
+
+
+def _build_cue_lookahead_voice_line(
+    state: Any | None,
+    *,
+    event_type: str,
+    evidence_registry: EvidenceRegistry,
+) -> str | None:
+    if event_type not in _CUE_LOOKAHEAD_EVENT_TYPES or state is None:
+        return None
+
+    cue_id = _clean_citation_body(getattr(state, "next_phrase_cue_id", None))
+    if cue_id is None:
+        return None
+    confidence = _finite_float(getattr(state, "phrase_position_confidence", None))
+    if confidence is None or confidence < _CUE_LOOKAHEAD_CONFIDENCE_FLOOR:
+        return None
+    next_phrase_at = _finite_float(getattr(state, "next_phrase_at", None))
+    if next_phrase_at is None:
+        return None
+    set_seconds = _finite_float(getattr(state, "set_seconds", 0.0)) or 0.0
+    eta_s = next_phrase_at - set_seconds
+    if eta_s <= 0.0 or eta_s > _CUE_LOOKAHEAD_MAX_ETA_S:
+        return None
+
+    evidence_registry.write("cue", cue_id, next_phrase_at)
+    timing_clause = _phrase_timing_clause(state, eta_s)
+    return (
+        f"Forward cue receipt: the next citable phrase boundary is {timing_clause}. "
+        "Use it as one forward timing nudge for what comes next if the live sound "
+        f"supports it. Copy this citation exactly: [cue:{cue_id}]."
     )
 
 
@@ -119,6 +161,28 @@ def _clean_citation_body(value: object) -> str | None:
     if not value or _CITATION_BODY_RE.fullmatch(value) is None:
         return None
     return value
+
+
+def _finite_float(value: object) -> float | None:
+    if isinstance(value, bool):
+        return None
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError):
+        return None
+    if parsed != parsed or parsed in (float("inf"), float("-inf")):
+        return None
+    return parsed
+
+
+def _phrase_timing_clause(state: Any, eta_s: float) -> str:
+    bpm = _finite_float(getattr(state, "bpm", None))
+    bpm_confidence = _finite_float(getattr(state, "bpm_confidence", None)) or 0.0
+    if bpm is not None and bpm > 0.0 and bpm_confidence >= 0.6:
+        bars = max(1, round((eta_s * bpm) / 240.0))
+        unit = "bar" if bars == 1 else "bars"
+        return f"about {bars} {unit} ahead"
+    return "coming up in the phrase grid"
 
 
 def _clean_text(value: object, *, fallback: str, cap: int = 72) -> str:

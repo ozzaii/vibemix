@@ -763,23 +763,17 @@ async def coach_loop(
             continue
 
         if ev.type in (
+            "PHASE",
             "TRACK_CHANGE",
             "TRANSITION_OPPORTUNITY",
         ):
             try:
+                current_suggestion = None
                 if suggestion_service is not None:
-                    current_suggestion = None
                     if hasattr(suggestion_service, "current_for_state"):
                         current_suggestion = suggestion_service.current_for_state(state)
                     elif hasattr(suggestion_service, "current"):
                         current_suggestion = suggestion_service.current()
-                    voice_line = build_next_suggestion_voice_line(
-                        current_suggestion,
-                        event_type=ev.type,
-                        evidence_registry=evidence_registry,
-                    )
-                    if voice_line:
-                        ev.extra["next_suggestion_voice_line"] = voice_line
                     transition_line = build_transition_verdict_voice_line(
                         current_suggestion,
                         event_type=ev.type,
@@ -787,6 +781,14 @@ async def coach_loop(
                     )
                     if transition_line:
                         ev.extra["transition_verdict_voice_line"] = transition_line
+                voice_line = build_next_suggestion_voice_line(
+                    current_suggestion,
+                    event_type=ev.type,
+                    evidence_registry=evidence_registry,
+                    state=state,
+                )
+                if voice_line:
+                    ev.extra["next_suggestion_voice_line"] = voice_line
                 set_line = build_set_progress_voice_line(
                     getattr(state, "set_progress", None),
                     event_type=ev.type,

@@ -31,15 +31,20 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import subprocess
 import sys
+import time
+from pathlib import Path
 
 import httpx
 
+from vibemix.agent.dj_cohost import repair_finished_headphone_line
 from vibemix.bench.fixtures import fixture_state_for
 from vibemix.llm.model_router import resolve_model
 from vibemix.prompts.matrix import build_system_instruction
 from vibemix.runtime.speak_gate import decide_speak_gate
-from vibemix.state import Event
+from vibemix.runtime.suggestion_voice import build_next_suggestion_voice_line
+from vibemix.state import Event, EvidenceRegistry
 
 RESPAN_BASE = "https://api.respan.ai/api"
 GATEWAY = f"{RESPAN_BASE}/chat/completions"
@@ -76,6 +81,15 @@ DIMS = [
 # Controlled scenarios — authored faithful to the real evidence-bundle format.
 # `expect` = the gate verdict we expect from today's build.
 _HEAR = "hearing[rms=0.16 sub=0.62 low=0.24 mid=0.10 high=0.04 bpm=150]"
+_CUE_HEAR = "hearing[rms=0.16 sub=0.62 low=0.24 mid=0.10 high=0.04 bpm=120]"
+_CUE_STATE = {
+    "set_seconds": 100.0,
+    "phrase_position_confidence": 0.9,
+    "next_phrase_at": 108.0,
+    "next_phrase_cue_id": "phrase_boundary@108.0",
+    "bpm": 120.0,
+    "bpm_confidence": 0.95,
+}
 SCENARIOS = [
     {
         "name": "idle_heartbeat", "event": "HEARTBEAT", "extra": {}, "expect": "silent",
@@ -83,9 +97,10 @@ SCENARIOS = [
         "task": "Steady stretch, no controller move. If there's a sound read worth one sharp line, say it; otherwise a single space to stay silent.",
     },
     {
-        "name": "phase_shift_idle", "event": "PHASE", "extra": {}, "expect": "silent",
-        "evidence": f"{_HEAR} | track=unknown | deck=mix | phase=groove->build | recent_moves[8s]: NONE",
-        "task": "The phase shifted groove->build with no move from Kaan. One forward read if it helps, else stay silent.",
+        "name": "phase_with_cue_lookahead", "event": "PHASE", "extra": {},
+        "state": _CUE_STATE, "cue_lookahead": True, "expect": "speak",
+        "evidence": f"{_CUE_HEAR} | track=unknown | deck=mix | phase=groove->build | recent_moves[8s]: NONE | cue_anchor=phrase_boundary@108.0 | next_phrase_at=108.0",
+        "task": "The phase shifted groove->build with no controller move, and the packet carries a grounded phrase-boundary lookahead. Hand one forward timing nudge.",
     },
     {
         "name": "heartbeat_with_grounded_payload", "event": "HEARTBEAT",
@@ -115,9 +130,10 @@ SCENARIOS = [
         "task": "A new top-end layer came in with no move from Kaan. Coach the direction if worth it, else stay silent.",
     },
     {
-        "name": "track_change", "event": "TRACK_CHANGE", "extra": {}, "expect": "silent",
-        "evidence": f"{_HEAR} | track=\"Valence - Infinite\"->\"Raik - Trio d'Acid\" | deck=A | recent_moves[8s]: NONE | transition_block=no_resolved_decks",
-        "task": "The track just changed on deck A. One forward read or nudge grounded in what you can back.",
+        "name": "track_change_with_cue_lookahead", "event": "TRACK_CHANGE", "extra": {},
+        "state": _CUE_STATE, "cue_lookahead": True, "expect": "speak",
+        "evidence": f"{_CUE_HEAR} | track=\"Valence - Infinite\"->\"Raik - Trio d'Acid\" | deck=A | recent_moves[8s]: NONE | cue_anchor=phrase_boundary@108.0 | next_phrase_at=108.0 | transition_block=no_resolved_decks",
+        "task": "The track changed with no controller move or next-track candidate, and the packet carries a grounded phrase-boundary lookahead. Hand one forward timing nudge.",
     },
     {
         "name": "track_change_with_next", "event": "TRACK_CHANGE",
@@ -127,6 +143,60 @@ SCENARIOS = [
         "task": "The track just changed and the packet carries a grounded next-track receipt. Hand one forward nudge.",
     },
 ]
+
+
+def _state_for_scenario(sc: dict) -> object:
+    state, _ = fixture_state_for("snapshot", "plain")
+    for key, value in (sc.get("state") or {}).items():
+        if key == "set_seconds":
+            state.set_start_at = time.time() - float(value)
+        else:
+            setattr(state, key, value)
+    return state
+
+
+def _extra_for_scenario(sc: dict, state: object) -> dict:
+    extra = dict(sc["extra"])
+    if sc.get("cue_lookahead"):
+        registry = EvidenceRegistry()
+        line = build_next_suggestion_voice_line(
+            None,
+            event_type=sc["event"],
+            evidence_registry=registry,
+            state=state,
+        )
+        if line:
+            extra["next_suggestion_voice_line"] = line
+    return extra
+
+
+def _run_heartbeat_judge(
+    *,
+    session: str,
+    out: str | None,
+    dry_run: bool,
+    no_log: bool,
+) -> int:
+    judge_script = Path(__file__).with_name("respan_sven_heartbeat_judge.py")
+    cmd = [
+        sys.executable,
+        str(judge_script),
+        "--session",
+        session,
+        "--events",
+        "ALL",
+        "--apply-current-gate",
+        "--concurrency",
+        "4",
+    ]
+    if dry_run:
+        cmd.append("--dry-run")
+    if no_log:
+        cmd.append("--no-log")
+    if out:
+        cmd.extend(["--out", out])
+    print("\nRecorded-set current-gate judge:", flush=True)
+    return subprocess.call(cmd)
 
 
 def _post(url: str, payload: dict, key: str, timeout: float = 60.0) -> tuple[int, dict | str]:
@@ -180,9 +250,14 @@ def main() -> int:
     ap.add_argument("--gate-only", action="store_true", help="deterministic gate routing, no model")
     ap.add_argument("--no-log", action="store_true")
     ap.add_argument("--out", default=None)
+    ap.add_argument(
+        "--heartbeat-session",
+        default=None,
+        help="also run respan_sven_heartbeat_judge.py --apply-current-gate on this recording",
+    )
+    ap.add_argument("--heartbeat-out", default=None)
     args = ap.parse_args()
 
-    state, _ = fixture_state_for("snapshot", "plain")
     # The live coach persona (the current build): intermediate/hype cell = SVEN_COACH_IDENTITY.
     persona = build_system_instruction(
         "intermediate", "hype", include_tag_dsl=False, include_citation_grammar=False,
@@ -198,7 +273,8 @@ def main() -> int:
     results = []
     print(f"{'scenario':<32} {'event':<16} {'gate':<8} {'ok?':<4} friend/grnd/earn/move/voice")
     for sc in SCENARIOS:
-        ev = Event(type=sc["event"], state=state, extra=dict(sc["extra"]))
+        state = _state_for_scenario(sc)
+        ev = Event(type=sc["event"], state=state, extra=_extra_for_scenario(sc, state))
         gate = decide_speak_gate(ev)
         ok = "ok" if gate.verdict == sc["expect"] else "!!"
         row = {"name": sc["name"], "event": sc["event"], "gate": gate.verdict,
@@ -209,9 +285,19 @@ def main() -> int:
             continue
         user = f"{sc['evidence']}\n\n{sc['task']}"
         _st, line = _chat(persona, user, key)
-        line = (line or "").strip()
-        scores = _judge(sc["evidence"], line, key) if line else {}
-        row.update({"line": line, "scores": scores})
+        raw_line = (line or "").strip()
+        line = repair_finished_headphone_line(raw_line) or ""
+        if line:
+            scores = _judge(sc["evidence"], line, key)
+        elif raw_line:
+            scores = {
+                **{dim: 0 for dim in DIMS},
+                "should_speak": False,
+                "why": "runtime suppressed scaffold or packet fragment",
+            }
+        else:
+            scores = {}
+        row.update({"line": line, "raw_line": raw_line, "scores": scores})
         sd = "/".join(str(scores.get(d, "-")) for d in DIMS)
         print(f"{sc['name']:<32} {sc['event']:<16} {gate.verdict:<8} {ok:<4} {sd}")
         print(f"    -> {line[:140]}")
@@ -235,6 +321,13 @@ def main() -> int:
         with open(args.out, "w") as f:
             json.dump({"results": results}, f, indent=2, ensure_ascii=False)
         print(f"-> wrote {args.out}", file=sys.stderr)
+    if args.heartbeat_session:
+        return _run_heartbeat_judge(
+            session=args.heartbeat_session,
+            out=args.heartbeat_out,
+            dry_run=args.gate_only,
+            no_log=args.no_log,
+        )
     return 0
 
 
