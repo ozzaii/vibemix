@@ -1004,6 +1004,7 @@ else:
         "source": "flx4",
         "detail": "FLX4 live-context proof is ready.",
     }
+effective_next_action = str(next_operator_action.get("detail") or next_action)
 _write_operator_runbook(operator_runbook_path, operator_action_queue)
 operator_actions_payload = {
     "source": "flx4",
@@ -1040,7 +1041,7 @@ summary = {
     "proof_legs_total": proof_legs_total,
     "direct_midi_probe": direct_midi_probe,
     "midi_motion_diagnosis": midi_motion_diagnosis,
-    "next_action": next_action,
+    "next_action": effective_next_action,
     "checks": {
         "controller_connected": bool(checks.get("controller_connected")),
         "deck_state_resolved": bool(checks.get("deck_state_resolved")),
@@ -1097,7 +1098,7 @@ print(
         audio_source_detail_rejected=audio_source_detail_rejected,
         action_hint=action_hint,
         first_blocker=first_blocker,
-        next_action=next_action,
+        next_action=effective_next_action,
         proof=sys.argv[1],
     )
 )

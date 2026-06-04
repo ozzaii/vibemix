@@ -397,6 +397,8 @@ def test_check_flx4_live_context_prioritizes_silent_capture_route(
         "first_blocker='live master audio was not observed above the audible floor'"
         in proc.stderr
     )
+    assert "next_action='Deck-pair capture is configured" in proc.stderr
+    assert "Route Rekordbox output into the BlackHole/Aggregate capture device" in proc.stderr
     summary = json.loads((tmp_path / "out" / "flx4_live_context_summary.json").read_text())
     assert summary["action_hint"] == "route_dj_audio_to_capture"
     assert summary["first_blocker"] == "live master audio was not observed above the audible floor"
@@ -405,6 +407,10 @@ def test_check_flx4_live_context_prioritizes_silent_capture_route(
         "no recent controller moves were observed",
     ]
     assert summary["operator_actions"][0]["code"] == "route_dj_audio_to_capture"
+    assert summary["next_action"] == summary["operator_actions"][0]["detail"]
+    assert "Route Rekordbox output into the BlackHole/Aggregate capture device" in (
+        summary["next_action"]
+    )
     assert "perform_physical_proof_window" not in [
         action["code"] for action in summary["operator_actions"]
     ]
