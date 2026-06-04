@@ -1468,8 +1468,11 @@ function setGhostText(el: HTMLElement, text: string): void {
 }
 
 function idleReadinessLines(state: SessionState): { inputs: string; action: string } {
+  const audioActive = musicSignalActive(state.meters.music);
+  const audioWaiting = state.status.livekit === "ok" && !audioActive;
+  const controllerWaiting = state.status.midi === 0;
   const audio = state.status.livekit === "ok"
-    ? musicSignalActive(state.meters.music)
+    ? audioActive
       ? "audio hearing"
       : "audio waiting"
     : state.status.livekit === "connecting"
@@ -1494,9 +1497,14 @@ function idleReadinessLines(state: SessionState): { inputs: string; action: stri
       : state.status.screen === "unavailable"
         ? "screen proof unavailable"
         : "screen proof checking";
+  const action = audioWaiting
+    ? "capture silent · Route DJ output into capture."
+    : controllerWaiting
+      ? `${screen} · Move a control once, I will not guess.`
+      : `${screen} · Start playback, I will not guess.`;
   return {
     inputs: `${audio} · ${ai} · ${controller}`,
-    action: `${screen} · Start playback, I will not guess.`,
+    action,
   };
 }
 
@@ -1512,9 +1520,7 @@ function setIdleProof(mounted: Mounted, state: SessionState): void {
   setIdleCell(mounted.idleProofCells.sven, sven);
   setIdleCell(mounted.idleProofCells.controller, controller);
   setIdleCell(mounted.idleProofCells.screen, screen);
-  const next = screen.state === "ok"
-    ? "Start playback. Sven will cite what lands."
-    : "Start playback. Sven waits for proof.";
+  const next = idleProofNext(audio, controller, screen);
   if (mounted.idleProofNext.textContent !== next) mounted.idleProofNext.textContent = next;
 }
 
@@ -1525,6 +1531,22 @@ function setIdleCell(
   if (value.textContent !== proof.label) value.textContent = proof.label;
   const cell = value.parentElement;
   if (cell && cell.dataset.state !== proof.state) cell.dataset.state = proof.state;
+}
+
+function idleProofNext(
+  audio: { label: string; state: IdleProofState },
+  controller: { label: string; state: IdleProofState },
+  screen: { label: string; state: IdleProofState },
+): string {
+  if (audio.label === "waiting") {
+    return "Route DJ output into capture. Sven waits for sound.";
+  }
+  if (controller.label === "no motion") {
+    return "Move the controller once. Sven waits for proof.";
+  }
+  return screen.state === "ok"
+    ? "Start playback. Sven will cite what lands."
+    : "Start playback. Sven waits for proof.";
 }
 
 function musicSignalActive(music: SessionState["meters"]["music"]): boolean {

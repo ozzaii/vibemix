@@ -790,6 +790,10 @@ describe("SessionLayout", () => {
     expect(root.querySelector(".vmx-now")?.textContent).toBe("Ready for the first move.");
     expect(root.textContent).toContain("audio waiting · Sven ready · controller seen");
     expect(root.textContent).toContain(
+      "capture silent · Route DJ output into capture.",
+    );
+    expect(root.textContent).toContain("Route DJ output into capture. Sven waits for sound.");
+    expect(root.textContent).not.toContain(
       "screen proof unavailable · Start playback, I will not guess.",
     );
     expect(root.textContent).not.toContain("listening for the mix");
@@ -814,6 +818,26 @@ describe("SessionLayout", () => {
         ?.querySelector<HTMLElement>('[data-axis="audio"]')
         ?.dataset.state,
     ).toBe("ok");
+  });
+
+  it("asks for controller motion once audio is audible but MIDI is unproven", () => {
+    const root = host();
+    const state = defaultState();
+    state.meters.music = { rms: 0.08, peak: 0.14 };
+    state.status.livekit = "ok";
+    state.status.gemini = "ok";
+    state.status.midi = 0;
+    state.status.screen = "ok";
+
+    mountSessionLayout(root, state);
+
+    const rail = root.querySelector<HTMLElement>('[data-wire="session.idle-proof"]');
+    const controller = rail?.querySelector<HTMLElement>('[data-axis="controller"]');
+    expect(root.textContent).toContain("audio hearing · Sven ready · controller not proven");
+    expect(root.textContent).toContain("screen proof ready · Move a control once, I will not guess.");
+    expect(root.textContent).toContain("Move the controller once. Sven waits for proof.");
+    expect(controller?.textContent).toContain("controllerno motion");
+    expect(controller?.dataset.state).toBe("warn");
   });
 
   it("shows a passive voice status only when the local voice engine is muted", () => {
