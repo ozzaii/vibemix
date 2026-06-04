@@ -1,0 +1,70 @@
+{
+  "bpm_values": [
+    171.4
+  ],
+  "errors": [],
+  "latest_status": {
+    "capture_device": "BlackHole 2ch",
+    "gemini": "ok",
+    "livekit": "ok",
+    "midi": 1,
+    "midi_activity": "connected_no_midi_traffic",
+    "midi_device": "DDJ-FLX4",
+    "screen": "unavailable",
+    "voice": "muted"
+  },
+  "music_rms_max": 0.0355385743564081,
+  "music_rms_median": 0.02174844590346526,
+  "music_rms_min": 0.012495765596220815,
+  "n_snapshots": 46,
+  "ok": true,
+  "sample_snapshots": [
+    {
+      "bpm": 171.4,
+      "cohost_status": "LISTENING",
+      "grounded": true,
+      "music_rms": 0.0215489084510831,
+      "transcript_delta": [],
+      "ts": "2026-06-04T08:09:53.366691+00:00",
+      "voice_rms": 0.0
+    },
+    {
+      "bpm": 171.4,
+      "cohost_status": "LISTENING",
+      "grounded": true,
+      "music_rms": 0.014842571769724533,
+      "transcript_delta": [],
+      "ts": "2026-06-04T08:09:53.492110+00:00",
+      "voice_rms": 0.0
+    },
+    {
+      "bpm": 171.4,
+      "cohost_status": "LISTENING",
+      "grounded": true,
+      "music_rms": 0.03313255938977744,
+      "transcript_delta": [],
+      "ts": "2026-06-04T08:09:53.563345+00:00",
+      "voice_rms": 0.0
+    },
+    {
+      "bpm": 171.4,
+      "cohost_status": "LISTENING",
+      "grounded": true,
+      "music_rms": 0.026813987103448296,
+      "transcript_delta": [],
+      "ts": "2026-06-04T08:09:53.686632+00:00",
+      "voice_rms": 0.0
+    },
+    {
+      "bpm": 171.4,
+      "cohost_status": "LISTENING",
+      "grounded": true,
+      "music_rms": 0.01813718565633024,
+      "transcript_delta": [],
+      "ts": "2026-06-04T08:09:53.813618+00:00",
+      "voice_rms": 0.0
+    }
+  ],
+  "schema": "live_capture_ws_summary_v1",
+  "voice_rms_max": 0.0
+}
