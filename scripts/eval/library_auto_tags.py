@@ -33,6 +33,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+from urllib.parse import unquote, urlparse
 
 import numpy as np
 
@@ -55,6 +56,7 @@ from vibemix.library.auto_tags import (  # noqa: E402
     score_auto_tag_categories,
 )
 from vibemix.library.clap_engine import ClapEngine  # noqa: E402
+from vibemix.library.rekordbox import RekordboxLibrary, TrackEntry  # noqa: E402
 from vibemix.library.store import open_store  # noqa: E402
 
 SCHEMA = "library_auto_tags_bench_v1"
@@ -65,6 +67,16 @@ DEFAULT_MIN_HAND_LABELS = 50
 THRESHOLD_GRID = tuple(round(x / 1000, 3) for x in range(80, 321, 10))
 CATEGORIES: tuple[AutoTagCategory, ...] = ("mood", "texture", "instrument")
 TODO_LABEL_STATUSES = {"draft", "pending", "todo"}
+
+
+def _local_path_text(raw: str) -> str:
+    text = str(raw or "").strip()
+    if not text:
+        return ""
+    parsed = urlparse(text)
+    if parsed.scheme == "file":
+        return unquote(parsed.path)
+    return unquote(text)
 
 
 @dataclass(frozen=True)
@@ -409,6 +421,72 @@ def build_label_template_rows(
     return out
 
 
+def _library_cache_candidates() -> tuple[Path, ...]:
+    primary = RekordboxLibrary.CACHE_PATH.expanduser()
+    return (primary, primary.with_suffix(primary.suffix + ".v1bak"))
+
+
+def _load_track_contexts(track_ids: set[str]) -> dict[str, TrackEntry]:
+    contexts: dict[str, TrackEntry] = {}
+    if not track_ids:
+        return contexts
+    old_cache_path = RekordboxLibrary.CACHE_PATH
+    try:
+        for cache_path in _library_cache_candidates():
+            if not cache_path.exists():
+                continue
+            RekordboxLibrary.CACHE_PATH = cache_path
+            lib = RekordboxLibrary()
+            if not lib.try_load_cache():
+                continue
+            for track_id in track_ids:
+                if track_id not in contexts and track_id in lib.tracks:
+                    contexts[track_id] = lib.tracks[track_id]
+            if len(contexts) == len(track_ids):
+                break
+    finally:
+        RekordboxLibrary.CACHE_PATH = old_cache_path
+    return contexts
+
+
+def _track_private_context(track: TrackEntry | None) -> dict[str, Any]:
+    if track is None:
+        return {"found": False}
+    local = Path(_local_path_text(track.filepath)) if track.filepath else None
+    return {
+        "found": True,
+        "title": track.title,
+        "artist": track.artist,
+        "album": track.album,
+        "genre": track.genre,
+        "bpm": track.bpm,
+        "key": track.key,
+        "duration_s": track.duration_s,
+        "folder": local.parent.name if local is not None else "",
+        "filename": local.name if local is not None else "",
+    }
+
+
+def build_private_label_template_rows(
+    template_rows: Sequence[Mapping[str, Any]],
+) -> list[dict[str, Any]]:
+    """Add local-only review context to template rows.
+
+    The public `.planning/eval-runs` report stays redacted. This helper is used
+    only when the operator passes ``--private-label-template-out`` and wants a
+    local file that is actually labelable by a human.
+    """
+    track_ids = {str(row.get("track_id", "")) for row in template_rows}
+    contexts = _load_track_contexts(track_ids)
+    out: list[dict[str, Any]] = []
+    for row in template_rows:
+        copied = dict(row)
+        track_id = str(copied.get("track_id", ""))
+        copied["track_context"] = _track_private_context(contexts.get(track_id))
+        out.append(copied)
+    return out
+
+
 def _load_store() -> tuple[list[str], np.ndarray, str, str]:
     store = open_store()
     try:
@@ -558,6 +636,15 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--max-examples", type=int, default=DEFAULT_MAX_EXAMPLES)
     parser.add_argument("--min-hand-labels", type=int, default=DEFAULT_MIN_HAND_LABELS)
     parser.add_argument("--no-label-template", action="store_true")
+    parser.add_argument(
+        "--private-label-template-out",
+        type=Path,
+        default=None,
+        help=(
+            "write a local-only review JSONL with title/artist/folder hints; "
+            "keep it under eval/private/ and do not commit it"
+        ),
+    )
     parser.add_argument("--json", action="store_true")
     parser.add_argument(
         "--require-labels",
@@ -583,6 +670,16 @@ def main(argv: list[str] | None = None) -> int:
             encoding="utf-8",
         )
         report["label_template"]["path"] = str(template_path)
+        if args.private_label_template_out is not None:
+            private_rows = build_private_label_template_rows(template_rows)
+            args.private_label_template_out.parent.mkdir(parents=True, exist_ok=True)
+            args.private_label_template_out.write_text(
+                "".join(json.dumps(row, sort_keys=True) + "\n" for row in private_rows),
+                encoding="utf-8",
+            )
+            report["label_template"]["private_path_written"] = str(
+                args.private_label_template_out
+            )
     out_path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
     if args.json:

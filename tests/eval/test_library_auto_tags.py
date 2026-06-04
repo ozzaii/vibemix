@@ -8,6 +8,7 @@ import numpy as np
 from scripts.eval import library_auto_tags as lat
 
 from vibemix.library.auto_tags import AutoTagDecision
+from vibemix.library.rekordbox import TrackEntry
 
 
 def test_load_hand_labels_accepts_nested_tags_and_reports_unknown(tmp_path: Path) -> None:
@@ -185,3 +186,46 @@ def test_build_label_template_rows_balances_buckets_and_excludes_labeled_ids() -
 
     assert [row["track_id"] for row in rows] == ["a2", "b1"]
     assert all(row["label_status"] == "todo" for row in rows)
+
+
+def test_private_label_template_rows_add_review_context_without_changing_labels(
+    monkeypatch,
+) -> None:
+    track = TrackEntry(
+        track_id="t1",
+        title="Track One",
+        artist="Artist",
+        album="Album",
+        bpm=145.0,
+        key="5A",
+        duration_s=360.0,
+        cues=(),
+        filepath="file:///Users/test/Music/Hard%20Techno/track-one.mp3",
+        genre="Techno",
+    )
+    monkeypatch.setattr(lat, "_load_track_contexts", lambda ids: {"t1": track})
+    rows = [
+        {
+            "track_id": "t1",
+            "split": "holdout",
+            "label_status": "todo",
+            "tags": {"mood": [], "texture": [], "instrument": []},
+        }
+    ]
+
+    out = lat.build_private_label_template_rows(rows)
+
+    assert out[0]["label_status"] == "todo"
+    assert out[0]["tags"] == {"mood": [], "texture": [], "instrument": []}
+    assert out[0]["track_context"] == {
+        "found": True,
+        "title": "Track One",
+        "artist": "Artist",
+        "album": "Album",
+        "genre": "Techno",
+        "bpm": 145.0,
+        "key": "5A",
+        "duration_s": 360.0,
+        "folder": "Hard Techno",
+        "filename": "track-one.mp3",
+    }
