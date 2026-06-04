@@ -256,8 +256,6 @@ export const MOCK_TRANSFER_CONTRACT: readonly MockTransferSurface[] = [
       { wire: "debrief.drills-list", purpose: "practice drills" },
       { wire: "debrief.ear-test", purpose: "ear-test sign-off section" },
       { wire: "debrief.ear-test-toggle", purpose: "ear-test sign-off" },
-      { wire: "debrief.bravoh", purpose: "Bravoh waitlist opt-in section" },
-      { wire: "debrief.bravoh-toggle", purpose: "Bravoh opt-in" },
       { wire: "debrief.error-banner", purpose: "sidecar errors" },
       { wire: "debrief.tooltip", purpose: "citation tooltip" },
     ],
@@ -280,8 +278,6 @@ export const MOCK_TRANSFER_CONTRACT: readonly MockTransferSurface[] = [
       "ipc.debrief.citation-tooltip-request",
       "ipc.debrief.ear-test-submit",
       "write_ear_test_log",
-      "read_bravoh_waitlist_opt_in",
-      "write_bravoh_waitlist_opt_in",
     ],
   },
   {

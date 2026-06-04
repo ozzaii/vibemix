@@ -24,9 +24,9 @@
  * bezel) rather than depending on the utility class — components don't
  * need to be edited; only the CSS surface changes.
  *
- * The peak-end emotional moment lives here (last surface before the
- * Bravoh waitlist opt-in). The visual contract MUST match the wizard +
- * session deck so the user's final glance reads as one product.
+ * The peak-end emotional moment lives here. The visual contract MUST
+ * match the wizard + session deck so the user's final glance reads as
+ * one product.
  */
 
 /* === Root + titlebar =================================================== */
@@ -222,11 +222,10 @@
   z-index: 1;
   display: grid;
   grid-template-columns: minmax(292px, 320px) minmax(0, 1fr);
-  grid-template-rows: minmax(220px, auto) minmax(320px, 1fr) auto auto;
+  grid-template-rows: minmax(220px, auto) minmax(320px, 1fr) auto;
   grid-template-areas:
     "sidebar main"
     "drills main"
-    "bravoh main"
     "ear ear";
   gap: var(--sp-5);
   padding: var(--sp-5);
@@ -423,10 +422,10 @@
     var(--shadow-raised);
 }
 
-/* The TL;DR is the debrief's HERO — the peak-end card the DJ lands on before
- * the Bravoh ask. It alone carries the lit hero stack (the one governed drop
- * + faint rose rim) so it reads as sitting on the desk under the room light.
- * Everything else stays raised-flat. */
+/* The TL;DR is the debrief's HERO — the peak-end card the DJ lands on. It
+ * alone carries the lit hero stack (the one governed drop + faint rose rim)
+ * so it reads as sitting on the desk under the room light. Everything else
+ * stays raised-flat. */
 .vmx-debrief-tldr {
   border-color: var(--border-strong);
   background:
@@ -476,7 +475,7 @@
 /* P1-a uplift 3 — the verdict line. ONE amber focal point on the whole
  * debrief: the session's standout stat, in JetBrains Mono amber, sitting
  * above the TL;DR player and below the silk section title. This is the
- * single warm note the DJ's eye lands on before the Bravoh ask — 20/80
+ * single warm note the DJ's eye lands on — 20/80
  * holds because it's the ONLY amber text on the surface (regions glow,
  * playhead, and this line all share the one accent; nothing else does).
  * Tabular nums so the stat reads as an instrument readout, not prose. */
@@ -1364,125 +1363,6 @@
   color: var(--led-ok);
 }
 
-/* === Bravoh waitlist opt-in (Plan 44-04 / LAUNCH-05) ===================
- * Sits in its own debrief.html section host. The conversion-funnel
- * surface for vibemix → Bravoh. Stays opt-in and quiet — faint amber
- * outline shows when the row is opted-in, subtitle copy stays silk-40
- * so the row reads as ambient context, not a sales pitch. */
-
-.vmx-debrief-bravoh-host {
-  grid-area: bravoh;
-  margin-top: var(--sp-4);
-}
-
-.vmx-bravoh-waitlist-row {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: var(--sp-3) var(--sp-4);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--rad-md);
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.018) 0%, transparent 24%, transparent 100%),
-    var(--glass-2);
-  box-shadow:
-    inset 0 1px 0 var(--glass-top),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.5),
-    var(--shadow-raised);
-  transition: border-color var(--motion-transition) var(--ease-brand), box-shadow var(--motion-transition) var(--ease-brand);
-}
-
-.vmx-bravoh-waitlist-row[data-opt-in="true"] {
-  border-color: var(--amber-40);
-  box-shadow:
-    inset 0 1px 0 var(--glass-top),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.45),
-    var(--glow-faint);
-}
-
-.vmx-bravoh-waitlist-toggle-label {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  cursor: pointer;
-  user-select: none;
-  font-family: var(--type-body);
-  font-size: 13px;
-  color: var(--silk);
-}
-
-.vmx-bravoh-waitlist-checkbox {
-  appearance: none;
-  width: 16px;
-  height: 16px;
-  margin: 0;
-  border: 1px solid var(--silk-22);
-  border-radius: var(--rad-sm);
-  background: transparent;
-  cursor: pointer;
-  position: relative;
-  flex-shrink: 0;
-  transition: border-color var(--motion-snap) ease-out, background var(--motion-snap) ease-out;
-}
-
-.vmx-bravoh-waitlist-checkbox:hover,
-.vmx-bravoh-waitlist-checkbox:focus-visible {
-  border-color: var(--amber);
-  outline: none;
-}
-
-.vmx-bravoh-waitlist-checkbox:checked {
-  border-color: var(--amber);
-  background: var(--amber);
-}
-
-.vmx-bravoh-waitlist-checkbox:checked::after {
-  content: "";
-  position: absolute;
-  left: 4px;
-  top: 1px;
-  width: 4px;
-  height: 8px;
-  border: solid var(--void-1);
-  border-width: 0 2px 2px 0;
-  transform: rotate(45deg);
-}
-
-.vmx-bravoh-waitlist-label {
-  font-family: var(--type-body);
-  font-size: 13px;
-  letter-spacing: 0.01em;
-  color: var(--silk);
-}
-
-.vmx-bravoh-waitlist-subtitle {
-  margin: 0;
-  padding-left: 26px;
-  font-size: 12px;
-  color: var(--silk-40);
-  line-height: 1.4;
-}
-
-.vmx-bravoh-waitlist-link {
-  margin-left: 26px;
-  margin-top: 4px;
-  font-family: var(--type-mono);
-  font-size: 11px;
-  letter-spacing: 0.04em;
-  color: var(--amber-pale);
-  text-decoration: none;
-  border-bottom: 1px solid transparent;
-  width: fit-content;
-  transition: color var(--motion-snap) ease-out, border-color var(--motion-snap) ease-out;
-}
-
-.vmx-bravoh-waitlist-link:hover,
-.vmx-bravoh-waitlist-link:focus-visible {
-  color: var(--amber);
-  border-bottom-color: var(--amber-40);
-  outline: none;
-}
-
 /* === Responsive analyzer chassis ======================================= */
 
 @media (max-width: 1040px) {
@@ -1493,7 +1373,6 @@
       "main"
       "sidebar"
       "drills"
-      "bravoh"
       "ear";
     gap: var(--sp-4);
     padding: var(--sp-4);
@@ -1559,8 +1438,7 @@
   .vmx-debrief-tldr,
   .vmx-debrief-timeline,
   .vmx-debrief-drills,
-  .vmx-debrief-ear-test-form,
-  .vmx-bravoh-waitlist-row {
+  .vmx-debrief-ear-test-form {
     border-radius: var(--rad-sm);
     padding: var(--sp-3);
   }
