@@ -156,6 +156,7 @@ _BEATMATCH_PRACTICE_LOCK_REQUIRED_LESSONS = frozenset({"L2.01", "L2.02"})
 _BEATMATCH_PRACTICE_GRADE_STATES = frozenset(
     {"awaiting_action", "hint_strike_1", "hint_strike_2", "hint_strike_3", "advancing"}
 )
+_RECOVERY_DRILL_ARMED_EVENT = "RECOVERY_DRILL_ARMED"
 _PRACTICE_AUDIO_CONTROLS = frozenset(
     {
         "cue",
@@ -629,6 +630,7 @@ class LessonRuntime(StateMachine):
         self._beatmatch_practice_player_active = False
         self._waveform_ready_lesson_id: str | None = None
         self._recovery_drill_armed_step_key: tuple[str, int] | None = None
+        self._recovery_drill_armed_citation: str | None = None
         self._cue_placement_practice_lock_active = False
         super().__init__()
 
@@ -1255,6 +1257,18 @@ class LessonRuntime(StateMachine):
             )
             return
         self._recovery_drill_armed_step_key = key
+        t_session = self._evidence_time()
+        self._recovery_drill_armed_citation = None
+        if self._evidence_registry is not None:
+            self._record_evidence(
+                source=BEATMATCH_EVIDENCE_SOURCE,
+                key=_RECOVERY_DRILL_ARMED_EVENT,
+                t_session=t_session,
+            )
+            self._recovery_drill_armed_citation = (
+                f"[{BEATMATCH_EVIDENCE_SOURCE}:{_RECOVERY_DRILL_ARMED_EVENT}@"
+                f"{t_session:.3f}]"
+            )
         self._log_session_event(
             "learn_recovery_drill_armed",
             lesson_id=lesson_id,
@@ -1263,6 +1277,7 @@ class LessonRuntime(StateMachine):
             drill=drill.drill,
             deck=drill.deck or "B",
             shape=drill.shape,
+            evidence_time=t_session,
         )
         if should_grade:
             self._beatmatch_practice_lock_active = False
@@ -1380,6 +1395,7 @@ class LessonRuntime(StateMachine):
         self._active_flow = None
         self._active_step_index = 0
         self._recovery_drill_armed_step_key = None
+        self._recovery_drill_armed_citation = None
 
         # WR-02 fix (P92 REVIEW): defend against an invalid lesson_id
         # reaching the CURRICULUM lookup. The boundary (ipc_handlers.py)
@@ -2047,6 +2063,8 @@ class LessonRuntime(StateMachine):
             citations = (
                 f"[{BEATMATCH_EVIDENCE_SOURCE}:{BEATMATCH_GRADED_EVENT}@{result.t_session:.3f}]",
             )
+        elif self._recovery_drill_armed_citation is not None:
+            citations = (self._recovery_drill_armed_citation,)
         citation = citations[0] if citations else None
 
         phase_error = float(result.grade.phase_error_beats)

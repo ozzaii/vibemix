@@ -524,13 +524,18 @@ def test_recovery_drill_lesson_arms_each_authored_owned_deck_miss() -> None:
 
     live_grades = _live_grade_payloads(runtime._ipc)
     assert live_grades[-1]["verdict"] == "tempo_off"
-    assert _tutor_speak_payloads(runtime._ipc)[-1]["text"] == (
+    assert live_grades[-1]["citation"] == "[ev:RECOVERY_DRILL_ARMED@71.000]"
+    tutor_payload = _tutor_speak_payloads(runtime._ipc)[-1]
+    assert tutor_payload["text"] == (
         "I pitched deck B up into the clash - hear that pull, then bail out clean."
     )
+    assert tutor_payload["citations"] == ["[ev:RECOVERY_DRILL_ARMED@71.000]"]
+    assert registry.has("ev", "RECOVERY_DRILL_ARMED", 71.0, tol=1.0)
     drill_events = [
         fields for kind, fields in events if kind == "learn_recovery_drill_armed"
     ]
     assert drill_events[-1]["drill"] == "key_clash"
+    assert drill_events[-1]["evidence_time"] == 71.0
 
     handled = runtime.handle_step_ack(
         {"type": "button", "control": "lesson_continue", "direction": "down"}
@@ -539,13 +544,17 @@ def test_recovery_drill_lesson_arms_each_authored_owned_deck_miss() -> None:
     assert handled is True
     live_grades = _live_grade_payloads(runtime._ipc)
     assert live_grades[-1]["verdict"] == "trainwreck"
-    assert _tutor_speak_payloads(runtime._ipc)[-1]["text"] == (
+    assert live_grades[-1]["citation"] == "[ev:RECOVERY_DRILL_ARMED@71.000]"
+    tutor_payload = _tutor_speak_payloads(runtime._ipc)[-1]
+    assert tutor_payload["text"] == (
         "Deck B is a quarter-beat off - the kicks are fighting, so cut or filter out."
     )
+    assert tutor_payload["citations"] == ["[ev:RECOVERY_DRILL_ARMED@71.000]"]
     drill_events = [
         fields for kind, fields in events if kind == "learn_recovery_drill_armed"
     ]
     assert drill_events[-1]["drill"] == "misaligned_phrase"
+    assert drill_events[-1]["evidence_time"] == 71.0
     assert runtime.current_state.id == "awaiting_action"
 
 
