@@ -19,6 +19,7 @@ from vibemix.learn.mastered_vocal import (
     MASTERED_VOCALS,
     mastered_unlock_line,
 )
+from vibemix.learn.skill_tree import SKILL_MANIFEST
 
 _FIXTURE = (
     Path(__file__).resolve().parents[2]
@@ -65,6 +66,11 @@ def test_unknown_skill_falls_back_to_default_line():
     line = mastered_unlock_line("not_a_real_skill", was_mastered=False, now_mastered=True)
     assert line == MASTERED_VOCALS["_default"]
     assert isinstance(line, str) and line.strip()
+
+
+def test_fixture_has_specific_line_for_every_manifest_skill():
+    missing = set(SKILL_MANIFEST) - (set(MASTERED_VOCALS) - {"_default"})
+    assert missing == set()
 
 
 def test_packaging_fallback_keeps_the_same_factual_tone():

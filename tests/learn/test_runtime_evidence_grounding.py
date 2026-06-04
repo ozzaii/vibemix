@@ -631,6 +631,73 @@ def test_live_beatmatch_grade_voices_locked_with_resolving_citation(monkeypatch)
     assert _live_grade_payloads(ipc)[-1]["citation"] is None
 
 
+def test_beatmatch_mastered_flip_speaks_factual_proof_once(monkeypatch) -> None:
+    """The fused beatmatch lock gets a specific Mastered proof line on the flip."""
+
+    monkeypatch.setattr("vibemix.learn.progress.save_progress", lambda _progress: None)
+    progress = LearnProgress()
+    _make_beatmatching_competent(progress)
+    threshold = SKILL_MANIFEST["beatmatching"].mastered_threshold
+    progress.skills["beatmatching"] = {
+        "live_proof_count": threshold - 1,
+        "mastered": False,
+        "first_mastered_at": None,
+    }
+    registry = EvidenceRegistry()
+    ipc = MagicMock(name="ipc_router")
+    runtime = LessonRuntime(
+        learn_state=LearnState(),
+        midi_mirror=MagicMock(name="midi_mirror"),
+        controller_state=MagicMock(name="controller_state"),
+        ipc_router=ipc,
+        progress_store=progress,
+        evidence_registry=registry,
+        evidence_clock=lambda: 44.0,
+        beatmatch_practice_loader=_locked_beatmatch_snapshot,
+    )
+    runtime.send(
+        "load",
+        lesson_id="L2.01",
+        course_id="course_2_transitions",
+        controller_id="pioneer_ddj_flx4",
+    )
+
+    runtime._emit_live_beatmatch_grade(runtime._grade_beatmatch_practice_tick())
+
+    assert progress.skills["beatmatching"]["mastered"] is True
+    mastered_payloads = [
+        payload
+        for payload in _tutor_speak_payloads(ipc)
+        if payload["tts_marker"] == "L2.01.mastered.beatmatching"
+    ]
+    assert mastered_payloads == [
+        {
+            "text": "Beatmatching is mastered from cited tempo-and-phase practice.",
+            "tts_marker": "L2.01.mastered.beatmatching",
+            "citations": ["[ev:BEATMATCH_GRADED@44.000]"],
+            "data_state": "hint",
+        }
+    ]
+    grade_payload = [
+        payload
+        for payload in _tutor_speak_payloads(ipc)
+        if payload["tts_marker"] == "L2.01.grade"
+    ][-1]
+    assert grade_payload["text"] == "tempo and phase are matched."
+    assert CitationLinter().check(
+        " ".join(mastered_payloads[0]["citations"]),
+        registry.snapshot(),
+    ).valid is True
+
+    runtime._emit_live_beatmatch_grade(runtime._grade_beatmatch_practice_tick())
+
+    assert [
+        payload
+        for payload in _tutor_speak_payloads(ipc)
+        if payload["tts_marker"] == "L2.01.mastered.beatmatching"
+    ] == mastered_payloads
+
+
 def test_credited_beatmatch_grade_completes_and_loads_next_lesson(monkeypatch) -> None:
     """A cited locked L2.01 grade credits, completes, snapshots, and opens L2.02."""
     monkeypatch.setattr("vibemix.learn.progress.save_progress", lambda _progress: None)

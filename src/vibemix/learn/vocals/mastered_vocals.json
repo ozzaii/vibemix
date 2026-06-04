@@ -1,5 +1,6 @@
 {
   "_default": "This skill is mastered from cited practice proofs.",
+  "beatmatching": "Beatmatching is mastered from cited tempo-and-phase practice.",
   "deck_control": "Deck control is mastered from cited deck-control practice.",
   "eq_mixing": "EQ mixing is mastered from cited EQ practice.",
   "transitions": "Transitions are mastered from cited transition practice.",
