@@ -133,6 +133,25 @@ if TYPE_CHECKING:  # pragma: no cover — typing-only
 # instruction.
 SILENCE_TOKEN = "<silence/>"
 
+_GROUNDED_RECEIPT_EXTRA_KEYS = (
+    "next_suggestion_voice_line",
+    "transition_verdict_voice_line",
+    "set_progress_voice_line",
+    "judge_evidence_line",
+)
+_OPTION_SCAFFOLD_PREFIX_RE = re.compile(
+    r"^\s*(?:[-*]\s*)?(?:option(?:\s+[ab])?\b|[ab][).:])",
+    re.IGNORECASE,
+)
+_OPTION_A_RE = re.compile(
+    r"^\s*(?:[-*]\s*)?(?:option\s+a(?:\s*/\s*option\s+b)?\s*[:.)-]|a[).:])\s*(?P<body>.*)",
+    re.IGNORECASE | re.DOTALL,
+)
+_OPTION_B_SPLIT_RE = re.compile(
+    r"(?:^|\s)(?:[-*]\s*)?(?:option\s+b\s*[:.)-]|b[).:])\s*",
+    re.IGNORECASE,
+)
+
 # Events where the screen Part is ALWAYS skipped, even if a screen frame is
 # available. This is independent from the audio window size: MIX_MOVE needs
 # the full master-output ear, but screen pixels still over-prime it to invent
@@ -149,6 +168,40 @@ DECK_AUDIO_PART_MIN_RMS: float = 0.003
 DECK_AUDIO_PART_AUTO_EVENTS: frozenset[str] = frozenset(
     {"MIX_MOVE", "TRANSITION_OPPORTUNITY", "KEY_CLASH", "MANUAL"}
 )
+
+
+def _has_grounded_receipt_extra(extra: dict[str, Any]) -> bool:
+    return any(
+        isinstance(extra.get(key), str) and bool(str(extra.get(key)).strip())
+        for key in _GROUNDED_RECEIPT_EXTRA_KEYS
+    )
+
+
+def _should_guard_option_scaffold(ev_tag: str, ev_extra: dict[str, Any]) -> bool:
+    return ev_tag == "TRACK_CHANGE" and _has_grounded_receipt_extra(ev_extra)
+
+
+def _starts_option_scaffold(text: str) -> bool:
+    return bool(_OPTION_SCAFFOLD_PREFIX_RE.match(text or ""))
+
+
+def _repair_option_scaffold_line(text: str) -> str | None:
+    """Return the first model-provided option as one spoken line, or None."""
+
+    if not _starts_option_scaffold(text):
+        return None
+    joined = " ".join(part.strip() for part in (text or "").splitlines() if part.strip())
+    match = _OPTION_A_RE.match(joined)
+    if match is None:
+        return None
+    body = match.group("body").strip()
+    body = _OPTION_B_SPLIT_RE.split(body, maxsplit=1)[0].strip()
+    body = body.strip(" \"'")
+    if not body or _starts_option_scaffold(body):
+        return None
+    if len(body.split()) < 2:
+        return None
+    return body
 
 # Env-var names — public contract, surfaced in CLI / Settings UI in Phase 11/12.
 ENV_SKILL_LEVEL = "VIBEMIX_SKILL_LEVEL"
@@ -2182,6 +2235,7 @@ class DJCoHostAgent(Agent):
             audio_seconds = DIET_AUDIO_SECONDS if diet else INVOKE_AUDIO_SECONDS
             skip_screen = ev_type_for_diet in SCREEN_SKIP_EVENTS
             ev_extra = ev.extra if ev is not None and isinstance(ev.extra, dict) else {}
+            guard_option_scaffold = _should_guard_option_scaffold(ev_type_for_diet, ev_extra)
             judge_evidence_line = ev_extra.get("judge_evidence_line")
             if not isinstance(judge_evidence_line, str):
                 judge_evidence_line = None
@@ -2832,6 +2886,8 @@ class DJCoHostAgent(Agent):
                     language_matches = english_only_violation_matches(spoken_so_far)
                     if language_matches:
                         language_defer_stream = True
+                    if guard_option_scaffold and _starts_option_scaffold(full_text):
+                        continue
                     if live_claim_defer_stream:
                         continue
                     if language_defer_stream:
@@ -2952,6 +3008,26 @@ class DJCoHostAgent(Agent):
             print()
             elapsed = time.time() - t_start
             stripped = full_text.strip()
+            option_scaffold_suppressed = False
+            if guard_option_scaffold and _starts_option_scaffold(full_text):
+                repaired = _repair_option_scaffold_line(full_text)
+                if repaired:
+                    raw_option_scaffold_text = full_text
+                    full_text = repaired
+                    buffered_chunks = [full_text]
+                    stripped = full_text.strip()
+                    try:
+                        self._recorder.log_event(
+                            "option_scaffold_repaired",
+                            event=ev_tag,
+                            raw_text=raw_option_scaffold_text,
+                            repaired_text=full_text,
+                            latency_s=round(elapsed, 2),
+                        )
+                    except Exception:
+                        pass
+                else:
+                    option_scaffold_suppressed = True
 
             # ---- Plan 18-04: citation-count telemetry ----
             # Count citations in the FULL response text BEFORE the suppression
@@ -2994,7 +3070,9 @@ class DJCoHostAgent(Agent):
             # ---- Silence + slop gate (Phase 10) ----
             suppression: str | None = None
             slop_matches: list[str] = []
-            if stripped == SILENCE_TOKEN or stripped.startswith(SILENCE_TOKEN):
+            if option_scaffold_suppressed:
+                suppression = "option_scaffold"
+            elif stripped == SILENCE_TOKEN or stripped.startswith(SILENCE_TOKEN):
                 suppression = "silence"
             else:
                 # Run filter_for_slop on the FULL accumulated text; suppress turn
@@ -3115,6 +3193,16 @@ class DJCoHostAgent(Agent):
                 print(f"[ai_text] <slop suppressed: {slop_matches}>", flush=True)
                 if head_yielded:
                     _push_silence_pad_and_cancel("slop")
+            elif suppression == "option_scaffold":
+                self._recorder.log_event(
+                    "option_scaffold_suppressed",
+                    event=ev_tag,
+                    response_chars=len(full_text),
+                    latency_s=round(elapsed, 2),
+                )
+                print("[ai_text] <option scaffold suppressed>", flush=True)
+                if head_yielded:
+                    _push_silence_pad_and_cancel("option_scaffold")
             elif suppression == "non_english":
                 self._recorder.log_event(
                     "non_english_suppressed",
