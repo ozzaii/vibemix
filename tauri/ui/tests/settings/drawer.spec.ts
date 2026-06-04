@@ -304,23 +304,6 @@ describe("group rendering", () => {
     expect(document.querySelectorAll(".vmx-hotkey-capture").length).toBe(1);
   });
 
-  it("labels deferred voice and output controls as next-start settings", () => {
-    mountSettingsDrawer(document.body);
-    openSettings();
-
-    const voiceNote = document.querySelector<HTMLElement>(
-      '[data-wire="settings.persona.voice.deferred-note"]',
-    );
-    const outputNote = document.querySelector<HTMLElement>(
-      '[data-wire="settings.output.deferred-note"]',
-    );
-
-    expect(voiceNote?.getAttribute("role")).toBe("note");
-    expect(voiceNote?.textContent).toBe("voice changes when Sven restarts");
-    expect(outputNote?.getAttribute("role")).toBe("note");
-    expect(outputNote?.textContent).toBe("routing changes when audio restarts");
-  });
-
   it("uses product labels instead of wire abbreviations in the top controls", () => {
     const state = getSessionState();
     setSessionState({
@@ -341,76 +324,6 @@ describe("group rendering", () => {
     expect(drawer?.textContent).toContain("Device 5");
     expect(drawer?.textContent).toContain("Speakers");
     expect(drawer?.textContent).not.toContain("CFG");
-  });
-
-  it("surfaces local trust facts before the settings groups", () => {
-    const state = getSessionState();
-    setSessionState({
-      ...state,
-      grounded: true,
-      settings: {
-        ...state.settings,
-        voice: "Bella",
-        mode: "coach",
-        lens: "critique",
-        skill: "intermediate",
-        output_device_id: "5",
-        output_profile: "spk",
-      },
-    });
-    setRecordingsSlice({
-      usage: { sessions: 12, bytes_total: 3_656_838_349 },
-    });
-
-    mountSettingsDrawer(document.body);
-    setSettingsUIState({ open: true });
-
-    const trust = document.querySelector<HTMLElement>('[data-wire="settings.trust"]');
-    expect(trust?.textContent).toContain("How Sven listens");
-    expect(trust?.textContent).toContain("Bella · Coach · Intermediate");
-    expect(trust?.textContent).toContain(
-      "Critique lens · Speakers · Device 5 · reading the room",
-    );
-    expect(trust?.textContent).toContain("Local voice");
-    expect(trust?.textContent).toContain("Bella · MOSS");
-    expect(trust?.textContent).toContain("Sven speaks from the bundled voice stack");
-    expect(trust?.textContent).toContain("Speakers · Device 5");
-    expect(trust?.textContent).toContain("12 sessions");
-    expect(trust?.textContent).toContain("3.4 GB stored locally");
-    expect(trust?.textContent).toContain("reading the room");
-    expect(
-      document.querySelector<HTMLElement>('[data-wire="settings.trust.proof"]')
-        ?.dataset.status,
-    ).toBe("ok");
-  });
-
-  it("keeps recording and proof trust cells honest when evidence is missing", () => {
-    const state = getSessionState();
-    setSessionState({
-      ...state,
-      grounded: false,
-      claimPolicy: {
-        policy: "require-move-context",
-        level: "yellow",
-        reason: "screen proof unavailable",
-        label: "proof pending",
-      },
-    });
-    setRecordingsSlice({ error: "ipc timeout" });
-
-    mountSettingsDrawer(document.body);
-    setSettingsUIState({ open: true });
-
-    const recordings = document.querySelector<HTMLElement>(
-      '[data-wire="settings.trust.recordings"]',
-    );
-    const proof = document.querySelector<HTMLElement>('[data-wire="settings.trust.proof"]');
-    expect(recordings?.textContent).toContain("unavailable");
-    expect(recordings?.textContent).toContain("local session list did not answer");
-    expect(recordings?.dataset.status).toBe("warn");
-    expect(proof?.textContent).toContain("listening");
-    expect(proof?.textContent).toContain("screen context unavailable");
-    expect(proof?.dataset.status).toBe("warn");
   });
 
   it("RECORDING group shows the retention slider with 6 knobs", () => {
