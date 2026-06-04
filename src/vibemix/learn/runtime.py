@@ -84,6 +84,10 @@ from statemachine import State, StateMachine
 
 from vibemix.audio.grid import BeatGrid
 from vibemix.audio.miniplayer import DeckState
+from vibemix.learn.control_practice import (
+    ControlPracticeResult,
+    grade_matched_control_practice,
+)
 from vibemix.learn.cue_practice import (
     CUE_PLACEMENT_EVIDENCE_SOURCE,
     CUE_PLACEMENT_GRADED_EVENT,
@@ -736,7 +740,17 @@ class LessonRuntime(StateMachine):
             return False
         try:
             if observer.matches(midi):
+                evidence_time = self._record_action_evidence(
+                    expected=None,
+                    midi=midi,
+                    matched=True,
+                )
                 self._mark_progress_practice_source(midi)
+                self._record_learn_control_practice_action(
+                    midi,
+                    expected=None,
+                    evidence_time=evidence_time,
+                )
                 observer.ack(lesson_id=self._learn.current_lesson_id or "")
         except Exception as exc:  # pragma: no cover — defensive
             import sys
@@ -1223,12 +1237,18 @@ class LessonRuntime(StateMachine):
         prehandled_beatmatch_ack = self._beatmatch_practice_ack_prehandled
         self._beatmatch_practice_ack_prehandled = False
         if isinstance(midi, dict) and not prehandled_beatmatch_ack:
-            self._record_action_evidence(
-                expected=self._current_expected_action(),
+            expected = self._current_expected_action()
+            evidence_time = self._record_action_evidence(
+                expected=expected,
                 midi=midi,
                 matched=True,
             )
             self._mark_progress_practice_source(midi)
+            self._record_learn_control_practice_action(
+                midi,
+                expected=expected,
+                evidence_time=evidence_time,
+            )
             self._record_beatmatch_practice_action(midi)
             self._record_cue_placement_practice_action(midi)
 
@@ -1264,6 +1284,65 @@ class LessonRuntime(StateMachine):
         self._beatmatch_practice_lock_active = False
         result = self._grade_beatmatch_practice_tick()
         self._emit_live_beatmatch_grade(result)
+        return result
+
+    def _record_learn_control_practice_action(
+        self,
+        midi: dict[str, Any],
+        *,
+        expected: dict[str, Any] | None,
+        evidence_time: float | None = None,
+    ) -> ControlPracticeResult | None:
+        """Credit a matched Learn control action through the cited skill spine."""
+
+        if self._evidence_registry is None:
+            return None
+        t_session = self._evidence_time() if evidence_time is None else evidence_time
+        try:
+            result = grade_matched_control_practice(
+                expected=expected,
+                midi=midi,
+                evidence_registry=self._evidence_registry,
+                t_session=t_session,
+                progress=self._progress,
+                now=datetime.now(UTC).isoformat(),
+                lesson_id=self._learn.current_lesson_id or "",
+            )
+        except Exception as exc:  # pragma: no cover - defensive
+            import sys
+
+            print(
+                f"[learn.runtime] control practice grade failed: {exc!r}",
+                file=sys.stderr,
+            )
+            return None
+        if result.event is None:
+            return result
+        if result.credited:
+            try:
+                from vibemix.learn.progress import LearnProgress, save_progress
+
+                if isinstance(self._progress, LearnProgress):
+                    save_progress(self._progress)
+            except Exception as exc:  # pragma: no cover - defensive
+                import sys
+
+                print(
+                    f"[learn.runtime] control practice progress save failed: {exc!r}",
+                    file=sys.stderr,
+                )
+            self._emit_progress_snapshot()
+        self._log_session_event(
+            "learn_control_practice_graded",
+            lesson_id=self._learn.current_lesson_id or "",
+            course_id=self._learn.current_course_id or "",
+            step_id=self._current_step_id(),
+            evidence_time=result.t_session,
+            control=result.control,
+            deck=result.deck,
+            skill_id=result.skill_id or "",
+            credited=list(result.credited),
+        )
         return result
 
     def _apply_beatmatch_practice_action(self, midi: dict[str, Any]) -> bool | None:

@@ -8,6 +8,7 @@ from vibemix.audio.grid import BeatGrid
 from vibemix.audio.miniplayer import DeckState
 from vibemix.coach.citation_linter import CitationLinter
 from vibemix.learn.beatmatch_practice_driver import BeatmatchPracticeDriver
+from vibemix.learn.control_practice import CONTROL_PRACTICE_GRADED_EVENT
 from vibemix.learn.cue_placement_practice_driver import CuePlacementPracticeDriver
 from vibemix.learn.progress import LearnProgress
 from vibemix.learn.runtime import (
@@ -117,6 +118,17 @@ def _make_beatmatching_competent(progress: LearnProgress) -> None:
 
 def _make_phrasing_competent(progress: LearnProgress) -> None:
     spec = SKILL_MANIFEST["phrasing_performance"]
+    for lesson_id in spec.lesson_ids:
+        progress.lessons[lesson_id] = {
+            "completed": True,
+            "completed_at": "2026-06-02T00:00:00Z",
+            "strikes_used": 0,
+        }
+    setattr(progress, spec.gate, True)
+
+
+def _make_skill_competent(progress: LearnProgress, skill_id: str) -> None:
+    spec = SKILL_MANIFEST[skill_id]
     for lesson_id in spec.lesson_ids:
         progress.lessons[lesson_id] = {
             "completed": True,
@@ -307,6 +319,122 @@ def test_runtime_logs_learn_milestones_to_session_event_sink() -> None:
     assert action["expected_control_id"] == "eq_hi:A"
     assert action["matched"] is True
     assert isinstance(action["evidence_time"], float)
+
+
+def test_matched_eq_lesson_action_writes_control_receipt_and_progress(monkeypatch) -> None:
+    """A matched Learn control action can credit Skill Wall progress."""
+    saved: list[LearnProgress] = []
+    monkeypatch.setattr("vibemix.learn.progress.save_progress", saved.append)
+    progress = LearnProgress()
+    _make_skill_competent(progress, "eq_mixing")
+    registry = EvidenceRegistry()
+    ipc = MagicMock(name="ipc_router")
+    events: list[tuple[str, dict]] = []
+    runtime = LessonRuntime(
+        learn_state=LearnState(),
+        midi_mirror=MagicMock(name="midi_mirror"),
+        controller_state=MagicMock(name="controller_state"),
+        ipc_router=ipc,
+        progress_store=progress,
+        evidence_registry=registry,
+        evidence_clock=lambda: 58.25,
+        session_event_logger=lambda kind, fields: events.append((kind, dict(fields))),
+    )
+
+    runtime.send(
+        "load",
+        lesson_id="L2.04",
+        course_id="course_2_transitions",
+        controller_id="pioneer_ddj_flx4",
+    )
+    runtime.send("begin")
+    runtime.send(
+        "ack_action",
+        midi={
+            "type": "cc",
+            "control": "eq_low",
+            "deck": "A",
+            "value": 127,
+            "prev_value": 0,
+            "source": "midi",
+        },
+    )
+
+    assert registry.has("ev", CONTROL_PRACTICE_GRADED_EVENT, 58.25, tol=1.0)
+    assert progress.skills["eq_mixing"]["live_proof_count"] == 1
+    assert progress in saved
+    assert any(
+        call.args[0].get("type") == "ipc.learn.progress_state"
+        and call.args[0].get("payload", {}).get("progress", {}).get("skills", {})
+        .get("eq_mixing", {})
+        .get("live_proof_count")
+        == 1
+        for call in ipc.emit.call_args_list
+    )
+    event = next(
+        fields for kind, fields in events if kind == "learn_control_practice_graded"
+    )
+    assert event["lesson_id"] == "L2.04"
+    assert event["control"] == "eq_low"
+    assert event["deck"] == "A"
+    assert event["skill_id"] == "eq_mixing"
+    assert event["credited"] == ["eq_mixing"]
+
+
+def test_observer_ack_writes_control_receipt_before_lesson_cycle_ack(monkeypatch) -> None:
+    """Observer-driven L1.14 actions still become cited control practice."""
+    saved: list[LearnProgress] = []
+    monkeypatch.setattr("vibemix.learn.progress.save_progress", saved.append)
+    progress = LearnProgress()
+    _make_skill_competent(progress, "eq_mixing")
+    registry = EvidenceRegistry()
+    observer = MagicMock(name="observer")
+    observer.matches.return_value = True
+    events: list[tuple[str, dict]] = []
+    runtime = LessonRuntime(
+        learn_state=LearnState(),
+        midi_mirror=MagicMock(name="midi_mirror"),
+        controller_state=MagicMock(name="controller_state"),
+        ipc_router=MagicMock(name="ipc_router"),
+        progress_store=progress,
+        evidence_registry=registry,
+        evidence_clock=lambda: 60.0,
+        session_event_logger=lambda kind, fields: events.append((kind, dict(fields))),
+    )
+    runtime.register_lesson_observer("L1.14", observer)
+    midi = {
+        "type": "cc",
+        "control": "eq_low",
+        "deck": "A",
+        "value": 127,
+        "prev_value": 0,
+        "source": "midi",
+    }
+
+    runtime.send(
+        "load",
+        lesson_id="L1.14",
+        course_id="course_1_anatomy",
+        controller_id="pioneer_ddj_flx4",
+    )
+    runtime.send("begin")
+    handled = runtime.handle_observer_ack(midi)
+
+    assert handled is True
+    observer.ack.assert_called_once_with(lesson_id="L1.14")
+    assert registry.has("ev", CONTROL_PRACTICE_GRADED_EVENT, 60.0, tol=1.0)
+    assert progress.skills["eq_mixing"]["live_proof_count"] == 1
+    assert progress in saved
+    action = next(fields for kind, fields in events if kind == "learn_action_observed")
+    assert action["lesson_id"] == "L1.14"
+    assert action["observed_control_id"] == "eq_low:A"
+    assert action["expected_control_id"] is None
+    control_grade = next(
+        fields for kind, fields in events if kind == "learn_control_practice_graded"
+    )
+    assert control_grade["lesson_id"] == "L1.14"
+    assert control_grade["skill_id"] == "eq_mixing"
+    assert control_grade["credited"] == ["eq_mixing"]
 
 
 def test_beatmatch_practice_tick_writes_receipt_and_credits_once(monkeypatch) -> None:
@@ -1161,6 +1289,7 @@ def test_matched_cue_action_records_and_grades_immediately(monkeypatch) -> None:
     assert recorded_midi["cue_frame"] == target
     assert "action_elapsed_s" not in recorded_midi
     assert registry.has("ev", "CUE_PLACEMENT_GRADED", 73.5, tol=1.0)
+    assert not registry.has("ev", CONTROL_PRACTICE_GRADED_EVENT, 73.5, tol=1.0)
     assert progress.skills["phrasing_performance"]["live_proof_count"] == 1
     assert progress in saved
     assert any(kind == "learn_cue_placement_practice_graded" for kind, _fields in events)

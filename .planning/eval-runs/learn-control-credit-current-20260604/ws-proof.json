@@ -1,0 +1,436 @@
+{
+  "control_grade_event": {
+    "control": "eq_low",
+    "course_id": "course_2_transitions",
+    "credited": [
+      "eq_mixing"
+    ],
+    "deck": "A",
+    "evidence_time": 43.71512198448181,
+    "kind": "learn_control_practice_graded",
+    "lesson_id": "L2.04",
+    "skill_id": "eq_mixing",
+    "step_id": "L2.04.practice",
+    "t": 44.622
+  },
+  "current_source": true,
+  "learn_frames": [
+    {
+      "payload": {
+        "controller_id": "pioneer_ddj_flx4",
+        "course_id": "course_2_transitions",
+        "lesson_id": "L2.04",
+        "progress_dots": [
+          {
+            "lesson_id": "L2.01",
+            "status": "pending"
+          },
+          {
+            "lesson_id": "L2.02",
+            "status": "pending"
+          },
+          {
+            "lesson_id": "L2.03",
+            "status": "pending"
+          },
+          {
+            "lesson_id": "L2.04",
+            "status": "current"
+          },
+          {
+            "lesson_id": "L2.05",
+            "status": "completed"
+          },
+          {
+            "lesson_id": "L2.06",
+            "status": "pending"
+          },
+          {
+            "lesson_id": "L2.07",
+            "status": "pending"
+          },
+          {
+            "lesson_id": "L2.08",
+            "status": "pending"
+          },
+          {
+            "lesson_id": "L2.09",
+            "status": "pending"
+          },
+          {
+            "lesson_id": "L2.10",
+            "status": "pending"
+          },
+          {
+            "lesson_id": "L2.11",
+            "status": "pending"
+          },
+          {
+            "lesson_id": "L2.12",
+            "status": "pending"
+          },
+          {
+            "lesson_id": "L2.13",
+            "status": "pending"
+          },
+          {
+            "lesson_id": "L2.14",
+            "status": "pending"
+          }
+        ],
+        "title": "eq swap"
+      },
+      "ts": "2026-06-04T12:59:20.611385+00:00",
+      "type": "ipc.learn.lesson_loaded"
+    },
+    {
+      "payload": {
+        "action": "snapshot",
+        "eq_mixing": {
+          "first_mastered_at": null,
+          "live_proof_count": 0,
+          "mastered": false
+        },
+        "eq_mixing_wall": {
+          "competent": true,
+          "first_mastered_at": null,
+          "learn_fill": 1.0,
+          "live_proof_count": 0,
+          "mastered": false,
+          "skill_id": "eq_mixing",
+          "stage": "competent",
+          "what_remains": "3 more cited live demos to Master"
+        }
+      },
+      "ts": "2026-06-04T12:59:20.614666+00:00",
+      "type": "ipc.learn.progress_state"
+    },
+    {
+      "payload": {
+        "annotation": "",
+        "control_id": "eq_low",
+        "cue_color": "amber",
+        "cue_shape": "pulse-ring",
+        "deck": "A",
+        "expected_action": {
+          "control": "eq_low",
+          "deck": "A",
+          "direction": "",
+          "min_delta": 80,
+          "type": "cc"
+        }
+      },
+      "ts": "2026-06-04T12:59:20.617211+00:00",
+      "type": "ipc.learn.highlight"
+    },
+    {
+      "payload": {
+        "band": "low",
+        "control_id": "eq_low",
+        "deck": "A",
+        "phase": "focus"
+      },
+      "ts": "2026-06-04T12:59:20.619076+00:00",
+      "type": "ipc.learn.teaching_focus"
+    },
+    {
+      "payload": {
+        "citations": [],
+        "data_state": "active",
+        "text": "the eq swap is a transition without the crossfader. you cut deck a's bands one by one as you raise deck b's matching bands.",
+        "tts_marker": "L204.beat0"
+      },
+      "ts": "2026-06-04T12:59:20.621286+00:00",
+      "type": "ipc.learn.tutor_speak"
+    },
+    {
+      "payload": {
+        "citations": [
+          "[screen:eq_low:A]"
+        ],
+        "data_state": "active",
+        "teaching_loop": {
+          "observation": {
+            "backstage_lenses": [
+              "evidence_registry",
+              "controller_state"
+            ],
+            "control_id": "eq_low:A",
+            "input_surfaces": [
+              "hardware",
+              "screen"
+            ],
+            "kind": "practice",
+            "lesson_id": "L2.04",
+            "step_id": "L2.04.practice",
+            "strikes_used": 0
+          },
+          "route_path": "learn_tutor",
+          "stages": [
+            "observe",
+            "decide",
+            "teach",
+            "verify",
+            "adapt"
+          ],
+          "turn_kind": "teach",
+          "verification": {
+            "control": "eq_low",
+            "deck": "A",
+            "direction": "",
+            "input_surfaces": [
+              "hardware",
+              "screen"
+            ],
+            "kind": "cc_delta",
+            "min_delta": 80,
+            "observable_control_ids": [
+              "eq_low:A"
+            ]
+          }
+        },
+        "text": "start with the lows. drop deck a's low knob, then raise deck b's low knob on the next beat one.",
+        "tts_marker": "L204.beat1"
+      },
+      "ts": "2026-06-04T12:59:20.624653+00:00",
+      "type": "ipc.learn.tutor_speak"
+    },
+    {
+      "payload": {
+        "beat_interval_s": 0.46875,
+        "decks": {
+          "A": {
+            "bpm": 128.0,
+            "cue_bands": null,
+            "duration_s": 30.0,
+            "peaks_len": 512
+          },
+          "B": {
+            "bpm": 128.0,
+            "cue_bands": null,
+            "duration_s": 30.0,
+            "peaks_len": 512
+          }
+        },
+        "sample_rate": 44100
+      },
+      "ts": "2026-06-04T12:59:20.627685+00:00",
+      "type": "ipc.learn.waveform_ready"
+    },
+    {
+      "payload": {
+        "decks": {
+          "A": {
+            "bpm": 128.0,
+            "frame": 0.0,
+            "position_s": 0.0
+          },
+          "B": {
+            "bpm": 124.16,
+            "frame": 0.0,
+            "position_s": 0.0
+          }
+        }
+      },
+      "ts": "2026-06-04T12:59:20.687469+00:00",
+      "type": "ipc.learn.playhead_tick"
+    },
+    {
+      "payload": {
+        "action": "snapshot",
+        "eq_mixing": {
+          "first_mastered_at": null,
+          "live_proof_count": 1,
+          "mastered": false
+        },
+        "eq_mixing_wall": {
+          "competent": true,
+          "first_mastered_at": null,
+          "learn_fill": 1.0,
+          "live_proof_count": 1,
+          "mastered": false,
+          "skill_id": "eq_mixing",
+          "stage": "competent",
+          "what_remains": "2 more cited live demos to Master"
+        }
+      },
+      "ts": "2026-06-04T12:59:20.693300+00:00",
+      "type": "ipc.learn.progress_state"
+    },
+    {
+      "payload": {
+        "lesson_id": "L2.04",
+        "reason": "action_matched"
+      },
+      "ts": "2026-06-04T12:59:20.809493+00:00",
+      "type": "ipc.learn.advance"
+    },
+    {
+      "payload": {
+        "band": "low",
+        "control_id": "eq_low",
+        "deck": "A",
+        "phase": "reform"
+      },
+      "ts": "2026-06-04T12:59:20.811844+00:00",
+      "type": "ipc.learn.teaching_focus"
+    },
+    {
+      "payload": {
+        "decks": {
+          "A": {
+            "bpm": 128.0,
+            "frame": 0.0,
+            "position_s": 0.0
+          },
+          "B": {
+            "bpm": 124.16,
+            "frame": 0.0,
+            "position_s": 0.0
+          }
+        }
+      },
+      "ts": "2026-06-04T12:59:20.841500+00:00",
+      "type": "ipc.learn.playhead_tick"
+    },
+    {
+      "payload": {
+        "decks": {
+          "A": {
+            "bpm": 128.0,
+            "frame": 0.0,
+            "position_s": 0.0
+          },
+          "B": {
+            "bpm": 124.16,
+            "frame": 0.0,
+            "position_s": 0.0
+          }
+        }
+      },
+      "ts": "2026-06-04T12:59:20.996758+00:00",
+      "type": "ipc.learn.playhead_tick"
+    },
+    {
+      "payload": {
+        "decks": {
+          "A": {
+            "bpm": 128.0,
+            "frame": 0.0,
+            "position_s": 0.0
+          },
+          "B": {
+            "bpm": 124.16,
+            "frame": 0.0,
+            "position_s": 0.0
+          }
+        }
+      },
+      "ts": "2026-06-04T12:59:21.150570+00:00",
+      "type": "ipc.learn.playhead_tick"
+    },
+    {
+      "payload": {
+        "decks": {
+          "A": {
+            "bpm": 128.0,
+            "frame": 0.0,
+            "position_s": 0.0
+          },
+          "B": {
+            "bpm": 124.16,
+            "frame": 0.0,
+            "position_s": 0.0
+          }
+        }
+      },
+      "ts": "2026-06-04T12:59:21.305010+00:00",
+      "type": "ipc.learn.playhead_tick"
+    },
+    {
+      "payload": {
+        "decks": {
+          "A": {
+            "bpm": 128.0,
+            "frame": 0.0,
+            "position_s": 0.0
+          },
+          "B": {
+            "bpm": 124.16,
+            "frame": 0.0,
+            "position_s": 0.0
+          }
+        }
+      },
+      "ts": "2026-06-04T12:59:21.458883+00:00",
+      "type": "ipc.learn.playhead_tick"
+    },
+    {
+      "payload": {
+        "lesson_id": "L2.04",
+        "reason": "completed"
+      },
+      "ts": "2026-06-04T12:59:21.516840+00:00",
+      "type": "ipc.learn.complete_lesson"
+    },
+    {
+      "payload": {
+        "action": "snapshot",
+        "eq_mixing": {
+          "first_mastered_at": null,
+          "live_proof_count": 1,
+          "mastered": false
+        },
+        "eq_mixing_wall": {
+          "competent": true,
+          "first_mastered_at": null,
+          "learn_fill": 1.0,
+          "live_proof_count": 1,
+          "mastered": false,
+          "skill_id": "eq_mixing",
+          "stage": "competent",
+          "what_remains": "2 more cited live demos to Master"
+        }
+      },
+      "ts": "2026-06-04T12:59:21.519393+00:00",
+      "type": "ipc.learn.progress_state"
+    }
+  ],
+  "progress_path": "/tmp/vibemix-control-credit-progress.json",
+  "run": "learn-control-credit-current-20260604",
+  "sent": {
+    "ack": {
+      "payload": {
+        "control_id": "eq_low:A",
+        "direction": "",
+        "prev_value": 0,
+        "source": "midi",
+        "value": 127
+      },
+      "ts": "2026-06-04T12:59:20.591768+00:00",
+      "type": "ipc.learn.ack"
+    },
+    "start_lesson": {
+      "payload": {
+        "lesson_id": "L2.04",
+        "level": "replay"
+      },
+      "ts": "2026-06-04T12:59:20.591629+00:00",
+      "type": "ipc.learn.start_lesson"
+    }
+  },
+  "session_after": "/Users/ozai/Library/Application Support/vibemix/recordings/20260604-155836",
+  "session_before": "/Users/ozai/Library/Application Support/vibemix/recordings/20260604-155836",
+  "summary": {
+    "ack_sent": true,
+    "advance_seen": true,
+    "control_grade_credited": [
+      "eq_mixing"
+    ],
+    "control_grade_event_logged": true,
+    "lesson_loaded_l204": true,
+    "progress_live_proof_count": 1,
+    "skill_wall_stage": "competent"
+  },
+  "timestamp": "2026-06-04T12:59:34.047243+00:00"
+}

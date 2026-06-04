@@ -2,13 +2,14 @@
 """Skill-recognizer — the citation-gated event→skill credit spine (MAST-02/03).
 
 Phase 103 (v11.0 "Earned"), Plan 02. This is the anti-slop heart of v11.0:
-``recognize`` maps a detected live event to the skill(s) it demonstrates via a
+``recognize`` maps a detected event to the skill(s) it demonstrates via a
 reverse map keyed on the REAL ``state/event_detector.py`` event-type string
-literals (MAST-02 — no new detectors), then grants Mastered credit ONLY when an
-INJECTED citation predicate resolves true (MAST-03 — un-cited / fabricated →
-ZERO credit). Credit is applied through :func:`skill_tree.record_live_demo`
-(Plan 103-01), which itself enforces the MAST-01 Competent floor + the flip
-math — the recognizer never re-implements either.
+literals plus Learn-owned practice receipts, then grants Mastered credit ONLY
+when an INJECTED citation predicate resolves true (MAST-03 — un-cited /
+fabricated → ZERO credit). Credit is applied through
+:func:`skill_tree.record_live_demo` (Plan 103-01), which itself enforces the
+MAST-01 Competent floor + the flip math — the recognizer never re-implements
+either.
 
 WHY the citation check is INJECTED (a ``Callable``, not a real
 ``EvidenceRegistry``): it keeps the engine offline-unit-testable and island-clean
@@ -65,12 +66,15 @@ if TYPE_CHECKING:  # type hints only — NEVER a runtime state/ import (Pitfall 
     from vibemix.state.evidence_registry import EvidenceRegistry  # noqa: F401
 
 # ---------------------------------------------------------------------------
-# EVENT_SKILL_MAP (MAST-02, single source per GA2) — REAL event-type literals
+# EVENT_SKILL_MAP (MAST-02, single source per GA2) — citable event literals
 # ---------------------------------------------------------------------------
 # Keys are the exact ``Event.type`` strings fired in ``state/event_detector.py``
-# (verified this session). Values are the skill ids the event demonstrates. NO
-# phantom event constants; NO new detector. MIX_MOVE is handled separately
-# below (it resolves by move-label substring, not a flat skill list).
+# (verified this session). Learn-owned practice receipts live beside those
+# detector literals because they are still grounded ``ev`` citations, just
+# produced by the lesson runtime instead of the live detector. Values are the
+# skill ids the event demonstrates. MIX_MOVE and LEARN_CONTROL_GRADED are handled
+# separately below (their payloads decide the exact skill).
+CONTROL_PRACTICE_GRADED_EVENT = "LEARN_CONTROL_GRADED"
 EVENT_SKILL_MAP: dict[str, tuple[str, ...]] = {
     "LAYER_ARRIVAL": ("transitions",),  # a layer/element arrival = a transition
     "PHASE": ("phrasing_performance",),  # a phase change = phrase-locked play
@@ -191,6 +195,20 @@ def _candidate_skills(event: Any) -> list[str]:
             return []
         if extra.get("verdict") in {"beat_locked", "drop_locked"}:
             return ["phrasing_performance"]
+        return []
+
+    if ev_type == CONTROL_PRACTICE_GRADED_EVENT:
+        # Learn-owned control practice. The runtime emits this only after the
+        # lesson matcher has accepted the student's real action and the
+        # EvidenceRegistry receipt has been written. Keep the branch narrow:
+        # it can credit deck_control or eq_mixing, and only when the payload says
+        # the action was matched.
+        extra = getattr(event, "extra", None)
+        if not isinstance(extra, dict) or not bool(extra.get("matched")):
+            return []
+        skill_id = str(extra.get("skill_id", "") or "")
+        if skill_id in {"deck_control", "eq_mixing"}:
+            return [skill_id]
         return []
 
     return list(EVENT_SKILL_MAP.get(ev_type, ()))

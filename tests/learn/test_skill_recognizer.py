@@ -29,7 +29,7 @@ from __future__ import annotations
 from types import SimpleNamespace
 
 from vibemix.learn.progress import LearnProgress
-from vibemix.learn.skill_recognizer import recognize
+from vibemix.learn.skill_recognizer import CONTROL_PRACTICE_GRADED_EVENT, recognize
 from vibemix.learn.skill_tree import SKILL_MANIFEST, SkillTree
 
 # A fixed injected timestamp — recognize/record_live_demo never call a clock;
@@ -200,6 +200,36 @@ def test_event_skill_map_credits_real_events() -> None:
         now=_NOW,
     )
     assert credited == []
+
+
+def test_learn_control_practice_event_credits_only_matched_allowed_skills() -> None:
+    """Matched Learn control receipts credit deck_control/eq_mixing, not arbitrary skills."""
+
+    progress = _competent_progress("eq_mixing", "deck_control", "harmonic_mixing")
+    eq_event = SimpleNamespace(
+        type=CONTROL_PRACTICE_GRADED_EVENT,
+        extra={"matched": True, "skill_id": "eq_mixing"},
+        _t=40.0,
+    )
+    bad_skill_event = SimpleNamespace(
+        type=CONTROL_PRACTICE_GRADED_EVENT,
+        extra={"matched": True, "skill_id": "harmonic_mixing"},
+        _t=41.0,
+    )
+    unmatched_event = SimpleNamespace(
+        type=CONTROL_PRACTICE_GRADED_EVENT,
+        extra={"matched": False, "skill_id": "deck_control"},
+        _t=42.0,
+    )
+
+    credited = _recognize(eq_event, citation_check=_cited, progress=progress, now=_NOW)
+    assert credited == ["eq_mixing"]
+    assert _count(progress, "eq_mixing") == 1
+
+    assert _recognize(bad_skill_event, citation_check=_cited, progress=progress, now=_NOW) == []
+    assert _recognize(unmatched_event, citation_check=_cited, progress=progress, now=_NOW) == []
+    assert _count(progress, "harmonic_mixing") == 0
+    assert _count(progress, "deck_control") == 0
 
 
 # ---------------------------------------------------------------------------
