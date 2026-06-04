@@ -27,7 +27,11 @@ import pytest
 
 from vibemix.learn.progress import LearnProgress, load_progress
 from vibemix.learn.skill_tree import SKILL_MANIFEST, SkillTree
-from vibemix.runtime.coach import _credit_live_skill_demo, _make_mastered_speak
+from vibemix.runtime.coach import (
+    _credit_live_beatmatch_grade_receipts,
+    _credit_live_skill_demo,
+    _make_mastered_speak,
+)
 from vibemix.state.evidence_registry import EvidenceRegistry
 
 
@@ -66,6 +70,14 @@ def _state(t_into_set: float = 10.0) -> SimpleNamespace:
     # helper's ``time.time() - set_start_at`` lands ~``t_into_set``, matching the
     # citation we write (well within the ±1.0s ``has`` tolerance).
     return SimpleNamespace(set_start_at=time.time() - t_into_set)
+
+
+def _live_state(t_into_set: float = 10.0) -> SimpleNamespace:
+    state = _state(t_into_set)
+    state.session_active = True
+    state.audible = True
+    state.audible_deck = "mix"
+    return state
 
 
 def _event(ev_type: str, moves=None) -> SimpleNamespace:
@@ -246,6 +258,72 @@ def test_unmapped_event_credits_nothing(_redirect_progress: Path) -> None:
 
     assert credited == []
     assert _count(progress, "transitions") == 0
+
+
+def test_live_beatmatch_grade_receipt_credits_beatmatching(
+    _redirect_progress: Path,
+) -> None:
+    """W12: a fresh live ``[ev:BEATMATCH_GRADED@t]`` receipt is enough to feed
+    the existing cited live credit spine and advance beatmatching.
+
+    The owned producer writes this receipt only for a measured locked grade; the
+    coach side supplies the minimal locked event shape and lets the normal
+    recognizer + EvidenceRegistry citation gate decide credit.
+    """
+
+    progress = LearnProgress()
+    _make_competent(progress, "beatmatching")
+    reg = EvidenceRegistry()
+    reg.write("ev", "BEATMATCH_GRADED", 10.0)
+    seen: set[float] = set()
+
+    credited = _credit_live_beatmatch_grade_receipts(
+        _live_state(10.0),
+        evidence_registry=reg,
+        learn_progress=progress,
+        seen_receipts=seen,
+    )
+
+    assert credited == ["beatmatching"]
+    assert _count(progress, "beatmatching") == 1
+    reloaded, _ = load_progress()
+    assert int(reloaded.skills.get("beatmatching", {}).get("live_proof_count", 0)) == 1
+
+    # Same receipt on a later loop tick must not double-credit.
+    credited_again = _credit_live_beatmatch_grade_receipts(
+        _live_state(10.1),
+        evidence_registry=reg,
+        learn_progress=progress,
+        seen_receipts=seen,
+    )
+    assert credited_again == []
+    assert _count(progress, "beatmatching") == 1
+
+
+def test_beatmatch_grade_receipt_is_not_live_credit_when_session_inactive(
+    _redirect_progress: Path,
+) -> None:
+    """Practice receipts are cited, but they are not live demonstrations.
+
+    The live-credit consumer refuses while ``MusicState.session_active`` is
+    false, preserving the practice-vs-live boundary instead of counting a Learn
+    MiniDeck exercise as a real driven-set proof.
+    """
+
+    progress = LearnProgress()
+    _make_competent(progress, "beatmatching")
+    reg = EvidenceRegistry()
+    reg.write("ev", "BEATMATCH_GRADED", 10.0)
+
+    credited = _credit_live_beatmatch_grade_receipts(
+        _state(10.0),
+        evidence_registry=reg,
+        learn_progress=progress,
+        seen_receipts=set(),
+    )
+
+    assert credited == []
+    assert _count(progress, "beatmatching") == 0
 
 
 # ---------------------------------------------------------------------------

@@ -109,6 +109,8 @@ if TYPE_CHECKING:
 # line while the co-host is already silent.
 CITATION_PUBLISH_INTERVAL_S = 2.0
 CITATION_UNCHANGED_PUBLISH_INTERVAL_S = 30.0
+_BEATMATCH_GRADED_EVENT = "BEATMATCH_GRADED"
+_BEATMATCH_GRADED_RECEIPT_FRESH_S = 2.0
 
 
 def _safe_print(*args: object, **kwargs: object) -> None:
@@ -156,6 +158,7 @@ def _credit_live_skill_demo(
     learn_progress: Any | None,
     speak: Callable[[str], None] | None = None,
     mastered_marker_writer: Callable[[str, MusicState], Any] | None = None,
+    event_t: float | None = None,
 ) -> list[str]:
     """Credit the v11.0 skill(s) a CITED live event demonstrates (the
     ``§EARNED-LIVE-MASTERED-VERIFY`` backend wiring — finally giving the
@@ -191,7 +194,11 @@ def _credit_live_skill_demo(
         from vibemix.learn.skill_recognizer import recognize
 
         set_start_at = float(getattr(state, "set_start_at", 0.0) or 0.0)
-        t_session = max(0.0, time.time() - set_start_at)
+        t_session = (
+            max(0.0, time.time() - set_start_at)
+            if event_t is None
+            else max(0.0, float(event_t))
+        )
         iso_now = datetime.now(tz=UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
         # SURF-03 — snapshot each skill's Mastered flag BEFORE crediting so we can
@@ -251,6 +258,82 @@ def _credit_live_skill_demo(
         return credited
     except Exception as exc:  # never wedge the reaction loop on a credit failure
         _safe_print(f"\n[coach skill-credit err] {exc}", file=sys.stderr)
+        return []
+
+
+def _credit_live_beatmatch_grade_receipts(
+    state: MusicState,
+    *,
+    evidence_registry: EvidenceRegistry | None,
+    learn_progress: Any | None,
+    seen_receipts: set[float],
+    speak: Callable[[str], None] | None = None,
+    mastered_marker_writer: Callable[[str, MusicState], Any] | None = None,
+) -> list[str]:
+    """Credit fresh live ``BEATMATCH_GRADED`` receipts that bypass EventDetector.
+
+    The owned Beatmatch Judge writes ``[ev:BEATMATCH_GRADED@t]`` only for a
+    locked, measured grade. That receipt is citable evidence, but it is not an
+    ``EventDetector.detect()`` return value, so the generic live credit site
+    never sees it. Poll the registry directly, synthesize the minimal locked
+    event shape the recognizer expects, and pass the receipt timestamp through
+    the normal citation gate.
+
+    Live-only guard: Learn practice can also write this receipt. It must not
+    become live proof while the Course 3/live-session lens is off.
+    """
+
+    if evidence_registry is None or learn_progress is None:
+        return []
+    if not bool(getattr(state, "session_active", False)):
+        return []
+    try:
+        from vibemix.state.event import Event
+
+        set_start_at = float(getattr(state, "set_start_at", 0.0) or 0.0)
+        now_session = max(0.0, time.time() - set_start_at)
+        ev_times = (
+            evidence_registry.snapshot()
+            .get("ev", {})
+            .get(_BEATMATCH_GRADED_EVENT, ())
+        )
+        credited: list[str] = []
+        for t_raw in sorted(ev_times):
+            try:
+                t_receipt = float(t_raw)
+            except (TypeError, ValueError):
+                continue
+            receipt_id = round(t_receipt, 3)
+            if receipt_id in seen_receipts:
+                continue
+            if abs(now_session - t_receipt) > _BEATMATCH_GRADED_RECEIPT_FRESH_S:
+                continue
+            seen_receipts.add(receipt_id)
+            ev = Event(
+                _BEATMATCH_GRADED_EVENT,
+                state,
+                extra={
+                    "verdict": "locked",
+                    "tempo_matched": True,
+                    "phase_locked": True,
+                    "abstain": False,
+                    "source": "live_receipt",
+                },
+            )
+            credited.extend(
+                _credit_live_skill_demo(
+                    ev,
+                    state,
+                    evidence_registry=evidence_registry,
+                    learn_progress=learn_progress,
+                    speak=speak,
+                    mastered_marker_writer=mastered_marker_writer,
+                    event_t=t_receipt,
+                )
+            )
+        return credited
+    except Exception as exc:  # never wedge the reaction loop on a credit failure
+        _safe_print(f"\n[coach beatmatch-credit err] {exc}", file=sys.stderr)
         return []
 
 
@@ -485,6 +568,7 @@ async def coach_loop(
     # SURF-03 — the rare grounded "Mastered" unlock vocal hook (fixed-text co-host
     # path). Built once; None when the session can't speak (credit still lands).
     mastered_speak = _make_mastered_speak(session)
+    seen_live_beatmatch_grade_receipts: set[float] = set()
 
     # SessionTracer hook — additive, side-effect-free, fully fail-soft. A None
     # tracer (or a tracer raising) must NEVER perturb the in_flight gate or the
@@ -496,6 +580,24 @@ async def coach_loop(
             getattr(tracer, method)(ev_name, **detail)
         except Exception:
             pass
+
+    async def _handle_live_skill_credits(credited: list[str]) -> None:
+        # A live cited demo just advanced the Earned Wall — push the refresh to
+        # the shell so the SkillWall trophy updates without a reload.
+        await _emit_earned_wall_refresh(credited, learn_progress, ipc_bus)
+        if not credited:
+            return
+        refresh_aim = getattr(agent, "refresh_coaching_aim", None)
+        if not callable(refresh_aim):
+            return
+        try:
+            maybe_refreshed = refresh_aim(learn_progress)
+            if asyncio.iscoroutine(maybe_refreshed):
+                maybe_refreshed = await maybe_refreshed
+            if maybe_refreshed:
+                _tr("event", "coaching_aim_refreshed", credited=credited)
+        except Exception as exc:
+            _safe_print(f"\n[coach aim-refresh err] {exc}", file=sys.stderr)
 
     while not stop_event.is_set():
         await asyncio.sleep(0.1)
@@ -537,6 +639,16 @@ async def coach_loop(
                 _safe_print(f"\n[coach citation publish err] {e}", file=sys.stderr)
             finally:
                 last_citation_publish_at = now
+
+        beatmatch_credited = _credit_live_beatmatch_grade_receipts(
+            state,
+            evidence_registry=evidence_registry,
+            learn_progress=learn_progress,
+            seen_receipts=seen_live_beatmatch_grade_receipts,
+            speak=mastered_speak,
+            mastered_marker_writer=mastered_marker_writer,
+        )
+        await _handle_live_skill_credits(beatmatch_credited)
 
         # Don't fire while a generation is in-flight
         if trigger_state.get("in_flight"):
@@ -690,20 +802,7 @@ async def coach_loop(
                 speak=mastered_speak,
                 mastered_marker_writer=mastered_marker_writer,
             )
-            # A live cited demo just advanced the Earned Wall — push the refresh
-            # to the shell so the SkillWall trophy updates without a reload.
-            await _emit_earned_wall_refresh(credited, learn_progress, ipc_bus)
-            if credited:
-                refresh_aim = getattr(agent, "refresh_coaching_aim", None)
-                if callable(refresh_aim):
-                    try:
-                        maybe_refreshed = refresh_aim(learn_progress)
-                        if asyncio.iscoroutine(maybe_refreshed):
-                            maybe_refreshed = await maybe_refreshed
-                        if maybe_refreshed:
-                            _tr("event", "coaching_aim_refreshed", credited=credited)
-                    except Exception as exc:
-                        _safe_print(f"\n[coach aim-refresh err] {exc}", file=sys.stderr)
+            await _handle_live_skill_credits(credited)
             _tr(
                 "event",
                 "emit",

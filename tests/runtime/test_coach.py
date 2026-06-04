@@ -1297,6 +1297,82 @@ def test_coach_16_live_credit_refreshes_coaching_aim(
     fake_agent.refresh_coaching_aim.assert_awaited_once_with(learn_progress)
 
 
+def test_coach_17_live_beatmatch_receipt_credits_and_refreshes_wall(
+    mocker,
+    fake_session,
+    fake_agent,
+    fake_levels,
+    fake_recorder,
+    fake_event_detector,
+    music_state,
+    tmp_path,
+    monkeypatch,
+):
+    """W12 by-bus proof: a cited live BEATMATCH_GRADED receipt advances the
+    beatmatching live proof path and emits a Learn progress refresh."""
+
+    from vibemix.learn.progress import LearnProgress
+    from vibemix.learn.skill_tree import SKILL_MANIFEST, SkillTree
+
+    monkeypatch.setenv(
+        "VIBEMIX_LEARN_PROGRESS_PATH", str(tmp_path / "learn-progress.json")
+    )
+    progress = LearnProgress()
+    spec = SKILL_MANIFEST["beatmatching"]
+    for lesson_id in spec.lesson_ids:
+        progress.lessons[lesson_id] = {
+            "completed": True,
+            "completed_at": "2026-06-04T00:00:00Z",
+            "strikes_used": 0,
+        }
+    setattr(progress, spec.gate, True)
+    assert SkillTree().compute(progress)["beatmatching"].competent is True
+
+    music_state.set_start_at = 990.0
+    music_state.session_active = True
+    music_state.audible = True
+    music_state.audible_deck = "mix"
+    registry = EvidenceRegistry()
+    registry.write("ev", "BEATMATCH_GRADED", 10.0)
+    fake_event_detector.detect.return_value = None
+    fake_agent.refresh_coaching_aim = AsyncMock(return_value=True)
+    ipc_bus = MagicMock()
+    ipc_bus.emit = AsyncMock(return_value=None)
+
+    stop_event = asyncio.Event()
+    fake_sleep, _ = _make_stop_after(2, stop_event)
+    mocker.patch("vibemix.runtime.coach.asyncio.sleep", side_effect=fake_sleep)
+    mocker.patch("vibemix.runtime.coach.time.time", side_effect=_auto_time(start=1000.0))
+
+    asyncio.run(
+        coach_loop(
+            fake_session,
+            fake_agent,
+            music_state,
+            fake_levels,
+            fake_event_detector,
+            fake_recorder,
+            asyncio.Event(),
+            {"in_flight": False},
+            stop_event,
+            evidence_registry=registry,
+            learn_progress=progress,
+            ipc_bus=ipc_bus,
+        )
+    )
+
+    assert int(progress.skills["beatmatching"]["live_proof_count"]) == 1
+    fake_agent.refresh_coaching_aim.assert_awaited_once_with(progress)
+    progress_msgs = [
+        call.args[0]
+        for call in ipc_bus.emit.await_args_list
+        if call.args and call.args[0].get("type") == "ipc.learn.progress_state"
+    ]
+    assert progress_msgs
+    payload = progress_msgs[-1]["payload"]
+    assert payload["progress"]["skills"]["beatmatching"]["live_proof_count"] == 1
+
+
 # ---------------------------------------------------------------------------
 # CONST-WS-01 — WS_HOST / WS_PORT centralized
 # ---------------------------------------------------------------------------
