@@ -29,11 +29,14 @@ afterEach(() => {
 });
 
 describe("wizard step — skill level", () => {
-  it("renders the verbatim heading 'STEP 4 / 6 · SKILL'", () => {
+  it("renders the focused skill heading without a duplicate step counter", () => {
     const r = renderStepSkillLevel(makeState(), makeCallbacks());
     document.body.append(r);
     expect(r.querySelector(".wizard-step__heading")?.textContent).toContain(
-      "STEP 4 / 6 · SKILL",
+      "SKILL",
+    );
+    expect(r.querySelector(".wizard-step__heading")?.textContent).not.toContain(
+      "STEP 4",
     );
   });
 

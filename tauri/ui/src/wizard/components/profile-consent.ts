@@ -1,7 +1,7 @@
 /* profile-consent.ts — Phase 32 / PROFILE-05.
  *
  * First-launch consent card: a single checkbox toggle ("Build a profile?")
- * + field-set disclosure (the five allowed fields with one-line each) +
+ * + field disclosure (the five allowed fields with one-line each) +
  * the privacy footer ("stored locally only / never uploaded").
  *
  * Default-OFF (PROFILE-05 non-negotiable). The user advances regardless of
@@ -101,14 +101,13 @@ const CSS = `
 
 registerStyle("profile-consent", CSS);
 
-// Field-set disclosure: each entry is the schema key + a one-line description.
-// Verbatim — these strings ARE the privacy disclosure.
+// User-facing disclosure: keep schema keys out of the first-run UI.
 const FIELDS: Array<{ name: string; desc: string }> = [
-  { name: "preferred_genre", desc: "hard_tek, techno, house, or unknown" },
-  { name: "avg_session_duration", desc: "session length in minutes" },
-  { name: "mix_style_tags", desc: "up to 8 tags (long_blends, quick_cuts, …)" },
-  { name: "tempo_preference_bin", desc: "BPM band (128-138, 138-150, …)" },
-  { name: "event_response_preferences", desc: "how often to react per event type" },
+  { name: "music you play", desc: "genre notes you choose or vibemix learns" },
+  { name: "set length", desc: "typical session length in minutes" },
+  { name: "mixing style", desc: "up to 8 tags, like long blends or quick cuts" },
+  { name: "tempo range", desc: "the BPM bands you usually sit in" },
+  { name: "reaction style", desc: "how often Sven should speak for each moment" },
 ];
 
 export function renderProfileConsentCard(props: ProfileConsentProps): HTMLElement {

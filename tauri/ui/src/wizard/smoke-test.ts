@@ -1,13 +1,13 @@
 /* smoke-test.ts — final wizard surface after Step 3 passes (UI-SPEC §11 / CDJ Whisper v5).
  *
- * Heading "WIZARD COMPLETE" in --amber with composite --glow-soft glow.
- * Body "playing a short greeting to test your headphones…".
+ * Heading "READY TO PLAY" in --amber with composite --glow-soft glow.
+ * Body "listen for a short voice check through your headphones."
  * Center: 96×96 LED pulse disc (Phase 13 mascot lives as overlay window,
  * not embedded here — this is the deck-LED placeholder).
  * 3-bar audio meter at static 50% (Wave 3 mock; Wave 4 wires real RMS).
  * Replay link + Open vibemix CTA (disabled until greetingPlayed).
  *
- * Copy strings VERBATIM from UI-SPEC §Smoke Test Strings. */
+ * Copy stays short: this is the first audible handoff, not a system receipt. */
 
 import { registerStyle } from "./components/_style-registry.js";
 import { PrimaryPanel } from "./components/primary-panel.js";
@@ -111,13 +111,11 @@ export function renderSmokeTest(state: SmokeTestState, cb: SmokeTestCallbacks): 
 
   const heading = document.createElement("h1");
   heading.className = "smoke-test__heading";
-  // UI-SPEC §Smoke Test "Heading" — VERBATIM
-  heading.textContent = "WIZARD COMPLETE";
+  heading.textContent = "READY TO PLAY";
 
   const sub = document.createElement("p");
   sub.className = "smoke-test__body";
-  // UI-SPEC §Smoke Test "Body" — VERBATIM
-  sub.textContent = "playing a short greeting to test your headphones…";
+  sub.textContent = "listen for a short voice check through your headphones.";
 
   const pulse = document.createElement("div");
   pulse.className = "smoke-test__pulse";

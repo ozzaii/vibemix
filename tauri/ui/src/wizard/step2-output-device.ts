@@ -73,8 +73,7 @@ export function renderStep2(state: Step2State, cb: Step2Callbacks): HTMLElement 
 
   const heading = document.createElement("h1");
   heading.className = "wizard-step__heading";
-  // UI-SPEC §Step 2 H1 — VERBATIM
-  heading.textContent = "STEP 2 / 6 · OUTPUT DEVICE";
+  heading.textContent = "OUTPUT DEVICE";
   withStepLeadGlyph(heading, 2);
 
   const subtitle = document.createElement("p");

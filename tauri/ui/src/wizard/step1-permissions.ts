@@ -182,14 +182,13 @@ export function renderStep1(state: Step1State, cb: Step1Callbacks): HTMLElement 
 
   const heading = document.createElement("h1");
   heading.className = "wizard-step__heading";
-  // UI-SPEC §Step 1 H1 — VERBATIM
-  heading.textContent = "STEP 1 / 6 · PERMISSIONS";
+  heading.textContent = "PERMISSIONS";
   withStepLeadGlyph(heading, 1);
 
   const subtitle = document.createElement("p");
   subtitle.className = "wizard-step__subtitle";
-  // UI-SPEC §Step 1 Subtitle — VERBATIM
-  subtitle.textContent = "vibemix needs to listen to your master output and watch your dj window.";
+  subtitle.textContent =
+    "choose how vibemix listens and follows your DJ app.";
 
   const cards = document.createElement("div");
   cards.className = "wizard-step__cards";

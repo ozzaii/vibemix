@@ -142,11 +142,10 @@ const CSS = `
 
 registerStyle("cmp-perm-card", CSS);
 
-// UI-SPEC §6 + Step 1 strings — VERBATIM.
 const COPY: Record<PermissionKind, { label: string; sub: string }> = {
   "screen-recording": {
     label: "SCREEN RECORDING",
-    sub: "required to see your dj software window",
+    sub: "lets vibemix read your DJ app window",
   },
   microphone: {
     label: "MICROPHONE",

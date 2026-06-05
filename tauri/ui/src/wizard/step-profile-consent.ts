@@ -1,7 +1,7 @@
 /* step-profile-consent.ts — Phase 32 / PROFILE-05.
  *
  * Wizard step inserted between "skill-level" and "telemetry-consent":
- * STEP 5 / 6 · PROFILE. Asks the user whether to enable long-term profile
+ * PROFILE. Asks the user whether to enable long-term profile
  * learning. Default-OFF; the toggle is a single click; Continue advances
  * regardless of the toggle state.
  *
@@ -59,7 +59,7 @@ export function renderStepProfileConsent(
 
   const heading = document.createElement("h1");
   heading.className = "wizard-step__heading";
-  heading.textContent = "STEP 5 / 6 · PROFILE";
+  heading.textContent = "PROFILE";
   withStepLeadGlyph(heading, 5);
 
   const subtitle = document.createElement("p");

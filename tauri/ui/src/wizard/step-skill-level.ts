@@ -1,7 +1,7 @@
 /* step-skill-level.ts — Quick 260529-ifq.
  *
  * New wizard step inserted between "controller" and "profile-consent":
- * STEP 4 / 6 · SKILL. Asks the user which DJ level they are
+ * SKILL. Asks the user which DJ level they are
  * (beginner / intermediate / pro). On Continue we emit ipc.wizard.set_skill
  * with the current selection so the sidecar persists it to config.json
  * before the wizard exits — the next cold boot seeds VIBEMIX_SKILL_LEVEL
@@ -57,7 +57,7 @@ export function renderStepSkillLevel(
 
   const heading = document.createElement("h1");
   heading.className = "wizard-step__heading";
-  heading.textContent = "STEP 4 / 6 · SKILL";
+  heading.textContent = "SKILL";
   withStepLeadGlyph(heading, 4);
 
   const subtitle = document.createElement("p");

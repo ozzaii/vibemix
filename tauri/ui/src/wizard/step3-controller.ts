@@ -56,14 +56,12 @@ export function renderStep3(state: Step3State, cb: Step3Callbacks): HTMLElement 
 
   const heading = document.createElement("h1");
   heading.className = "wizard-step__heading";
-  // UI-SPEC §Step 3 H1 — VERBATIM
-  heading.textContent = "STEP 3 / 6 · CONTROLLER";
+  heading.textContent = "CONTROLLER";
   withStepLeadGlyph(heading, 3);
 
   const subtitle = document.createElement("p");
   subtitle.className = "wizard-step__subtitle";
-  // UI-SPEC §Step 3 Subtitle — VERBATIM
-  subtitle.textContent = "proving your midi gear is wired in.";
+  subtitle.textContent = "move a control so vibemix knows what is connected.";
 
   body.append(heading, subtitle);
 
