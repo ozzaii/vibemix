@@ -1,0 +1,139 @@
+# SPDX-License-Identifier: Apache-2.0
+"""Next-practice mission is a derived booth hint, not stored progress."""
+
+from __future__ import annotations
+
+from vibemix.learn.curriculum import CURRICULUM
+from vibemix.learn.practice_mission import next_practice_mission
+from vibemix.learn.progress import LearnProgress
+from vibemix.learn.skill_tree import SKILL_MANIFEST
+
+
+def _make_skill_competent(progress: LearnProgress, skill_id: str) -> None:
+    spec = SKILL_MANIFEST[skill_id]
+    for lesson_id in spec.lesson_ids:
+        meta = CURRICULUM[lesson_id]
+        progress.mark_completed(meta.course_id, lesson_id)
+    setattr(progress, spec.gate, True)
+
+
+def test_fresh_mission_starts_with_useful_controller_practice() -> None:
+    mission = next_practice_mission(LearnProgress())
+
+    assert mission["lesson_id"] == "L1.02"
+    assert mission["mode"] == "start"
+    assert mission["title"] == "meet your controller"
+    assert "deck control" in mission["command"]
+    assert mission["estimated_minutes"] >= 1
+    assert mission["focus"] == "first_rep"
+    assert mission["focus_label"] == "first rep"
+    assert mission["challenge"] == "Touch the control before you read ahead."
+    assert mission["meter_label"] == "first rep"
+    assert mission["meter_value"] == 0
+    assert mission["meter_max"] == 1
+    assert mission["meter_state"] == "armed"
+    assert mission["meter_caption"] == "touch the control to begin"
+
+
+def test_in_progress_mission_keeps_the_user_on_the_current_move() -> None:
+    progress = LearnProgress()
+    progress.mark_started("course_1_anatomy", "L1.03")
+    progress.mark_hint_strike("course_1_anatomy", "L1.03", 2)
+    progress.mark_practice_source("course_1_anatomy", "L1.03", "screen")
+
+    mission = next_practice_mission(progress)
+
+    assert mission["lesson_id"] == "L1.03"
+    assert mission["mode"] == "finish"
+    assert mission["focus"] == "retry"
+    assert mission["focus_label"] == "retry 2/3"
+    assert mission["command"] == "Retry channel strip; no hints, one clean move is the checkpoint."
+    assert mission["challenge"] == "No hint this time; one clean move clears the loop."
+    assert mission["proof"] == "screen deck has worked; repeat it cleanly"
+    assert mission["meter_label"] == "retry loop"
+    assert mission["meter_value"] == 2
+    assert mission["meter_max"] == 3
+    assert mission["meter_state"] == "retry"
+    assert mission["meter_caption"] == "one clean move clears it"
+
+
+def test_locked_next_course_replays_cleared_open_course() -> None:
+    progress = LearnProgress()
+    for lesson_id in [f"L1.{i:02d}" for i in range(1, 17)]:
+        progress.mark_completed("course_1_anatomy", lesson_id)
+
+    mission = next_practice_mission(progress)
+
+    assert mission["lesson_id"] == "L1.01"
+    assert mission["mode"] == "replay"
+    assert "course 1" in mission["why"].lower() or "deck control" in mission["why"]
+
+
+def test_cleared_competent_skill_turns_into_cited_proof_mission() -> None:
+    progress = LearnProgress(course_2_unlocked=True, course_3_unlocked=True)
+    for lesson_id, meta in CURRICULUM.items():
+        if not lesson_id.startswith("L0."):
+            progress.mark_completed(meta.course_id, lesson_id)
+    progress.skills["deck_control"]["live_proof_count"] = 1
+
+    mission = next_practice_mission(progress)
+
+    assert mission["mode"] == "prove"
+    assert mission["lesson_id"] == "L1.02"
+    assert mission["focus"] == "proof"
+    assert mission["focus_label"] == "proof 1/3"
+    assert mission["proof"] == "1 cited proof banked; 2 left"
+    assert mission["challenge"] == "Only cited live proof moves Mastery."
+    assert mission["meter_label"] == "proof bank"
+    assert mission["meter_value"] == 1
+    assert mission["meter_max"] == 3
+    assert mission["meter_state"] == "proof"
+    assert mission["meter_caption"] == "2 proofs left to Mastery"
+
+
+def test_active_competent_lesson_becomes_the_current_proof_mission() -> None:
+    progress = LearnProgress()
+    _make_skill_competent(progress, "deck_control")
+    _make_skill_competent(progress, "beatmatching")
+    progress.skills["beatmatching"]["live_proof_count"] = 2
+
+    mission = next_practice_mission(progress, active_lesson_id="L2.01")
+
+    assert mission["lesson_id"] == "L2.01"
+    assert mission["mode"] == "prove"
+    assert mission["focus_label"] == "proof 2/3"
+    assert mission["proof"] == "2 cited proofs banked; 1 left"
+    assert mission["meter_label"] == "proof bank"
+    assert mission["meter_value"] == 2
+    assert mission["meter_max"] == 3
+    assert mission["meter_caption"] == "1 proof left to Mastery"
+
+
+def test_active_mastered_lesson_becomes_the_current_mastery_mission() -> None:
+    progress = LearnProgress()
+    _make_skill_competent(progress, "deck_control")
+    _make_skill_competent(progress, "beatmatching")
+    threshold = SKILL_MANIFEST["beatmatching"].mastered_threshold
+    progress.skills["beatmatching"] = {
+        "live_proof_count": threshold,
+        "mastered": True,
+        "first_mastered_at": "2026-06-05T19:00:00Z",
+    }
+
+    mission = next_practice_mission(progress, active_lesson_id="L2.01")
+
+    assert mission["lesson_id"] == "L2.01"
+    assert mission["mode"] == "mastered"
+    assert mission["focus"] == "mastery"
+    assert mission["focus_label"] == "mastered"
+    assert mission["command"] == (
+        "Review beatmatching by ear; carry the mastered beatmatching move into a real set."
+    )
+    assert mission["proof"] == "3 cited proofs banked; Mastery earned"
+    assert mission["why"] == "Mastery earned from cited live proof"
+    assert mission["challenge"] == "Carry it into a real set while it is fresh."
+    assert mission["meter_label"] == "mastery"
+    assert mission["meter_value"] == 3
+    assert mission["meter_max"] == 3
+    assert mission["meter_state"] == "mastered"
+    assert mission["meter_caption"] == "Mastery earned"

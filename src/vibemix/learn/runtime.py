@@ -2323,7 +2323,9 @@ class LessonRuntime(StateMachine):
     def _emit_progress_snapshot(self) -> None:
         """Emit the current progress snapshot when it is schema-shaped."""
         try:
-            snapshot = self._progress.snapshot()
+            snapshot = self._progress.snapshot(
+                active_lesson_id=self._learn.current_lesson_id
+            )
             if not isinstance(snapshot, dict):
                 snapshot = None
             progress_env = LearnProgressState.make(

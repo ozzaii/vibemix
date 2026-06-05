@@ -88,6 +88,7 @@ import {
   CURRICULUM_META,
   firstRecommendedLessonId,
   type LearnProgressProjection,
+  type LearnPracticeMission,
 } from "./lesson/curriculum-meta.js";
 import type { SkillWallRow } from "./SkillWall.js";
 import {
@@ -216,6 +217,7 @@ interface ProgressStatePayload {
     }>;
     course_2_unlocked?: boolean;
     course_3_unlocked?: boolean;
+    next_practice_mission?: LearnPracticeMission;
     skill_wall?: SkillWallRow[];
   };
 }
@@ -331,6 +333,13 @@ function mountLearnWindow(root: HTMLElement): {
         <strong id="learn-booth-title" class="learn-booth-title">next lesson</strong>
         <span id="learn-booth-proof" class="learn-booth-proof">screen deck available</span>
       </div>
+      <div id="learn-booth-reward" class="learn-booth-reward" data-visible="false" data-state="armed" aria-label="practice progress">
+        <span id="learn-booth-reward-label" class="learn-booth-reward__label">first rep</span>
+        <span class="learn-booth-reward__track" aria-hidden="true">
+          <span id="learn-booth-reward-fill" class="learn-booth-reward__fill"></span>
+        </span>
+        <span id="learn-booth-reward-caption" class="learn-booth-reward__caption">touch the control to begin</span>
+      </div>
       <div class="learn-booth-command" aria-label="practice mission">
         <span class="learn-booth-command__label">your move</span>
         <strong id="learn-booth-command-text" class="learn-booth-command__text">
@@ -409,6 +418,10 @@ function mountLearnWindow(root: HTMLElement): {
   const boothCourse = root.querySelector("#learn-booth-course") as HTMLElement;
   const boothTitle = root.querySelector("#learn-booth-title") as HTMLElement;
   const boothProof = root.querySelector("#learn-booth-proof") as HTMLElement;
+  const boothReward = root.querySelector("#learn-booth-reward") as HTMLElement;
+  const boothRewardLabel = root.querySelector("#learn-booth-reward-label") as HTMLElement;
+  const boothRewardFill = root.querySelector("#learn-booth-reward-fill") as HTMLElement;
+  const boothRewardCaption = root.querySelector("#learn-booth-reward-caption") as HTMLElement;
   const boothCommandText = root.querySelector("#learn-booth-command-text") as HTMLElement;
   const boothPulse = root.querySelector("#learn-booth-pulse") as HTMLElement;
   const screenAction = root.querySelector("#learn-screen-action") as HTMLButtonElement;
@@ -458,6 +471,35 @@ function mountLearnWindow(root: HTMLElement): {
     // eslint-disable-next-line @typescript-eslint/no-unused-expressions
     void boothPulse.offsetWidth;
     boothPulse.classList.add("is-fresh");
+  };
+  const showLiveGradeMissionFeedback = (payload: LiveGradeWirePayload): void => {
+    const feedback = liveGradeMissionFeedback(payload);
+    if (!feedback) return;
+    status.setPracticeFeedback(feedback.text, {
+      ariaLabel: feedback.ariaLabel,
+      title: feedback.ariaLabel,
+      tone: feedback.tone,
+    });
+    if (boothPanel.dataset.visible === "true") {
+      setBoothPulse(feedback.state, feedback.text, {
+        ariaLabel: feedback.ariaLabel,
+        title: feedback.ariaLabel,
+      });
+    }
+  };
+  const showSnapshotMissionFeedback = (
+    mission: LearnPracticeMission | undefined,
+  ): void => {
+    if (!mission || currentLessonId === null || mission.lesson_id !== currentLessonId) {
+      return;
+    }
+    const feedback = snapshotMissionFeedback(mission);
+    if (!feedback) return;
+    status.setPracticeFeedback(feedback.text, {
+      ariaLabel: feedback.ariaLabel,
+      title: feedback.ariaLabel,
+      tone: feedback.tone,
+    });
   };
   const clearExemplarTimer = (): void => {
     if (exemplarHideTimer !== null) {
@@ -574,12 +616,32 @@ function mountLearnWindow(root: HTMLElement): {
   };
   let progressList: ProgressListHandle;
   const renderLessonChooser = (): void => {
-    const lessons = buildProgressEntries(latestProgress);
-    const recommended = lessons.find((lesson) => lesson.is_recommended);
+    const mission = latestProgress?.next_practice_mission;
+    const lessons = applyMissionRecommendation(
+      buildProgressEntries(latestProgress),
+      mission,
+    );
+    const missionLesson = mission
+      ? lessons.find((lesson) =>
+        lesson.lesson_id === mission.lesson_id &&
+        (!lesson.locked || lesson.status === "completed")
+      )
+      : undefined;
+    const recommended =
+      missionLesson ?? lessons.find((lesson) => lesson.is_recommended);
+    const activeMission = missionLesson ? mission : undefined;
     recommendedLessonId =
       recommended?.lesson_id ?? firstRecommendedLessonId(latestProgress);
-    recommendedLessonLevel = recommended?.status === "completed" ? "replay" : "fresh";
-    const recommendedVerb = recommendedActionVerb(recommended?.status);
+    recommendedLessonLevel =
+      activeMission?.mode === "replay" ||
+      activeMission?.mode === "prove" ||
+      activeMission?.mode === "mastered" ||
+      recommended?.status === "completed"
+        ? "replay"
+        : "fresh";
+    const recommendedVerb = activeMission
+      ? missionActionVerb(activeMission)
+      : recommendedActionVerb(recommended?.status);
     startRecommendedButton.textContent = recommended
       ? `${recommendedVerb} ${recommended.title}`
       : "start practice";
@@ -592,10 +654,11 @@ function mountLearnWindow(root: HTMLElement): {
       },
     });
     progressListBody.replaceChildren(progressList);
-    updateBoothPulseForRecommendation(recommended);
+    updateBoothPulseForRecommendation(recommended, activeMission);
   };
   const updateBoothPulseForRecommendation = (
     recommended: ProgressListEntry | undefined,
+    mission?: LearnPracticeMission,
   ): void => {
     if (boothPanel.dataset.visible !== "true") return;
     const readiness = controllerDetected
@@ -608,21 +671,41 @@ function mountLearnWindow(root: HTMLElement): {
       ? recommended.course_label
       : "Next lesson";
     boothTitle.textContent = recommended?.title ?? "pick a first lesson";
-    boothProof.textContent = readinessProofLine(readiness, controllerDisplayName);
-    boothCommandText.textContent = practiceCommandLine(
-      recommended,
-      readiness,
-      controllerDisplayName,
-    );
-    const cue = recommendationBoothCue(
-      recommended,
-      readiness,
-      controllerDisplayName,
-    );
+    boothProof.textContent =
+      cleanMissionText(mission?.proof) ??
+      readinessProofLine(readiness, controllerDisplayName);
+    boothCommandText.textContent =
+      cleanMissionText(mission?.command) ??
+      practiceCommandLine(recommended, readiness, controllerDisplayName);
+    renderBoothReward(mission);
+    const cue = mission
+      ? missionBoothCue(mission, recommended, readiness, controllerDisplayName)
+      : recommendationBoothCue(recommended, readiness, controllerDisplayName);
     setBoothPulse(cue.state, cue.text, {
       ariaLabel: cue.ariaLabel,
       title: cue.title,
     });
+  };
+  const renderBoothReward = (mission?: LearnPracticeMission): void => {
+    if (!mission) {
+      boothReward.dataset.visible = "false";
+      boothRewardFill.style.width = "0%";
+      boothReward.removeAttribute("aria-label");
+      return;
+    }
+    const label = cleanMissionText(mission.meter_label) ?? "progress";
+    const caption = cleanMissionText(mission.meter_caption) ?? "keep going";
+    const value = missionMeterValue(mission);
+    const max = missionMeterMax(mission);
+    boothReward.dataset.visible = "true";
+    boothReward.dataset.state = mission.meter_state;
+    boothRewardLabel.textContent = `${label} ${value}/${max}`;
+    boothRewardCaption.textContent = caption;
+    boothRewardFill.style.width = `${missionMeterPercent(mission)}%`;
+    boothReward.setAttribute(
+      "aria-label",
+      `${label} ${value} of ${max}. ${caption}`,
+    );
   };
   renderLessonChooser();
 
@@ -889,6 +972,7 @@ function mountLearnWindow(root: HTMLElement): {
     lessonActionCount = 0;
     lessonMatchedSourceCounts = freshLessonSourceCounts();
     lessonUsedHint = false;
+    status.clearPracticeFeedback();
     if (!liveMeter) {
       liveMeter = LiveGradeMeter(liveMeterHost);
     } else {
@@ -1017,6 +1101,7 @@ function mountLearnWindow(root: HTMLElement): {
     // lesson_loaded fires resetLockout.
     currentLessonId = null;
     status.setCourse3LessonActive(false);
+    status.clearPracticeFeedback();
     currentExpectedAction = null;
     lastHighlightPayload = null;
     screenAction.hidden = true;
@@ -1086,6 +1171,7 @@ function mountLearnWindow(root: HTMLElement): {
     ) {
       latestProgress = payload.progress;
       renderLessonChooser();
+      showSnapshotMissionFeedback(payload.progress.next_practice_mission);
     }
   });
 
@@ -1106,6 +1192,7 @@ function mountLearnWindow(root: HTMLElement): {
       liveMeter = LiveGradeMeter(liveMeterHost);
     }
     liveMeter.update(payload);
+    showLiveGradeMissionFeedback(payload);
   });
   addWindowListener("ipc.learn.waveform_ready", (ev: Event) => {
     const payload = (ev as CustomEvent<WaveformReadyPayload>).detail;
@@ -1599,6 +1686,157 @@ function recommendedActionVerb(status: LessonStatus | undefined): string {
   if (status === "completed") return "replay";
   if (status === "in-progress") return "retry";
   return "start";
+}
+
+function applyMissionRecommendation(
+  lessons: ProgressListEntry[],
+  mission: LearnPracticeMission | undefined,
+): ProgressListEntry[] {
+  if (!mission) return lessons;
+  const target = lessons.find((lesson) =>
+    lesson.lesson_id === mission.lesson_id &&
+    (!lesson.locked || lesson.status === "completed")
+  );
+  if (!target) return lessons;
+  return lessons.map((lesson) => ({
+    ...lesson,
+    is_recommended: lesson.lesson_id === target.lesson_id,
+  }));
+}
+
+function missionActionVerb(mission: LearnPracticeMission): string {
+  if (mission.mode === "prove") return "prove";
+  if (mission.mode === "mastered") return "review";
+  if (mission.mode === "replay") return "replay";
+  if (mission.mode === "finish") return "finish";
+  return "start";
+}
+
+function missionBoothCue(
+  mission: LearnPracticeMission,
+  recommended: ProgressListEntry | undefined,
+  readiness: "hardware" | "midi" | "screen",
+  controllerName: string | null,
+): {
+  state: "ready";
+  text: string;
+  ariaLabel?: string;
+  title?: string;
+} {
+  const action = `${missionActionVerb(mission)} ${recommended?.title ?? mission.title}`;
+  const why = cleanMissionText(mission.why);
+  const payoff = cleanMissionText(mission.payoff);
+  const proof = cleanMissionText(mission.proof) ??
+    missionProofPhrase(readiness, controllerName);
+  const challenge = cleanMissionText(mission.challenge);
+  const reward = cleanMissionText(mission.meter_caption);
+  const label = [action, why, challenge, payoff, proof, reward]
+    .filter((part): part is string => Boolean(part))
+    .join(". ");
+  const focusLabel = cleanMissionText(mission.focus_label);
+  return {
+    state: "ready",
+    text: focusLabel ?? `${Math.max(1, Math.round(mission.estimated_minutes))} min drill`,
+    ariaLabel: label,
+    title: label,
+  };
+}
+
+function liveGradeMissionFeedback(payload: LiveGradeWirePayload): {
+  text: string;
+  ariaLabel: string;
+  tone: string;
+  state: "idle" | "ready" | "listening" | "success";
+} | null {
+  const phaseLine = liveGradePhaseLine(payload.phase_error_beats);
+  if (payload.verdict === "locked") {
+    if (payload.citation) {
+      return {
+        text: "locked proof",
+        ariaLabel: `locked beatmatch proof, ${payload.citation}. hold it or start the next proof rep.`,
+        tone: "locked",
+        state: "success",
+      };
+    }
+    return {
+      text: "locked",
+      ariaLabel: "beatmatch locked. hold it until cited proof lands.",
+      tone: "locked",
+      state: "success",
+    };
+  }
+  if (payload.verdict === "drifting") {
+    return {
+      text: "nudge jog",
+      ariaLabel: `drifting ${phaseLine}; nudge the jog and listen for the kicks to meet.`,
+      tone: "correct",
+      state: "ready",
+    };
+  }
+  if (payload.verdict === "tempo_off") {
+    return {
+      text: "fix tempo",
+      ariaLabel: `tempo is off ${phaseLine}; move the pitch fader closer before nudging.`,
+      tone: "correct",
+      state: "ready",
+    };
+  }
+  if (payload.verdict === "trainwreck") {
+    return {
+      text: "re-find the 1",
+      ariaLabel: `trainwreck ${phaseLine}; pull back and re-find beat 1.`,
+      tone: "danger",
+      state: "idle",
+    };
+  }
+  return null;
+}
+
+function snapshotMissionFeedback(mission: LearnPracticeMission): {
+  text: string;
+  ariaLabel: string;
+  tone: string;
+} | null {
+  const focusLabel = cleanMissionText(mission.focus_label);
+  if (!focusLabel) return null;
+  const challenge = cleanMissionText(mission.challenge);
+  const proof = cleanMissionText(mission.proof);
+  const why = cleanMissionText(mission.why);
+  const reward = cleanMissionText(mission.meter_caption);
+  const ariaLabel = [focusLabel, challenge, proof, why, reward]
+    .filter((part): part is string => Boolean(part))
+    .join(". ");
+  return {
+    text: focusLabel,
+    ariaLabel,
+    tone: mission.meter_state === "mastered" ? "mastered" : mission.focus,
+  };
+}
+
+function liveGradePhaseLine(phaseErrorBeats: number): string {
+  if (!Number.isFinite(phaseErrorBeats) || Math.abs(phaseErrorBeats) < 0.005) {
+    return "at center";
+  }
+  const side = phaseErrorBeats > 0 ? "behind" : "ahead";
+  return `${Math.abs(phaseErrorBeats).toFixed(2)} beat ${side}`;
+}
+
+function cleanMissionText(value: string | null | undefined): string | null {
+  const text = value?.trim();
+  return text ? text : null;
+}
+
+
+function missionMeterMax(mission: LearnPracticeMission): number {
+  return Math.max(1, Math.round(mission.meter_max));
+}
+
+function missionMeterValue(mission: LearnPracticeMission): number {
+  return Math.max(0, Math.min(missionMeterMax(mission), Math.round(mission.meter_value)));
+}
+
+function missionMeterPercent(mission: LearnPracticeMission): number {
+  return Math.round((missionMeterValue(mission) / missionMeterMax(mission)) * 100);
 }
 
 

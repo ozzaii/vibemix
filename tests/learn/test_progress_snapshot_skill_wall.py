@@ -6,6 +6,7 @@ derived `skill_wall` rides the wire there. `to_dict()` is the JSON-FILE shape an
 the persistence path (`save_progress` / `from_dict` round-trip) — it must NEVER
 carry the derived block, or the recomputed-on-load contract breaks.
 """
+
 from __future__ import annotations
 
 from vibemix.learn.progress import LearnProgress
@@ -32,6 +33,15 @@ def test_to_dict_stays_pure_file_shape_without_skill_wall():
     assert "skill_wall" not in LearnProgress().to_dict()
 
 
+def test_snapshot_carries_next_practice_mission_without_persisting_it():
+    snap = LearnProgress().snapshot()
+    assert snap["next_practice_mission"]["lesson_id"] == "L1.02"
+    assert snap["next_practice_mission"]["mode"] == "start"
+
+    stored = LearnProgress().to_dict()
+    assert "next_practice_mission" not in stored
+
+
 def test_mastered_demo_reaches_the_envelope_wall():
     progress = LearnProgress()
     skill_id = "harmonic_mixing"
@@ -40,7 +50,8 @@ def test_mastered_demo_reaches_the_envelope_wall():
         progress.lessons[lesson_id] = {"completed": True}
     setattr(progress, spec.gate, True)
     progress.skills[skill_id] = {
-        "live_proof_count": 3, "mastered": True,
+        "live_proof_count": 3,
+        "mastered": True,
         "first_mastered_at": "2026-05-30T11:00:00Z",
     }
     row = next(r for r in progress.snapshot()["skill_wall"] if r["skill_id"] == skill_id)

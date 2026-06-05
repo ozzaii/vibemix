@@ -364,6 +364,7 @@
   grid-template-areas:
     "kicker kicker"
     "next next"
+    "reward reward"
     "command command"
     "pulse pulse"
     "primary secondary";
@@ -438,6 +439,79 @@
 .learn-booth-proof {
   color: var(--brand);
   text-shadow: var(--text-emboss);
+}
+
+.learn-booth-reward {
+  grid-area: reward;
+  display: grid;
+  grid-template-columns: auto minmax(96px, 1fr) auto;
+  align-items: center;
+  gap: var(--sp-2);
+  width: min(560px, calc(100vw - var(--sp-8)));
+  min-height: 24px;
+  padding: 0 var(--sp-2);
+  color: var(--silk-65);
+}
+
+.learn-booth-reward[data-visible="false"] {
+  display: none;
+}
+
+.learn-booth-reward__label,
+.learn-booth-reward__caption {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--type-mono);
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.learn-booth-reward__label {
+  color: var(--text-secondary);
+}
+
+.learn-booth-reward__caption {
+  color: var(--silk-40);
+  text-align: right;
+}
+
+.learn-booth-reward__track {
+  position: relative;
+  height: 5px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 220, 240, 0.07);
+  box-shadow:
+    inset 0 1px 1px rgba(0, 0, 0, 0.55),
+    var(--chrome-highlight);
+}
+
+.learn-booth-reward__fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 0%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--brand-22), var(--brand));
+  box-shadow: 0 0 12px var(--brand-22);
+  transition: width 220ms var(--ease-brand);
+}
+
+.learn-booth-reward[data-state="proof"] .learn-booth-reward__caption,
+.learn-booth-reward[data-state="mastered"] .learn-booth-reward__caption {
+  color: var(--brand);
+  text-shadow: var(--text-emboss);
+}
+
+.learn-booth-reward[data-state="retry"] .learn-booth-reward__fill {
+  background: linear-gradient(90deg, rgba(244, 197, 66, 0.18), var(--amber-pale));
+  box-shadow: 0 0 10px rgba(244, 197, 66, 0.22);
+}
+
+.learn-booth-reward[data-state="mastered"] .learn-booth-reward__fill {
+  background: linear-gradient(90deg, var(--brand-40), var(--amber-pale));
 }
 
 .learn-booth-command {
@@ -544,6 +618,16 @@
     width: 100%;
     grid-template-columns: 1fr;
     gap: var(--sp-1);
+  }
+
+  .learn-booth-reward {
+    width: 100%;
+    grid-template-columns: 1fr;
+    gap: var(--sp-1);
+  }
+
+  .learn-booth-reward__caption {
+    text-align: left;
   }
 
   .learn-booth-next {

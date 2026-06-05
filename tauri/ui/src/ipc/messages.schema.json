@@ -3452,6 +3452,34 @@
                       "what_remains": {"type": "string"}
                     }
                   }
+                },
+                "next_practice_mission": {
+                  "$comment": "IPC-only derived Learn booth mission. Deterministic next move built from curriculum/progress/skill wall; never persisted to learn-progress.json.",
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["lesson_id", "course_id", "course_label", "skill_id", "skill_label", "title", "mode", "command", "payoff", "proof", "why", "estimated_minutes", "focus", "focus_label", "challenge", "meter_label", "meter_value", "meter_max", "meter_state", "meter_caption"],
+                  "properties": {
+                    "lesson_id": {"type": "string"},
+                    "course_id": {"type": "string"},
+                    "course_label": {"type": "string"},
+                    "skill_id": {"type": "string"},
+                    "skill_label": {"type": "string"},
+                    "title": {"type": "string"},
+                    "mode": {"type": "string", "enum": ["start", "finish", "replay", "prove", "mastered"]},
+                    "command": {"type": "string"},
+                    "payoff": {"type": "string"},
+                    "proof": {"type": "string"},
+                    "why": {"type": "string"},
+                    "estimated_minutes": {"type": "integer", "minimum": 1},
+                    "focus": {"type": "string", "enum": ["first_rep", "retry", "proof", "replay", "hardware", "lock", "mastery"]},
+                    "focus_label": {"type": "string"},
+                    "challenge": {"type": "string"},
+                    "meter_label": {"type": "string"},
+                    "meter_value": {"type": "integer", "minimum": 0},
+                    "meter_max": {"type": "integer", "minimum": 1},
+                    "meter_state": {"type": "string", "enum": ["armed", "retry", "proof", "mastered", "replay"]},
+                    "meter_caption": {"type": "string"}
+                  }
                 }
               }
             }

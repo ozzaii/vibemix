@@ -54,7 +54,31 @@ export interface LearnProgressProjection {
   >;
   course_2_unlocked?: boolean;
   course_3_unlocked?: boolean;
+  next_practice_mission?: LearnPracticeMission;
   [key: string]: unknown;
+}
+
+export interface LearnPracticeMission {
+  lesson_id: string;
+  course_id: string;
+  course_label: string;
+  skill_id: string;
+  skill_label: string;
+  title: string;
+  mode: "start" | "finish" | "replay" | "prove" | "mastered";
+  command: string;
+  payoff: string;
+  proof: string;
+  why: string;
+  estimated_minutes: number;
+  focus: "first_rep" | "retry" | "proof" | "replay" | "hardware" | "lock" | "mastery";
+  focus_label: string;
+  challenge: string;
+  meter_label: string;
+  meter_value: number;
+  meter_max: number;
+  meter_state: "armed" | "retry" | "proof" | "mastered" | "replay";
+  meter_caption: string;
 }
 
 /** Canonical lesson order generated from Python CURRICULUM. */

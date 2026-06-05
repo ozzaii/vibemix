@@ -165,6 +165,16 @@ def _live_grade_payloads(ipc: MagicMock) -> list[dict]:
     ]
 
 
+def _progress_snapshots(ipc: MagicMock) -> list[dict]:
+    return [
+        call.args[0]["payload"]["progress"]
+        for call in ipc.emit.call_args_list
+        if call.args
+        and call.args[0].get("type") == "ipc.learn.progress_state"
+        and isinstance(call.args[0].get("payload", {}).get("progress"), dict)
+    ]
+
+
 def test_runtime_grade_feedback_avoids_empty_compliments() -> None:
     """Runtime-authored grade lines must describe the measured result."""
 
@@ -543,6 +553,7 @@ def test_beatmatch_practice_tick_writes_receipt_and_credits_once(monkeypatch) ->
     saved: list[LearnProgress] = []
     monkeypatch.setattr("vibemix.learn.progress.save_progress", saved.append)
     progress = LearnProgress()
+    _make_skill_competent(progress, "deck_control")
     _make_beatmatching_competent(progress)
     registry = EvidenceRegistry()
     ipc = MagicMock(name="ipc_router")
@@ -558,6 +569,13 @@ def test_beatmatch_practice_tick_writes_receipt_and_credits_once(monkeypatch) ->
         beatmatch_practice_loader=_locked_beatmatch_snapshot,
         session_event_logger=lambda kind, fields: events.append((kind, dict(fields))),
     )
+    runtime.send(
+        "load",
+        lesson_id="L2.01",
+        course_id="course_2_transitions",
+        controller_id="pioneer_ddj_flx4",
+    )
+    saved.clear()
 
     result = runtime._grade_beatmatch_practice_tick()
 
@@ -574,6 +592,18 @@ def test_beatmatch_practice_tick_writes_receipt_and_credits_once(monkeypatch) ->
     )
     assert events[-1][0] == "learn_beatmatch_practice_graded"
     assert events[-1][1]["credited"] == ["beatmatching"]
+    mission = _progress_snapshots(ipc)[-1]["next_practice_mission"]
+    assert mission["lesson_id"] == "L2.01"
+    assert mission["mode"] == "prove"
+    assert mission["focus"] == "proof"
+    assert mission["focus_label"] == "proof 1/3"
+    assert mission["proof"] == "1 cited proof banked; 2 left"
+    assert mission["challenge"] == "Only cited live proof moves Mastery."
+    assert mission["meter_label"] == "proof bank"
+    assert mission["meter_value"] == 1
+    assert mission["meter_max"] == 3
+    assert mission["meter_state"] == "proof"
+    assert mission["meter_caption"] == "2 proofs left to Mastery"
 
     repeated = runtime._grade_beatmatch_practice_tick()
 
@@ -636,6 +666,7 @@ def test_beatmatch_mastered_flip_speaks_factual_proof_once(monkeypatch) -> None:
 
     monkeypatch.setattr("vibemix.learn.progress.save_progress", lambda _progress: None)
     progress = LearnProgress()
+    _make_skill_competent(progress, "deck_control")
     _make_beatmatching_competent(progress)
     threshold = SKILL_MANIFEST["beatmatching"].mastered_threshold
     progress.skills["beatmatching"] = {
@@ -665,6 +696,18 @@ def test_beatmatch_mastered_flip_speaks_factual_proof_once(monkeypatch) -> None:
     runtime._emit_live_beatmatch_grade(runtime._grade_beatmatch_practice_tick())
 
     assert progress.skills["beatmatching"]["mastered"] is True
+    mission = _progress_snapshots(ipc)[-1]["next_practice_mission"]
+    assert mission["lesson_id"] == "L2.01"
+    assert mission["mode"] == "mastered"
+    assert mission["focus"] == "mastery"
+    assert mission["focus_label"] == "mastered"
+    assert mission["proof"] == "3 cited proofs banked; Mastery earned"
+    assert mission["why"] == "Mastery earned from cited live proof"
+    assert mission["meter_label"] == "mastery"
+    assert mission["meter_value"] == 3
+    assert mission["meter_max"] == 3
+    assert mission["meter_state"] == "mastered"
+    assert mission["meter_caption"] == "Mastery earned"
     mastered_payloads = [
         payload
         for payload in _tutor_speak_payloads(ipc)

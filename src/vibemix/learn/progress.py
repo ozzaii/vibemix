@@ -62,6 +62,7 @@ there is zero dual-write drift. Phase 103 writes the live-portion; Phase
 REQ-ID: LESSON-03 (progress persistence + corruption recovery + reset CLI);
 DATA-01/02/03 (Phase 102 skills block + v1→v2 migration + reset).
 """
+
 from __future__ import annotations
 
 import json
@@ -217,9 +218,7 @@ class LearnProgress:
     # never persisted. ``default_factory=_fresh_skills_block`` seeds the
     # 6-skill defaults on a fresh object — which is also the corrupt-recovery
     # seed (``load_progress`` returns ``LearnProgress()`` on garbage bytes).
-    skills: dict[str, dict[str, Any]] = field(
-        default_factory=_fresh_skills_block
-    )
+    skills: dict[str, dict[str, Any]] = field(default_factory=_fresh_skills_block)
 
     def mark_completed(
         self,
@@ -325,7 +324,7 @@ class LearnProgress:
             return
         row["strikes_used"] = max(0, min(3, int(strikes_used)))
 
-    def snapshot(self) -> dict[str, Any]:
+    def snapshot(self, *, active_lesson_id: str | None = None) -> dict[str, Any]:
         """The ``LearnProgressState`` envelope payload — the file shape PLUS the
         derived Earned-Wall block.
 
@@ -338,9 +337,17 @@ class LearnProgress:
         stays the pure stored shape. The import is local to keep the module
         import graph one-way (``skill_tree`` reads ``progress`` structurally).
         """
+        from vibemix.learn.practice_mission import next_practice_mission
         from vibemix.learn.skill_tree import skill_wall_payload
 
-        return {**self.to_dict(), "skill_wall": skill_wall_payload(self)}
+        return {
+            **self.to_dict(),
+            "skill_wall": skill_wall_payload(self),
+            "next_practice_mission": next_practice_mission(
+                self,
+                active_lesson_id=active_lesson_id,
+            ),
+        }
 
     def dots_for_course(
         self,

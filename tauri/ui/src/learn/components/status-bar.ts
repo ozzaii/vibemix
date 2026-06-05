@@ -176,6 +176,30 @@ export class StatusBar {
     this.renderOperatorAction(action, "external-action");
   }
 
+  setPracticeFeedback(
+    text: string,
+    options: { ariaLabel?: string; title?: string; tone?: string } = {},
+  ): void {
+    this.hintEl.textContent = text;
+    this.hintEl.dataset.practiceFeedback = options.tone ?? "active";
+    this.hintEl.dataset.operatorAction = "none";
+    if (options.ariaLabel) {
+      this.hintEl.setAttribute("aria-label", options.ariaLabel);
+    } else {
+      this.hintEl.removeAttribute("aria-label");
+    }
+    if (options.title) {
+      this.hintEl.setAttribute("title", options.title);
+    } else {
+      this.hintEl.removeAttribute("title");
+    }
+  }
+
+  clearPracticeFeedback(): void {
+    this.hintEl.removeAttribute("data-practice-feedback");
+    this.restoreDefaultHint();
+  }
+
   setCourse3LessonActive(active: boolean): void {
     this.course3LessonActive = active;
     if (!active) {
@@ -276,6 +300,7 @@ export class StatusBar {
     this.hintEl.textContent = this.defaultHint;
     this.hintEl.dataset.course3Lens = "cold";
     this.hintEl.dataset.operatorAction = "none";
+    this.hintEl.removeAttribute("data-practice-feedback");
     this.hintEl.removeAttribute("aria-label");
     this.hintEl.removeAttribute("title");
   }

@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 """Frontend navigation projection generated from the Python curriculum."""
+
 from __future__ import annotations
 
 import json
@@ -58,15 +59,9 @@ def render_curriculum_meta_ts() -> str:
         }
     )
     gate_type = " | ".join(json.dumps(gate) for gate in gates) or "never"
-    progress_gate_rows = "".join(
-        f"  {_ts_progress_field(gate)}?: boolean;\n" for gate in gates
-    )
-    frontstage_modes = sorted(
-        {str(course["frontstage_mode"]) for course in projection["courses"]}
-    )
-    frontstage_mode_type = (
-        " | ".join(json.dumps(mode) for mode in frontstage_modes) or "never"
-    )
+    progress_gate_rows = "".join(f"  {_ts_progress_field(gate)}?: boolean;\n" for gate in gates)
+    frontstage_modes = sorted({str(course["frontstage_mode"]) for course in projection["courses"]})
+    frontstage_mode_type = " | ".join(json.dumps(mode) for mode in frontstage_modes) or "never"
     capabilities = sorted(
         {
             str(capability)
@@ -74,10 +69,7 @@ def render_curriculum_meta_ts() -> str:
             for capability in course["capabilities"]
         }
     )
-    capability_type = (
-        " | ".join(json.dumps(capability) for capability in capabilities)
-        or "never"
-    )
+    capability_type = " | ".join(json.dumps(capability) for capability in capabilities) or "never"
     course_rows = ",\n".join(
         "  "
         + json.dumps(course["course_id"], ensure_ascii=False)
@@ -159,7 +151,31 @@ def render_curriculum_meta_ts() -> str:
         "    } | undefined\n"
         "  >;\n"
         f"{progress_gate_rows}"
+        "  next_practice_mission?: LearnPracticeMission;\n"
         "  [key: string]: unknown;\n"
+        "}\n"
+        "\n"
+        "export interface LearnPracticeMission {\n"
+        "  lesson_id: string;\n"
+        "  course_id: string;\n"
+        "  course_label: string;\n"
+        "  skill_id: string;\n"
+        "  skill_label: string;\n"
+        "  title: string;\n"
+        '  mode: "start" | "finish" | "replay" | "prove" | "mastered";\n'
+        "  command: string;\n"
+        "  payoff: string;\n"
+        "  proof: string;\n"
+        "  why: string;\n"
+        "  estimated_minutes: number;\n"
+        '  focus: "first_rep" | "retry" | "proof" | "replay" | "hardware" | "lock" | "mastery";\n'
+        "  focus_label: string;\n"
+        "  challenge: string;\n"
+        "  meter_label: string;\n"
+        "  meter_value: number;\n"
+        "  meter_max: number;\n"
+        '  meter_state: "armed" | "retry" | "proof" | "mastered" | "replay";\n'
+        "  meter_caption: string;\n"
         "}\n"
         "\n"
         "/** Canonical lesson order generated from Python CURRICULUM. */\n"

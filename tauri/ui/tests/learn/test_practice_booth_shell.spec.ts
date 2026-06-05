@@ -168,6 +168,10 @@ describe("practice booth shell", () => {
       expect(meter?.dataset.state).toBe("active");
       expect(meter?.dataset.verdict).toBe("drifting");
       expect(Number(meter?.dataset.needlePct)).toBeGreaterThan(50);
+      const hint = root.querySelector<HTMLElement>(".learn-status-hint")!;
+      expect(hint.textContent).toBe("nudge jog");
+      expect(hint.dataset.practiceFeedback).toBe("correct");
+      expect(hint.getAttribute("aria-label")).toContain("0.25 beat behind");
 
       window.dispatchEvent(
         new CustomEvent("ipc.learn.live_grade", {
@@ -183,6 +187,41 @@ describe("practice booth shell", () => {
       expect(meter?.dataset.verdict).toBe("locked");
       expect(Number(meter?.dataset.needlePct)).toBe(50);
       expect(meter?.dataset.citation).toBe("[ev:BEATMATCH_GRADED@12.345]");
+      expect(hint.textContent).toBe("locked proof");
+      expect(hint.dataset.practiceFeedback).toBe("locked");
+      expect(hint.getAttribute("aria-label")).toContain(
+        "[ev:BEATMATCH_GRADED@12.345]",
+      );
+      expect(root.querySelector<HTMLElement>("#learn-booth-panel")?.dataset.visible).toBe(
+        "false",
+      );
+    } finally {
+      ws.close();
+    }
+  });
+
+  it("turns trainwreck live grade into a visible recovery command", async () => {
+    const root = document.getElementById("learn-root") as HTMLElement;
+    const { ws } = mountLearnWindow(root);
+    try {
+      await waitForMountedControl(root, "eq_hi:A");
+      dispatchLessonLoaded("L2.01", "course_2_transitions");
+
+      window.dispatchEvent(
+        new CustomEvent("ipc.learn.live_grade", {
+          detail: {
+            verdict: "trainwreck",
+            phase_error_beats: -0.42,
+            score: 0.05,
+            citation: null,
+          },
+        }),
+      );
+
+      const hint = root.querySelector<HTMLElement>(".learn-status-hint")!;
+      expect(hint.textContent).toBe("re-find the 1");
+      expect(hint.dataset.practiceFeedback).toBe("danger");
+      expect(hint.getAttribute("aria-label")).toContain("0.42 beat ahead");
     } finally {
       ws.close();
     }
@@ -1390,6 +1429,353 @@ describe("practice booth shell", () => {
         lesson_id: "L1.01",
         level: "replay",
       });
+    } finally {
+      ws.close();
+    }
+  });
+
+  it("lets the backend mission drive booth copy and the primary lesson", () => {
+    const root = document.getElementById("learn-root") as HTMLElement;
+    const { ws } = mountLearnWindow(root);
+    try {
+      window.dispatchEvent(
+        new CustomEvent("ipc.learn.progress_state", {
+          detail: {
+            action: "snapshot",
+            progress: {
+              schema_version: 2,
+              courses: {},
+              lessons: completedRows(["L1.01", "L1.02"]),
+              course_2_unlocked: false,
+              course_3_unlocked: false,
+              next_practice_mission: {
+                lesson_id: "L1.03",
+                course_id: "course_1_anatomy",
+                course_label: "Course 1 · Anatomy",
+                skill_id: "deck_control",
+                skill_label: "deck control",
+                title: "channel strip",
+                mode: "start",
+                command: "Practice channel strip; build one useful deck control rep.",
+                payoff: "You learn which part of the track each band changes.",
+                proof: "Learn waits for a real deck control move",
+                why: "Finish the lessons to reach Competent",
+                estimated_minutes: 4,
+                focus: "first_rep",
+                focus_label: "first rep",
+                challenge: "Touch the control before you read ahead.",
+                meter_label: "first rep",
+                meter_value: 0,
+                meter_max: 1,
+                meter_state: "armed",
+                meter_caption: "touch the control to begin",
+              },
+            },
+          },
+        }),
+      );
+
+      expect(root.querySelector<HTMLElement>("#learn-booth-title")?.textContent).toBe(
+        "channel strip",
+      );
+      expect(
+        root.querySelector<HTMLElement>("#learn-booth-command-text")?.textContent,
+      ).toBe("Practice channel strip; build one useful deck control rep.");
+      expect(root.querySelector<HTMLElement>("#learn-booth-proof")?.textContent).toBe(
+        "Learn waits for a real deck control move",
+      );
+      expect(root.querySelector<HTMLElement>("#learn-booth-pulse")?.textContent).toBe(
+        "first rep",
+      );
+      const reward = root.querySelector<HTMLElement>("#learn-booth-reward")!;
+      expect(reward.dataset.visible).toBe("true");
+      expect(reward.dataset.state).toBe("armed");
+      expect(
+        root.querySelector<HTMLElement>("#learn-booth-reward-label")?.textContent,
+      ).toBe("first rep 0/1");
+      expect(
+        root.querySelector<HTMLElement>("#learn-booth-reward-caption")?.textContent,
+      ).toBe("touch the control to begin");
+      expect(
+        root.querySelector<HTMLElement>("#learn-booth-reward-fill")?.style.width,
+      ).toBe("0%");
+      expect(
+        root.querySelector<HTMLElement>("#learn-booth-pulse")?.getAttribute("aria-label"),
+      ).toContain("Touch the control before you read ahead.");
+      expect(
+        root.querySelector<HTMLElement>("#learn-booth-pulse")?.getAttribute("title"),
+      ).toContain("You learn which part of the track each band changes.");
+      expect(
+        root.querySelector<HTMLElement>(
+          ".vmx-progress-list__lesson[data-recommended='true']",
+        )?.textContent,
+      ).toContain("channel strip");
+
+      mocks.emitIpc.mockClear();
+      root.querySelector<HTMLButtonElement>("#learn-start-recommended")!.click();
+      expect(mocks.emitIpc).toHaveBeenCalledWith("ipc.learn.start_lesson", {
+        lesson_id: "L1.03",
+        level: "fresh",
+      });
+    } finally {
+      ws.close();
+    }
+  });
+
+  it("renders proof-bank progress as a small booth reward meter", () => {
+    const root = document.getElementById("learn-root") as HTMLElement;
+    const { ws } = mountLearnWindow(root);
+    try {
+      window.dispatchEvent(
+        new CustomEvent("ipc.learn.progress_state", {
+          detail: {
+            action: "snapshot",
+            progress: {
+              schema_version: 2,
+              courses: {},
+              lessons: completedRows(["L2.01", "L2.02"]),
+              course_2_unlocked: true,
+              course_3_unlocked: false,
+              next_practice_mission: {
+                lesson_id: "L2.01",
+                course_id: "course_2_transitions",
+                course_label: "Course 2 · Transitions",
+                skill_id: "beatmatching",
+                skill_label: "beatmatching",
+                title: "beatmatching by ear",
+                mode: "prove",
+                command: "Prove beatmatching; earn the next cited proof on beatmatching by ear.",
+                payoff: "You hear drift tighten into lock instead of reading about it.",
+                proof: "2 cited proofs banked; 1 left",
+                why: "1 more cited proof to Master",
+                estimated_minutes: 6,
+                focus: "proof",
+                focus_label: "proof 2/3",
+                challenge: "Only cited live proof moves Mastery.",
+                meter_label: "proof bank",
+                meter_value: 2,
+                meter_max: 3,
+                meter_state: "proof",
+                meter_caption: "1 proof left to Mastery",
+              },
+            },
+          },
+        }),
+      );
+
+      const reward = root.querySelector<HTMLElement>("#learn-booth-reward")!;
+      expect(reward.dataset.visible).toBe("true");
+      expect(reward.dataset.state).toBe("proof");
+      expect(reward.getAttribute("aria-label")).toBe(
+        "proof bank 2 of 3. 1 proof left to Mastery",
+      );
+      expect(
+        root.querySelector<HTMLElement>("#learn-booth-reward-label")?.textContent,
+      ).toBe("proof bank 2/3");
+      expect(
+        root.querySelector<HTMLElement>("#learn-booth-reward-caption")?.textContent,
+      ).toBe("1 proof left to Mastery");
+      expect(
+        root.querySelector<HTMLElement>("#learn-booth-reward-fill")?.style.width,
+      ).toBe("67%");
+      expect(
+        root.querySelector<HTMLButtonElement>("#learn-start-recommended")
+          ?.textContent,
+      ).toMatch(/prove beatmatching by ear/i);
+    } finally {
+      ws.close();
+    }
+  });
+
+  it("turns earned mastery into a review mission with a full booth meter", () => {
+    const root = document.getElementById("learn-root") as HTMLElement;
+    const { ws } = mountLearnWindow(root);
+    try {
+      window.dispatchEvent(
+        new CustomEvent("ipc.learn.progress_state", {
+          detail: {
+            action: "snapshot",
+            progress: {
+              schema_version: 2,
+              courses: {},
+              lessons: completedRows(["L2.01", "L2.02"]),
+              course_2_unlocked: true,
+              course_3_unlocked: false,
+              next_practice_mission: {
+                lesson_id: "L2.01",
+                course_id: "course_2_transitions",
+                course_label: "Course 2 · Transitions",
+                skill_id: "beatmatching",
+                skill_label: "beatmatching",
+                title: "beatmatching by ear",
+                mode: "mastered",
+                command:
+                  "Review beatmatching by ear; carry the mastered beatmatching move into a real set.",
+                payoff: "You hear drift tighten into lock instead of reading about it.",
+                proof: "3 cited proofs banked; Mastery earned",
+                why: "Mastery earned from cited live proof",
+                estimated_minutes: 6,
+                focus: "mastery",
+                focus_label: "mastered",
+                challenge: "Carry it into a real set while it is fresh.",
+                meter_label: "mastery",
+                meter_value: 3,
+                meter_max: 3,
+                meter_state: "mastered",
+                meter_caption: "Mastery earned",
+              },
+            },
+          },
+        }),
+      );
+
+      const reward = root.querySelector<HTMLElement>("#learn-booth-reward")!;
+      expect(reward.dataset.visible).toBe("true");
+      expect(reward.dataset.state).toBe("mastered");
+      expect(reward.getAttribute("aria-label")).toBe("mastery 3 of 3. Mastery earned");
+      expect(
+        root.querySelector<HTMLElement>("#learn-booth-reward-label")?.textContent,
+      ).toBe("mastery 3/3");
+      expect(
+        root.querySelector<HTMLElement>("#learn-booth-reward-caption")?.textContent,
+      ).toBe("Mastery earned");
+      expect(
+        root.querySelector<HTMLElement>("#learn-booth-reward-fill")?.style.width,
+      ).toBe("100%");
+      expect(
+        root.querySelector<HTMLButtonElement>("#learn-start-recommended")
+          ?.textContent,
+      ).toMatch(/review beatmatching by ear/i);
+
+      mocks.emitIpc.mockClear();
+      root.querySelector<HTMLButtonElement>("#learn-start-recommended")!.click();
+      expect(mocks.emitIpc).toHaveBeenCalledWith("ipc.learn.start_lesson", {
+        lesson_id: "L2.01",
+        level: "replay",
+      });
+    } finally {
+      ws.close();
+    }
+  });
+
+  it("refreshes the active lesson mission hint after live proof lands", () => {
+    const root = document.getElementById("learn-root") as HTMLElement;
+    const { ws } = mountLearnWindow(root);
+    try {
+      dispatchLessonLoaded("L2.01", "course_2_transitions");
+      window.dispatchEvent(
+        new CustomEvent("ipc.learn.progress_state", {
+          detail: {
+            action: "snapshot",
+            progress: {
+              schema_version: 2,
+              courses: {},
+              lessons: completedRows(["L2.01", "L2.02"]),
+              course_2_unlocked: true,
+              course_3_unlocked: false,
+              next_practice_mission: {
+                lesson_id: "L2.01",
+                course_id: "course_2_transitions",
+                course_label: "Course 2 · Transitions",
+                skill_id: "beatmatching",
+                skill_label: "beatmatching",
+                title: "beatmatch lock",
+                mode: "prove",
+                command: "Prove beatmatching; earn the next cited proof on beatmatch lock.",
+                payoff: "You hear drift tighten into lock instead of reading about it.",
+                proof: "1 cited proof banked; 2 left",
+                why: "1 more cited proof to Master",
+                estimated_minutes: 6,
+                focus: "proof",
+                focus_label: "proof 1/3",
+                challenge: "Only cited live proof moves Mastery.",
+                meter_label: "proof bank",
+                meter_value: 1,
+                meter_max: 3,
+                meter_state: "proof",
+                meter_caption: "2 proofs left to Mastery",
+              },
+            },
+          },
+        }),
+      );
+
+      const hint = root.querySelector<HTMLElement>(".learn-status-hint")!;
+      expect(hint.textContent).toBe("proof 1/3");
+      expect(hint.getAttribute("data-practice-feedback")).toBe("proof");
+      expect(hint.getAttribute("aria-label")).toContain(
+        "Only cited live proof moves Mastery.",
+      );
+      expect(hint.getAttribute("aria-label")).toContain(
+        "1 cited proof banked; 2 left",
+      );
+      expect(hint.getAttribute("aria-label")).toContain(
+        "2 proofs left to Mastery",
+      );
+      expect(root.querySelector<HTMLElement>("#learn-booth-panel")?.dataset.visible).toBe(
+        "false",
+      );
+    } finally {
+      ws.close();
+    }
+  });
+
+  it("refreshes the active lesson hint when live proof earns mastery", () => {
+    const root = document.getElementById("learn-root") as HTMLElement;
+    const { ws } = mountLearnWindow(root);
+    try {
+      dispatchLessonLoaded("L2.01", "course_2_transitions");
+      window.dispatchEvent(
+        new CustomEvent("ipc.learn.progress_state", {
+          detail: {
+            action: "snapshot",
+            progress: {
+              schema_version: 2,
+              courses: {},
+              lessons: completedRows(["L2.01", "L2.02"]),
+              course_2_unlocked: true,
+              course_3_unlocked: false,
+              next_practice_mission: {
+                lesson_id: "L2.01",
+                course_id: "course_2_transitions",
+                course_label: "Course 2 · Transitions",
+                skill_id: "beatmatching",
+                skill_label: "beatmatching",
+                title: "beatmatch lock",
+                mode: "mastered",
+                command:
+                  "Review beatmatch lock; carry the mastered beatmatching move into a real set.",
+                payoff: "You hear drift tighten into lock instead of reading about it.",
+                proof: "3 cited proofs banked; Mastery earned",
+                why: "Mastery earned from cited live proof",
+                estimated_minutes: 6,
+                focus: "mastery",
+                focus_label: "mastered",
+                challenge: "Carry it into a real set while it is fresh.",
+                meter_label: "mastery",
+                meter_value: 3,
+                meter_max: 3,
+                meter_state: "mastered",
+                meter_caption: "Mastery earned",
+              },
+            },
+          },
+        }),
+      );
+
+      const hint = root.querySelector<HTMLElement>(".learn-status-hint")!;
+      expect(hint.textContent).toBe("mastered");
+      expect(hint.getAttribute("data-practice-feedback")).toBe("mastered");
+      expect(hint.getAttribute("aria-label")).toContain(
+        "Carry it into a real set while it is fresh.",
+      );
+      expect(hint.getAttribute("aria-label")).toContain(
+        "3 cited proofs banked; Mastery earned",
+      );
+      expect(hint.getAttribute("aria-label")).toContain("Mastery earned");
+      expect(root.querySelector<HTMLElement>("#learn-booth-panel")?.dataset.visible).toBe(
+        "false",
+      );
     } finally {
       ws.close();
     }
