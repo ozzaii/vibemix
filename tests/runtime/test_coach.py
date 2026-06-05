@@ -919,6 +919,8 @@ def test_coach_11_timeout_doesnt_crash_loop(
 ):
     """COACH-11: asyncio.wait_for raises TimeoutError on first event fire →
     loop catches, clears in_flight, continues. Next tick proceeds normally."""
+    music_state.audible = True
+    music_state.rms = 0.12
     fake_event_detector.detect.return_value = fake_event
 
     call_count = {"n": 0}
@@ -983,6 +985,8 @@ def test_coach_12_exception_doesnt_crash_loop(
 ):
     """COACH-12: session.generate_reply raises RuntimeError → loop catches,
     clears in_flight, continues. Next tick proceeds normally."""
+    music_state.audible = True
+    music_state.rms = 0.12
     fake_event_detector.detect.return_value = fake_event
 
     call_count = {"n": 0}
@@ -1109,14 +1113,19 @@ def test_coach_14_plain_heartbeat_stays_silent(
 
     assert fake_agent.set_next_event.call_count == 0
     assert fake_session.generate_reply.call_count == 0
-    fake_recorder.log_event.assert_called_once_with(
-        "speak_gate",
-        type="HEARTBEAT",
-        verdict="silent",
-        reason="describe_bank_only",
-        tier="runtime_value_gate",
-        schema_version="1",
-    )
+    fake_recorder.log_event.assert_called_once()
+    args, kwargs = fake_recorder.log_event.call_args
+    assert args == ("speak_gate",)
+    assert kwargs["type"] == "HEARTBEAT"
+    assert kwargs["verdict"] == "silent"
+    assert kwargs["reason"] == "describe_bank_only"
+    assert kwargs["tier"] == "runtime_value_gate"
+    assert kwargs["schema_version"] == "1"
+    assert kwargs["worthiness"] < 0.38
+    assert kwargs["deck"] == music_state.audible_deck
+    assert kwargs["track"] == music_state.audible_track
+    assert kwargs["phase"] == music_state.phase
+    assert kwargs["coach_grounded_keys"] == []
 
 
 def test_coach_14_plain_phase_stays_silent(
@@ -1156,14 +1165,15 @@ def test_coach_14_plain_phase_stays_silent(
 
     assert fake_agent.set_next_event.call_count == 0
     assert fake_session.generate_reply.call_count == 0
-    fake_recorder.log_event.assert_called_once_with(
-        "speak_gate",
-        type="PHASE",
-        verdict="silent",
-        reason="describe_bank_only",
-        tier="runtime_value_gate",
-        schema_version="1",
-    )
+    fake_recorder.log_event.assert_called_once()
+    args, kwargs = fake_recorder.log_event.call_args
+    assert args == ("speak_gate",)
+    assert kwargs["type"] == "PHASE"
+    assert kwargs["verdict"] == "silent"
+    assert kwargs["reason"] == "describe_bank_only"
+    assert kwargs["tier"] == "runtime_value_gate"
+    assert kwargs["schema_version"] == "1"
+    assert kwargs["worthiness"] < 0.38
 
 
 def test_coach_14_repeat_phase_stays_silent(
@@ -1205,14 +1215,15 @@ def test_coach_14_repeat_phase_stays_silent(
 
     assert fake_agent.set_next_event.call_count == 0
     assert fake_session.generate_reply.call_count == 0
-    fake_recorder.log_event.assert_called_once_with(
-        "speak_gate",
-        type="PHASE",
-        verdict="silent",
-        reason="repeat_of_recent",
-        tier="runtime_value_gate",
-        schema_version="1",
-    )
+    fake_recorder.log_event.assert_called_once()
+    args, kwargs = fake_recorder.log_event.call_args
+    assert args == ("speak_gate",)
+    assert kwargs["type"] == "PHASE"
+    assert kwargs["verdict"] == "silent"
+    assert kwargs["reason"] == "repeat_of_recent"
+    assert kwargs["tier"] == "runtime_value_gate"
+    assert kwargs["schema_version"] == "1"
+    assert kwargs["worthiness"] < 0.38
 
 
 def test_coach_15_manual_event_reaches_model(

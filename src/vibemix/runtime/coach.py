@@ -89,7 +89,7 @@ from vibemix.state.deck_context import (
 from vibemix.ui_bus import SessionCitation
 
 from .set_plan_voice import build_set_progress_voice_line
-from .speak_gate import decide_speak_gate
+from .speak_gate import decide_speak_gate, grounded_voice_payload_keys
 from .suggestion_voice import build_next_suggestion_voice_line
 from .transition_verdict_voice import build_transition_verdict_voice_line
 
@@ -925,6 +925,7 @@ async def coach_loop(
             recent_fingerprints=recent_fps,
         )
         if not speak_gate.should_speak:
+            grounded_keys = grounded_voice_payload_keys(ev)
             try:
                 recorder.log_event(
                     "speak_gate",
@@ -932,6 +933,15 @@ async def coach_loop(
                     verdict=speak_gate.verdict,
                     reason=speak_gate.reason,
                     tier=speak_gate.tier,
+                    worthiness=speak_gate.worthiness,
+                    audible=state.audible,
+                    deck=state.audible_deck,
+                    track=state.audible_track,
+                    track_conf=round(state.audible_track_confidence, 2),
+                    phase=state.phase,
+                    rms=round(float(getattr(state, "rms", 0.0) or 0.0), 4),
+                    bpm=round(float(getattr(state, "bpm", 0.0) or 0.0), 1),
+                    coach_grounded_keys=list(grounded_keys),
                     schema_version="1",
                 )
             except Exception:
@@ -942,6 +952,7 @@ async def coach_loop(
                 type=ev.type,
                 verdict=speak_gate.verdict,
                 reason=speak_gate.reason,
+                worthiness=speak_gate.worthiness,
             )
             continue
 
@@ -962,6 +973,18 @@ async def coach_loop(
                 "track_conf": round(state.audible_track_confidence, 2),
                 "phase": state.phase,
             }
+            grounded_keys = grounded_voice_payload_keys(ev)
+            if grounded_keys:
+                coach_signal = "grounded_coaching_receipt"
+            elif manual or kaan_just_spoke or tag in {"MANUAL", "KAAN_SPOKE"}:
+                coach_signal = "human_or_manual"
+            else:
+                coach_signal = "music_direction_fallback"
+            event_payload["coach_signal_schema_version"] = "1"
+            event_payload["coach_signal"] = coach_signal
+            event_payload["coach_grounded_keys"] = list(grounded_keys)
+            event_payload["coach_speak_gate_reason"] = speak_gate.reason
+            event_payload["coach_speak_gate_worthiness"] = speak_gate.worthiness
             audio_delta_items = render_audio_delta_items(state)
             moves = ev.extra.get("moves", []) if isinstance(ev.extra, dict) else []
             context_feed_contract = render_context_feed_contract(
