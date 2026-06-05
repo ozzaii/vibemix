@@ -4,7 +4,7 @@
 // items (one word each, with a Cmd accelerator), a collapse handle, and the
 // co-host live pill at the foot. Pure render + store wiring; all styling is in
 // shell.css. Collapse width is driven by the root data-collapsed attribute, so
-// this component only flips aria-current on the active item.
+// this component only keeps aria-current on the active item.
 
 import type { ShellStore } from "./shell-store.js";
 import { SURFACES } from "./surfaces.js";
@@ -76,7 +76,11 @@ export function createSidebar(store: ShellStore): HTMLElement {
     const state = store.getState();
     const active = state.settingsOpen ? "settings" : state.activeSurface;
     for (const item of items) {
-      item.el.setAttribute("aria-current", item.id === active ? "true" : "false");
+      if (item.id === active) {
+        item.el.setAttribute("aria-current", "true");
+      } else {
+        item.el.removeAttribute("aria-current");
+      }
     }
   };
   store.subscribe(render);

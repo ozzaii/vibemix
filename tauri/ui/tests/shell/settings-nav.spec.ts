@@ -108,7 +108,7 @@ describe("wireSettingsNav", () => {
       host.querySelector<HTMLElement>('.sb-nav-item[data-surface="crate"]')?.getAttribute(
         "aria-current",
       ),
-    ).toBe("false");
+    ).toBeNull();
 
     settings.setOpen(false);
 

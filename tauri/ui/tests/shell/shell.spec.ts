@@ -58,6 +58,12 @@ describe("DesktopShell", () => {
     expect(host.querySelectorAll(".surface").length).toBe(SURFACES.length);
     expect(host.querySelectorAll(".surface.is-active").length).toBe(1);
     expect(host.querySelector(".surface.is-active")?.getAttribute("data-surface")).toBe("crate");
+    expect(crateNav.getAttribute("aria-current")).toBe("true");
+    expect(
+      host.querySelector<HTMLElement>('.sb-nav-item[data-surface="deck"]')?.getAttribute(
+        "aria-current",
+      ),
+    ).toBeNull();
   });
 
   it("renders a grounded co-host empty state for each non-deck surface", () => {
