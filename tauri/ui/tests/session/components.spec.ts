@@ -813,15 +813,13 @@ describe("SessionLayout", () => {
     expect(document.head.textContent).toContain('.vmx-read[data-readout="key"]');
   });
 
-  it("mounts a visible Vibe Engine rail control", () => {
+  it("does not mount a crate/create rail control inside the live deck", () => {
     const root = host();
     mountSessionLayout(root);
-    const btn = root.querySelector<HTMLElement>('[data-action="vibe-engine"]');
-    expect(btn).toBeTruthy();
-    expect(btn?.dataset.primary).toBe("true");
-    expect(btn?.textContent).toBe("crate");
-    expect(btn?.getAttribute("aria-label")).toBe("open Viber crate");
-    expect(btn?.getAttribute("title")).toContain("Viber library");
+    expect(root.querySelector('[data-action="vibe-engine"]')).toBeNull();
+    expect(root.querySelector('[data-wire="session.vibe-engine"]')).toBeNull();
+    expect(root.textContent).not.toContain("crate");
+    expect(root.textContent).not.toContain("Create");
   });
 
   it("renders the idle Deck as an actionable readiness state, not vague listening copy", () => {
@@ -1014,22 +1012,18 @@ describe("SessionLayout", () => {
     expect(voice?.hidden).toBe(true);
   });
 
-  it("rail controls call the latest rendered handlers", () => {
+  it("rail mute control calls the latest rendered handler", () => {
     const root = host();
     const mounted = mountSessionLayout(root, defaultState());
-    let opened = 0;
     let muted = 0;
     const next = {
       ...defaultState(),
       cohost: { ...defaultState().cohost, onMute: () => { muted += 1; } },
-      actions: { onOpenVibeEngine: () => { opened += 1; } },
     };
     renderSessionFrame(mounted, next);
 
-    root.querySelector<HTMLElement>('[data-action="vibe-engine"]')?.click();
     root.querySelector<HTMLElement>('[data-action="mute"]')?.click();
 
-    expect(opened).toBe(1);
     expect(muted).toBe(1);
   });
 

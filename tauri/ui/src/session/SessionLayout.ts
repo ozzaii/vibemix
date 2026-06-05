@@ -93,10 +93,6 @@ export interface SessionState {
      *  Omitted (dev mock) → the mute control renders but is a no-op. */
     onMute?: () => void;
   };
-  actions: {
-    /** Open the Library/Viber chat + set-building window. */
-    onOpenVibeEngine?: () => void;
-  };
   status: {
     livekit: BadgeState;
     gemini: "ok" | "down" | null;
@@ -169,7 +165,6 @@ export interface Mounted {
   /** Rail persona button (tap-to-cycle mood). */
   persona: HTMLElement;
   personaValue: HTMLElement;
-  vibeEngineButton: HTMLElement;
   muteButton: HTMLElement;
   /** Cross-fade liveness labels (always mounted; opacity toggled by mode). */
   liveFault: HTMLElement;
@@ -963,15 +958,6 @@ export function mountSessionLayout(
 
   const controls = document.createElement("div");
   controls.className = "vmx-deck__controls";
-  const vibeEngineBtn = document.createElement("button");
-  vibeEngineBtn.type = "button";
-  vibeEngineBtn.dataset.action = "vibe-engine";
-  vibeEngineBtn.dataset.wire = "session.vibe-engine";
-  vibeEngineBtn.dataset.primary = "true";
-  vibeEngineBtn.textContent = "crate";
-  vibeEngineBtn.setAttribute("aria-label", "open Viber crate");
-  vibeEngineBtn.setAttribute("title", "open Viber library and set builder");
-  vibeEngineBtn.addEventListener("click", () => mountedHandle?.current.actions.onOpenVibeEngine?.());
   const muteBtn = document.createElement("button");
   muteBtn.type = "button";
   muteBtn.dataset.action = "mute";
@@ -994,7 +980,7 @@ export function mountSessionLayout(
     root.dataset.runstate = "armed";
     mountedHandle?.current.onStop?.();
   });
-  controls.append(vibeEngineBtn, muteBtn, stopBtn);
+  controls.append(muteBtn, stopBtn);
 
   const live = document.createElement("div");
   live.className = "vmx-live";
@@ -1127,7 +1113,6 @@ export function mountSessionLayout(
     titlebar,
     persona,
     personaValue,
-    vibeEngineButton: vibeEngineBtn,
     muteButton: muteBtn,
     liveFault,
     ghosts: [ghost1, ghost2],
@@ -1673,7 +1658,6 @@ export function defaultState(): SessionState {
       latencyMs: null,
       grounded: false,
     },
-    actions: {},
     status: {
       livekit: null,
       gemini: null,

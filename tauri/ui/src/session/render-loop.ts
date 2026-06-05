@@ -104,16 +104,6 @@ function statusRecheckHandler(
   });
 }
 
-/** Runtime entry to the Library/Viber window. This uses the same registered
- * Tauri command as the tray menu, so the visible deck control and tray item
- * focus the same single Vibe Engine window. */
-function openVibeEngineHandler(): void {
-  void invoke("open_library_window").catch((err: unknown) => {
-    // eslint-disable-next-line no-console
-    console.warn("[render-loop] open_library_window failed:", err);
-  });
-}
-
 function openModeSurface(mode: "cohost" | "learn" | "build" | "debrief"): Promise<unknown> {
   if (mode === "learn") return invoke("open_learn_window");
   if (mode === "build") return invoke("open_library_window");
@@ -381,9 +371,6 @@ function projectToLayoutState(s: BridgeSessionState): LayoutSessionState {
       onOpenAllReactions: cohostOpenAllHandler,
       // "The Deck Speaks" — deck rail mute control → ipc.session.mute.
       onMute: cohostMuteHandler,
-    },
-    actions: {
-      onOpenVibeEngine: openVibeEngineHandler,
     },
     status: {
       livekit: s.status.livekit,
