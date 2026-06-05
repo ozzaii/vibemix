@@ -1805,13 +1805,21 @@ async def main() -> None:
 
             anti_slop_flag = os.environ.get("VIBEMIX_ANTI_SLOP", "on").strip().lower()
             anti_slop_enabled = anti_slop_flag not in ("off", "0", "false")
-            citation_lint_flag = os.environ.get("VIBEMIX_CITATION_LINT", "off").strip().lower()
-            citation_linter = (
-                CitationLinter()
-                if anti_slop_enabled and citation_lint_flag not in ("off", "0", "false", "")
-                else None
+            citation_lint_flag = os.environ.get("VIBEMIX_CITATION_LINT", "on").strip().lower()
+            citation_lint_enabled = anti_slop_enabled and citation_lint_flag not in (
+                "off",
+                "0",
+                "false",
+                "",
             )
+            citation_linter = CitationLinter() if citation_lint_enabled else None
             stripped_rate_tracker = StrippedRateTracker() if anti_slop_enabled else None
+            print(
+                "-> anti-slop: "
+                f"{'on' if anti_slop_enabled else 'off'}; "
+                f"citation lint: {'on' if citation_lint_enabled else 'off'} "
+                f"(VIBEMIX_CITATION_LINT={citation_lint_flag or '<empty>'})"
+            )
 
             library_cache = Path.home() / ".cache" / "vibemix" / "library.pkl"
             deck_library = None

@@ -179,3 +179,13 @@ def test_track_deck_dominant_B_branch():
     # The dominant-deck branch handles 'B' identically — pin it for coverage.
     out = derive_audible_track("X", "B", 0.7, True)
     assert out == ("X", 0.7)
+
+
+def test_track_known_source_deck_must_match_audible_deck():
+    out = derive_audible_track("X", "B", 0.8, True, track_deck="A")
+    assert out == (None, 0.0)
+
+
+def test_track_known_source_deck_matching_audible_deck_can_pass():
+    out = derive_audible_track("X", "B", 0.8, True, track_deck="B")
+    assert out == ("X", 0.8)

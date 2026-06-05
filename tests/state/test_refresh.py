@@ -917,6 +917,44 @@ def test_tick_appends_track_history_when_confidence_ge_05():
     assert state.track_history == [(1000.0, "X")]
 
 
+def test_tick_omits_nowplaying_title_when_source_side_disagrees_with_audible_deck():
+    state = MusicState()
+    state.audible = True
+    buf = _audible_buf()
+    ctrl = _ctrl_mock()
+    ctrl.deck_snapshot.return_value = {
+        "A": {"vol": 0, "play": False, "eq_low": 64, "eq_mid": 64, "eq_hi": 64, "filter": 64},
+        "B": {"vol": 127, "play": True, "eq_low": 64, "eq_mid": 64, "eq_hi": 64, "filter": 64},
+        "xfader": 127,
+        "connected": True,
+    }
+    deck_source = MagicMock()
+    deck_source.source_snapshot.return_value = {
+        "resolution": "library_match",
+        "resolved_side": "A",
+    }
+    deck_source.snapshot.return_value = {}
+
+    _tick_once(
+        state,
+        buf,
+        ctrl,
+        _track_mock(title="Wrong Deck Title"),
+        now=1000.0,
+        last_audible_high=999.0,
+        last_audible_low=0.0,
+        bpm_cache=130.0,
+        last_bpm_at=999.0,
+        deck_source=deck_source,
+    )
+
+    assert state.audible_deck == "B"
+    assert state.deck_confidence >= 0.5
+    assert state.audible_track is None
+    assert state.audible_track_confidence == 0.0
+    assert state.track_history == []
+
+
 def test_tick_does_not_append_track_history_when_confidence_below_05():
     state = MusicState()
     state.audible = True

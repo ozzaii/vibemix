@@ -10841,3 +10841,41 @@ Proof before staging:
 - `uv run ruff check src/vibemix/runtime/session_loop.py tests/runtime/test_session_loop.py`
 - `uv run python -m compileall -q src/vibemix/runtime/session_loop.py tests/runtime/test_session_loop.py`
 - `git diff --check -- src/vibemix/runtime/session_loop.py tests/runtime/test_session_loop.py tauri/ui/src/ipc/messages.schema.json tauri/ui/src/ipc/messages.ts tauri/ui/src/ipc/validator.generated.mjs .planning/handoffs/2026-05-31-package-checklist.md`
+
+## Package 93 - Default Strict Citation Gate and Deck-Matched Titles
+
+Suggested commit: `fix(cohost): default to strict cited speech`
+
+Include:
+
+- `src/vibemix/__main__.py`
+- `src/vibemix/state/refresh.py`
+- `src/vibemix/state/track_resolver.py`
+- `tests/coach/test_main_anti_slop_wiring.py`
+- `tests/state/test_refresh.py`
+- `tests/state/test_track_resolver.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Prompt rewrites, live-claim guard policy rewrites, UI settings changes, replay
+  report scoring, and library/deck-poller source acquisition changes. This
+  package only makes the existing citation linter the normal launch default and
+  prevents a nowplaying title resolved to one deck from naming the other deck.
+
+Reason:
+
+- A normal user launch still defaulted `VIBEMIX_CITATION_LINT` to `off`, so the
+  response-level strip-to-silence chokepoint could be skipped even though the
+  linter, tracker, playback, and registry were wired. Default the gate on while
+  preserving `VIBEMIX_CITATION_LINT=off` as an explicit debug opt-out and print
+  the startup state. Also thread deck-source `resolved_side` provenance into
+  `derive_audible_track()` so Sven says `track=unknown` when the current
+  nowplaying title belongs to deck A but the audible deck is deck B.
+
+Proof before staging:
+
+- `uv run pytest -q tests/coach/test_main_anti_slop_wiring.py tests/state/test_track_resolver.py tests/state/test_refresh.py tests/agent/test_dj_cohost_linter.py tests/agent/test_dj_cohost.py::test_llm_node_11_exception_does_not_propagate tests/agent/test_dj_cohost.py::test_llm_node_proxy_mode_503_marks_proxy_unavailable_without_speech tests/agent/test_dj_cohost_streaming_pipe.py::test_citation_failure_after_short_response_stays_silent`
+- `uv run ruff check src/vibemix/__main__.py src/vibemix/state/track_resolver.py src/vibemix/state/refresh.py tests/coach/test_main_anti_slop_wiring.py tests/state/test_track_resolver.py tests/state/test_refresh.py`
+- `uv run python -m compileall -q src/vibemix/__main__.py src/vibemix/state/track_resolver.py src/vibemix/state/refresh.py tests/coach/test_main_anti_slop_wiring.py tests/state/test_track_resolver.py tests/state/test_refresh.py`
+- `git diff --check -- src/vibemix/__main__.py src/vibemix/state/track_resolver.py src/vibemix/state/refresh.py tests/coach/test_main_anti_slop_wiring.py tests/state/test_track_resolver.py tests/state/test_refresh.py .planning/handoffs/2026-05-31-package-checklist.md`

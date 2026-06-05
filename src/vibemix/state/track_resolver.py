@@ -89,14 +89,16 @@ def derive_audible_track(
     audible_deck: str,
     deck_confidence: float,
     audio_audible: bool,
+    *,
+    track_deck: str | None = None,
 ) -> tuple[str | None, float]:
     """Combines nowplaying-cli's title with controller-derived audible deck
     to produce a confidence-tagged track. Conservative — would rather say
     `unknown` than name a track that isn't actually playing.
 
-    nowplaying-cli only gives ONE current title (whichever deck cued/loaded
-    most recently). When the controller says audio is coming primarily from
-    a single deck, we trust the title. Otherwise we lower confidence."""
+    nowplaying-cli only gives ONE current title. If a deck source can attribute
+    that title to a concrete side, it must agree with the audible deck; otherwise
+    omit the title rather than anchoring Sven on the wrong deck."""
     if not audio_audible or not track_title:
         return None, 0.0
     if audible_deck == "none":
@@ -106,6 +108,10 @@ def derive_audible_track(
     if audible_deck == "mix":
         # Two decks playing — nowplaying-cli may have latched either side.
         return None, 0.0
+    if track_deck is not None:
+        source_deck = track_deck.strip().upper()
+        if source_deck in {"A", "B"} and audible_deck.upper() != source_deck:
+            return None, 0.0
     # Single dominant deck. Trust the title roughly proportional to confidence.
     if deck_confidence < 0.5:
         return None, 0.0

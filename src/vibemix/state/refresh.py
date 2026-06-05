@@ -595,6 +595,18 @@ def _nowplaying_playback_audible_deck_from_status(
     return side, NOWPLAYING_PLAYBACK_CONF
 
 
+def _nowplaying_title_deck_from_status(source_status: dict[str, object]) -> str | None:
+    """Return the deck side that the current nowplaying title resolved to.
+
+    This is provenance for the title label, not independent audio proof. The
+    controller/audio path still owns ``state.audible_deck``.
+    """
+    side = str(source_status.get("resolved_side") or "").upper()
+    if side not in {"A", "B"}:
+        return None
+    return side
+
+
 def _write_live_grounding_evidence(
     evidence_registry: EvidenceRegistry | None,
     state: MusicState,
@@ -1324,7 +1336,14 @@ def _tick_once(
         # Track inference (cross-reference with audible deck)
         tsnap = track_info.snapshot()
         raw_nowplaying_title = tsnap.get("title") or None
-        tt, tc = derive_audible_track(raw_nowplaying_title, aud_deck, deck_conf, state.audible)
+        nowplaying_title_deck = _nowplaying_title_deck_from_status(deck_source_status)
+        tt, tc = derive_audible_track(
+            raw_nowplaying_title,
+            aud_deck,
+            deck_conf,
+            state.audible,
+            track_deck=nowplaying_title_deck,
+        )
         track_changed = False
         if tt and tc >= 0.5:
             last_title = state.track_history[-1][1] if state.track_history else None

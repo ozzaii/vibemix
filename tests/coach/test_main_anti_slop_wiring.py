@@ -177,16 +177,15 @@ def test_wire12_env_var_vibemix_anti_slop_read(main_src: str) -> None:
 
 
 def test_wire13_anti_slop_disabled_path_passes_none_kwargs(main_src: str) -> None:
-    """W13: When VIBEMIX_ANTI_SLOP is off (or the post-2026-05-21 separate
-    VIBEMIX_CITATION_LINT gate is off), the linter primitive is None.
+    """W13: When VIBEMIX_ANTI_SLOP is off or VIBEMIX_CITATION_LINT is explicitly
+    off, the linter primitive is None.
 
     The original v1 contract was a single `CitationLinter() if anti_slop_enabled
-    else None`. The 2026-05-21 decoupling (Kaan) split citation enforcement
-    onto its own VIBEMIX_CITATION_LINT flag because gemini-3.x rarely emits the
-    [cite] grammar — wiring it on by default muzzled the co-host. The intent
-    of the test (linter is conditionally constructed, not unconditionally
-    instantiated) is preserved as long as `CitationLinter()` appears with
-    `if <flag> else None` adjacent.
+    else None`. The separate VIBEMIX_CITATION_LINT flag is now strict-on by
+    default, but it still needs an explicit opt-out for local debugging. The
+    intent of the test (linter is conditionally constructed, not unconditionally
+    instantiated) is preserved as long as `CitationLinter()` appears with `if
+    <flag> else None` adjacent.
 
     Accept either form:
       - `CitationLinter() if anti_slop_enabled else None` (v1)
@@ -200,6 +199,11 @@ def test_wire13_anti_slop_disabled_path_passes_none_kwargs(main_src: str) -> Non
         "`CitationLinter() if anti_slop_enabled else None` OR "
         "`CitationLinter() if citation_lint_enabled else None`"
     )
+
+
+def test_wire13b_citation_lint_defaults_on(main_src: str) -> None:
+    """Normal user launches should hit the strip-to-silence chokepoint."""
+    assert 'os.environ.get("VIBEMIX_CITATION_LINT", "on")' in main_src
 
 
 def test_wire14_anti_slop_banner_printed(main_src: str) -> None:
