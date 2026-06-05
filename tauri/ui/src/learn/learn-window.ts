@@ -1314,6 +1314,7 @@ function mountLearnWindow(root: HTMLElement): {
     direction: "" | "up" | "down",
   ): void => {
     lastActionSource = source;
+    showFreePracticeFeedback(controlId, source);
     void emitLearnIpc("ipc.learn.ack", {
       control_id: controlId,
       source,
@@ -1323,8 +1324,26 @@ function mountLearnWindow(root: HTMLElement): {
     });
   };
 
+  const showFreePracticeFeedback = (
+    controlId: string,
+    source: "midi" | "click",
+  ): void => {
+    if (currentLessonId !== null) return;
+    const line = freePracticeFeedbackLine(controlId, source);
+    status.setPracticeFeedback(line.text, {
+      ariaLabel: line.ariaLabel,
+      title: line.ariaLabel,
+      tone: "active",
+    });
+    if (boothPanel.dataset.visible === "true") {
+      setBoothPulse("listening", line.text, {
+        ariaLabel: line.ariaLabel,
+        title: line.ariaLabel,
+      });
+    }
+  };
+
   const triggerScreenControl = (controlId: string): void => {
-    if (!currentLessonId) return;
     const ackControlId = ackControlIdFor(controlId, currentExpectedAction);
     const visualControlId = visualControlIdFor(controlId);
     const isButton = isButtonControl(ackControlId);
@@ -1417,7 +1436,6 @@ function mountLearnWindow(root: HTMLElement): {
   // action — so a blast of unrelated control changes during the lesson
   // doesn't false-advance.
   addWindowListener("ipc.learn.midi_position", (ev: Event) => {
-    if (!currentLessonId) return;
     const detail = (ev as CustomEvent<MidiPositionPayload>).detail;
     if (!detail) return;
     for (const [controlId, value] of Object.entries(detail.positions ?? {})) {
@@ -1691,6 +1709,29 @@ function actionSourceFeedbackLabel(source: "click" | "midi" | null): string | un
   if (source === "midi") return "hardware";
   if (source === "click") return "screen";
   return undefined;
+}
+
+function freePracticeFeedbackLine(
+  controlId: string,
+  source: "click" | "midi",
+): {
+  text: string;
+  ariaLabel: string;
+} {
+  const sourceLabel = source === "midi" ? "hardware" : "screen";
+  const control = freePracticeControlLabel(controlId);
+  return {
+    text: `${sourceLabel}: ${control}`,
+    ariaLabel: `free practice ${sourceLabel} move, ${control}`,
+  };
+}
+
+function freePracticeControlLabel(controlId: string): string {
+  const [rawHead, deck] = controlId.split(":");
+  const head =
+    rawHead === "jog_touch" || rawHead === "jog_touched" ? "jog" : rawHead;
+  const label = controlLabel(head ?? controlId);
+  return deck ? `deck ${deck} ${label}` : label;
 }
 
 interface LessonSourceCounts {

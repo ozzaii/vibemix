@@ -116,6 +116,41 @@ def test_mixer_actions_route_to_owned_deck_without_arming_grade() -> None:
     assert driver.snapshot() is None
 
 
+def test_sandbox_actions_move_owned_deck_without_arming_grade() -> None:
+    driver = BeatmatchPracticeDriver()
+
+    assert driver.record_action(None, {"control": "tempo", "deck": "B", "value": 64}) is False
+    tempo_state = driver.deck.state()
+    assert tempo_state.rate_b == 1.0
+
+    assert (
+        driver.record_action(
+            None,
+            {"type": "button", "control": "sync", "deck": "B", "direction": "down"},
+        )
+        is False
+    )
+    assert driver.snapshot() is None
+
+    before = driver.deck.state().b_frame
+    assert (
+        driver.record_action(
+            None,
+            {
+                "type": "cc",
+                "control": "jog",
+                "deck": "B",
+                "value": 127,
+                "prev_value": 64,
+                "direction": "down",
+            },
+        )
+        is False
+    )
+    assert driver.deck.state().b_frame > before
+    assert driver.snapshot() is None
+
+
 def test_ear_practice_large_pitch_move_does_not_credit_as_locked() -> None:
     driver = BeatmatchPracticeDriver()
 

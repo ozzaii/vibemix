@@ -33,6 +33,7 @@ _RECOVERY_DRILL_LESSONS = frozenset({"L3.05"})
 _MIXER_CONTROLS = frozenset({"eq_hi", "eq_mid", "eq_low", "filter", "vol"})
 _ASSET_PACKAGE = "vibemix.learn.assets.band_exemplars"
 _DEMO_LOOP_BEATS = 64
+_SANDBOX_JOG_BEATS = 0.08
 
 
 def _deck_from_midi(midi: dict[str, Any]) -> str:
@@ -65,6 +66,14 @@ def _tempo_rate_from_cc(value: Any) -> float:
         cc = _CENTER_CC
     cc = min(127.0, max(0.0, cc))
     return 1.0 + (cc - _CENTER_CC) / _TEMPO_CC_RATE_SPAN
+
+
+def _cc_float(value: Any, *, default: float = _CENTER_CC) -> float:
+    try:
+        cc = float(value)
+    except (TypeError, ValueError):
+        cc = default
+    return min(127.0, max(0.0, cc))
 
 
 def _beat_frames() -> int:
@@ -263,6 +272,10 @@ class BeatmatchPracticeDriver:
         practice lane and should be graded. The driver never reads live
         Rekordbox decks; it only reacts to the authored L2.01/L2.02 practice
         actions that ``LessonRuntime`` has already matched.
+
+        ``lesson_id is None`` is the free-practice sandbox. It updates the same
+        owned deck so the learner can play before starting a lesson, but it
+        never arms a graded snapshot.
         """
 
         deck = _deck_from_midi(midi).upper()
@@ -290,6 +303,10 @@ class BeatmatchPracticeDriver:
                 )
             return False
 
+        if lesson_id is None:
+            self._record_sandbox_action(control=control, deck=deck, midi=midi)
+            return False
+
         if lesson_id in _RECOVERY_DRILL_LESSONS and control == "recovery_drill":
             self._arm_recovery_drill(midi)
             return True
@@ -313,6 +330,44 @@ class BeatmatchPracticeDriver:
             self._armed = True
             return True
         return False
+
+    def _record_sandbox_action(
+        self,
+        *,
+        control: str,
+        deck: str,
+        midi: dict[str, Any],
+    ) -> None:
+        """Apply a free-practice gesture without arming a lesson grade."""
+
+        deck = deck.upper()
+        if deck not in {"A", "B"}:
+            deck = "B"
+        if control == "tempo":
+            rate = _tempo_rate_from_cc(midi.get("value"))
+            if deck == "A":
+                self._deck.set_rates(rate_a=rate, smooth=True)
+            else:
+                self._deck.set_rates(rate_b=rate, smooth=True)
+            return
+        if control == "sync":
+            state = self._deck.state()
+            if deck == "A":
+                self._deck.set_rates(rate_a=state.rate_b, smooth=False)
+            else:
+                self._deck.set_rates(rate_b=state.rate_a, smooth=False)
+            return
+        if control in {"jog", "jog_touch", "jog_touched"}:
+            direction = str(midi.get("direction", "") or "")
+            value = _cc_float(midi.get("value"))
+            prev = _cc_float(midi.get("prev_value"), default=value)
+            delta = value - prev
+            if abs(delta) < 1.0:
+                delta = 1.0 if direction != "up" else -1.0
+            self._deck.offset_playhead(
+                deck,
+                _beat_frames() * _SANDBOX_JOG_BEATS * (delta / 64.0),
+            )
 
     def _arm_recovery_drill(self, midi: dict[str, Any]) -> None:
         """Introduce one authored L3.05 train-wreck state on the owned deck."""

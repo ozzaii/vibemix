@@ -900,8 +900,8 @@ class LessonRuntime(StateMachine):
         finally:
             self._beatmatch_practice_player_active = False
 
-    def _emit_waveform_ready(self) -> None:
-        lesson_id = self._learn.current_lesson_id
+    def _emit_waveform_ready(self, scope_id: str | None = None) -> None:
+        lesson_id = scope_id if scope_id is not None else self._learn.current_lesson_id
         if (
             lesson_id is None
             or self._waveform_ready_lesson_id == lesson_id
@@ -928,11 +928,17 @@ class LessonRuntime(StateMachine):
             )
 
     def _emit_playhead_tick(self) -> None:
-        if (
-            not self._is_beatmatch_practice_audio_lesson()
-            or self.current_state.id not in _BEATMATCH_PRACTICE_GRADE_STATES
-            or self._playhead_payload_loader is None
-        ):
+        if self._playhead_payload_loader is None:
+            return
+        lesson_playing = (
+            self._is_beatmatch_practice_audio_lesson()
+            and self.current_state.id in _BEATMATCH_PRACTICE_GRADE_STATES
+        )
+        sandbox_playing = (
+            self._learn.current_lesson_id is None
+            and self._beatmatch_practice_player_active
+        )
+        if not lesson_playing and not sandbox_playing:
             return
         try:
             payload = self._playhead_payload_loader()
@@ -1101,11 +1107,36 @@ class LessonRuntime(StateMachine):
         advancement reasons. Audio cannot wait for that: a learner dragging a
         pitch fader, EQ, filter, channel fader, or xfader should hear the deck
         change on the first ack frame.
+
+        With no lesson active, the same path becomes free practice: it starts
+        the Learn-owned deck and applies the gesture without emitting progress,
+        completion, or tutor credit. The FSM can still ignore the ack later.
         """
 
+        if self._learn.current_lesson_id is None:
+            self._start_practice_sandbox_player()
+            self._apply_beatmatch_practice_action(midi)
+            return
         if not self._is_beatmatch_practice_audio_lesson():
             return
         self._apply_beatmatch_practice_action(midi)
+
+    def _start_practice_sandbox_player(self) -> None:
+        """Start the Learn-owned deck for free practice outside a lesson."""
+
+        if self._beatmatch_practice_player is None or self._beatmatch_practice_player_active:
+            return
+        try:
+            self._emit_waveform_ready("sandbox")
+            self._beatmatch_practice_player.start()
+            self._beatmatch_practice_player_active = True
+        except Exception as exc:  # pragma: no cover - defensive
+            import sys
+
+            print(
+                f"[learn.runtime] practice sandbox player start failed: {exc!r}",
+                file=sys.stderr,
+            )
 
     def handle_mismatch_ack(self, midi: dict[str, Any]) -> bool:
         """Emit one deterministic adaptive hint for a wrong user action.

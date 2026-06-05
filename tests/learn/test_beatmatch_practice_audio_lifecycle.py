@@ -218,6 +218,55 @@ def test_practice_audio_ack_applies_before_lesson_gate() -> None:
     ]
 
 
+def test_free_practice_ack_starts_player_without_lesson_progress() -> None:
+    calls: list[tuple[str | None, dict]] = []
+
+    def recorder(lesson_id: str | None, midi: dict) -> bool:
+        calls.append((lesson_id, dict(midi)))
+        return False
+
+    progress = LearnProgress()
+    runtime = LessonRuntime(
+        learn_state=LearnState(),
+        midi_mirror=MagicMock(name="midi_mirror"),
+        controller_state=MagicMock(name="controller_state"),
+        ipc_router=MagicMock(name="ipc_router"),
+        progress_store=progress,
+        beatmatch_practice_action_recorder=recorder,
+        waveform_payload_loader=lambda: {"sample_rate": 44_100, "decks": {}},
+    )
+    player = _FakePracticePlayer()
+    runtime.set_beatmatch_practice_player(player)
+
+    runtime.handle_practice_audio_ack(
+        {
+            "type": "cc",
+            "control": "eq_hi",
+            "deck": "A",
+            "value": 127,
+            "prev_value": 64,
+            "source": "click",
+        }
+    )
+
+    assert player.starts == 1
+    assert runtime.current_state.id == "idle"
+    assert calls == [
+        (
+            None,
+            {
+                "type": "cc",
+                "control": "eq_hi",
+                "deck": "A",
+                "value": 127,
+                "prev_value": 64,
+                "source": "click",
+            },
+        )
+    ]
+    assert progress.lessons == {}
+
+
 def test_loading_another_lesson_stops_active_practice_player() -> None:
     runtime = _runtime()
     player = _FakePracticePlayer()

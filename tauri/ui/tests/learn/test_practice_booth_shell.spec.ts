@@ -146,6 +146,74 @@ describe("practice booth shell", () => {
     }
   });
 
+  it("free-practice screen deck emits an ack before a lesson starts", async () => {
+    const root = document.getElementById("learn-root") as HTMLElement;
+    const { ws } = mountLearnWindow(root);
+    try {
+      const eq = await waitForMountedControl(root, "eq_hi:A");
+      const booth = root.querySelector<HTMLElement>("#learn-booth-panel")!;
+      const pulse = root.querySelector<HTMLElement>("#learn-booth-pulse")!;
+
+      mocks.emitIpc.mockClear();
+      eq.dispatchEvent(new Event("pointerdown", { bubbles: true, cancelable: true }));
+
+      expect(mocks.emitIpc).toHaveBeenCalledWith("ipc.learn.ack", {
+        control_id: "eq_hi:A",
+        source: "click",
+        value: 127,
+        prev_value: 0,
+        direction: "down",
+      });
+      expect(booth.dataset.visible).toBe("true");
+      expect(pulse.textContent).toBe("screen: deck A high EQ");
+      expect(pulse.getAttribute("aria-label")).toBe(
+        "free practice screen move, deck A high EQ",
+      );
+    } finally {
+      ws.close();
+    }
+  });
+
+  it("free-practice hardware deltas emit acks before a lesson starts", () => {
+    const root = document.getElementById("learn-root") as HTMLElement;
+    const { ws } = mountLearnWindow(root);
+    try {
+      const pulse = root.querySelector<HTMLElement>("#learn-booth-pulse")!;
+
+      mocks.emitIpc.mockClear();
+      window.dispatchEvent(
+        new CustomEvent("ipc.learn.midi_position", {
+          detail: {
+            controller_id: "pioneer_ddj_flx4",
+            positions: { "eq_hi:A": 0 },
+          },
+        }),
+      );
+      window.dispatchEvent(
+        new CustomEvent("ipc.learn.midi_position", {
+          detail: {
+            controller_id: "pioneer_ddj_flx4",
+            positions: { "eq_hi:A": 127 },
+          },
+        }),
+      );
+
+      expect(mocks.emitIpc).toHaveBeenCalledWith("ipc.learn.ack", {
+        control_id: "eq_hi:A",
+        source: "midi",
+        value: 127,
+        prev_value: 0,
+        direction: "down",
+      });
+      expect(pulse.textContent).toBe("hardware: deck A high EQ");
+      expect(pulse.getAttribute("aria-label")).toBe(
+        "free practice hardware move, deck A high EQ",
+      );
+    } finally {
+      ws.close();
+    }
+  });
+
   it("mounts the live grade meter and updates it from the learn bus", async () => {
     const root = document.getElementById("learn-root") as HTMLElement;
     const { ws } = mountLearnWindow(root);
