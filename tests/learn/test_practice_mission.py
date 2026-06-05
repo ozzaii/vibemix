@@ -71,14 +71,14 @@ def test_screen_free_practice_receipt_becomes_banked_finish_mission() -> None:
 
     assert mission["lesson_id"] == "L1.03"
     assert mission["mode"] == "finish"
-    assert mission["focus_label"] == "screen rep"
+    assert mission["focus_label"] == "practice bank 1/3"
     assert mission["proof"] == "screen deck has worked; repeat it cleanly"
-    assert mission["challenge"] == "Repeat the banked move inside the lesson."
+    assert mission["challenge"] == "Repeat a banked move inside the lesson."
     assert mission["meter_label"] == "practice bank"
     assert mission["meter_value"] == 1
-    assert mission["meter_max"] == 1
+    assert mission["meter_max"] == 3
     assert mission["meter_state"] == "armed"
-    assert mission["meter_caption"] == "screen rep banked"
+    assert mission["meter_caption"] == "1 screen rep banked"
 
 
 def test_hardware_free_practice_receipt_becomes_controller_finish_mission() -> None:
@@ -90,12 +90,30 @@ def test_hardware_free_practice_receipt_becomes_controller_finish_mission() -> N
     assert mission["lesson_id"] == "L1.07"
     assert mission["mode"] == "finish"
     assert mission["focus"] == "hardware"
-    assert mission["focus_label"] == "hardware rep"
+    assert mission["focus_label"] == "practice bank 1/3"
     assert mission["proof"] == "last pass used hardware; repeat it on the controller"
     assert mission["challenge"] == "Repeat the controller move inside the lesson."
     assert mission["meter_label"] == "practice bank"
     assert mission["meter_value"] == 1
-    assert mission["meter_caption"] == "hardware rep banked"
+    assert mission["meter_max"] == 3
+    assert mission["meter_caption"] == "1 controller rep banked"
+
+
+def test_mixed_free_practice_receipts_build_a_three_rep_bank() -> None:
+    progress = LearnProgress()
+    progress.mark_practice_source("course_1_anatomy", "L1.03", "screen")
+    progress.mark_practice_source("course_1_anatomy", "L1.03", "midi")
+    progress.mark_practice_source("course_1_anatomy", "L1.03", "screen")
+    progress.mark_practice_source("course_1_anatomy", "L1.03", "screen")
+
+    mission = next_practice_mission(progress)
+
+    assert mission["lesson_id"] == "L1.03"
+    assert mission["focus_label"] == "practice bank 3/3"
+    assert mission["meter_label"] == "practice bank"
+    assert mission["meter_value"] == 3
+    assert mission["meter_max"] == 3
+    assert mission["meter_caption"] == "3 reps banked: screen + hardware"
 
 
 def test_locked_next_course_replays_cleared_open_course() -> None:

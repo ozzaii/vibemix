@@ -1819,6 +1819,82 @@ describe("practice booth shell", () => {
     }
   });
 
+  it("renders banked free-practice reps as a booth reward meter", () => {
+    const root = document.getElementById("learn-root") as HTMLElement;
+    const { ws } = mountLearnWindow(root);
+    try {
+      window.dispatchEvent(
+        new CustomEvent("ipc.learn.progress_state", {
+          detail: {
+            action: "snapshot",
+            progress: {
+              schema_version: 2,
+              courses: {},
+              lessons: {
+                "L1.03": {
+                  completed: false,
+                  completed_at: null,
+                  strikes_used: 0,
+                  practice_sources: { hardware: 1, screen: 2 },
+                  last_practice_source: "screen",
+                },
+              },
+              course_2_unlocked: false,
+              course_3_unlocked: false,
+              next_practice_mission: {
+                lesson_id: "L1.03",
+                course_id: "course_1_anatomy",
+                course_label: "Course 1 · Anatomy",
+                skill_id: "deck_control",
+                skill_label: "deck control",
+                title: "channel strip",
+                mode: "finish",
+                command: "Finish channel strip; use one clean move, then let Learn verify it.",
+                payoff: "You learn which part of the track each band actually changes.",
+                proof: "screen deck has worked; repeat it cleanly",
+                why: "Finish the lessons to reach Competent",
+                estimated_minutes: 4,
+                focus: "hardware",
+                focus_label: "practice bank 3/3",
+                challenge: "Repeat a banked move inside the lesson.",
+                meter_label: "practice bank",
+                meter_value: 3,
+                meter_max: 3,
+                meter_state: "armed",
+                meter_caption: "3 reps banked: screen + hardware",
+              },
+            },
+          },
+        }),
+      );
+
+      const reward = root.querySelector<HTMLElement>("#learn-booth-reward")!;
+      expect(root.querySelector<HTMLElement>("#learn-booth-pulse")?.textContent).toBe(
+        "practice bank 3/3",
+      );
+      expect(reward.dataset.visible).toBe("true");
+      expect(reward.dataset.state).toBe("armed");
+      expect(reward.getAttribute("aria-label")).toBe(
+        "practice bank 3 of 3. 3 reps banked: screen + hardware",
+      );
+      expect(
+        root.querySelector<HTMLElement>("#learn-booth-reward-label")?.textContent,
+      ).toBe("practice bank 3/3");
+      expect(
+        root.querySelector<HTMLElement>("#learn-booth-reward-caption")?.textContent,
+      ).toBe("3 reps banked: screen + hardware");
+      expect(
+        root.querySelector<HTMLElement>("#learn-booth-reward-fill")?.style.width,
+      ).toBe("100%");
+      expect(
+        root.querySelector<HTMLButtonElement>("#learn-start-recommended")
+          ?.textContent,
+      ).toMatch(/finish channel strip/i);
+    } finally {
+      ws.close();
+    }
+  });
+
   it("renders proof-bank progress as a small booth reward meter", () => {
     const root = document.getElementById("learn-root") as HTMLElement;
     const { ws } = mountLearnWindow(root);

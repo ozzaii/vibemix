@@ -356,9 +356,9 @@ def _focus_label_for(
     if focus == "replay":
         return "clean replay"
     if focus == "hardware":
-        return "hardware rep"
+        return _practice_bank_label(row)
     if _source_total(row, "screen") > 0:
-        return "screen rep"
+        return _practice_bank_label(row)
     if focus == "lock":
         return "lock drill"
     return "first rep"
@@ -382,7 +382,7 @@ def _challenge_for(
     if mode == "finish" and _source_total(row, "hardware") > 0:
         return "Repeat the controller move inside the lesson."
     if mode == "finish" and _source_total(row, "screen") > 0:
-        return "Repeat the banked move inside the lesson."
+        return "Repeat a banked move inside the lesson."
     if mode == "replay":
         return f"Make {skill_label} feel automatic before moving on."
     return "Touch the control before you read ahead."
@@ -440,20 +440,22 @@ def _meter_for(
             "meter_caption": f"keep {skill_label} warm",
         }
     if _source_total(row, "hardware") > 0:
+        count = _practice_bank_count(row)
         return {
             "meter_label": "practice bank",
-            "meter_value": 1,
-            "meter_max": 1,
+            "meter_value": count,
+            "meter_max": 3,
             "meter_state": "armed",
-            "meter_caption": "hardware rep banked",
+            "meter_caption": _practice_bank_caption(row),
         }
     if _source_total(row, "screen") > 0:
+        count = _practice_bank_count(row)
         return {
             "meter_label": "practice bank",
-            "meter_value": 1,
-            "meter_max": 1,
+            "meter_value": count,
+            "meter_max": 3,
             "meter_state": "armed",
-            "meter_caption": "screen rep banked",
+            "meter_caption": _practice_bank_caption(row),
         }
     return {
         "meter_label": "first rep",
@@ -582,6 +584,30 @@ def _source_total(row: dict[str, Any] | None, source: str) -> int:
     if not isinstance(counts, dict):
         return 0
     return max(0, _safe_int(counts.get(source), default=0))
+
+
+def _practice_bank_count(row: dict[str, Any] | None) -> int:
+    return max(
+        0,
+        min(3, _source_total(row, "hardware") + _source_total(row, "screen")),
+    )
+
+
+def _practice_bank_label(row: dict[str, Any] | None) -> str:
+    count = _practice_bank_count(row)
+    return f"practice bank {count}/3"
+
+
+def _practice_bank_caption(row: dict[str, Any] | None) -> str:
+    hardware = _source_total(row, "hardware")
+    screen = _source_total(row, "screen")
+    count = _practice_bank_count(row)
+    if hardware > 0 and screen > 0:
+        return f"{count} reps banked: screen + hardware"
+    unit = "rep" if count == 1 else "reps"
+    if hardware > 0:
+        return f"{count} controller {unit} banked"
+    return f"{count} screen {unit} banked"
 
 
 def _safe_int(value: Any, *, default: int) -> int:
