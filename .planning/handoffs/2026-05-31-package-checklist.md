@@ -10626,3 +10626,36 @@ Proof before staging:
 - `uv run ruff check src/vibemix/agent/dj_cohost.py tests/agent/test_dj_cohost_ground_secondary.py`
 - `uv run python -m compileall -q src/vibemix/agent/dj_cohost.py tests/agent/test_dj_cohost_ground_secondary.py`
 - `git diff --check -- src/vibemix/agent/dj_cohost.py tests/agent/test_dj_cohost_ground_secondary.py .planning/handoffs/2026-05-31-package-checklist.md`
+
+## Package 87 - Disable Citation Bypass Speech
+
+Suggested commit: `fix(cohost): disable citation bypass speech`
+
+Include:
+
+- `src/vibemix/agent/dj_cohost.py`
+- `tests/agent/test_dj_cohost_linter.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Tracker telemetry semantics, historical report parsing, provider switching,
+  prompt rewrites, citation grammar changes, UI behavior, Learn runtime changes,
+  and new dependencies. This package only removes the live co-host call site
+  that consumed the one-shot citation bypass as a speech permission.
+
+Reason:
+
+- After pre-TTS deferral, the remaining escape hatch was the old one-shot
+  bypass: an invalid linter result could still speak an unverified line when
+  `StrippedRateTracker.should_bypass()` fired. The live co-host must treat every
+  invalid citation-linter result as silent `citation_strip`; historical
+  `citation_bypass` rows can remain readable as blocker diagnostics, but new
+  live speech must not create them.
+
+Proof before staging:
+
+- `uv run pytest -q tests/agent/test_dj_cohost_linter.py tests/agent/test_dj_cohost_streaming_pipe.py tests/agent/test_dj_cohost_ground_secondary.py tests/coach/test_stripped_rate_tracker.py tests/eval/test_cohost_viber_session_report.py`
+- `uv run ruff check src/vibemix/agent/dj_cohost.py tests/agent/test_dj_cohost_linter.py`
+- `uv run python -m compileall -q src/vibemix/agent/dj_cohost.py tests/agent/test_dj_cohost_linter.py`
+- `git diff --check -- src/vibemix/agent/dj_cohost.py tests/agent/test_dj_cohost_linter.py .planning/handoffs/2026-05-31-package-checklist.md`

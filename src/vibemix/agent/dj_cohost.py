@@ -3712,13 +3712,12 @@ class DJCoHostAgent(Agent):
                 # races would be possible). The legacy path emits unchanged.
                 #
                 # Decision ladder (when wired AND suppression is None):
-                #   1. valid → emit + tracker.record(False) + ai_text log.
-                #   2. invalid + bypass → emit anyway + record(False) +
-                #      citation_bypass log + "[ai_text:unverified]" stdout.
-                #      Bypass is one-shot per breach window (T-20-01-02).
-                #   3. invalid + strip → DO NOT yield + record(True) +
-                #      citation_strip log. silence > invented citation.
-                #      (The pre-recorded ack-bank substitution was retired —
+                #   1. valid -> emit + tracker.record(False) + ai_text log.
+                #   2. invalid -> DO NOT yield + record(True) + citation_strip
+                #      log. Silence beats invented or uncitable speech.
+                #      The old one-shot bypass remains a tracker diagnostic
+                #      primitive, but live cohost speech no longer consumes it.
+                #      (The pre-recorded ack-bank substitution was retired;
                 #      see the strip block below.)
                 if self._linter_wired and self._linter is not None:
                     lint_result = self._linter.check(full_text, snapshot, mode="live")
@@ -3764,83 +3763,36 @@ class DJCoHostAgent(Agent):
                         else:
                             print("[ai_text] <empty> (skip TTS)", flush=True)
                     else:
-                        # Invalid — consult the one-shot bypass before stripping.
-                        if (
-                            self._stripped_tracker.should_bypass()
-                            if self._stripped_tracker is not None
-                            else False
-                        ):
-                            citation_action = "bypass"
-                            # Plan 41-04 — same head_yielded guard as the
-                            # valid path: chunks already in-flight, no
-                            # re-yield from buffer.
-                            if not head_yielded:
-                                if citation_lint_defer_stream:
-                                    tts_txt = _prepare_tts_segment(audience_text)
-                                    if tts_txt:
-                                        yield tts_txt
-                                else:
-                                    for txt in buffered_chunks:
-                                        tts_txt = _prepare_tts_segment(txt)
-                                        if tts_txt:
-                                            yield tts_txt
-                            # Bypass means we did NOT strip — tracker records
-                            # the actual outcome (False = "we let it through").
-                            # Plan 55-03 — surface the raw reply as the
-                            # last-unverified text: the user HEARD this unverified
-                            # line, so the diagnostics strip must show it.
-                            if self._stripped_tracker is not None:
-                                self._stripped_tracker.record(False, unverified_text=full_text)
-                            self._recorder.log_event(
-                                "citation_bypass",
-                                response_id=response_id,
-                                raw_text=full_text,
-                                missing=citation_lint_missing_payload,
-                                reason=lint_result.reason,
-                                latency_s=round(elapsed, 2),
-                            )
-                            print(f"[ai_text:unverified] {audience_stripped!r}", flush=True)
-                            # History appended on bypass — the user heard the
-                            # text, so the no-repeat memory must reflect it.
-                            if audience_stripped:
-                                # WR-04 — stamp from event-fired set_seconds.
-                                self._record_said(
-                                    audience_stripped[:140],
-                                    set_s_at_event=ev_set_seconds,
-                                    event=ev,
-                                )
-                                pending_transcript_text = audience_stripped[:140]
-                        else:
-                            # Strip path — no chunks yielded. Pre-recorded
-                            # ack substitution is retired (English placeholder
-                            # clips fought the anti-slop thesis and the
-                            # Turkish persona). Linter-wired live mode
-                            # defers chunks until validation, so this is
-                            # normally pre-TTS silence. The head_yielded
-                            # branch remains a defensive legacy-path mask
-                            # for any already-in-flight speculative head.
-                            citation_action = "strip"
-                            if head_yielded:
-                                _push_silence_pad_and_cancel("citation_failure")
-                            # Plan 55-03 — surface the raw reply as the
-                            # last-unverified text: this is the line the user did
-                            # NOT hear, but the diagnostics strip should show what
-                            # got silenced. Mirrors the raw_text= log field below.
-                            if self._stripped_tracker is not None:
-                                self._stripped_tracker.record(True, unverified_text=full_text)
-                            self._recorder.log_event(
-                                "citation_strip",
-                                response_id=response_id,
-                                raw_text=full_text,
-                                missing=citation_lint_missing_payload,
-                                reason=lint_result.reason,
-                                latency_s=round(elapsed, 2),
-                            )
-                            print(
-                                f"[ai_text:stripped] reason={lint_result.reason}",
-                                flush=True,
-                            )
-                            # History NOT appended — nothing was emitted.
+                        # Strip path — no chunks yielded. Pre-recorded
+                        # ack substitution is retired (English placeholder
+                        # clips fought the anti-slop thesis and the
+                        # Turkish persona). Linter-wired live mode
+                        # defers chunks until validation, so this is
+                        # normally pre-TTS silence. The head_yielded
+                        # branch remains a defensive legacy-path mask
+                        # for any already-in-flight speculative head.
+                        citation_action = "strip"
+                        if head_yielded:
+                            _push_silence_pad_and_cancel("citation_failure")
+                        # Plan 55-03 — surface the raw reply as the
+                        # last-unverified text: this is the line the user did
+                        # NOT hear, but the diagnostics strip should show what
+                        # got silenced. Mirrors the raw_text= log field below.
+                        if self._stripped_tracker is not None:
+                            self._stripped_tracker.record(True, unverified_text=full_text)
+                        self._recorder.log_event(
+                            "citation_strip",
+                            response_id=response_id,
+                            raw_text=full_text,
+                            missing=citation_lint_missing_payload,
+                            reason=lint_result.reason,
+                            latency_s=round(elapsed, 2),
+                        )
+                        print(
+                            f"[ai_text:stripped] reason={lint_result.reason}",
+                            flush=True,
+                        )
+                        # History NOT appended — nothing was emitted.
                 else:
                     # Legacy Phase 18/19 path — clean turn, yield buffered chunks
                     # in their original order and run the v4 ai_text logging
@@ -3883,9 +3835,9 @@ class DJCoHostAgent(Agent):
             # VIBEMIX_DEBUG_LOG=1), append ONE auditable ``reaction_evidence`` event
             # per turn: a compact digest of the evidence packet the linter checked
             # against (sources → atom count, never the payload) + the citation-gate
-            # decision. Runs for EVERY turn — suppressed, emit, bypass, strip,
+            # decision. Runs for EVERY turn — suppressed, emit, strip,
             # legacy. Default-OFF so events.jsonl is byte-identical in normal runs
-            # (the discrete citation_count/strip/bypass/ai_text events already cover
+            # (the discrete citation_count/strip/ai_text events already cover
             # the default case). Best-effort: never breaks the LLM response path.
             if debug_log_enabled():
                 try:
@@ -3914,7 +3866,7 @@ class DJCoHostAgent(Agent):
                 except Exception:
                     pass
 
-            if citation_action in ("emit", "bypass") and emote_intents and audience_stripped:
+            if citation_action == "emit" and emote_intents and audience_stripped:
                 reaction_intent = emote_intents[-1]
                 try:
                     self._state.last_reaction_intent = reaction_intent
@@ -3933,7 +3885,7 @@ class DJCoHostAgent(Agent):
             reaction_msg_dict: dict[str, Any] | None = None
             reaction_msg_ts: str | None = None
             reaction_strip: list[dict] = []
-            if self._ipc_bus is not None and citation_action in ("emit", "bypass"):
+            if self._ipc_bus is not None and citation_action == "emit":
                 try:
                     reaction_strip = (
                         _build_citation_strip(
@@ -3956,14 +3908,13 @@ class DJCoHostAgent(Agent):
             # ---- Plan 24-02 — overlay-highlight publish ----
             # Fire once per [screen:<element>] citation IFF:
             #   1. ipc_bus is wired (sidecar publish path enabled).
-            #   2. citation_action is a "user-heard-the-text" action — "emit"
-            #      (normal flow) or "bypass" (unverified-but-spoken via the
-            #      one-shot bypass guard). "strip" and "skip"-from-suppression
-            #      do NOT publish: a ring without audio is ghost-firing.
+            #   2. citation_action is "emit" (user heard verified text).
+            #      "strip" and "skip"-from-suppression do NOT publish: a ring
+            #      without audio is ghost-firing.
             # Best-effort: every step wrapped in try/except so a malformed
             # element_id, schema validation error, or bus emit failure
             # cannot break the LLM response path (T-18-04-03-style mitigation).
-            if self._ipc_bus is not None and citation_action in ("emit", "bypass"):
+            if self._ipc_bus is not None and citation_action == "emit":
                 try:
                     for source, body in parse_citations(full_text):
                         if source != "screen":
@@ -3984,7 +3935,7 @@ class DJCoHostAgent(Agent):
 
             # ---- Plan 44-03 / LAUNCH-02 — cohost-reaction broadcast ----
             # Same guard as overlay-highlight: fire only when the user actually
-            # heard the reaction (citation_action in {emit, bypass}). When the
+            # heard the reaction (citation_action == emit). When the
             # linter stripped the text or suppression beat the linter to it,
             # no chips fire — chips below a silent reaction would be ghost UI.
             # When the registry is None (Phase 4 backward-compat path) or has
@@ -3995,7 +3946,7 @@ class DJCoHostAgent(Agent):
             # Best-effort: any exception in chip building OR the bus emit is
             # logged + swallowed; the LLM response path must NEVER crash on
             # the launch-marketing surface (T-18-04-03-style mitigation).
-            if self._ipc_bus is not None and citation_action in ("emit", "bypass"):
+            if self._ipc_bus is not None and citation_action == "emit":
                 if reaction_msg_dict is not None:
                     try:
                         await self._ipc_bus.emit(reaction_msg_dict)
@@ -4011,13 +3962,13 @@ class DJCoHostAgent(Agent):
                                 self._last_recall_callback_at = time.time()
                         except Exception as _e:
                             print(f"\n[recall cooldown arm err] {_e}", file=sys.stderr)
-            elif self._ipc_bus is None and citation_action in ("emit", "bypass"):
+            elif self._ipc_bus is None and citation_action == "emit":
                 # Phase 66 (COPILOT-02) — bus-less arm path. When ``_ipc_bus`` is
                 # None (test contexts that don't wire the UI broadcast surface,
                 # or production agents that skip the IPC bus) the chip surface
                 # never publishes, but the AUDIO surface still delivered the
                 # reaction to the audience via the TTS chunks (citation_action
-                # emit/bypass). Reuse the same grounded-strip lens as the bus
+                # emit). Reuse the same grounded-strip lens as the bus
                 # path so fabricated recall atoms never arm cooldown.
                 if self._recall_enabled and self._registry is not None:
                     try:

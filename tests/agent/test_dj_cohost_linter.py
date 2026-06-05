@@ -7,12 +7,11 @@ playback) for the post-stream citation gate. Contract:
 - All three None (default) → legacy Phase 18/19 path is byte-identical
   (no linter check, no [unverified] log).
 - All three non-None ("wired" mode) → post-stream gate runs after silence/
-  slop suppression. Decision ladder: valid → emit + record(False); invalid
-  + bypass → emit + record(False) + citation_bypass log; invalid + strip →
-  no emit + citation_strip log + record(True). Silence is the strip
-  substitute — the pre-recorded ack-bank surface was retired.
-- History append on bypass (text was emitted, no-repeat history must
-  reflect it) but NOT on strip (no text emitted = nothing to repeat).
+  slop suppression. Decision ladder: valid → emit + record(False); invalid →
+  no emit + citation_strip log + record(True). Silence is the strip substitute
+  — the pre-recorded ack-bank surface and old bypass emission were retired.
+- History appends only on verified emit. It must NOT grow on strip because no
+  text reached the audience.
 """
 
 from __future__ import annotations
@@ -1213,28 +1212,25 @@ def test_empty_response_with_registered_event_stays_silent(mocker, tmp_path) -> 
 
 
 # --------------------------------------------------------------------------
-# (e) Bypass emits with [unverified] marker
+# (e) Invalid responses stay silent even when the old bypass would fire
 # --------------------------------------------------------------------------
 
 
-def test_bypass_emits_with_unverified_marker(mocker, tmp_path, capsys) -> None:
-    """Force tracker.should_bypass()→True; invalid response → chunks YIELDED,
-    citation_bypass logged, stdout contains '[ai_text:unverified]'."""
+def test_invalid_response_strips_even_when_tracker_bypass_would_fire(
+    mocker, tmp_path, capsys
+) -> None:
+    """Invalid live responses must not consult or consume the old bypass path."""
     registry = EvidenceRegistry()
     agent, gen, recorder, state, _, tracker, playback = _build_agent_wired(
         mocker, tmp_path, registry
     )
     mocker.patch("vibemix.agent.dj_cohost.snapshot_wav", return_value=b"FAKEWAV")
     mocker.patch.object(AICoach, "build_prompt", return_value="EVIDENCE: x")
-    # Force the bypass to fire on this turn — monkey-patch the tracker's
-    # should_bypass to return True exactly once (mirrors one-shot semantic).
-    bypass_calls = {"n": 0}
-
-    def _force_bypass() -> bool:
-        bypass_calls["n"] += 1
-        return bypass_calls["n"] == 1
-
-    mocker.patch.object(tracker, "should_bypass", side_effect=_force_bypass)
+    mocker.patch.object(
+        tracker,
+        "should_bypass",
+        side_effect=AssertionError("live cohost must not use citation bypass for speech"),
+    )
     gen.aio.models.generate_content_stream = mocker.AsyncMock(
         return_value=_async_iter(["unverified [ev:NONEXISTENT@1.0] reply"])
     )
@@ -1243,20 +1239,19 @@ def test_bypass_emits_with_unverified_marker(mocker, tmp_path, capsys) -> None:
     agent.set_next_event(ev)
     chunks = _drive(agent)
 
-    # Chunks ARE yielded under bypass, but citation atoms are still TTS-only
-    # stripped so the voice path does not read bracket receipts aloud.
-    assert chunks == ["unverified reply"]
+    assert chunks == []
     kinds = [k for k, _ in recorder.events]
-    assert "citation_bypass" in kinds
-    bypass_log = next(f for k, f in recorder.events if k == "citation_bypass")
-    assert bypass_log["response_id"].startswith("0001_")
-    assert "unverified" in bypass_log["raw_text"]
-    assert bypass_log["reason"] == "invalid_atoms"
-    # No audio pushed on bypass — we emitted text instead.
+    assert "citation_bypass" not in kinds
+    assert "citation_strip" in kinds
+    strip_log = next(f for k, f in recorder.events if k == "citation_strip")
+    assert strip_log["response_id"].startswith("0001_")
+    assert "unverified" in strip_log["raw_text"]
+    assert strip_log["reason"] == "invalid_atoms"
+    assert tracker.rate() == 1.0
     playback.push.assert_not_called()
-    # Stdout marker.
     captured = capsys.readouterr().out
-    assert "[ai_text:unverified]" in captured
+    assert "[ai_text:unverified]" not in captured
+    assert "[ai_text:stripped]" in captured
 
 
 # --------------------------------------------------------------------------
@@ -1295,13 +1290,12 @@ def test_strip_path_with_unknown_event_class(mocker, tmp_path) -> None:
 
 
 # --------------------------------------------------------------------------
-# (g) History appended on bypass, NOT on strip
+# (g) History is not appended when invalid responses strip
 # --------------------------------------------------------------------------
 
 
-def test_history_appended_on_bypass_not_on_strip(mocker, tmp_path) -> None:
-    """_ai_text_history grows on bypass (text was emitted) but NOT on strip
-    (no text emitted = nothing to repeat)."""
+def test_history_not_appended_when_invalid_response_strips(mocker, tmp_path) -> None:
+    """_ai_text_history stays unchanged when invalid turns never reach speech."""
     registry = EvidenceRegistry()
     agent, gen, _recorder, state, _, tracker, _playback = _build_agent_wired(
         mocker, tmp_path, registry
@@ -1318,24 +1312,18 @@ def test_history_appended_on_bypass_not_on_strip(mocker, tmp_path) -> None:
     _drive(agent)
     assert len(agent._ai_text_history) == 0, "strip path must NOT grow history"
 
-    # Turn 2: force bypass.
-    bypass_state = {"used": False}
-
-    def _force_bypass_once() -> bool:
-        if bypass_state["used"]:
-            return False
-        bypass_state["used"] = True
-        return True
-
-    mocker.patch.object(tracker, "should_bypass", side_effect=_force_bypass_once)
+    mocker.patch.object(
+        tracker,
+        "should_bypass",
+        side_effect=AssertionError("strip path must not consult bypass"),
+    )
     gen.aio.models.generate_content_stream = mocker.AsyncMock(
         return_value=_async_iter(["[ev:NONE@2.0] two"])
     )
     ev2 = Event(type="HEARTBEAT", state=state, extra={})
     agent.set_next_event(ev2)
     _drive(agent)
-    assert len(agent._ai_text_history) == 1, "bypass path MUST grow history"
-    assert "two" in agent._ai_text_history[0]
+    assert len(agent._ai_text_history) == 0, "invalid strip must NOT grow history"
 
 
 # ---- Phase 66 — coach-tier cooldown tests (COPILOT-02) ----
