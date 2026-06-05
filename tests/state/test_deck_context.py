@@ -287,6 +287,44 @@ def test_two_resolved_decks_mark_mix_candidate() -> None:
     assert "transition_candidate=two_resolved_decks_mixing" in out
     assert "A='OutA'" in out
     assert "B='InB'" in out
+    assert "tempo_bridge[decks=A+B bpm=A:128,B:130 folded_delta=1.6% risk=matched" in out
+    assert "rule=metadata_not_live_beatgrid_proof" in out
+
+
+def test_two_resolved_decks_surface_tempo_jump_as_metadata_only() -> None:
+    state = MusicState(audible_deck="mix", deck_confidence=0.5)
+    state.deck_state = DeckState(
+        decks={
+            "A": _deck("OutA", camelot="8A", bpm=128.0),
+            "B": _deck("InB", camelot="9A", bpm=145.0),
+        }
+    )
+
+    out = render_deck_context(state)
+    compact = render_deck_context(state, compact=True)
+
+    assert out is not None
+    assert compact is not None
+    assert "tempo_bridge[decks=A+B bpm=A:128,B:145 folded_delta=13.3% risk=tempo_jump" in out
+    assert "rule=metadata_not_live_beatgrid_proof" in out
+    assert "tempo_drift" not in out
+    assert "tempo_bridge[decks=A+B bpm=A:128,B:145" in compact
+
+
+def test_two_resolved_decks_with_missing_bpm_blocks_tempo_claims() -> None:
+    state = MusicState(audible_deck="mix", deck_confidence=0.5)
+    state.deck_state = DeckState(
+        decks={
+            "A": _deck("OutA", camelot="8A", bpm=0.0),
+            "B": _deck("InB", camelot="9A", bpm=145.0),
+        }
+    )
+
+    out = render_deck_context(state)
+
+    assert out is not None
+    assert "tempo_bridge[decks=A+B risk=bpm_unknown" in out
+    assert "rule=metadata_not_live_beatgrid_proof" in out
 
 
 def test_two_resolved_decks_single_audible_is_watch_not_claim() -> None:

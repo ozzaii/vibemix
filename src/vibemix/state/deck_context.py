@@ -17,6 +17,7 @@ from typing import TYPE_CHECKING, Any
 
 from vibemix.audio.xfade import xfade_gains
 from vibemix.intel.eq_move_model import canonical_eq_move, predicted_band_gains
+from vibemix.intel.transition_scorer import bpm_folded_delta_pct
 from vibemix.state.deck_state import DeckTrack
 from vibemix.state.deltas import DELTA_FLOOR, render_delta
 
@@ -898,12 +899,14 @@ def render_deck_context(state: MusicState, *, compact: bool = False) -> str | No
     resolved_sides = "+".join(sorted(resolved)) if resolved else "none"
 
     if compact:
+        tempo_bridge = _tempo_bridge_context(resolved)
+        tempo_field = f" {tempo_bridge}" if tempo_bridge else ""
         return (
             "deck_context["
             f"audible={state.audible_deck} "
             f"resolved={resolved_sides} "
             f"{_deck_identity_evidence_status(resolved)} "
-            f"{status}]"
+            f"{status}{tempo_field}]"
         )
 
     fields = [
@@ -916,6 +919,9 @@ def render_deck_context(state: MusicState, *, compact: bool = False) -> str | No
     if resolved:
         loaded = " | ".join(_deck_summary(side, dt) for side, dt in sorted(resolved.items()))
         fields.append(f"loaded={loaded}")
+    tempo_bridge = _tempo_bridge_context(resolved)
+    if tempo_bridge:
+        fields.append(tempo_bridge)
 
     return "deck_context[" + " ".join(fields) + "]"
 
@@ -3759,6 +3765,53 @@ def _transition_status(state: MusicState, resolved: dict[str, DeckTrack]) -> str
     if state.audible_deck in ("A", "B"):
         return f"transition_watch=two_resolved_decks_single_audible_{state.audible_deck}"
     return "transition_watch=two_resolved_decks_audible_unknown"
+
+
+def _tempo_bridge_context(resolved: dict[str, DeckTrack]) -> str | None:
+    """Return metadata-only BPM gap context for the two active deck identities.
+
+    This is deliberately not a timing or beatgrid verdict. The source is deck
+    metadata, so the prompt field carries the rule that it cannot prove live
+    beat drift by itself.
+    """
+    if len(resolved) < 2:
+        return None
+
+    sides = [side for side in ("A", "B") if side in resolved]
+    if len(sides) < 2:
+        sides = sorted(resolved)[:2]
+    if len(sides) < 2:
+        return None
+
+    left, right = sides[0], sides[1]
+    left_bpm = resolved[left].bpm
+    right_bpm = resolved[right].bpm
+    delta = bpm_folded_delta_pct(left_bpm, right_bpm)
+    if delta is None:
+        return (
+            "tempo_bridge["
+            f"decks={left}+{right} "
+            "risk=bpm_unknown "
+            "rule=metadata_not_live_beatgrid_proof]"
+        )
+
+    if delta <= 0.03:
+        risk = "matched"
+    elif delta <= 0.06:
+        risk = "bridge"
+    elif delta <= 0.08:
+        risk = "tempo_push"
+    else:
+        risk = "tempo_jump"
+
+    return (
+        "tempo_bridge["
+        f"decks={left}+{right} "
+        f"bpm={left}:{left_bpm:.0f},{right}:{right_bpm:.0f} "
+        f"folded_delta={delta * 100:.1f}% "
+        f"risk={risk} "
+        "rule=metadata_not_live_beatgrid_proof]"
+    )
 
 
 def _deck_identity_scope(resolved: dict[str, DeckTrack]) -> list[str]:
