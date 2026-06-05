@@ -127,11 +127,6 @@ export const MOCK_TRANSFER_CONTRACT: readonly MockTransferSurface[] = [
         purpose: "Viber chat move-grade and XP receipt rows",
         producerFile: "src/library/index.ts",
       },
-      {
-        wire: "library.chat-agent-log",
-        purpose: "inline live Viber tool log attached to the chat turn",
-        producerFile: "src/library/index.ts",
-      },
     ],
     inbound: [
       "library_search",

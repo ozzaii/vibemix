@@ -2908,9 +2908,8 @@ export async function onModelProgress(
   }
 }
 
-/** One live tool call from Viber's Codex run (the agentic tape). Emitted by the
- *  Rust bridge as `library://viber-tool` while a curate/build/chat runs, so the
- *  conversation can show each tool firing — search, sequence, create — live. */
+/** One live tool call from Viber's Codex run. Emitted by the Rust bridge as
+ *  `library://viber-tool`; the UI turns it into plain pending status copy. */
 export interface LibraryViberToolEvent {
   tool: string;
   ok: boolean;

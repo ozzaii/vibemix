@@ -713,7 +713,7 @@ describe("chat - real runChat path", () => {
     );
   });
 
-  it("renders a grounded tool trace and playlist artifact from one Viber turn", async () => {
+  it("renders a playlist artifact without exposing raw Viber tool receipts", async () => {
     await mountChat();
     await sendChat("find two dark peak techno tracks");
 
@@ -730,11 +730,12 @@ describe("chat - real runChat path", () => {
       (document.getElementById("vmx-lib-chat") as HTMLTextAreaElement).value,
     ).toBe("");
 
+    expect(document.querySelector(".vmx-lib-agent-log")).toBeNull();
     const toolText =
-      document.querySelector(".vmx-lib-agent-log")?.textContent ?? "";
-    expect(toolText).toContain("search_vibe");
-    expect(toolText).toContain("dark peak techno");
-    expect(toolText).toContain("create_playlist");
+      document.getElementById("vmx-lib-chat-tools")?.textContent ?? "";
+    expect(toolText).not.toContain("search_vibe");
+    expect(toolText).not.toContain("dark peak techno");
+    expect(toolText).not.toContain("create_playlist");
 
     const artifactText =
       document.getElementById("vmx-lib-chat-thread")?.textContent ?? "";
@@ -964,7 +965,7 @@ describe("chat - real runChat path", () => {
     expect(emitIpcMock).not.toHaveBeenCalled();
   });
 
-  it("shows the live Viber tool tape while the chat turn is still running", async () => {
+  it("shows human live Viber status while the chat turn is still running", async () => {
     let resolveChat!: (value: LibraryChatResult) => void;
     chatMock.mockImplementationOnce(
       () =>
@@ -976,17 +977,21 @@ describe("chat - real runChat path", () => {
     await mountChat();
     await sendChat("find a dark rolling bridge");
     viberToolCallback?.({
-      tool: "search_vibe",
+      tool: "discover_pool",
       ok: true,
       summary: "dark rolling bridge; 8 tracks",
     });
     for (let i = 0; i < 4; i++) await Promise.resolve();
 
     const liveText =
-      document.querySelector(".vmx-lib-agent-log")?.textContent ?? "";
-    expect(liveText).toContain("search_vibe");
-    expect(liveText).toContain("dark rolling bridge");
-    expect(liveText).toContain("8 tracks");
+      document.querySelector<HTMLElement>(
+        '.vmx-lib-chat-turn[data-role="viber"][data-pending="true"] .body',
+      )?.textContent ?? "";
+    expect(liveText).toContain("Discovering tracks…");
+    expect(liveText).not.toContain("discover_pool");
+    expect(liveText).not.toContain("dark rolling bridge");
+    expect(liveText).not.toContain("8 tracks");
+    expect(document.querySelector(".vmx-lib-agent-log")).toBeNull();
     expect(document.getElementById("vmx-lib-scope-state")?.textContent).toBe(
       "working",
     );

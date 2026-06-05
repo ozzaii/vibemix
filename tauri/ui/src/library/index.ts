@@ -13,7 +13,7 @@
  *   - curate   theme → libraryCurate → numbered set + notes
  *   - build    brief + curve → libraryBuildSet → AutoCrate set + Rekordbox export
  *   - cue      folder + format → libraryCueFolder → portable cue export receipt
- *   - chat     message + history → libraryChat → reply, tools, artifacts
+ *   - chat     message + history → libraryChat → reply, live proof, artifacts
  *
  * Wire-vs-dev: every api.ts call falls back to the real 2026-05-25 subset-run
  * sample only when `invoke()` is unavailable, so the surface is demoable before
@@ -50,7 +50,6 @@ import {
   type LibraryChatMoveGrade,
   type LibraryChatPlaylist,
   type LibraryChatResult,
-  type LibraryChatToolTrace,
   type LibraryChatTurn,
   type LibraryCueResult,
   type LibraryLiveDeck,
@@ -1192,79 +1191,35 @@ function appendChatTurn(
   return turn;
 }
 
-let activeInlineToolLog: HTMLElement | null = null;
+let activeChatTurn: HTMLElement | null = null;
 
-function createInlineToolLog(turn: HTMLElement): HTMLElement {
-  const existing = turn.querySelector<HTMLElement>(".vmx-lib-agent-log");
-  if (existing) return existing;
+const TOOL_STATUS_COPY: Record<string, string> = {
+  compile_musical_context: "Checking mix context…",
+  create_playlist: "Writing playlist…",
+  discover_pool: "Discovering tracks…",
+  export_set: "Exporting set…",
+  export_smart_cues: "Writing cue file…",
+  fetch_url: "Reading source…",
+  get_track_energy: "Checking energy…",
+  get_track_features: "Checking BPM and key…",
+  get_track_sections: "Reading track sections…",
+  inspect_candidates: "Reading candidate tracks…",
+  quote_moment: "Marking the moment…",
+  retrieve_dj_knowledge: "Checking DJ technique notes…",
+  search_vibe: "Searching your library…",
+  sequence_set: "Sequencing the set…",
+  smart_hot_cues: "Finding hot cues…",
+  transition_slate: "Finding mix points…",
+  web_search: "Checking sources…",
+};
 
-  const log = document.createElement("div");
-  log.className = "vmx-lib-agent-log";
-  log.dataset.wire = "library.chat-agent-log";
-  log.dataset.toolCount = "0";
-
-  const head = document.createElement("div");
-  head.className = "vmx-lib-agent-log__head";
-  const title = document.createElement("span");
-  title.textContent = "Live agent log";
-  const state = document.createElement("b");
-  state.textContent = "thinking";
-  head.append(title, state);
-
-  const rows = document.createElement("div");
-  rows.className = "vmx-lib-agent-log__rows";
-  rows.dataset.role = "rows";
-
-  log.append(head, rows);
-  turn.append(log);
-  return log;
+function humanToolLabel(tool: string): string {
+  return tool.replace(/[_-]+/g, " ").trim() || "tool";
 }
 
-function appendInlineToolRow(log: HTMLElement, e: LibraryViberToolEvent): void {
-  const rows = log.querySelector<HTMLElement>('[data-role="rows"]');
-  if (!rows) return;
-  const row = document.createElement("div");
-  row.className = "vmx-lib-agent-log__row";
-  row.dataset.ok = String(e.ok);
-  row.dataset.state = "running";
-
-  const status = document.createElement("span");
-  status.className = "vmx-lib-agent-log__status";
-  status.setAttribute("aria-hidden", "true");
-
-  const text = document.createElement("div");
-  const name = document.createElement("b");
-  name.textContent = chatToolDisplayName(e.tool);
-  const arg = document.createElement("span");
-  arg.textContent = chatToolDisplayArg(e.tool, e.summary, e.ok);
-  text.append(name, arg);
-  row.append(status, text);
-  rows.append(row);
-
-  const count = Number(log.dataset.toolCount ?? "0") + 1;
-  log.dataset.toolCount = String(count);
-  log.querySelector<HTMLElement>(".vmx-lib-agent-log__head b")!.textContent =
-    `${count} tool${count === 1 ? "" : "s"}`;
-  window.setTimeout(() => {
-    row.dataset.state = e.ok ? "done" : "failed";
-  }, 180);
-}
-
-function finalizeInlineToolLog(
-  log: HTMLElement | null,
-  result: Pick<LibraryChatResult, "iterations" | "stop_reason">,
-): void {
-  if (!log) return;
-  const count = Number(log.dataset.toolCount ?? "0");
-  const headState = log.querySelector<HTMLElement>(".vmx-lib-agent-log__head b");
-  if (count > 0) {
-    log.dataset.collapsed = "true";
-    if (headState) {
-      headState.textContent = `${count} real tool${count === 1 ? "" : "s"} · ${result.stop_reason}`;
-    }
-    return;
-  }
-  log.remove();
+function viberToolStatusText(event: LibraryViberToolEvent): string {
+  if (!event.ok) return `${humanToolLabel(event.tool)} failed.`;
+  return TOOL_STATUS_COPY[event.tool] ?? `Working on ${humanToolLabel(event.tool)}…`;
 }
 
 function setChatTurnText(
@@ -1568,35 +1523,9 @@ function renderChatIdleSide(): void {
   renderInlineSetupCard(latestStats);
 }
 
-/** Append one live tool-tape row as Viber fires it (the agentic work made
- *  visible). XSS-safe: textContent only, no innerHTML. The first event of a run
- *  clears any placeholder ("thinking" / "no tools this turn"). */
-function appendLiveToolRow(e: LibraryViberToolEvent): void {
-  if (activeInlineToolLog) {
-    appendInlineToolRow(activeInlineToolLog, e);
-    return;
-  }
-  const tools = $("vmx-lib-chat-tools");
-  if (tools.dataset.live !== "true") {
-    tools.replaceChildren();
-    tools.dataset.live = "true";
-  }
-  const row = document.createElement("div");
-  row.className = "vmx-lib-chat-tool";
-  row.dataset.ok = String(e.ok);
-  const gem = document.createElement("span");
-  gem.className = "gem";
-  const text = document.createElement("div");
-  const name = document.createElement("div");
-  name.className = "name";
-  name.textContent = chatToolDisplayName(e.tool);
-  const arg = document.createElement("div");
-  arg.className = "arg";
-  arg.textContent = chatToolDisplayArg(e.tool, e.summary, e.ok);
-  text.append(name, arg);
-  row.append(gem, text);
-  tools.append(row);
-  tools.scrollTop = tools.scrollHeight;
+function updateLiveToolStatus(event: LibraryViberToolEvent): void {
+  if (!activeChatTurn) return;
+  setChatTurnText(activeChatTurn, viberToolStatusText(event), true);
 }
 
 function liveVerificationStateText(v: LibraryLiveVerification): string {
@@ -1644,19 +1573,6 @@ function appendLiveVerificationToolRow(
   tools.append(row);
 }
 
-function isInternalLiveProofTool(tool: LibraryChatToolTrace): boolean {
-  return tool.name === "live_context_required";
-}
-
-function chatToolDisplayName(name: string): string {
-  return name === "live_context_required" ? "live read" : name;
-}
-
-function chatToolDisplayArg(name: string, arg: string, ok: boolean): string {
-  if (name === "live_context_required") return "waiting";
-  return arg || (ok ? "ok" : "failed");
-}
-
 function chatScopeStateText(result: LibraryChatResult): string {
   if (isChatSetupStop(result.stop_reason))
     return `setup · ${result.stop_reason}`;
@@ -1668,19 +1584,6 @@ function chatScopeStateText(result: LibraryChatResult): string {
 function renderChatSide(result: LibraryChatResult): void {
   const tools = $maybe("vmx-lib-chat-tools");
   tools?.replaceChildren();
-  if (activeInlineToolLog && Number(activeInlineToolLog.dataset.toolCount ?? "0") === 0) {
-    result.tool_trace
-      .filter(
-        (tool) => !(result.live_verification && isInternalLiveProofTool(tool)),
-      )
-      .forEach((tool) => {
-        appendInlineToolRow(activeInlineToolLog as HTMLElement, {
-          tool: tool.name,
-          ok: tool.ok,
-          summary: tool.arg,
-        });
-      });
-  }
   if (result.live_verification) {
     if (tools) appendLiveVerificationToolRow(tools, result.live_verification);
   } else {
@@ -1692,52 +1595,22 @@ function renderChatSide(result: LibraryChatResult): void {
     empty.textContent = "";
     tools.append(empty);
   }
-  if (tools && result.tool_trace.length > 0) {
-    result.tool_trace
-      .filter(
-        (tool) => !(result.live_verification && isInternalLiveProofTool(tool)),
-      )
-      .forEach((tool) => {
-        const row = document.createElement("div");
-        row.className = "vmx-lib-chat-tool";
-        row.dataset.ok = String(tool.ok);
-        const gem = document.createElement("span");
-        gem.className = "gem";
-        const text = document.createElement("div");
-        const name = document.createElement("div");
-        name.className = "name";
-        name.textContent = chatToolDisplayName(tool.name);
-        const arg = document.createElement("div");
-        arg.className = "arg";
-        arg.textContent = chatToolDisplayArg(tool.name, tool.arg, tool.ok);
-        text.append(name, arg);
-        row.append(gem, text);
-        tools.append(row);
-      });
-  }
 
   const artifact = $maybe("vmx-lib-chat-artifact");
   artifact?.replaceChildren();
   const card = chatArtifactCard(result);
   if (card) {
-    const inlineTarget = activeInlineToolLog?.closest<HTMLElement>(
-      ".vmx-lib-chat-turn",
-    );
-    if (inlineTarget) inlineTarget.append(card);
+    if (activeChatTurn) activeChatTurn.append(card);
     else artifact?.append(card);
   }
   const setupCard = chatLibrarySetupCard(latestStats);
   if (setupCard) {
-    const inlineTarget = activeInlineToolLog?.closest<HTMLElement>(
-      ".vmx-lib-chat-turn",
-    );
-    if (inlineTarget) inlineTarget.append(setupCard);
+    if (activeChatTurn) activeChatTurn.append(setupCard);
     else artifact?.append(setupCard);
   }
   const scopeState = $maybe("vmx-lib-scope-state");
   if (scopeState) scopeState.textContent = chatScopeStateText(result);
-  finalizeInlineToolLog(activeInlineToolLog, result);
-  activeInlineToolLog = null;
+  activeChatTurn = null;
 }
 
 function isChatSetupStop(stopReason: string): boolean {
@@ -2094,7 +1967,7 @@ function renderChatError(err: unknown): void {
   $maybe("vmx-lib-chat-tools")?.replaceChildren();
   const scopeState = $maybe("vmx-lib-scope-state");
   if (scopeState) scopeState.textContent = "error";
-  activeInlineToolLog = null;
+  activeChatTurn = null;
 }
 
 // ── Bootstrap ───────────────────────────────────────────────────────────────
@@ -2303,10 +2176,11 @@ export function mountLibrary(root: ParentNode = document): void {
     echoEl.textContent = "conversation";
 
     const pending = appendChatTurn(chatThread, "viber", "", true);
-    activeInlineToolLog = createInlineToolLog(pending);
+    activeChatTurn = pending;
+    setChatTurnText(pending, "Thinking…", true);
     cancelActiveRun = () => {
       pending.remove();
-      activeInlineToolLog = null;
+      activeChatTurn = null;
       const lastTurn = chatHistory[chatHistory.length - 1];
       if (lastTurn?.role === "you" && lastTurn.text === message) {
         chatHistory.pop();
@@ -2402,8 +2276,7 @@ export function mountLibrary(root: ParentNode = document): void {
     const runId = ++runSeq;
     const modeAtStart = state.mode;
     cancelActiveRun = null;
-    // Reset the live tool tape for the Viber/Codex modes that stream tool calls,
-    // so each run's tape starts clean (the listener repopulates it live).
+    // Reset transient Viber status/proof chrome so each run starts clean.
     if (
       modeAtStart === "chat" ||
       modeAtStart === "curate" ||
@@ -2412,7 +2285,7 @@ export function mountLibrary(root: ParentNode = document): void {
       const liveTools = $("vmx-lib-chat-tools");
       liveTools.replaceChildren();
       delete liveTools.dataset.live;
-      activeInlineToolLog = null;
+      activeChatTurn = null;
     }
     try {
       if (modeAtStart === "search") await runSearch(runId);
@@ -2656,19 +2529,11 @@ export function mountLibrary(root: ParentNode = document): void {
     $("vmx-lib-model-state").textContent = modelProgressStateText(p);
   });
 
-  // The live tool tape: each tool Viber fires (search, sequence, create) streams
-  // in as it happens, so a curate/build/chat run is a visible agentic process,
-  // not an opaque wait. No-op listener outside Tauri (dev/jsdom).
+  // Live Viber tool events drive a plain pending status. The raw tool receipt
+  // panel is intentionally gone from the user surface.
   void onViberTool((e: LibraryViberToolEvent) => {
-    if (!busy) return;
-    if (
-      state.mode !== "chat" &&
-      state.mode !== "curate" &&
-      state.mode !== "build"
-    ) {
-      return;
-    }
-    appendLiveToolRow(e);
+    if (!busy || state.mode !== "chat") return;
+    updateLiveToolStatus(e);
   });
 
   // initial paint
