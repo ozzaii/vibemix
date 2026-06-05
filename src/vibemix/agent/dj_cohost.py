@@ -3109,6 +3109,13 @@ class DJCoHostAgent(Agent):
             full_text = ""
             buffered_chunks: list[str] = []
             head_yielded = False
+            # When the citation linter is wired, do not stream speculative
+            # audio before the full response has passed the evidence gate.
+            # A silence-pad can mask trailing audio, but it cannot guarantee
+            # the already-yielded head was never heard. Buffering wired turns
+            # keeps the product contract binary: cited lines speak; uncitable
+            # lines never enter TTS.
+            citation_lint_defer_stream = self._linter_wired
             language_defer_stream = False
             language_matches: tuple[str, ...] = ()
             tts_yielded_any = False
@@ -3272,6 +3279,8 @@ class DJCoHostAgent(Agent):
                     if live_claim_defer_stream:
                         continue
                     if language_defer_stream:
+                        continue
+                    if citation_lint_defer_stream:
                         continue
                     # Chunk-by-chunk yield with bracket-balance clipping.
                     # Before the speed-gate clears we hold every chunk
@@ -3722,10 +3731,15 @@ class DJCoHostAgent(Agent):
                         # in-flight; the legacy re-yield from buffered_chunks
                         # would duplicate audio. Skip it.
                         if not head_yielded:
-                            for txt in buffered_chunks:
-                                tts_txt = _prepare_tts_segment(txt)
+                            if citation_lint_defer_stream:
+                                tts_txt = _prepare_tts_segment(audience_text)
                                 if tts_txt:
                                     yield tts_txt
+                            else:
+                                for txt in buffered_chunks:
+                                    tts_txt = _prepare_tts_segment(txt)
+                                    if tts_txt:
+                                        yield tts_txt
                         if self._stripped_tracker is not None:
                             self._stripped_tracker.record(False)
                         if audience_stripped:
@@ -3759,10 +3773,15 @@ class DJCoHostAgent(Agent):
                             # valid path: chunks already in-flight, no
                             # re-yield from buffer.
                             if not head_yielded:
-                                for txt in buffered_chunks:
-                                    tts_txt = _prepare_tts_segment(txt)
+                                if citation_lint_defer_stream:
+                                    tts_txt = _prepare_tts_segment(audience_text)
                                     if tts_txt:
                                         yield tts_txt
+                                else:
+                                    for txt in buffered_chunks:
+                                        tts_txt = _prepare_tts_segment(txt)
+                                        if tts_txt:
+                                            yield tts_txt
                             # Bypass means we did NOT strip — tracker records
                             # the actual outcome (False = "we let it through").
                             # Plan 55-03 — surface the raw reply as the

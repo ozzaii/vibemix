@@ -15,10 +15,9 @@ Pins the dual-phase gate behavior:
 
   * **Post-stream full gate:** after stream completes, the existing
     silence-suppression / slop-filter / citation-linter pipeline runs on
-    the full text. When the head was emitted speculatively AND the
-    post-stream gate fails (slop / citation_failure), a silence-pad
-    frame is pushed to the playback queue and a ``streaming_cancel``
-    event is emitted (T-41-04-01 / T-41-04-04 mitigation).
+    the full text. Legacy speculative heads still get a silence-pad cancel
+    on post-stream failure, but wired citation mode buffers until the linter
+    passes so uncitable text never reaches TTS.
 
   * **Pitfall 1 — citation period collision:** a period INSIDE
     ``[ev:foo@2.5]`` must NEVER trigger a premature yield.
@@ -258,10 +257,12 @@ def test_slop_prefix_head_suppresses_via_full_filter(mocker, tmp_path) -> None:
     assert "slop_suppressed" in kinds
 
 
-def test_citation_failure_after_head_emits_cancel(mocker, tmp_path) -> None:
-    """Head streams (passes head gate), but full text fails citation
-    linter → PlaybackQueue.push called with silence-pad PCM + a
-    ``streaming_cancel`` event with reason ``citation_failure``."""
+def test_citation_failure_defers_before_tts(mocker, tmp_path) -> None:
+    """Wired citation mode buffers until the full response passes the linter.
+
+    If the full text fails citation validation, no speculative head reaches
+    TTS and no silence-pad cancel is needed.
+    """
     registry = EvidenceRegistry()  # empty — every citation will miss
     agent, gen, recorder, state, _, playback = _build_agent_wired(mocker, tmp_path, registry)
     mocker.patch("vibemix.agent.dj_cohost.snapshot_wav", return_value=b"FAKEWAV")
@@ -277,30 +278,17 @@ def test_citation_failure_after_head_emits_cancel(mocker, tmp_path) -> None:
     ev = Event(type="HEARTBEAT", state=state, extra={})
     agent.set_next_event(ev)
     chunks = _drive(agent)
-    # Head was emitted speculatively (passed head_gate — clean prefix).
-    assert chunks and chunks[0].startswith("Killer drop coming in hot here.")
-    # streaming_cancel event fired with citation_failure reason.
+    assert chunks == []
     kinds = [k for k, _ in recorder.events]
-    assert "streaming_cancel" in kinds
-    cancel_idx = kinds.index("streaming_cancel")
-    cancel_fields = recorder.events[cancel_idx][1]
-    assert cancel_fields["reason"] == "citation_failure"
-    # Silence-pad pushed to playback queue.
-    playback.push.assert_called()
-    pad_args = playback.push.call_args.args
-    assert isinstance(pad_args[0], bytes)
-    assert len(pad_args[0]) > 0
-    # Silence pad MUST be zero-filled (sanity — no random data).
-    assert pad_args[0] == b"\x00" * len(pad_args[0])
+    assert "citation_strip" in kinds
+    assert "streaming_cancel" not in kinds
+    playback.push.assert_not_called()
 
 
-def test_citation_failure_after_short_response_emits_cancel(mocker, tmp_path) -> None:
+def test_citation_failure_after_short_response_stays_silent(mocker, tmp_path) -> None:
     """Short single-chunk response with a citation that misses the
-    registry. The chunk-by-chunk pipe yields the head immediately
-    (clean prefix → speed-gate passes; balanced brackets → safe yield),
-    then the post-stream citation linter fails on the unresolved
-    ``[ev:MISS@0.1]`` and a silence-pad cancel fires because the head
-    is already in-flight to TTS.
+    registry. Wired citation mode buffers until the full response can be
+    validated, so the failure produces no TTS chunks.
     """
     registry = EvidenceRegistry()
     agent, gen, recorder, state, _, playback = _build_agent_wired(mocker, tmp_path, registry)
@@ -312,18 +300,12 @@ def test_citation_failure_after_short_response_emits_cancel(mocker, tmp_path) ->
     ev = Event(type="HEARTBEAT", state=state, extra={})
     agent.set_next_event(ev)
     chunks = _drive(agent)
-    # Head WAS emitted speculatively — the chunk-by-chunk yield no
-    # longer waits for a sentence boundary, so short responses also
-    # stream.
-    assert chunks == ["wow yeah"]
+    assert chunks == []
     kinds = [k for k, _ in recorder.events]
     # Citation linter still fails on the missing registry entry.
     assert "citation_strip" in kinds
-    # Silence-pad cancel fires because head was in-flight.
-    assert "streaming_cancel" in kinds
-    cancel_idx = kinds.index("streaming_cancel")
-    assert recorder.events[cancel_idx][1]["reason"] == "citation_failure"
-    playback.push.assert_called()
+    assert "streaming_cancel" not in kinds
+    playback.push.assert_not_called()
 
 
 def test_citation_pass_no_head_yields_after_stream(mocker, tmp_path) -> None:
