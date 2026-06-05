@@ -10696,3 +10696,40 @@ Proof before staging:
 - `uv run ruff check src/vibemix/agent/dj_cohost.py src/vibemix/agent/persona.py src/vibemix/prompts/matrix.py tests/agent/test_dj_cohost.py tests/agent/test_dj_cohost_matrix_dispatch.py`
 - `uv run python -m compileall -q src/vibemix/agent/dj_cohost.py src/vibemix/agent/persona.py src/vibemix/prompts/matrix.py tests/agent/test_dj_cohost.py tests/agent/test_dj_cohost_matrix_dispatch.py`
 - `git diff --check -- src/vibemix/agent/dj_cohost.py src/vibemix/agent/persona.py src/vibemix/prompts/matrix.py tests/agent/test_dj_cohost.py tests/agent/test_dj_cohost_matrix_dispatch.py .planning/handoffs/2026-05-31-package-checklist.md`
+
+## Package 89 - Recall Memory Accrual Live Wiring
+
+Suggested commit: `fix(memory): wire recall ingest on live path`
+
+Include:
+
+- `src/vibemix/__main__.py`
+- `tests/memory/test_ingest_wiring.py`
+- `tests/test_main_smoke.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- UI settings for recall, retention policy changes, memory schema changes,
+  prompt rewrites, Learn runtime changes, provider switching, and new
+  dependencies. This package only makes the existing explicit recall flag
+  reach the live runtime and existing off-loop ingest hooks.
+
+Reason:
+
+- `ConfigStore.recall_enabled` and `VIBEMIX_RECALL_ENABLED` existed, and
+  `SessionLoop._fire_ingest()` already handled boot/close memory accrual off
+  the event loop, but live `main()` hardcoded `recall_enabled=False` on the
+  co-host and `memory_ingest_enabled=False` on the session IPC. An opted-in
+  user could not accrue or retrieve session memory. Resolve the flag once at
+  boot, build `MemoryRecall` only inside the Start-gated live session, enable
+  ingest on the live IPC only when opted in, and call the ingest-only boot/close
+  hooks without double-running recording retention.
+
+Proof before staging:
+
+- `uv run pytest -q tests/memory/test_ingest_wiring.py tests/test_main_smoke.py::test_recall_enabled_resolves_env_before_config tests/test_main_smoke.py::test_smoke_03_full_wiring tests/test_main_smoke.py::test_smoke_03_recall_enabled_wires_memory_recall_and_ingest tests/test_main_smoke.py::test_smoke_03b_idle_is_cold_until_start`
+- `uv run pytest -q tests/memory/test_ingest.py tests/memory/test_retrieval.py tests/memory/test_retention.py tests/memory/test_no_live_path_import.py tests/memory/test_no_extraction.py tests/memory/test_thread_safety.py`
+- `uv run ruff check src/vibemix/__main__.py tests/memory/test_ingest_wiring.py tests/test_main_smoke.py`
+- `uv run python -m compileall -q src/vibemix/__main__.py tests/memory/test_ingest_wiring.py tests/test_main_smoke.py`
+- `git diff --check -- src/vibemix/__main__.py tests/memory/test_ingest_wiring.py tests/test_main_smoke.py .planning/handoffs/2026-05-31-package-checklist.md`

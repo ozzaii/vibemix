@@ -563,6 +563,20 @@ def test_deck_vision_capture_env_gate_defaults_off(monkeypatch):
     assert main_mod._deck_vision_capture_enabled() is False
 
 
+def test_recall_enabled_resolves_env_before_config(monkeypatch):
+    import vibemix.__main__ as main_mod
+
+    monkeypatch.delenv("VIBEMIX_RECALL_ENABLED", raising=False)
+    assert main_mod._resolve_recall_enabled(SimpleNamespace(recall_enabled=True)) is True
+    assert main_mod._resolve_recall_enabled(SimpleNamespace(recall_enabled="yes")) is False
+
+    monkeypatch.setenv("VIBEMIX_RECALL_ENABLED", "1")
+    assert main_mod._resolve_recall_enabled(SimpleNamespace(recall_enabled=False)) is True
+
+    monkeypatch.setenv("VIBEMIX_RECALL_ENABLED", "off")
+    assert main_mod._resolve_recall_enabled(SimpleNamespace(recall_enabled=True)) is False
+
+
 def _build_state_refresh_noop(mocker):
     """Patch state_refresh_loop to no-op so it doesn't touch the audio_buf."""
     import vibemix.__main__ as main_mod
@@ -795,6 +809,92 @@ def test_smoke_03_full_wiring(monkeypatch, mocker, tmp_path):
     assert "session_started" in tasks_seen
     sensor_mocks["screen_capture"].assert_not_called()
     sensor_mocks["track_poll"].assert_called_once()
+
+
+def test_smoke_03_recall_enabled_wires_memory_recall_and_ingest(
+    monkeypatch, mocker, tmp_path
+):
+    """Explicit recall opt-in wires MemoryRecall plus boot/close ingest hooks."""
+    monkeypatch.setenv("GEMINI_API_KEY", "dummy-key")
+    monkeypatch.setenv("OPENROUTER_API_KEY", "dummy-or")
+    monkeypatch.setenv("VIBEMIX_LLM_MODE", "direct")
+    monkeypatch.setenv("VIBEMIX_RECALL_ENABLED", "1")
+    monkeypatch.setattr("vibemix.__main__.load_dotenv", lambda: None)
+    monkeypatch.setenv("GEMINI_API_KEY", "dummy-key")
+    monkeypatch.setenv("OPENROUTER_API_KEY", "dummy-or")
+    monkeypatch.setenv("VIBEMIX_LLM_MODE", "direct")
+    monkeypatch.setenv("VIBEMIX_RECALL_ENABLED", "1")
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.delenv("CARTESIA_API_KEY", raising=False)
+    monkeypatch.delenv("VIBEMIX_DECK_VISION", raising=False)
+    monkeypatch.setenv("VIBEMIX_DECK_AUDIO_CHANNELS", "off")
+    monkeypatch.setenv("VIBEMIX_ENABLE_MIC", "1")
+
+    audio_mocks = _build_audio_mocks(mocker)
+    _build_sensor_mocks(mocker)
+    _build_state_refresh_noop(mocker)
+    livekit_mocks = _build_livekit_mocks(mocker)
+    _patch_voice_recorder(mocker, tmp_path)
+
+    class FakeStore:
+        def __init__(self, *args, **kwargs):
+            self.closed = False
+
+        def close(self) -> None:
+            self.closed = True
+
+    class FakeRecall:
+        def __init__(self, embedder, store) -> None:
+            self.embedder = embedder
+            self.store = store
+
+    fake_embedder = object()
+    mocker.patch("vibemix.memory.store.MemoryStore", FakeStore)
+    recall_ctor = MagicMock(side_effect=FakeRecall)
+    mocker.patch("vibemix.memory.retrieval.MemoryRecall", recall_ctor)
+    build_embedder = mocker.patch(
+        "vibemix.library.embed_factory.build_embedder",
+        return_value=fake_embedder,
+    )
+
+    ingest_calls: list[tuple[str, Path | None]] = []
+
+    async def fake_fire_ingest(self, trigger: str, *, session_dir: Path | None = None):
+        ingest_calls.append((trigger, session_dir))
+
+    from vibemix.runtime.session_loop import SessionLoop
+
+    mocker.patch.object(SessionLoop, "_fire_ingest", fake_fire_ingest)
+
+    tasks_seen: list = []
+    _patch_runtime_for_fast_smoke(mocker, tasks_seen, start_session=True)
+
+    from vibemix.__main__ import main
+
+    async def driver():
+        main_task = asyncio.create_task(main())
+        await _REAL_SLEEP(0.05)
+        main_task.cancel()
+        try:
+            await asyncio.wait_for(main_task, timeout=3.0)
+        except (asyncio.CancelledError, Exception):
+            pass
+
+    asyncio.run(driver())
+
+    agent_call = livekit_mocks["DJCoHostAgent"].call_args
+    assert agent_call.kwargs.get("recall_enabled") is True
+    assert isinstance(agent_call.kwargs.get("recall"), FakeRecall)
+    recall_ctor.assert_called_once()
+    build_embedder.assert_called_once()
+    assert ("boot", None) in ingest_calls
+    close_calls = [(trigger, path) for trigger, path in ingest_calls if trigger == "close"]
+    assert len(close_calls) == 1
+    assert close_calls[0][1] is not None
+    assert close_calls[0][1].name
+    # Existing Start-side smoke expectations still hold.
+    assert audio_mocks["open_capture"].call_count == 1
+    assert "session_started" in tasks_seen
 
 
 def test_smoke_03b_idle_is_cold_until_start(monkeypatch, mocker, tmp_path):

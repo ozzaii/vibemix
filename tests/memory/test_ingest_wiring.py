@@ -335,6 +335,8 @@ def test_main_ingest_is_gated_behind_recall_enabled() -> None:
     """The main()-path ingest is gated on recall_enabled (additive no-op default)."""
     src = _main_source()
     assert "recall_enabled" in src
+    assert "recall_enabled = _resolve_recall_enabled" in src
+    assert "memory_ingest_enabled=recall_enabled" in src
     # Heuristic proximity gate: a recall_enabled guard appears in the same
     # source region as the _fire_ingest call (additive-gated cold path).
     idx = src.find("_fire_ingest")

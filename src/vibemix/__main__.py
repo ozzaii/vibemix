@@ -934,6 +934,18 @@ def _deck_vision_capture_enabled() -> bool:
     }
 
 
+def _resolve_recall_enabled(config: Any | None = None) -> bool:
+    """Resolve explicit cross-session recall opt-in from env or config.
+
+    Env wins for dev/CI. Absent env, the persisted ConfigStore field is the
+    source of truth and defaults false. Garbage never enables recall.
+    """
+    raw = os.environ.get("VIBEMIX_RECALL_ENABLED")
+    if raw is not None:
+        return raw.strip().lower() in {"1", "true", "yes", "on"}
+    return bool(getattr(config, "recall_enabled", False) is True)
+
+
 def _maybe_upgrade_input_device_for_deck_audio(
     audio_backend: AudioMacOS,
     *,
@@ -1726,6 +1738,8 @@ async def main() -> None:
         midi_stop: threading.Event | None = None
         midi_watcher_stop: asyncio.Event | None = None
         grounding_store = None
+        recall_store = None
+        recall_service = None
         cleanup_tasks: list[asyncio.Task] = []
         try:
             _ensure_live_llm_tts_deps()
@@ -1834,6 +1848,25 @@ async def main() -> None:
                         grounding_store = None
                     print(f"-> grounding skipped: {exc!r}", file=sys.stderr)
 
+            if recall_enabled:
+                try:
+                    from vibemix.library.embed_factory import build_embedder
+                    from vibemix.memory.retrieval import MemoryRecall
+                    from vibemix.memory.store import MemoryStore
+
+                    recall_store = MemoryStore(db_path=None)
+                    recall_service = MemoryRecall(build_embedder(), recall_store)
+                    print("-> memory recall: armed")
+                except Exception as exc:
+                    recall_service = None
+                    if recall_store is not None:
+                        try:
+                            recall_store.close()
+                        except Exception:
+                            pass
+                        recall_store = None
+                    print(f"-> memory recall skipped: {exc!r}", file=sys.stderr)
+
             def _citation_telemetry() -> dict[str, Any]:
                 slop_ratio = stripped_rate_tracker.slop_ratio() if stripped_rate_tracker is not None else 0.0
                 rate = stripped_rate_tracker.rate() if stripped_rate_tracker is not None else 0.0
@@ -1869,8 +1902,8 @@ async def main() -> None:
                 mic_audio_buf=mic_audio_buf,
                 lookahead=lookahead_provider,
                 transcript_sink=transcript_buf,
-                recall=None,
-                recall_enabled=False,
+                recall=recall_service,
+                recall_enabled=recall_enabled and recall_service is not None,
                 grounding=grounding,
                 secondary_ear=os.environ.get("VIBEMIX_GROUND_SECONDARY_EAR", "0").strip().lower()
                 not in ("0", "off", "false", "no", ""),
@@ -2130,6 +2163,11 @@ async def main() -> None:
                     grounding_store.close()
                 except Exception as exc:
                     print(f"[close grounding store err] {exc}", file=sys.stderr)
+            if recall_store is not None:
+                try:
+                    recall_store.close()
+                except Exception as exc:
+                    print(f"[close recall store err] {exc}", file=sys.stderr)
             for stream in (voice_stream, pass_stream, input_stream):
                 if stream is None:
                     continue
@@ -2205,6 +2243,11 @@ async def main() -> None:
 
     ipc_router: IpcRouterBus | None = IpcRouterBus()
     _settings_config = _boot_settings_config
+    recall_enabled = _resolve_recall_enabled(_settings_config)
+    if recall_enabled:
+        print("-> memory recall: enabled (explicit opt-in)")
+    else:
+        print("-> memory recall: OFF")
     _live_settings_applier = SettingsApplier(
         config_store=_settings_config,
         cascade_agent=None,
@@ -2225,12 +2268,16 @@ async def main() -> None:
         recordings_root=recordings_root,
         active_recorder=recorder,
         evidence_registry=evidence_registry,
-        memory_ingest_enabled=False,
+        memory_ingest_enabled=recall_enabled,
         session_start=_start_live_session,
         session_stop=_stop_live_session,
         session_is_active=_is_live_session_active,
     )
     _session_ipc.register_handlers()
+    if recall_enabled:
+        boot_ingest_task = asyncio.create_task(_session_ipc._fire_ingest("boot"))
+        _background_tasks.add(boot_ingest_task)
+        boot_ingest_task.add_done_callback(_background_tasks.discard)
     from vibemix.learn.progress import load_progress as _load_progress
     from vibemix.learn.state import LearnState
 
@@ -2685,6 +2732,11 @@ async def main() -> None:
             recorder.close()
         except Exception as exc:
             print(f"[close recorder err] {exc}", file=sys.stderr)
+        if recall_enabled:
+            try:
+                await _session_ipc._fire_ingest("close", session_dir=recorder.session_dir)
+            except Exception as exc:
+                print(f"[memory ingest close err] {exc}", file=sys.stderr)
         try:
             cfg_for_close_sweep = load_config()
             result_close = run_retention_sweep(recordings_root, cfg_for_close_sweep.retention_days)
