@@ -10559,3 +10559,36 @@ Proof before staging:
 - `uv run ruff check src/vibemix/runtime/speak_gate.py src/vibemix/runtime/coach.py scripts/eval/respan_sven_heartbeat_judge.py scripts/eval/respan_sven_sim.py tests/runtime/test_speak_gate.py tests/runtime/test_coach.py tests/eval/test_respan_sven_heartbeat_quality_gate.py tests/eval/test_respan_sven_sim_quality_gate.py`
 - `uv run python -m compileall -q src/vibemix/runtime/speak_gate.py src/vibemix/runtime/coach.py scripts/eval/respan_sven_heartbeat_judge.py scripts/eval/respan_sven_sim.py tests/runtime/test_speak_gate.py tests/runtime/test_coach.py tests/eval/test_respan_sven_heartbeat_quality_gate.py tests/eval/test_respan_sven_sim_quality_gate.py`
 - `git diff --check -- src/vibemix/runtime/speak_gate.py src/vibemix/runtime/coach.py scripts/eval/respan_sven_heartbeat_judge.py scripts/eval/respan_sven_sim.py tests/runtime/test_speak_gate.py tests/runtime/test_coach.py tests/eval/test_respan_sven_heartbeat_quality_gate.py tests/eval/test_respan_sven_sim_quality_gate.py .planning/handoffs/2026-05-31-package-checklist.md`
+
+## Package 85 - Nowplaying Track Name Omission
+
+Suggested commit: `fix(state): omit nominal nowplaying track names`
+
+Include:
+
+- `src/vibemix/state/deck_poller.py`
+- `src/vibemix/state/refresh.py`
+- `tests/state/test_deck_poller.py`
+- `tests/state/test_refresh.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Deck-poller source rewrites, library matching changes, nowplaying owner
+  allowlist changes, CLAP self-match wiring, UI deck chips, prompt rewrites,
+  and new dependencies. This package only keeps the nominal macOS Now Playing
+  fallback below the track-name floor.
+
+Reason:
+
+- `nowplaying_playback` was documented as non-physical deck proof but used
+  confidence `0.5`, exactly the title naming floor in `derive_audible_track`.
+  Lowering that nominal fallback below the floor preserves deck provenance while
+  omitting the possibly wrong Now Playing title from `state.audible_track`.
+
+Proof before staging:
+
+- `uv run pytest -q tests/state/test_track_resolver.py tests/state/test_deck_poller.py::test_nowplaying_playback_seeds_deck_when_controller_has_no_midi_motion tests/state/test_refresh.py::test_tick_uses_nowplaying_playback_deck_status_without_naming_track tests/state/test_refresh.py::test_tick_does_not_append_track_history_when_confidence_below_05`
+- `uv run ruff check src/vibemix/state/deck_poller.py src/vibemix/state/refresh.py tests/state/test_deck_poller.py tests/state/test_refresh.py`
+- `uv run python -m compileall -q src/vibemix/state/deck_poller.py src/vibemix/state/refresh.py tests/state/test_deck_poller.py tests/state/test_refresh.py`
+- `git diff --check -- src/vibemix/state/deck_poller.py src/vibemix/state/refresh.py tests/state/test_deck_poller.py tests/state/test_refresh.py .planning/handoffs/2026-05-31-package-checklist.md`

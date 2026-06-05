@@ -23,6 +23,7 @@ from vibemix.library.rekordbox import RekordboxLibrary, TrackEntry
 from vibemix.state.deck_poller import (
     DECK_CITE_MIN_CONF,
     LAST_KNOWN_CONTEXT_CONF,
+    NOWPLAYING_PLAYBACK_CONF,
     XML_CONF_FLOOR,
     DeckPoller,
 )
@@ -405,7 +406,7 @@ def test_nowplaying_playback_seeds_deck_when_controller_has_no_midi_motion():
 
     snap = p.snapshot()
     assert snap["A"].track_id == "1"
-    assert snap["A"].confidence == pytest.approx(0.5)
+    assert snap["A"].confidence == pytest.approx(NOWPLAYING_PLAYBACK_CONF)
     assert snap["A"].confidence < DECK_CITE_MIN_CONF
     status = p.source_snapshot()
     assert status["audible_deck"] == "A"

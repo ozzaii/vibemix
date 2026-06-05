@@ -75,10 +75,11 @@ NUMPY_CONF_FLOOR: float = 0.5  # consumed when the deferred KS estimator lands
 # (RESEARCH Spike 3, A4 — mirrors the audible_track_confidence 0.5 gate, set a
 # touch higher so only confident keys are ever citable).
 DECK_CITE_MIN_CONF: float = 0.6
-# A global OS now-playing playback row can seed receipts, but it is not
-# physical per-deck proof on a 2-channel master feed. Keep it below the cite
-# floor so EvidenceRegistry will not write [deck:] / [track:] claims from it.
-NOWPLAYING_PLAYBACK_CONF: float = 0.5
+# A global OS now-playing playback row can seed diagnostics, but it is not
+# physical per-deck proof on a 2-channel master feed. Keep it below both the
+# track-name floor (0.5) and cite floor so prompts do not name a stale/wrong
+# nowplaying title as the audible track.
+NOWPLAYING_PLAYBACK_CONF: float = 0.49
 # Last-known deck rows are contextual memory only, not current deck identity
 # proof. Keep this below deck_context.DECK_CONTEXT_MIN_CONF (0.3) so shared
 # claim policy never treats a carried-over lane as resolved/citable.

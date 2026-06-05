@@ -1268,8 +1268,8 @@ def test_tick_refuses_unverified_deck_audio_fallback_when_controller_silent():
     assert state.audible_track_confidence == 0.0
 
 
-def test_tick_uses_nowplaying_playback_deck_status_when_controller_silent():
-    """FLX4/no-MIDI rigs can lift track confidence without minting deck proof."""
+def test_tick_uses_nowplaying_playback_deck_status_without_naming_track():
+    """FLX4/no-MIDI nowplaying provenance must not name the audible track."""
     state = MusicState()
     state.set_start_at = 900.0
     registry = EvidenceRegistry()
@@ -1307,9 +1307,9 @@ def test_tick_uses_nowplaying_playback_deck_status_when_controller_silent():
     )
 
     assert state.audible_deck == "A"
-    assert state.deck_confidence == 0.5
-    assert state.audible_track == "Nominal Tune"
-    assert state.audible_track_confidence == 0.5
+    assert state.deck_confidence < 0.5
+    assert state.audible_track is None
+    assert state.audible_track_confidence == 0.0
     snapshot = registry.snapshot()
     assert snapshot["mix"]["audible_deck=A"] == (100.0,)
     assert "track" not in snapshot

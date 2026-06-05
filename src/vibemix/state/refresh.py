@@ -580,8 +580,8 @@ def _nowplaying_playback_audible_deck_from_status(
 
     The poller only sets this status when macOS Now Playing is an actively
     playing DJ-app title. It is deliberately below the citation floor: this can
-    unblock TRACK_CHANGE on FLX4/no-MIDI master-feed rigs, but it cannot become
-    key:/track: proof of a physical deck.
+    explain the nominal nowplaying side on FLX4/no-MIDI master-feed rigs, but it
+    cannot name the audible track or become key:/track: proof of a physical deck.
     """
     if source_status.get("audible_deck_source") != "nowplaying_playback":
         return None
