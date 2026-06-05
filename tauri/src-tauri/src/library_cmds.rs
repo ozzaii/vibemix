@@ -53,6 +53,8 @@
 use serde_json::{json, Value};
 use std::{
     fs,
+    path::PathBuf,
+    process::Command,
     time::{SystemTime, UNIX_EPOCH},
 };
 use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
@@ -237,6 +239,71 @@ fn default_cue_export_path(export: &str) -> Result<String, String> {
         .join("exports")
         .join(format!("vibemix-cues.{suffix}"));
     Ok(path.to_string_lossy().to_string())
+}
+
+fn validate_export_reveal_path(raw: &str) -> Result<PathBuf, String> {
+    let trimmed = raw.trim();
+    if trimmed.is_empty() {
+        return Err("export path is required".to_string());
+    }
+    if trimmed.contains('\0') || trimmed.contains("://") {
+        return Err("export path must be a local file".to_string());
+    }
+    let candidate = PathBuf::from(trimmed);
+    if !candidate.is_absolute() {
+        return Err("export path must be absolute".to_string());
+    }
+    let safe = candidate
+        .canonicalize()
+        .map_err(|e| format!("export path canon: {e}"))?;
+    let metadata = fs::metadata(&safe).map_err(|e| format!("export path stat: {e}"))?;
+    if !metadata.is_file() {
+        return Err("export path must be a file".to_string());
+    }
+    let extension = safe
+        .extension()
+        .and_then(|value| value.to_str())
+        .unwrap_or("")
+        .to_ascii_lowercase();
+    if !matches!(extension.as_str(), "xml" | "m3u" | "m3u8") {
+        return Err("export path must be XML or M3U8".to_string());
+    }
+    Ok(safe)
+}
+
+/// Reveal an exported Rekordbox XML/M3U8 handoff in Finder / Explorer.
+///
+/// The renderer can only pass a path the backend already returned in a build or
+/// cue export receipt. This command still gates the shell-out to an existing
+/// absolute local export file so stale text, URLs, relative paths, and non-export
+/// files fail closed before hitting the OS opener.
+#[tauri::command]
+pub async fn library_reveal_export_path(path: String) -> Result<(), String> {
+    let safe = validate_export_reveal_path(&path)?;
+    let safe_str = safe
+        .to_str()
+        .ok_or_else(|| "export path utf8".to_string())?;
+
+    #[cfg(target_os = "macos")]
+    {
+        Command::new("open")
+            .args(["-R", safe_str])
+            .status()
+            .map_err(|e| format!("open: {e}"))?;
+    }
+    #[cfg(target_os = "windows")]
+    {
+        Command::new("explorer")
+            .arg(format!("/select,{}", safe_str))
+            .status()
+            .map_err(|e| format!("explorer: {e}"))?;
+    }
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+    {
+        let _ = safe_str;
+        return Err("unsupported platform".into());
+    }
+    Ok(())
 }
 
 fn cue_library_args(path: &str, out: &str, export: &str, name: &str, max_cues: u32) -> Vec<String> {
@@ -1563,6 +1630,45 @@ fn dispatch_embed_line(app: &AppHandle, line: &str) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn export_reveal_path_accepts_existing_xml_file() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let file = dir.path().join("warehouse.xml");
+        fs::write(&file, "<xml />").expect("write export");
+
+        let safe = validate_export_reveal_path(file.to_str().expect("utf8")).expect("valid");
+
+        assert_eq!(safe, file.canonicalize().expect("canonical"));
+    }
+
+    #[test]
+    fn export_reveal_path_accepts_existing_m3u8_file() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let file = dir.path().join("warehouse.m3u8");
+        fs::write(&file, "#EXTM3U").expect("write export");
+
+        let safe = validate_export_reveal_path(file.to_str().expect("utf8")).expect("valid");
+
+        assert_eq!(safe, file.canonicalize().expect("canonical"));
+    }
+
+    #[test]
+    fn export_reveal_path_rejects_relative_and_url_paths() {
+        assert!(validate_export_reveal_path("warehouse.xml").is_err());
+        assert!(validate_export_reveal_path("https://example.test/warehouse.xml").is_err());
+    }
+
+    #[test]
+    fn export_reveal_path_rejects_missing_or_non_export_files() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let missing = dir.path().join("missing.xml");
+        let text = dir.path().join("notes.txt");
+        fs::write(&text, "notes").expect("write text");
+
+        assert!(validate_export_reveal_path(missing.to_str().expect("utf8")).is_err());
+        assert!(validate_export_reveal_path(text.to_str().expect("utf8")).is_err());
+    }
 
     #[test]
     fn parses_ok_progress_line() {

@@ -11,6 +11,7 @@
  *   invoke("library_auto_crate", { query, curve, nSlots, exportTarget, tagWriteGranted }) -> BuildSetResult
  *   invoke("library_cue_folder", { path, exportFormat, out, name, maxCues })
  *        -> LibraryCueResult
+ *   invoke("library_reveal_export_path", { path }) -> reveal exported XML/M3U8
  *   invoke("library_stats")                        -> LibraryStats
  *   invoke("library_embed_folder", { path, strategy })
  *        -> kicks off a folder embed; progress arrives as Tauri events:
@@ -2742,6 +2743,17 @@ export async function libraryCueFolder(
       maxCues,
     }),
   );
+}
+
+/** Reveal an exported XML/M3U8 file in Finder/Explorer.
+ *
+ * Returns `false` outside Tauri (plain vite/jsdom). Real Tauri errors propagate
+ * so a rejected/missing path never looks like it opened. */
+export async function libraryRevealExport(path: string): Promise<boolean> {
+  const invoke = await getInvoke();
+  if (!invoke) return false;
+  await invoke("library_reveal_export_path", { path });
+  return true;
 }
 
 /** One conversational Viber turn. `history` is stateless caller-owned memory;

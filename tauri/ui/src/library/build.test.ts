@@ -109,6 +109,7 @@ const cueMock =
       exportFormat: CueExportFormat,
     ) => Promise<LibraryCueResult>
   >();
+const revealMock = vi.fn<(path: string) => Promise<boolean>>();
 const modelsMock =
   vi.fn<(install?: LibraryModelInstallTarget) => Promise<LibraryModelsResult>>();
 const chatMock =
@@ -323,6 +324,7 @@ function doMockApi(): void {
     ) => buildMock(brief, curve, landDjTags),
     libraryCueFolder: (path: string, exportFormat: CueExportFormat) =>
       cueMock(path, exportFormat),
+    libraryRevealExport: (path: string) => revealMock(path),
     // inert stubs — mountLibrary does a state-dependent boot run + status refresh.
     librarySearch: vi.fn(async () => ({ results: [], centered: true, corpus_size: 0 })),
     librarySimilar: vi.fn(async () => ({ results: [], centered: true, corpus_size: 0 })),
@@ -398,7 +400,10 @@ function mountSkeleton(): void {
     <p id="vmx-lib-rationale-body"></p>
     <div id="vmx-lib-rationale-meta"></div>
     <div id="vmx-lib-export" style="display: none">
-      <div id="vmx-lib-export-path"></div>
+      <div class="vmx-lib-export-path-row">
+        <div id="vmx-lib-export-path"></div>
+        <button id="vmx-lib-export-open" type="button" hidden>Reveal</button>
+      </div>
       <div id="vmx-lib-export-hint"></div>
     </div>
     <div id="vmx-lib-results"></div>
@@ -472,6 +477,8 @@ describe("build — real renderBuildSet path (jsdom, via mountLibrary)", () => {
     buildMock.mockReset();
     cueMock.mockReset();
     cueMock.mockResolvedValue(DEV_FALLBACK.cue);
+    revealMock.mockReset();
+    revealMock.mockResolvedValue(true);
     modelsMock.mockReset();
     modelsMock.mockResolvedValue(MODELS_READY);
     chatMock.mockReset();
@@ -543,6 +550,15 @@ describe("build — real renderBuildSet path (jsdom, via mountLibrary)", () => {
     expect(document.getElementById("vmx-lib-rationale-meta")?.textContent).toContain(
       "6 VM cues",
     );
+
+    const reveal = document.getElementById(
+      "vmx-lib-export-open",
+    ) as HTMLButtonElement;
+    expect(reveal.hidden).toBe(false);
+    expect(reveal.dataset.path).toBe("/tmp/warehouse.xml");
+    reveal.click();
+    await Promise.resolve();
+    expect(revealMock).toHaveBeenCalledWith("/tmp/warehouse.xml");
   });
 
   it("sends per-run tag permission only when the build switch is on", async () => {
@@ -610,6 +626,11 @@ describe("build — real renderBuildSet path (jsdom, via mountLibrary)", () => {
     // no export claim when nothing was written (anti-slop).
     const exportEl = document.getElementById("vmx-lib-export") as HTMLElement;
     expect(exportEl.style.display).toBe("none");
+    const reveal = document.getElementById(
+      "vmx-lib-export-open",
+    ) as HTMLButtonElement;
+    expect(reveal.hidden).toBe(true);
+    expect(reveal.dataset.path).toBeUndefined();
     expect(document.querySelectorAll(".vmx-lib-row")).toHaveLength(0);
     expect(document.getElementById("vmx-lib-rcount")?.textContent).toBe("0 in set");
   });
@@ -844,6 +865,14 @@ describe("build — real renderBuildSet path (jsdom, via mountLibrary)", () => {
     expect(document.getElementById("vmx-lib-export-path")?.textContent).toBe(
       "/tmp/vibemix-cues.xml",
     );
+    const reveal = document.getElementById(
+      "vmx-lib-export-open",
+    ) as HTMLButtonElement;
+    expect(reveal.hidden).toBe(false);
+    expect(reveal.dataset.path).toBe("/tmp/vibemix-cues.xml");
+    reveal.click();
+    await Promise.resolve();
+    expect(revealMock).toHaveBeenCalledWith("/tmp/vibemix-cues.xml");
     const text = document.body.textContent ?? "";
     expect(text).not.toMatch(/serato tags/i);
     expect(text).not.toMatch(/written into/i);

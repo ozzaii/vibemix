@@ -93,6 +93,7 @@ export const MOCK_TRANSFER_CONTRACT: readonly MockTransferSurface[] = [
       { wire: "library.results-panel", purpose: "main result/rationale panel" },
       { wire: "library.rationale", purpose: "curate/build set notes" },
       { wire: "library.export", purpose: "Rekordbox export result line" },
+      { wire: "library.export-open", purpose: "reveal exported XML/M3U8 file" },
       { wire: "library.results", purpose: "search/set/build rows" },
       { wire: "library.chat-thread", purpose: "conversation transcript" },
       { wire: "library.chat-starters", purpose: "Viber starter prompt actions" },
@@ -146,6 +147,7 @@ export const MOCK_TRANSFER_CONTRACT: readonly MockTransferSurface[] = [
       "library_auto_crate",
       "library_chat",
       "library_cue_folder",
+      "library_reveal_export_path",
     ],
   },
   {

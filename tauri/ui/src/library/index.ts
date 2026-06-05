@@ -30,6 +30,7 @@ import {
   libraryCurate,
   libraryEmbedFolder,
   libraryModels,
+  libraryRevealExport,
   librarySearch,
   librarySimilar,
   libraryStats,
@@ -647,6 +648,46 @@ function buildExportHint(result: BuildSetResult): string {
   return "File → Import Collection in Rekordbox, then drag the set into a playlist.";
 }
 
+function buildExportRevealPath(result: BuildSetResult): string | null {
+  const outputs = result.export_outputs ?? {};
+  return outputs.rekordbox ?? result.export_path ?? outputs.m3u8 ?? null;
+}
+
+function setExportRevealTarget(path: string | null): void {
+  const button = $maybe("vmx-lib-export-open") as HTMLButtonElement | null;
+  if (!button) return;
+  const cleanPath = path?.trim() ?? "";
+  if (!cleanPath) {
+    button.hidden = true;
+    button.disabled = true;
+    delete button.dataset.path;
+    button.removeAttribute("aria-label");
+    return;
+  }
+  button.hidden = false;
+  button.disabled = false;
+  button.textContent = "Reveal";
+  button.dataset.path = cleanPath;
+  button.setAttribute("aria-label", `Reveal export ${cleanPath}`);
+}
+
+async function revealExportFromButton(button: HTMLButtonElement): Promise<void> {
+  const path = button.dataset.path?.trim();
+  if (!path) return;
+  const hint = $maybe("vmx-lib-export-hint");
+  const previousLabel = button.textContent || "Reveal";
+  button.disabled = true;
+  button.textContent = "Revealing";
+  try {
+    await libraryRevealExport(path);
+  } catch (err) {
+    if (hint) hint.textContent = `Could not reveal export: ${errorMessage(err)}`;
+  } finally {
+    button.disabled = false;
+    button.textContent = previousLabel;
+  }
+}
+
 function buildAutoCueMeta(result: BuildSetResult): string | null {
   const cues = result.export_auto_cues;
   if (!cues || cues.enabled === false) return null;
@@ -674,6 +715,7 @@ function clearRationale(): void {
     if (p) p.textContent = "";
     const hint = $maybe("vmx-lib-export-hint");
     if (hint) hint.textContent = "";
+    setExportRevealTarget(null);
   }
 }
 
@@ -724,11 +766,13 @@ function renderBuildSet(result: BuildSetResult): void {
     $("vmx-lib-export-path").textContent = exportLines.join("\n");
     const hint = $maybe("vmx-lib-export-hint");
     if (hint) hint.textContent = buildExportHint(result);
+    setExportRevealTarget(buildExportRevealPath(result));
   } else {
     exportEl.style.display = "none";
     $("vmx-lib-export-path").textContent = "";
     const hint = $maybe("vmx-lib-export-hint");
     if (hint) hint.textContent = "";
+    setExportRevealTarget(null);
   }
 
   const el = $("vmx-lib-results");
@@ -772,6 +816,7 @@ function renderBuildSetLoading(brief: string): void {
   $("vmx-lib-export-path").textContent = "";
   const hint = $maybe("vmx-lib-export-hint");
   if (hint) hint.textContent = "";
+  setExportRevealTarget(null);
   const el = $("vmx-lib-results");
   el.innerHTML = "";
   for (let i = 0; i < 4; i++) {
@@ -806,11 +851,13 @@ function renderCueExport(result: LibraryCueResult): void {
     $("vmx-lib-export-path").textContent = path;
     const hint = $maybe("vmx-lib-export-hint");
     if (hint) hint.textContent = "Import the XML in Rekordbox, or load the M3U8 in another DJ app.";
+    setExportRevealTarget(path);
   } else {
     exportEl.style.display = "none";
     $("vmx-lib-export-path").textContent = "";
     const hint = $maybe("vmx-lib-export-hint");
     if (hint) hint.textContent = "";
+    setExportRevealTarget(null);
   }
 
   const rows = $("vmx-lib-results");
@@ -842,6 +889,7 @@ function renderCueLoading(folder: string): void {
   $("vmx-lib-export-path").textContent = "";
   const hint = $maybe("vmx-lib-export-hint");
   if (hint) hint.textContent = "";
+  setExportRevealTarget(null);
   const rows = $("vmx-lib-results");
   rows.innerHTML = "";
   for (let i = 0; i < 3; i++) {
@@ -1983,6 +2031,7 @@ export function mountLibrary(root: ParentNode = document): void {
   const runBtn = $("vmx-lib-runbtn") as HTMLButtonElement;
   const installModelsBtn = $("vmx-lib-install-models") as HTMLButtonElement;
   const buildTagsToggle = $maybe("vmx-lib-build-tags") as HTMLButtonElement | null;
+  const exportOpenBtn = $maybe("vmx-lib-export-open") as HTMLButtonElement | null;
   const echoEl = $("vmx-lib-echo");
   const qlabelEl = $("vmx-lib-qlabel");
   const seedNameEl = $("vmx-lib-seed-name");
@@ -2368,6 +2417,7 @@ export function mountLibrary(root: ParentNode = document): void {
   // ── event wiring ───────────────────────────────────────────────────────────
 
   runBtn.addEventListener("click", () => void run());
+  exportOpenBtn?.addEventListener("click", () => void revealExportFromButton(exportOpenBtn));
   installModelsBtn.addEventListener("click", () => void installLocalModels());
   buildTagsToggle?.addEventListener("click", () => {
     state = setBuildTagWriteGranted(

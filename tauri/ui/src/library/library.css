@@ -1916,12 +1916,34 @@ body {
   box-shadow: var(--glow-soft);
 }
 .vmx-lib-export .hd .vmx-lib-label { color: var(--amber); margin: 0; }
+.vmx-lib-export-path-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
 .vmx-lib-export .path {
+  flex: 1;
+  min-width: 0;
   font-size: 12px;
   color: var(--silk);
   word-break: break-all;
   letter-spacing: 0.04em;
   white-space: pre-line;
+}
+.vmx-lib-export-open {
+  flex: 0 0 auto;
+  padding: 7px 10px;
+  border-radius: var(--rad-sm);
+  border: 1px solid var(--brand-26);
+  background: rgba(255, 165, 223, 0.07);
+  color: var(--silk);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+.vmx-lib-export-open:disabled {
+  opacity: 0.55;
 }
 .vmx-lib-export .hint {
   margin-top: 9px;
