@@ -80,7 +80,6 @@ import {
   type RetentionSliderHandle,
 } from "./components/retention-slider.js";
 import { renderConfirmDialog } from "./components/confirm-dialog.js";
-import { BrainGroup } from "./components/brain-group.js";
 import { HelpGroup } from "./components/help-group.js";
 import { LearnGroup } from "./components/learn-group.js";
 import { MascotGroup } from "./components/mascot-group.js";
@@ -1015,14 +1014,6 @@ function renderDrawerBody(body: HTMLElement, modalSlot: HTMLElement): void {
       children: personaBody,
     }),
   );
-
-  // --- BRAIN ----------------------------------------------------------------
-  // Direct/proxy brain controls include a BYO Gemini-key field. Keep them for
-  // local support builds only; shipped Settings uses the default hosted path
-  // and does not ask DJs for a Google key.
-  if (import.meta.env.DEV) {
-    body.append(BrainGroup());
-  }
 
   // --- OUTPUT ---------------------------------------------------------------
   const outputBody = document.createElement("div");

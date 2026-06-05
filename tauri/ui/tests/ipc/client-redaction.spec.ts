@@ -3,8 +3,8 @@
  * `ipc.settings.set_brain` carries the raw Gemini key over the wire. The
  * on-disk log (ui.log) must NEVER see it. `redactForLog` is the single choke
  * point both `sendIpcRequest` and `emitIpc` route their request log through.
- * This pins the branch directly (the brain-group spec mocks the client, so the
- * real redaction is exercised here).
+ * This pins the branch directly so the schema field stays masked even though
+ * Settings no longer renders a BYO key drawer.
  */
 
 import { describe, expect, it, vi } from "vitest";

@@ -102,14 +102,16 @@ describe("mountSettingsDrawer", () => {
   });
 
   it("gates internal settings tools to dev builds", () => {
-    // Brain/key controls, Profile view, citation diagnostics, calibration
-    // rerun, and Learn reset are support/tuning surfaces. They are present in
-    // dev builds and stripped from the shipped drawer a paying user sees.
+    // Profile view, citation diagnostics, calibration rerun, and Learn reset
+    // are support/tuning surfaces. They are present in dev builds and stripped
+    // from the shipped drawer a paying user sees. The old BYO brain-key group
+    // is deleted in both builds.
     mountSettingsDrawer(document.body);
+    expect(document.body.textContent).not.toContain("BRAIN");
+    expect(document.body.textContent).not.toContain("Gemini key");
+    expect(document.body.textContent).not.toContain("Google");
     if (import.meta.env.DEV) {
       expect(document.querySelector(".vmx-citation-diag")).not.toBeNull();
-      expect(document.body.textContent).toContain("BRAIN");
-      expect(document.body.textContent).toContain("Gemini key");
       expect(document.body.textContent).toContain("PROFILE");
       expect(document.body.textContent).toContain("DIAGNOSTICS");
       expect(document.body.textContent).toContain("CALIBRATION");
@@ -118,8 +120,6 @@ describe("mountSettingsDrawer", () => {
       expect(document.body.textContent).toContain("reset learn progress");
     } else {
       expect(document.querySelector(".vmx-citation-diag")).toBeNull();
-      expect(document.body.textContent).not.toContain("BRAIN");
-      expect(document.body.textContent).not.toContain("Gemini key");
       expect(document.body.textContent).not.toContain("PROFILE");
       expect(document.body.textContent).not.toContain("DIAGNOSTICS");
       expect(document.body.textContent).not.toContain("CALIBRATION");
@@ -319,7 +319,7 @@ describe("group rendering", () => {
     expect(groupHeaders.some((h) => h.includes("MASCOT"))).toBe(true);
     expect(groupHeaders.some((h) => h.includes("PERFORMANCE"))).toBe(true);
     expect(groupHeaders.some((h) => h.includes("HELP"))).toBe(true);
-    expect(groupHeaders.some((h) => h.includes("BRAIN"))).toBe(import.meta.env.DEV);
+    expect(groupHeaders.some((h) => h.includes("BRAIN"))).toBe(false);
     expect(groupHeaders.some((h) => h.includes("CALIBRATION"))).toBe(import.meta.env.DEV);
   });
 
