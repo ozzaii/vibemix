@@ -291,6 +291,24 @@ const CONTROL_FEEDBACK_LABELS: Readonly<Record<string, string>> = {
   vol: "fader lift",
   xfader: "blend move",
 };
+const PRACTICE_CONTROL_LESSON_IDS: Readonly<Record<string, string>> = {
+  cue: "L1.06",
+  eq_hi: "L1.03",
+  eq_low: "L1.03",
+  eq_mid: "L1.03",
+  filter: "L1.03",
+  headphone_cue: "L1.08",
+  jog: "L1.07",
+  jog_touch: "L1.07",
+  jog_touched: "L1.07",
+  master_vol: "L1.09",
+  play: "L1.06",
+  sync: "L1.06",
+  tap_tempo: "L1.05",
+  tempo: "L1.05",
+  vol: "L1.03",
+  xfader: "L1.04",
+};
 
 function referralLessonIdFromSearch(search: string): string | null {
   const lessonId = new URLSearchParams(search).get("lessonId")?.trim();
@@ -465,6 +483,7 @@ function mountLearnWindow(root: HTMLElement): {
   let latestProgress: LearnProgressProjection | null = null;
   let recommendedLessonId = firstRecommendedLessonId(latestProgress);
   let recommendedLessonLevel: "fresh" | "replay" = "fresh";
+  let practiceIntentLessonId: string | null = null;
   let exemplarHideTimer: ReturnType<typeof setTimeout> | null = null;
   let controllerDetected = false; // flipped by controller_detected handler
   let midiSeenOnStatusTick = false;
@@ -615,6 +634,7 @@ function mountLearnWindow(root: HTMLElement): {
     if (restoreFocus) openMapButton.focus();
   };
   const pickLesson = (lesson_id: string, level: "fresh" | "replay") => {
+    practiceIntentLessonId = null;
     closeLessonMap(false);
     boothPanel.dataset.visible = "false";
     setBoothPulse("listening", "hands on deck");
@@ -679,8 +699,16 @@ function mountLearnWindow(root: HTMLElement): {
         (!lesson.locked || lesson.status === "completed")
       )
       : undefined;
+    const practiceIntentLesson = practiceIntentLessonId
+      ? lessons.find((lesson) =>
+        lesson.lesson_id === practiceIntentLessonId &&
+        (!lesson.locked || lesson.status === "completed")
+      )
+      : undefined;
     const recommended =
-      missionLesson ?? lessons.find((lesson) => lesson.is_recommended);
+      missionLesson ??
+      practiceIntentLesson ??
+      lessons.find((lesson) => lesson.is_recommended);
     const activeMission = missionLesson ? mission : undefined;
     recommendedLessonId =
       recommended?.lesson_id ?? firstRecommendedLessonId(latestProgress);
@@ -891,6 +919,7 @@ function mountLearnWindow(root: HTMLElement): {
       return;
     }
     closeLessonMap(false);
+    practiceIntentLessonId = null;
     boothPanel.dataset.visible = "false";
     setBoothPulse("listening", "hands on deck");
     void emitLearnIpc("ipc.learn.start_course", payload).catch(
@@ -1330,6 +1359,11 @@ function mountLearnWindow(root: HTMLElement): {
   ): void => {
     if (currentLessonId !== null) return;
     const line = freePracticeFeedbackLine(controlId, source);
+    const lessonId = practiceLessonIdForControl(controlId);
+    if (lessonId && lessonId !== practiceIntentLessonId) {
+      practiceIntentLessonId = lessonId;
+      renderLessonChooser();
+    }
     status.setPracticeFeedback(line.text, {
       ariaLabel: line.ariaLabel,
       title: line.ariaLabel,
@@ -1764,6 +1798,14 @@ function freePracticeControlLabel(controlId: string): string {
     rawHead === "jog_touch" || rawHead === "jog_touched" ? "jog" : rawHead;
   const label = controlLabel(head ?? controlId);
   return deck ? `deck ${deck} ${label}` : label;
+}
+
+function practiceLessonIdForControl(controlId: string): string | null {
+  const [rawHead] = controlId.split(":");
+  const head =
+    rawHead === "jog_touch" || rawHead === "jog_touched" ? "jog" : rawHead;
+  const lessonId = PRACTICE_CONTROL_LESSON_IDS[head ?? controlId];
+  return knownLessonId(lessonId) ? lessonId : null;
 }
 
 function shouldIgnoreDeckKeyboard(ev: KeyboardEvent): boolean {

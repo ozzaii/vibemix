@@ -153,6 +153,10 @@ describe("practice booth shell", () => {
       const eq = await waitForMountedControl(root, "eq_hi:A");
       const booth = root.querySelector<HTMLElement>("#learn-booth-panel")!;
       const pulse = root.querySelector<HTMLElement>("#learn-booth-pulse")!;
+      const title = root.querySelector<HTMLElement>("#learn-booth-title")!;
+      const start = root.querySelector<HTMLButtonElement>(
+        "#learn-start-recommended",
+      )!;
 
       mocks.emitIpc.mockClear();
       eq.dispatchEvent(new Event("pointerdown", { bubbles: true, cancelable: true }));
@@ -169,6 +173,15 @@ describe("practice booth shell", () => {
       expect(pulse.getAttribute("aria-label")).toBe(
         "free practice screen move, deck A high EQ",
       );
+      expect(title.textContent).toBe("channel strip");
+      expect(start.textContent).toBe("start channel strip");
+
+      mocks.emitIpc.mockClear();
+      start.click();
+      expect(mocks.emitIpc).toHaveBeenCalledWith("ipc.learn.start_lesson", {
+        lesson_id: "L1.03",
+        level: "fresh",
+      });
     } finally {
       ws.close();
     }
@@ -257,6 +270,16 @@ describe("practice booth shell", () => {
         direction: "down",
       });
       expect(pulse.textContent).toBe("screen: deck A jog wheel");
+      expect(
+        root.querySelector<HTMLElement>("#learn-booth-title")?.textContent,
+      ).toBe("jog wheel");
+
+      mocks.emitIpc.mockClear();
+      root.querySelector<HTMLButtonElement>("#learn-start-recommended")?.click();
+      expect(mocks.emitIpc).toHaveBeenCalledWith("ipc.learn.start_lesson", {
+        lesson_id: "L1.07",
+        level: "fresh",
+      });
     } finally {
       ws.close();
     }
