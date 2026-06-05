@@ -13,6 +13,17 @@ const drill = {
   citation: "[ev:M@1]",
 };
 
+const referral = {
+  lesson_id: "L2.01",
+  course_id: "course_2_transitions",
+  course_label: "Course 2: Transitions",
+  skill_id: "beatmatching",
+  skill_label: "beatmatching",
+  title: "beatmatching by ear",
+  reason: "Debrief found tempo drift.",
+  cta: "Practice beatmatching by ear",
+};
+
 afterEach(() => {
   document.body.replaceChildren();
 });
@@ -56,6 +67,41 @@ describe("drills-panel", () => {
     mountDrillsPanel(div, [drill, drill, drill]);
     (div.querySelector("button.vmx-drill-citation") as HTMLButtonElement).click();
     expect(onClick).toHaveBeenCalledWith({ citation: "[ev:M@1]" });
+  });
+
+  it("learn referral renders a practice CTA with lesson metadata", () => {
+    const div = document.createElement("div");
+    document.body.append(div);
+    mountDrillsPanel(div, [
+      { ...drill, learn_referral: referral },
+      drill,
+      drill,
+    ]);
+
+    const button = div.querySelector<HTMLButtonElement>(".vmx-drill-learn");
+    expect(button?.textContent).toBe("Practice beatmatching by ear");
+    expect(button?.dataset.lessonId).toBe("L2.01");
+    expect(div.querySelector(".vmx-drill-learn-meta")?.textContent).toContain(
+      "L2.01",
+    );
+  });
+
+  it("learn referral CTA emits learn-referral-click event with detail", () => {
+    const div = document.createElement("div");
+    document.body.append(div);
+    const onClick = vi.fn();
+    div.addEventListener("learn-referral-click", (e: Event) => {
+      onClick((e as CustomEvent).detail);
+    });
+    mountDrillsPanel(div, [
+      { ...drill, learn_referral: referral },
+      drill,
+      drill,
+    ]);
+
+    div.querySelector<HTMLButtonElement>(".vmx-drill-learn")?.click();
+
+    expect(onClick).toHaveBeenCalledWith({ referral });
   });
 
   it("drill text is rendered via textContent (no XSS surface)", () => {

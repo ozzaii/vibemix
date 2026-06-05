@@ -591,6 +591,16 @@ export interface DebriefDrills {
         impact: string;
         action_recommended: string;
         citation: string;
+        learn_referral?: {
+          lesson_id: string;
+          course_id: string;
+          course_label: string;
+          skill_id: string;
+          skill_label: string;
+          title: string;
+          reason: string;
+          cta: string;
+        } | null;
       },
       {
         situation: string;
@@ -598,6 +608,16 @@ export interface DebriefDrills {
         impact: string;
         action_recommended: string;
         citation: string;
+        learn_referral?: {
+          lesson_id: string;
+          course_id: string;
+          course_label: string;
+          skill_id: string;
+          skill_label: string;
+          title: string;
+          reason: string;
+          cta: string;
+        } | null;
       },
       {
         situation: string;
@@ -605,6 +625,16 @@ export interface DebriefDrills {
         impact: string;
         action_recommended: string;
         citation: string;
+        learn_referral?: {
+          lesson_id: string;
+          course_id: string;
+          course_label: string;
+          skill_id: string;
+          skill_label: string;
+          title: string;
+          reason: string;
+          cta: string;
+        } | null;
       }
     ];
   };

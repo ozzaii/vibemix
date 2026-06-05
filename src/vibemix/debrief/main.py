@@ -123,7 +123,18 @@ def _chapter_to_payload(c: ChapterRegion):
 
 
 def _drill_to_payload(d: Drill):
-    from vibemix.ui_bus import DrillPayload
+    from vibemix.debrief.learn_referral import learn_referral_for_drill
+    from vibemix.ui_bus import DrillPayload, LearnReferralPayload
+
+    referral = learn_referral_for_drill(
+        {
+            "situation": d.situation,
+            "behavior": d.behavior,
+            "impact": d.impact,
+            "action_recommended": d.action_recommended,
+            "citation": d.citation,
+        }
+    )
 
     return DrillPayload(
         situation=d.situation,
@@ -131,6 +142,20 @@ def _drill_to_payload(d: Drill):
         impact=d.impact,
         action_recommended=d.action_recommended,
         citation=d.citation,
+        learn_referral=(
+            LearnReferralPayload(
+                lesson_id=referral.lesson_id,
+                course_id=referral.course_id,
+                course_label=referral.course_label,
+                skill_id=referral.skill_id,
+                skill_label=referral.skill_label,
+                title=referral.title,
+                reason=referral.reason,
+                cta=referral.cta,
+            )
+            if referral is not None
+            else None
+        ),
     )
 
 

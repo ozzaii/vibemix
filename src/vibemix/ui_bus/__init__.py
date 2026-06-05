@@ -216,6 +216,7 @@ from vibemix.ui_bus.schemas.debrief import (
     DebriefSessionLoadedPayload,
     DebriefTldrAudioPayload,
     DrillPayload,
+    LearnReferralPayload,
 )
 from vibemix.ui_bus.schemas.overlay import SessionOverlayHighlightPayload
 from vibemix.ui_bus.validator import parse_message, validate_message
@@ -317,6 +318,7 @@ __all__ = [
     "DebriefTldrAudio",
     "DebriefTldrAudioPayload",
     "DrillPayload",
+    "LearnReferralPayload",
     # Phase 28 Plan 09 — Library IPC
     "LibraryImport",
     "LibraryImportCancel",

@@ -102,6 +102,31 @@ class DebriefTldrAudioPayload:
 
 
 @dataclass(frozen=True, slots=True)
+class LearnReferralPayload:
+    """Optional authored Learn route attached to one debrief drill.
+
+    Fields:
+        lesson_id: canonical lesson id from ``vibemix.learn.curriculum``.
+        course_id: owning course id from the same curriculum row.
+        course_label: human-readable course label for compact UI context.
+        skill_id: owning skill-wall id.
+        skill_label: human-readable skill label.
+        title: authored Learn lesson title.
+        reason: deterministic explanation of why this drill maps there.
+        cta: short button label.
+    """
+
+    lesson_id: str
+    course_id: str
+    course_label: str
+    skill_id: str
+    skill_label: str
+    title: str
+    reason: str
+    cta: str
+
+
+@dataclass(frozen=True, slots=True)
 class DrillPayload:
     """Single SBI/STAR-AR drill row used inside :class:`DebriefDrillsPayload`.
 
@@ -112,6 +137,8 @@ class DrillPayload:
         action_recommended: actionable next-time advice (cited).
         citation: a single canonical ``[ev:*] / [track:*] / [mix:*]`` tag
             that the renderer uses for the citation chip + tooltip.
+        learn_referral: optional deterministic route into authored Learn
+            practice. ``None`` means this drill did not map confidently.
     """
 
     situation: str
@@ -119,6 +146,7 @@ class DrillPayload:
     impact: str
     action_recommended: str
     citation: str
+    learn_referral: LearnReferralPayload | None = None
 
 
 @dataclass(frozen=True, slots=True)

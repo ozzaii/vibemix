@@ -110,6 +110,7 @@ describe("practice booth shell", () => {
   });
 
   beforeEach(() => {
+    window.history.replaceState(null, "", "/learn.html");
     document.body.innerHTML = `<div id="learn-root"></div>`;
     StubWebSocket.instances = [];
     StubWebSocket.sent = [];
@@ -708,6 +709,40 @@ describe("practice booth shell", () => {
       root.querySelector<HTMLButtonElement>("#learn-start-recommended")!.click();
       expect(mocks.emitIpc).toHaveBeenCalledWith("ipc.learn.start_lesson", {
         lesson_id: "L1.02",
+        level: "fresh",
+      });
+    } finally {
+      ws.close();
+    }
+  });
+
+  it("lessonId query starts the referred lesson after progress proves it is unlocked", () => {
+    window.history.replaceState(null, "", "/learn.html?lessonId=L2.01");
+    const root = document.getElementById("learn-root") as HTMLElement;
+    const { ws } = mountLearnWindow(root);
+    try {
+      expect(mocks.emitIpc).not.toHaveBeenCalledWith(
+        "ipc.learn.start_lesson",
+        expect.objectContaining({ lesson_id: "L2.01" }),
+      );
+
+      window.dispatchEvent(
+        new CustomEvent("ipc.learn.progress_state", {
+          detail: {
+            action: "snapshot",
+            progress: {
+              schema_version: 1,
+              courses: {},
+              lessons: completedRows(COURSE_1_LESSON_IDS),
+              course_2_unlocked: true,
+              course_3_unlocked: false,
+            },
+          },
+        }),
+      );
+
+      expect(mocks.emitIpc).toHaveBeenCalledWith("ipc.learn.start_lesson", {
+        lesson_id: "L2.01",
         level: "fresh",
       });
     } finally {

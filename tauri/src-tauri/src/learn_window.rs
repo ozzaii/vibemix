@@ -11,10 +11,10 @@
 //!   * No second Python process is launched — Learn shares the main
 //!     vibemix process. The Learn webview connects to the existing
 //!     ws:8765 once it mounts.
-//!   * No path-input validation (the webview URL is a hardcoded literal;
-//!     Learn accepts no path arguments).
-//!   * No deep-link payload — Learn opens at lesson 0; navigation lives
-//!     inside the webview.
+//!   * No filesystem path input — Learn accepts only a validated lesson id
+//!     referral, never an arbitrary URL/path.
+//!   * No sidecar launch or second socket — a lesson referral only changes
+//!     the Learn webview URL/event payload.
 //!   * No close-event handler terminating a child process (there is no
 //!     child).
 //!   * No crash watcher (no spawn → no crash surface to emit on).
@@ -31,7 +31,7 @@
 //!     capability allowlist (Plan 91-01 `capabilities/default.json`)
 //!     gates webview invocation.
 
-use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindowBuilder};
+use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
 
 /// Tauri window label for the Learn surface. Lowercase + no whitespace
 /// per the `tauri-runtime-wry` restrictions; pinned by the unit test
@@ -62,17 +62,35 @@ const MIN_HEIGHT: f64 = 540.0;
 /// mitigated by construction.
 #[tauri::command]
 pub async fn open_learn_window(app: AppHandle) -> Result<(), String> {
+    open_learn_route(app, None).await
+}
+
+/// Open Learn and route the first paint to an authored lesson id.
+///
+/// This is intentionally separate from ``open_learn_window`` so existing mode
+/// switches keep their no-argument contract. The renderer still validates the
+/// id against its generated curriculum metadata before starting the lesson.
+#[tauri::command]
+pub async fn open_learn_lesson_window(app: AppHandle, lesson_id: String) -> Result<(), String> {
+    let safe_lesson_id = validate_lesson_id(&lesson_id)?;
+    open_learn_route(app, Some(safe_lesson_id)).await
+}
+
+async fn open_learn_route(app: AppHandle, lesson_id: Option<String>) -> Result<(), String> {
     // Focus existing window if already open — keeps the window count
     // bounded at 1 (T-91-04-03).
     if let Some(existing) = app.get_webview_window(LEARN_WINDOW_LABEL) {
         let _ = existing.set_focus();
+        if let Some(id) = lesson_id {
+            let _ = app.emit("vmx-learn-referral", serde_json::json!({ "lessonId": id }));
+        }
         return Ok(());
     }
 
     let _window = WebviewWindowBuilder::new(
         &app,
         LEARN_WINDOW_LABEL,
-        WebviewUrl::App("learn.html".into()),
+        learn_webview_url(lesson_id.as_deref()),
     )
     .title("Learn — vibemix")
     .inner_size(DEFAULT_WIDTH, DEFAULT_HEIGHT)
@@ -83,6 +101,27 @@ pub async fn open_learn_window(app: AppHandle) -> Result<(), String> {
     .map_err(|e| format!("window build: {e}"))?;
 
     Ok(())
+}
+
+fn learn_webview_url(lesson_id: Option<&str>) -> WebviewUrl {
+    match lesson_id {
+        Some(id) => WebviewUrl::App(format!("learn.html?lessonId={id}").into()),
+        None => WebviewUrl::App("learn.html".into()),
+    }
+}
+
+fn validate_lesson_id(raw: &str) -> Result<String, String> {
+    let lesson_id = raw.trim();
+    if lesson_id.is_empty() || lesson_id.len() > 64 {
+        return Err("invalid lesson id".into());
+    }
+    if !lesson_id
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | '_'))
+    {
+        return Err("invalid lesson id".into());
+    }
+    Ok(lesson_id.to_string())
 }
 
 #[cfg(test)]
@@ -112,5 +151,23 @@ mod tests {
         assert_eq!(DEFAULT_HEIGHT, 720.0);
         assert_eq!(MIN_WIDTH, 960.0);
         assert_eq!(MIN_HEIGHT, 540.0);
+    }
+
+    #[test]
+    fn learn_lesson_url_carries_sanitized_lesson_id() {
+        match learn_webview_url(Some("L2.01")) {
+            WebviewUrl::App(path) => {
+                assert_eq!(path.to_string_lossy(), "learn.html?lessonId=L2.01")
+            }
+            _ => panic!("expected app webview url"),
+        }
+    }
+
+    #[test]
+    fn learn_lesson_id_validation_rejects_query_smuggling() {
+        assert_eq!(validate_lesson_id(" L2.01 ").unwrap(), "L2.01");
+        assert!(validate_lesson_id("L2.01&x=1").is_err());
+        assert!(validate_lesson_id("../learn.html").is_err());
+        assert!(validate_lesson_id("").is_err());
     }
 }

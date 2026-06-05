@@ -23,6 +23,7 @@ from vibemix.ui_bus import (
     DebriefError,
     DebriefTldrAudio,
     DrillPayload,
+    LearnReferralPayload,
 )
 from vibemix.ui_bus.messages import _SCHEMA
 
@@ -132,6 +133,37 @@ def test_debrief_drills_roundtrip_exactly_3():
     parsed = json.loads(msg.to_json())
     assert parsed["type"] == "ipc.debrief.drills"
     assert len(parsed["payload"]["drills"]) == 3
+    assert parsed["payload"]["drills"][0]["learn_referral"] is None
+    jsonschema.validate(parsed, _SCHEMA)
+
+
+def test_debrief_drills_roundtrip_with_learn_referral():
+    referral = LearnReferralPayload(
+        lesson_id="L2.01",
+        course_id="course_2_transitions",
+        course_label="Course 2: Transitions",
+        skill_id="beatmatching",
+        skill_label="beatmatching",
+        title="beatmatching by ear",
+        reason="Debrief found tempo or phase drift.",
+        cta="Practice beatmatching by ear",
+    )
+    msg = DebriefDrills.make(
+        drills=tuple(
+            DrillPayload(
+                situation=f"Drill {i} situation",
+                behavior=f"Behavior [ev:MIX_MOVE@01:0{i}]",
+                impact=f"Impact [ev:PHASE@01:1{i}]",
+                action_recommended=f"Action [track:t{i}]",
+                citation=f"[ev:MIX_MOVE@01:0{i}]",
+                learn_referral=referral,
+            )
+            for i in range(3)
+        ),
+    )
+    parsed = json.loads(msg.to_json())
+
+    assert parsed["payload"]["drills"][0]["learn_referral"]["lesson_id"] == "L2.01"
     jsonschema.validate(parsed, _SCHEMA)
 
 

@@ -292,6 +292,27 @@ const CONTROL_FEEDBACK_LABELS: Readonly<Record<string, string>> = {
   xfader: "blend move",
 };
 
+function referralLessonIdFromSearch(search: string): string | null {
+  const lessonId = new URLSearchParams(search).get("lessonId")?.trim();
+  return knownLessonId(lessonId) ? lessonId : null;
+}
+
+function referralLessonIdFromEvent(detail: unknown): string | null {
+  if (typeof detail === "string") {
+    return knownLessonId(detail.trim()) ? detail.trim() : null;
+  }
+  if (typeof detail !== "object" || detail === null) return null;
+  const lessonId = (detail as { lessonId?: unknown }).lessonId;
+  return typeof lessonId === "string" && knownLessonId(lessonId.trim())
+    ? lessonId.trim()
+    : null;
+}
+
+function knownLessonId(lessonId: string | null | undefined): lessonId is string {
+  if (!lessonId) return false;
+  return CURRICULUM_META.some((entry) => entry.lesson_id === lessonId);
+}
+
 /**
  * Module-level latest-frame holder (RESEARCH §Pitfall 6). Set on every
  * midi_position event; drained by the rAF callback. When the user
@@ -447,6 +468,10 @@ function mountLearnWindow(root: HTMLElement): {
   let midiSeenOnStatusTick = false;
   let controllerDisplayName: string | null = null;
   let currentLessonId: string | null = null;
+  let pendingReferralLessonId =
+    typeof window !== "undefined"
+      ? referralLessonIdFromSearch(window.location.search)
+      : null;
   let currentExpectedAction: ExpectedActionPayload | null = null;
   let lastHighlightPayload: HighlightPayload | null = null;
   let lastPositions: Record<string, number> = {};
@@ -599,6 +624,31 @@ function mountLearnWindow(root: HTMLElement): {
       console.warn("[learn] start_lesson emit failed:", err);
     });
   };
+  const routePendingReferralLesson = (lessons: ProgressListEntry[]): void => {
+    if (!pendingReferralLessonId || latestProgress === null) return;
+    const lessonId = pendingReferralLessonId;
+    const lesson = lessons.find((entry) => entry.lesson_id === lessonId);
+    if (!lesson) {
+      pendingReferralLessonId = null;
+      return;
+    }
+    pendingReferralLessonId = null;
+    if (lesson.locked && lesson.status !== "completed") {
+      openLessonMap();
+      const target = Array.from(
+        progressListHost.querySelectorAll<HTMLButtonElement>(
+          ".vmx-progress-list__lesson",
+        ),
+      ).find((button) => button.dataset.lessonId === lesson.lesson_id);
+      target?.focus();
+      setBoothPulse("idle", lesson.lock_reason ?? `${lesson.title} is locked`);
+      return;
+    }
+    pickLesson(
+      lesson.lesson_id,
+      lesson.status === "completed" ? "replay" : "fresh",
+    );
+  };
   const handleHudDotActivation = (target: EventTarget | null): void => {
     if (!lessonHud || !(target instanceof Element)) return;
     const dot = target.closest<HTMLElement>(".dot");
@@ -655,6 +705,7 @@ function mountLearnWindow(root: HTMLElement): {
     });
     progressListBody.replaceChildren(progressList);
     updateBoothPulseForRecommendation(recommended, activeMission);
+    routePendingReferralLesson(lessons);
   };
   const updateBoothPulseForRecommendation = (
     recommended: ProgressListEntry | undefined,
@@ -813,6 +864,12 @@ function mountLearnWindow(root: HTMLElement): {
         console.warn("[learn] start_course emit failed:", err);
       },
     );
+  });
+  addWindowListener("vmx-learn-referral", (ev: Event) => {
+    const lessonId = referralLessonIdFromEvent((ev as CustomEvent<unknown>).detail);
+    if (!lessonId) return;
+    pendingReferralLessonId = lessonId;
+    renderLessonChooser();
   });
 
   // Phase 97 / ONBOARD-02 — first-launch tutor announce-by-name. On the

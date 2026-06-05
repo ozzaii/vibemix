@@ -14,7 +14,8 @@ import numpy as np
 import pytest
 
 from vibemix.debrief import EventsMissing, SessionTooShort
-from vibemix.debrief.main import run
+from vibemix.debrief.drills import Drill
+from vibemix.debrief.main import _drill_to_payload, run
 
 
 def _build_session(root: Path, name: str = "20260515-aaaaaa", duration_s: float = 600.0) -> Path:
@@ -234,3 +235,19 @@ def test_run_missing_events_raises(tmp_path: Path):
     sess.mkdir()
     with pytest.raises(EventsMissing):
         run(sess, client=MagicMock(), recordings_root=root, serve=False)
+
+
+def test_drill_payload_derives_learn_referral_without_persisted_shape_change():
+    payload = _drill_to_payload(
+        Drill(
+            situation="Beatmatch drift",
+            behavior="Kicks drifted apart during the blend [ev:MIX_MOVE@05:00]",
+            impact="The phrase felt unstable [ev:MIX_MOVE@05:00]",
+            action_recommended="Practice locking the tempo by ear [ev:MIX_MOVE@05:00]",
+            citation="[ev:MIX_MOVE@05:00]",
+        )
+    )
+
+    assert payload.learn_referral is not None
+    assert payload.learn_referral.lesson_id == "L2.01"
+    assert payload.learn_referral.title == "beatmatching by ear"

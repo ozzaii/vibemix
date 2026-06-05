@@ -1016,6 +1016,66 @@
   outline: none;
 }
 
+.vmx-drill-learn-route {
+  display: grid;
+  grid-template-columns: minmax(0, auto) 1fr;
+  gap: 4px var(--sp-2);
+  align-items: center;
+  margin-top: var(--sp-3);
+  padding-top: var(--sp-3);
+  border-top: 1px solid var(--border-subtle);
+}
+
+.vmx-drill-learn {
+  justify-self: start;
+  min-height: 26px;
+  max-width: 100%;
+  border: 1px solid var(--brand-40);
+  border-radius: var(--rad-sm);
+  padding: 4px 9px;
+  background:
+    linear-gradient(180deg, var(--brand-08), transparent 70%),
+    rgba(0, 0, 0, 0.26);
+  color: var(--brand-glow);
+  cursor: pointer;
+  font-family: var(--type-display);
+  font-variation-settings: "wdth" 85, "wght" 650;
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  line-height: 1.1;
+  text-transform: uppercase;
+  text-align: left;
+  transition: color var(--motion-snap) ease-out, border-color var(--motion-snap) ease-out, background var(--motion-snap) ease-out;
+}
+
+.vmx-drill-learn:hover,
+.vmx-drill-learn:focus-visible {
+  color: var(--amber);
+  border-color: var(--amber-40);
+  background:
+    linear-gradient(180deg, rgba(255, 197, 107, 0.1), transparent 70%),
+    rgba(0, 0, 0, 0.3);
+  outline: none;
+}
+
+.vmx-drill-learn-meta {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-muted);
+  font-family: var(--type-mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.vmx-drill-learn-reason {
+  grid-column: 1 / -1;
+  color: var(--silk-40);
+  font-size: 12px;
+}
+
 /* === Skeletons + error banner + tooltip ================================ */
 
 .vmx-debrief-skeleton {

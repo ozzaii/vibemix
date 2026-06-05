@@ -54,8 +54,10 @@ describe("test_learn_window_label.spec.ts (RENDER-07)", () => {
     ) as { windows?: string[] };
 
     expect(mainSource).toContain("learn_window::open_learn_window");
+    expect(mainSource).toContain("learn_window::open_learn_lesson_window");
     expect(learnWindowSource).toContain("#[tauri::command]");
     expect(learnWindowSource).toContain('WebviewUrl::App("learn.html".into())');
+    expect(learnWindowSource).toContain("learn.html?lessonId=");
     expect(capabilities.windows).toContain("learn");
   });
 });

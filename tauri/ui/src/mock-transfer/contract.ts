@@ -241,6 +241,7 @@ export const MOCK_TRANSFER_CONTRACT: readonly MockTransferSurface[] = [
     ],
     outbound: [
       "ipc.debrief.citation-tooltip-request",
+      "open_learn_lesson_window",
     ],
   },
   {

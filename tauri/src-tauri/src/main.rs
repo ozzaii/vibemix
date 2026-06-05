@@ -117,6 +117,7 @@ fn main() {
             library_cmds::library_reveal_export_path,
             library_cmds::open_library_window,
             learn_window::open_learn_window,
+            learn_window::open_learn_lesson_window,
             learn_e2e::record_learn_e2e_result,
         ])
         .manage(SidecarHandle::default())

@@ -7,10 +7,26 @@ export interface DrillPayload {
   impact: string;
   action_recommended: string;
   citation: string;
+  learn_referral?: LearnReferralPayload | null;
+}
+
+export interface LearnReferralPayload {
+  lesson_id: string;
+  course_id: string;
+  course_label: string;
+  skill_id: string;
+  skill_label: string;
+  title: string;
+  reason: string;
+  cta: string;
 }
 
 export interface CitationClickEvent extends CustomEvent {
   detail: { citation: string };
+}
+
+export interface LearnReferralClickEvent extends CustomEvent {
+  detail: { referral: LearnReferralPayload };
 }
 
 export function mountDrillsPanel(
@@ -61,6 +77,38 @@ export function mountDrillsPanel(
     });
 
     article.append(h3, dl, chip);
+    if (d.learn_referral) {
+      const referral = d.learn_referral;
+      const route = document.createElement("div");
+      route.className = "vmx-drill-learn-route";
+
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "vmx-drill-learn";
+      button.dataset.lessonId = referral.lesson_id;
+      button.textContent = referral.cta || `Practice ${referral.title}`;
+      button.title = referral.reason;
+      button.addEventListener("click", (e) => {
+        e.stopPropagation();
+        container.dispatchEvent(
+          new CustomEvent("learn-referral-click", {
+            detail: { referral },
+            bubbles: true,
+          }),
+        );
+      });
+
+      const meta = document.createElement("span");
+      meta.className = "vmx-drill-learn-meta";
+      meta.textContent = `${referral.skill_label} · ${referral.lesson_id}`;
+
+      const reason = document.createElement("span");
+      reason.className = "vmx-drill-learn-reason";
+      reason.textContent = referral.reason;
+
+      route.append(button, meta, reason);
+      article.append(route);
+    }
     container.append(article);
   }
 }

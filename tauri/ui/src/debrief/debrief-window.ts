@@ -2,7 +2,11 @@
 // Plan 29-05 Task 1 — debrief window entry point.
 
 import { mountChapterList, type ChapterPayload } from "./components/chapter-list.js";
-import { mountDrillsPanel, type DrillPayload } from "./components/drills-panel.js";
+import {
+  mountDrillsPanel,
+  type DrillPayload,
+  type LearnReferralPayload,
+} from "./components/drills-panel.js";
 import {
   mountTldrPlayer,
   renderVerdictLine,
@@ -131,6 +135,12 @@ if (isMockMode) {
     drillsEl.addEventListener("citation-click", (e: Event) => {
       const detail = (e as CustomEvent).detail as { citation: string };
       client.sendCitationTooltipRequest(detail.citation);
+    });
+    drillsEl.addEventListener("learn-referral-click", (e: Event) => {
+      const detail = (e as CustomEvent).detail as {
+        referral?: LearnReferralPayload;
+      };
+      if (detail.referral) void openLearnReferral(detail.referral);
     });
   }
   if (waveformEl) {
@@ -286,6 +296,22 @@ function mountMockDebrief(): void {
         citation: "mock:36:02",
       },
     ]);
+  }
+}
+
+async function openLearnReferral(referral: LearnReferralPayload): Promise<void> {
+  try {
+    const { invoke } = await import("@tauri-apps/api/core");
+    await invoke("open_learn_lesson_window", {
+      lessonId: referral.lesson_id,
+    });
+  } catch {
+    try {
+      const { invoke } = await import("@tauri-apps/api/core");
+      await invoke("open_learn_window");
+    } catch {
+      // Not running under Tauri (dev / test).
+    }
   }
 }
 
