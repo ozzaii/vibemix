@@ -3093,9 +3093,11 @@ class DJCoHostAgent(Agent):
             # silence/slop/citation gates are the authority on the FULL
             # response. When the gate never clears (banned-opener
             # locked), the post-stream gate fires the appropriate
-            # suppression and nothing is re-yielded. When chunks WERE
-            # flushed mid-stream and the post-stream gate fails (slop in
-            # trailing text, missing citation), a silence-pad frame
+            # suppression and nothing is re-yielded. In linter-wired
+            # live mode, all chunks are held until citation validation
+            # passes, so uncitable text never reaches TTS. In legacy /
+            # non-linter paths, chunks may still be flushed mid-stream;
+            # if a later post-stream gate fails, a silence-pad frame
             # cancels remaining audio (``streaming_cancel`` event).
             #
             # Streaming pipe state:
@@ -3812,11 +3814,11 @@ class DJCoHostAgent(Agent):
                             # Strip path — no chunks yielded. Pre-recorded
                             # ack substitution is retired (English placeholder
                             # clips fought the anti-slop thesis and the
-                            # Turkish persona). On head_yielded turns the
-                            # speculative head is already in flight, so we
-                            # cancel with a silence pad to mask the
-                            # mid-utterance cut. Otherwise this strip is
-                            # exactly the persona's "say NOTHING" path.
+                            # Turkish persona). Linter-wired live mode
+                            # defers chunks until validation, so this is
+                            # normally pre-TTS silence. The head_yielded
+                            # branch remains a defensive legacy-path mask
+                            # for any already-in-flight speculative head.
                             citation_action = "strip"
                             if head_yielded:
                                 _push_silence_pad_and_cancel("citation_failure")

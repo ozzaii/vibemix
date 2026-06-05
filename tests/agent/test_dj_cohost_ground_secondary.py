@@ -53,7 +53,6 @@ from vibemix.llm.model_router import resolve
 from vibemix.state import AICoach, Event, MusicState
 from vibemix.state.evidence_registry import EvidenceRegistry
 
-
 # ---------- helpers (copied verbatim from tests/agent/test_dj_cohost_mic_part.py) ----------
 
 
@@ -281,13 +280,10 @@ def test_unbacked_audio_claim_strips(mocker, tmp_path) -> None:
     chunks = _drive_llm_node(agent)
 
     # The un-backed citation misses the registry snapshot → the linter
-    # strips the whole turn. Under the chunk-by-chunk pipe the speculative
-    # head DOES yield (clean prefix, balanced brackets); the contract that
-    # "nothing audible reaches the user" is enforced by the silence-pad
-    # cancel + citation_strip event on the fast-completion stream.
-    assert chunks, f"speculative head expected to yield, got {chunks!r}"
-    # The agent's recorder captures the cancel + strip combination.
+    # strips the whole turn before any TTS chunk is yielded. Secondary-ear
+    # audio cannot widen the citable set or leak a speculative spoken head.
+    assert chunks == []
     kinds = [k for k, _ in agent._recorder.events]
-    assert "streaming_cancel" in kinds
     assert "citation_strip" in kinds
-    playback.push.assert_called()
+    assert "streaming_cancel" not in kinds
+    playback.push.assert_not_called()

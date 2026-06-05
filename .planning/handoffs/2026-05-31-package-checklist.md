@@ -10592,3 +10592,37 @@ Proof before staging:
 - `uv run ruff check src/vibemix/state/deck_poller.py src/vibemix/state/refresh.py tests/state/test_deck_poller.py tests/state/test_refresh.py`
 - `uv run python -m compileall -q src/vibemix/state/deck_poller.py src/vibemix/state/refresh.py tests/state/test_deck_poller.py tests/state/test_refresh.py`
 - `git diff --check -- src/vibemix/state/deck_poller.py src/vibemix/state/refresh.py tests/state/test_deck_poller.py tests/state/test_refresh.py .planning/handoffs/2026-05-31-package-checklist.md`
+
+## Package 86 - Citation Strip Pre-TTS Silence
+
+Suggested commit: `fix(cohost): keep citation strips pre-tts`
+
+Include:
+
+- `src/vibemix/agent/dj_cohost.py`
+- `tests/agent/test_dj_cohost_linter.py`
+- `tests/agent/test_dj_cohost_streaming_pipe.py`
+- `tests/agent/test_dj_cohost_ground_secondary.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Prompt rewrites, provider switching, linter policy changes, citation grammar
+  changes, new fallback speech, UI behavior, Learn runtime changes, and new
+  dependencies. This package only ensures wired citation-linter turns do not
+  stream speculative TTS before the full response validates.
+
+Reason:
+
+- A silence-pad cancel can mask trailing audio but cannot prove the already
+  yielded head was never heard. In linter-wired live mode, hold model chunks
+  until citation validation passes; valid cited lines still speak, while
+  uncitable/fabricated/no-citation replies yield zero TTS chunks. Update the
+  secondary-ear guard test to encode the same pre-TTS strip contract.
+
+Proof before staging:
+
+- `uv run pytest -q tests/agent/test_dj_cohost_ground_secondary.py tests/agent/test_dj_cohost_linter.py tests/agent/test_dj_cohost_streaming_pipe.py tests/llm/test_route_chain.py tests/agent/test_dj_cohost.py::test_llm_node_direct_mode_5xx_surfaces_connection_error tests/agent/test_dj_cohost.py::test_llm_node_proxy_mode_503_marks_proxy_unavailable_without_speech tests/integration/test_proxy_fallback.py`
+- `uv run ruff check src/vibemix/agent/dj_cohost.py tests/agent/test_dj_cohost_ground_secondary.py`
+- `uv run python -m compileall -q src/vibemix/agent/dj_cohost.py tests/agent/test_dj_cohost_ground_secondary.py`
+- `git diff --check -- src/vibemix/agent/dj_cohost.py tests/agent/test_dj_cohost_ground_secondary.py .planning/handoffs/2026-05-31-package-checklist.md`
