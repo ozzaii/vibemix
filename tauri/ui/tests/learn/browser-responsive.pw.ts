@@ -79,4 +79,49 @@ test.describe("Learn browser responsive shell", () => {
     await expect(page.locator("#learn-start-recommended")).toBeVisible();
     await expect(page.locator("#learn-open-map")).toBeVisible();
   });
+
+  test("ready waveforms take their own row below the controller stage", async ({
+    page,
+  }) => {
+    await page.evaluate(() => {
+      const deck = {
+        bpm: 128,
+        duration_s: 180,
+        peaks: Array.from({ length: 96 }, (_, i) => [
+          48 + (i % 6) * 18,
+          32 + (i % 5) * 14,
+          20 + (i % 4) * 10,
+        ]),
+        cues: [{ label: "drop", start_s: 80, end_s: 96 }],
+      };
+      window.dispatchEvent(
+        new CustomEvent("ipc.learn.waveform_ready", {
+          detail: {
+            sample_rate: 48000,
+            beat_interval_s: 0.468,
+            decks: { A: deck, B: deck },
+          },
+        }),
+      );
+    });
+
+    const waveformHost = page.locator("#learn-waveform-host");
+    await expect(waveformHost).toHaveAttribute("data-ready", "true");
+    await expect(waveformHost).toBeVisible();
+
+    const rects = await page.evaluate(() => {
+      const stage = document.querySelector("#learn-stage")!.getBoundingClientRect();
+      const waveform = document
+        .querySelector("#learn-waveform-host")!
+        .getBoundingClientRect();
+      return {
+        stageBottom: Math.round(stage.bottom),
+        waveformTop: Math.round(waveform.top),
+        waveformHeight: Math.round(waveform.height),
+      };
+    });
+
+    expect(rects.waveformHeight).toBeGreaterThan(100);
+    expect(rects.waveformTop).toBeGreaterThanOrEqual(rects.stageBottom - 1);
+  });
 });
