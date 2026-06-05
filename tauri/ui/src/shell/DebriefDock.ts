@@ -437,7 +437,7 @@ export function mountDebriefDock(host: HTMLElement): DebriefDockHandle {
     '<dl class="debrief-dock__proof">' +
     '<div class="debrief-dock__proof-row"><dt>Timeline</dt><dd>drops, recoveries, energy shape</dd></div>' +
     '<div class="debrief-dock__proof-row"><dt>The why</dt><dd>every call tied to what I actually heard</dd></div>' +
-    '<div class="debrief-dock__proof-row"><dt>Next</dt><dd>one drill or one crate move</dd></div>' +
+    '<div class="debrief-dock__proof-row"><dt>Next</dt><dd>one drill or one Viber move</dd></div>' +
     "</dl>";
 
   const sessions = document.createElement("section");
@@ -733,7 +733,7 @@ function paybackPath(
       target,
       blocker: "none",
       action: "open your review",
-      unlocks: "one drill or crate move",
+      unlocks: "one drill or Viber move",
     };
   }
   if (summary.crashed) {
@@ -757,7 +757,7 @@ function rowPayoffLine(
   ready: boolean,
   readiness: ReturnType<typeof reviewReadiness>,
 ): string {
-  if (ready) return "Payback: open review to leave with one drill or crate move.";
+  if (ready) return "Payback: open review to leave with one drill or Viber move.";
   if (summary.crashed) return "Record one full set start to finish and I can review it.";
   return `${readiness.remainingLabel} more and I can review this set.`;
 }

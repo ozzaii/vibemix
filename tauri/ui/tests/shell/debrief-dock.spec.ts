@@ -81,12 +81,12 @@ describe("DebriefDock", () => {
     expect(host.textContent).toContain("last set");
     expect(host.textContent).toContain("blocker");
     expect(host.textContent).toContain("open your review");
-    expect(host.textContent).toContain("one drill or crate move");
+    expect(host.textContent).toContain("one drill or Viber move");
     expect(host.textContent).toContain("2026-06-03 00:15");
     expect(host.textContent).toContain("42m");
     expect(host.textContent).toContain("19 events");
     expect(host.textContent).toContain("ready to review");
-    expect(host.textContent).toContain("Payback: open review to leave with one drill or crate move.");
+    expect(host.textContent).toContain("Payback: open review to leave with one drill or Viber move.");
 
     const openButtons = Array.from(
       host.querySelectorAll<HTMLButtonElement>(".debrief-dock__open"),

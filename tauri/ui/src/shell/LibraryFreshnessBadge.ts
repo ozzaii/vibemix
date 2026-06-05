@@ -2,7 +2,7 @@
 //
 // Compact shell readout for the library freshness engine. The backend already
 // computes source-aware freshness; this badge makes that truth visible without
-// opening Settings or Crate.
+// opening Settings or the Viber surface.
 
 import {
   libraryStats,

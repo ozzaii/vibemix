@@ -61,14 +61,14 @@ export const SURFACES: readonly SurfaceDef[] = [
   { id: "deck", label: "Deck", kbd: "1", glyph: GLYPH_DECK, hint: "the live co-host", wire: "shell.surface.deck" },
   {
     id: "crate",
-    label: "Crate",
+    label: "Viber",
     kbd: "2",
     glyph: GLYPH_CRATE,
-    hint: "library and Viber",
+    hint: "library and set prep",
     wire: "shell.surface.crate",
     empty: {
-      title: "Viber is waiting for your crate.",
-      sub: "Open Rekordbox or add a music folder. I can build sets and solve transitions.",
+      title: "Viber is ready for your library.",
+      sub: "Add a music folder or bring in a DJ library. I can build sets and solve transitions.",
       proof: [
         { label: "Build", value: "set arcs from indexed tracks" },
         { label: "Mix", value: "deck-backed transitions only" },
@@ -101,7 +101,7 @@ export const SURFACES: readonly SurfaceDef[] = [
       proof: [
         { label: "Timeline", value: "drops, recoveries, energy shape" },
         { label: "Why", value: "what made a praise or critique real" },
-        { label: "Next move", value: "practice drill or crate follow-up" },
+        { label: "Next move", value: "practice drill or Viber follow-up" },
       ],
     },
   },

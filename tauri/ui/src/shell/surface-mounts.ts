@@ -42,7 +42,7 @@ export interface MountedSurfaces {
 
 /**
  * Resolve a stub surface's hidden mount. The caller reveals it only after the
- * heavy interior mount succeeds, so a failed Crate/Learn boot leaves the
+ * heavy interior mount succeeds, so a failed Viber/Learn boot leaves the
  * designed empty state visible instead of blanking the surface.
  * Returns the `.surface-mount` element where the real interior is injected.
  */

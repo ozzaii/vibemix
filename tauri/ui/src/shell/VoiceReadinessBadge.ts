@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // Compact shell readout for the local MOSS voice model. The real install/check
-// surface already lives in Crate; this badge only makes the fresh-machine truth
+// surface already lives in Viber; this badge only makes the fresh-machine truth
 // visible from the live deck and routes the user there.
 
 import {

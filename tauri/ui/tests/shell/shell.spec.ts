@@ -86,16 +86,16 @@ describe("DesktopShell", () => {
     expect(debrief.textContent).toContain("Why");
     expect(debrief.textContent).toContain("what made a praise or critique real");
     expect(debrief.textContent).toContain("Next move");
-    expect(debrief.textContent).toContain("practice drill or crate follow-up");
+    expect(debrief.textContent).toContain("practice drill or Viber follow-up");
     expect(debrief.textContent).not.toContain("No set to review.");
   });
 
-  it("makes the Crate empty state a Viber operator preview, not a dead void", () => {
+  it("makes the Viber empty state an operator preview, not a dead void", () => {
     shell = mountDesktopShell(host);
     const crate = host.querySelector<HTMLElement>('.surface[data-surface="crate"]')!;
 
     expect(crate.querySelector(".se-title")?.textContent).toBe(
-      "Viber is waiting for your crate.",
+      "Viber is ready for your library.",
     );
     expect(crate.textContent).toContain("build sets and solve transitions");
     expect(crate.textContent).toContain("Build");

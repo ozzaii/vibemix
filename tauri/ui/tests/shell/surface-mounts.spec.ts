@@ -94,7 +94,7 @@ describe("surface-mount layer", () => {
     expect(got.deck).toBe(
       host.querySelector('.surface[data-surface="deck"] .deck-stage'),
     );
-    // Crate, Learn, and Debrief fold into their revealed keep-alive mounts.
+    // Viber, Learn, and Debrief fold into their revealed keep-alive mounts.
     const crateMount = got.crate;
     const learnMount = got.learn;
     const debriefMount = got.debrief;
@@ -153,7 +153,7 @@ describe("surface-mount layer", () => {
     expect(crate.classList.contains("surface--mounted")).toBe(false);
     expect(crate.querySelector<HTMLElement>(".surface-mount")!.hidden).toBe(true);
     expect(crate.querySelector(".surface-empty")?.textContent).toContain(
-      "Viber is waiting for your crate.",
+      "Viber is ready for your library.",
     );
   });
 });

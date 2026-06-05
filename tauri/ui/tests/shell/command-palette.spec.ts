@@ -134,7 +134,7 @@ describe("command palette — accelerators teach the shortcuts", () => {
     input.value = "viber";
     input.dispatchEvent(new Event("input"));
     let labels = Array.from(palette.querySelectorAll(".pi-label")).map((e) => e.textContent?.trim());
-    expect(labels).toEqual(["Go to Crate"]);
+    expect(labels).toEqual(["Go to Viber"]);
 
     input.value = "proof";
     input.dispatchEvent(new Event("input"));
