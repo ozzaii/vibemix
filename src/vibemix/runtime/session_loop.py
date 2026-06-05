@@ -73,6 +73,7 @@ from vibemix.ui_bus.messages import (
     IpcBoot,
     IpcError,
     LevelPair,
+    LibraryImportProgress,
     MetersTriple,
     MidiEventEntry,
     ProfileDeleteAck,
@@ -162,6 +163,36 @@ def _now_iso() -> str:
     return datetime.now(UTC).isoformat()
 
 
+def _parse_folder_import_progress(line: str) -> tuple[int, int, str, str] | None:
+    """Parse folder_ingest's human progress line into IPC progress fields.
+
+    Expected shape: ``[<done>/<total>] <ok|skip|err> <filename>  ~€<cost>``.
+    The cost suffix is intentionally ignored by the older
+    ``ipc.library.import_progress`` schema.
+    """
+    line = line.strip()
+    if not line.startswith("["):
+        return None
+    close = line.find("]")
+    if close < 0:
+        return None
+    counts = line[1:close]
+    slash = counts.find("/")
+    if slash < 0:
+        return None
+    try:
+        done = int(counts[:slash].strip())
+        total = int(counts[slash + 1 :].strip())
+    except ValueError:
+        return None
+    rest = line[close + 1 :].strip()
+    status, sep, after_status = rest.partition(" ")
+    if not sep or status not in {"ok", "skip", "err"}:
+        return None
+    filename = after_status.rsplit("~€", 1)[0].strip()
+    return total, done, status, filename[:200]
+
+
 class SessionLoop:
     """Live-session ipc.* runtime.
 
@@ -230,6 +261,8 @@ class SessionLoop:
         self._snapshot_task: asyncio.Task | None = None
         self._retention_task: asyncio.Task | None = None
         self._parent_watch_task: asyncio.Task | None = None
+        self._library_import_task: asyncio.Task | None = None
+        self._library_import_cancel_requested: bool = False
         # Phase 64 — the ref-kept boot-ingest task (created in run_boot_sweeps).
         # Declared here so run()'s teardown can cancel+await it; otherwise a
         # fast boot→shutdown orphans it ("Task was destroyed but pending"). WR-02.
@@ -293,6 +326,11 @@ class SessionLoop:
         self.bus.register_handler("ipc.recordings.list", self._on_recordings_list)
         self.bus.register_handler("ipc.recordings.delete", self._on_recordings_delete)
         self.bus.register_handler("ipc.recordings.events", self._on_recordings_events)
+        # Library import from the main settings/onboarding surface. The separate
+        # Library window uses the Tauri command bridge; this handler keeps the
+        # legacy/fresh-user ipc path alive for folder/XML imports.
+        self.bus.register_handler("ipc.library.import", self._on_library_import)
+        self.bus.register_handler("ipc.library.import_cancel", self._on_library_import_cancel)
         # Phase 32 / PROFILE-07 — Settings → Profile panel.
         # Three request-reply pairs:
         #   view       → view_result   (snapshot + bytes + consent)
@@ -695,6 +733,242 @@ class SessionLoop:
                     ).to_json()
                 )
             )
+
+    # ------------------------------------------------------------------
+    # Library import handlers
+    # ------------------------------------------------------------------
+
+    async def _on_library_import(self, msg: dict) -> None:
+        """Start a folder/XML library import from the main app IPC bus."""
+        payload = msg.get("payload", {})
+        raw_path = payload.get("path")
+        if not isinstance(raw_path, str) or not raw_path.strip():
+            await self._emit_ipc_error(
+                "library.import rejected: path missing",
+                "ipc.library.import",
+            )
+            return
+        if self._library_import_task is not None and not self._library_import_task.done():
+            await self._emit_ipc_error(
+                "library.import rejected: import already running",
+                "ipc.library.import",
+            )
+            return
+
+        source_path = Path(raw_path).expanduser()
+        self._library_import_cancel_requested = False
+        self._library_import_task = asyncio.create_task(
+            self._run_library_import(source_path),
+            name="library-import",
+        )
+
+    async def _on_library_import_cancel(self, _msg: dict) -> None:
+        """Best-effort cancel flag for the in-flight main-bus import."""
+        self._library_import_cancel_requested = True
+        task = self._library_import_task
+        if task is not None and not task.done():
+            task.cancel()
+        await self._emit_library_import_progress(
+            total=0,
+            done=0,
+            current_track_name="",
+            cache_hits=0,
+            cancelled=True,
+        )
+
+    async def _run_library_import(self, source_path: Path) -> None:
+        try:
+            if source_path.is_dir():
+                await self._start_folder_import(source_path)
+                return
+            catalog_source = self._catalog_source_for_import_path(source_path)
+            if catalog_source is not None:
+                await self._start_catalog_source_import(catalog_source)
+                return
+            await self._start_xml_import(source_path)
+        except asyncio.CancelledError:
+            log.info("library import cancelled: %s", source_path)
+        except Exception as exc:
+            log.exception("library import failed: %s", source_path)
+            await self._emit_ipc_error(
+                f"library.import failed: {type(exc).__name__}: {exc}",
+                "ipc.library.import",
+            )
+
+    async def _start_folder_import(self, folder: Path) -> None:
+        """Run raw-folder ingest off-loop and bridge progress to IPC."""
+        loop = asyncio.get_running_loop()
+
+        def _worker():
+            from vibemix.library import build_embedder, ingest_folder, open_store
+
+            embedder = build_embedder()
+            store = open_store()
+            cache_hits = 0
+            try:
+                def _progress(line: str) -> None:
+                    nonlocal cache_hits
+                    parsed = _parse_folder_import_progress(line)
+                    if parsed is None:
+                        return
+                    total, done, status, filename = parsed
+                    if status == "skip":
+                        cache_hits += 1
+                    future = asyncio.run_coroutine_threadsafe(
+                        self._emit_library_import_progress(
+                            total=total,
+                            done=done,
+                            current_track_name=filename,
+                            cache_hits=cache_hits,
+                            cancelled=self._library_import_cancel_requested,
+                        ),
+                        loop,
+                    )
+                    try:
+                        future.result(timeout=5)
+                    except Exception as emit_exc:
+                        log.warning("library folder progress emit failed: %s", emit_exc)
+
+                return ingest_folder(
+                    folder,
+                    embedder,
+                    store,
+                    persist_library=True,
+                    progress=_progress,
+                )
+            finally:
+                store.close()
+
+        report = await loop.run_in_executor(None, _worker)
+        await self._refresh_library_registry()
+        await self._emit_library_import_progress(
+            total=int(getattr(report, "total", 0)),
+            done=int(getattr(report, "total", 0)),
+            current_track_name="",
+            cache_hits=int(getattr(report, "skipped_cached", 0)),
+            cancelled=False,
+        )
+
+    @staticmethod
+    def _catalog_source_for_import_path(source_path: Path):
+        """Infer non-Rekordbox catalog source classes from the selected path."""
+        name = source_path.name.lower()
+        suffix = source_path.suffix.lower()
+        if suffix == ".nml":
+            from vibemix.library.sources.traktor import TraktorSource
+
+            return TraktorSource(nml_path=str(source_path))
+        if name == "database.xml":
+            from vibemix.library.sources.virtualdj import VirtualDJSource
+
+            return VirtualDJSource(database_path=str(source_path))
+        if name == "m.db" or suffix == ".db":
+            from vibemix.library.sources.engine import EngineDJSource
+
+            return EngineDJSource(database_path=str(source_path))
+        return None
+
+    async def _start_catalog_source_import(self, source) -> None:
+        """Run a parsed DJ-library source through the shared ingest orchestrator."""
+        loop = asyncio.get_running_loop()
+
+        def _worker():
+            from vibemix.library import build_embedder, open_store
+            from vibemix.library.ingest import ingest_source
+
+            embedder = build_embedder()
+            store = open_store()
+            try:
+                return ingest_source(
+                    source,
+                    embedder,
+                    store,
+                    persist_library=True,
+                )
+            finally:
+                store.close()
+
+        report = await loop.run_in_executor(None, _worker)
+        await self._refresh_library_registry()
+        await self._emit_library_import_progress(
+            total=int(getattr(report, "total", 0)),
+            done=int(getattr(report, "embedded", 0)) + int(getattr(report, "failed", 0)),
+            current_track_name="",
+            cache_hits=int(getattr(report, "skipped_cached", 0)),
+            cancelled=False,
+        )
+
+    async def _start_xml_import(self, xml_path: Path) -> None:
+        """Run Rekordbox XML import through the existing importer."""
+        from vibemix.library import build_embedder, open_store
+        from vibemix.library.importer import import_library_async
+
+        loop = asyncio.get_running_loop()
+        embedder = await loop.run_in_executor(None, build_embedder)
+        store = await loop.run_in_executor(None, open_store)
+        progress_tasks: list[asyncio.Task] = []
+
+        def _on_progress(payload: dict) -> None:
+            progress_tasks.append(
+                asyncio.create_task(
+                    self._emit_library_import_progress(
+                        total=int(payload.get("total", 0)),
+                        done=int(payload.get("done", 0)),
+                        current_track_name=str(payload.get("current_track_name", ""))[:200],
+                        cache_hits=int(payload.get("cache_hits", 0)),
+                        cancelled=bool(payload.get("cancelled", False)),
+                    )
+                )
+            )
+
+        try:
+            await import_library_async(
+                xml_path,
+                embedder,
+                store,
+                on_progress=_on_progress,
+                evidence_registry=self.evidence_registry,
+            )
+            if progress_tasks:
+                await asyncio.gather(*progress_tasks, return_exceptions=True)
+        finally:
+            store.close()
+
+    async def _refresh_library_registry(self) -> None:
+        if self.evidence_registry is None:
+            return
+        try:
+            from vibemix.library.rekordbox import RekordboxLibrary
+
+            lib = RekordboxLibrary()
+            if lib.try_load_cache():
+                n = self.evidence_registry.register_library(lib)  # type: ignore[attr-defined]
+                log.info("post-import EvidenceRegistry refreshed: %s tracks", n)
+        except Exception as exc:
+            log.warning("post-import registry refresh failed: %s", exc)
+
+    async def _emit_library_import_progress(
+        self,
+        *,
+        total: int,
+        done: int,
+        current_track_name: str,
+        cache_hits: int,
+        cancelled: bool,
+    ) -> None:
+        progress = LibraryImportProgress.make(
+            total=max(0, total),
+            done=max(0, done),
+            current_track_name=current_track_name[:200],
+            cache_hits=max(0, cache_hits),
+            cancelled=cancelled,
+        )
+        await self.bus.emit(json.loads(progress.to_json()))
+
+    async def _emit_ipc_error(self, reason: str, original_type: str) -> None:
+        await self.bus.emit(
+            json.loads(IpcError.make(reason=reason, original_type=original_type).to_json())
+        )
 
     # ------------------------------------------------------------------
     # Phase 32 / PROFILE-07 — Settings → Profile panel handlers

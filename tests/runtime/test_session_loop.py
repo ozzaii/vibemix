@@ -30,11 +30,13 @@ import asyncio
 import json
 from collections.abc import Awaitable, Callable
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
 
 from vibemix.runtime import config_store as cs_mod
+from vibemix.runtime import session_loop as session_loop_mod
 from vibemix.runtime.config_store import ConfigStore
 from vibemix.runtime.session_loop import (
     SNAPSHOT_INTERVAL,
@@ -172,6 +174,8 @@ def test_register_handlers_covers_all_session_types(fake_bus: FakeBus) -> None:
     loop = SessionLoop(fake_bus)
     loop.register_handlers()
     expected = {
+        "ipc.library.import",
+        "ipc.library.import_cancel",
         "ipc.session.mute",
         "ipc.settings.set",
         "ipc.settings.set_brain",
@@ -179,6 +183,140 @@ def test_register_handlers_covers_all_session_types(fake_bus: FakeBus) -> None:
         "ipc.status.recheck",
     }
     assert expected.issubset(set(fake_bus.handlers.keys()))
+
+
+def test_parse_folder_import_progress_line() -> None:
+    parsed = session_loop_mod._parse_folder_import_progress(
+        "[12/40] skip My Cool Track (Extended Mix).flac  ~€0.0000"
+    )
+    assert parsed == (40, 12, "skip", "My Cool Track (Extended Mix).flac")
+    assert session_loop_mod._parse_folder_import_progress("random banner") is None
+
+
+def test_library_import_routes_folder_to_ingest(
+    fake_bus: FakeBus, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import vibemix.library as library_mod
+
+    folder = tmp_path / "crate"
+    folder.mkdir()
+    calls: dict[str, object] = {}
+
+    class FakeStore:
+        def close(self) -> None:
+            calls["closed"] = True
+
+    def fake_ingest_folder(folder_arg, embedder, store, **kwargs):
+        calls["folder"] = folder_arg
+        calls["persist_library"] = kwargs.get("persist_library")
+        progress = kwargs["progress"]
+        progress("[1/2] ok first.mp3  ~€0.0000")
+        progress("[2/2] skip second.mp3  ~€0.0000")
+        return SimpleNamespace(total=2, skipped_cached=1)
+
+    monkeypatch.setattr(library_mod, "build_embedder", lambda *a, **k: object())
+    monkeypatch.setattr(library_mod, "open_store", lambda *a, **k: FakeStore())
+    monkeypatch.setattr(library_mod, "ingest_folder", fake_ingest_folder)
+
+    loop = SessionLoop(fake_bus)
+
+    async def _run() -> None:
+        await loop._on_library_import(
+            {
+                "type": "ipc.library.import",
+                "ts": "2026-06-05T00:00:00Z",
+                "payload": {"path": str(folder), "schema_version": "1"},
+            }
+        )
+        assert loop._library_import_task is not None
+        await loop._library_import_task
+
+    asyncio.run(_run())
+
+    assert calls["folder"] == folder
+    assert calls["persist_library"] is True
+    assert calls["closed"] is True
+    progress = fake_bus.emitted_by_type("ipc.library.import_progress")
+    assert [p["payload"]["done"] for p in progress] == [1, 2, 2]
+    assert progress[-1]["payload"]["cache_hits"] == 1
+
+
+def test_library_import_routes_xml_to_existing_importer(
+    fake_bus: FakeBus, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import vibemix.library as library_mod
+    import vibemix.library.importer as importer_mod
+
+    xml_path = tmp_path / "collection.xml"
+    calls: dict[str, object] = {}
+
+    class FakeStore:
+        def close(self) -> None:
+            calls["closed"] = True
+
+    async def fake_import_library_async(
+        xml_arg, embedder, store, *, on_progress, evidence_registry
+    ):
+        calls["xml"] = xml_arg
+        calls["evidence_registry"] = evidence_registry
+        on_progress(
+            {
+                "total": 3,
+                "done": 1,
+                "current_track_name": "Artist - Track",
+                "cache_hits": 0,
+                "cancelled": False,
+            }
+        )
+        return {"total": 3, "done": 1, "cache_hits": 0, "cancelled": False}
+
+    registry = MagicMock()
+    monkeypatch.setattr(library_mod, "build_embedder", lambda *a, **k: object())
+    monkeypatch.setattr(library_mod, "open_store", lambda *a, **k: FakeStore())
+    monkeypatch.setattr(importer_mod, "import_library_async", fake_import_library_async)
+
+    loop = SessionLoop(fake_bus, evidence_registry=registry)
+
+    async def _run() -> None:
+        await loop._on_library_import(
+            {
+                "type": "ipc.library.import",
+                "ts": "2026-06-05T00:00:00Z",
+                "payload": {"path": str(xml_path), "schema_version": "1"},
+            }
+        )
+        assert loop._library_import_task is not None
+        await loop._library_import_task
+
+    asyncio.run(_run())
+
+    assert calls["xml"] == xml_path
+    assert calls["evidence_registry"] is registry
+    assert calls["closed"] is True
+    progress = fake_bus.emitted_by_type("ipc.library.import_progress")
+    assert len(progress) == 1
+    assert progress[0]["payload"]["current_track_name"] == "Artist - Track"
+
+
+def test_library_import_routes_catalog_before_xml(
+    fake_bus: FakeBus, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    loop = SessionLoop(fake_bus)
+    catalog = tmp_path / "collection.nml"
+    calls: dict[str, object] = {}
+
+    async def fake_catalog_import(source) -> None:
+        calls["catalog_source"] = type(source).__name__
+
+    async def fake_xml_import(path: Path) -> None:
+        calls["xml"] = path
+
+    monkeypatch.setattr(loop, "_start_catalog_source_import", fake_catalog_import)
+    monkeypatch.setattr(loop, "_start_xml_import", fake_xml_import)
+
+    asyncio.run(loop._run_library_import(catalog))
+
+    assert calls == {"catalog_source": "TraktorSource"}
 
 
 # ---------------------------------------------------------------------------

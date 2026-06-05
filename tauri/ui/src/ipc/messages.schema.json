@@ -155,6 +155,15 @@
       "$ref": "#/definitions/DebriefError"
     },
     {
+      "$ref": "#/definitions/LibraryImport"
+    },
+    {
+      "$ref": "#/definitions/LibraryImportProgress"
+    },
+    {
+      "$ref": "#/definitions/LibraryImportCancel"
+    },
+    {
       "$ref": "#/definitions/LibraryStalenessNudge"
     },
     {
@@ -2547,6 +2556,73 @@
               ]
             },
             "message": { "type": "string" }
+          }
+        }
+      }
+    },
+    "LibraryImport": {
+      "$comment": "Plan 28-06 \u2014 renderer to sidecar. Start a library import from a folder or Rekordbox XML path.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "ts", "payload"],
+      "properties": {
+        "type": { "const": "ipc.library.import" },
+        "ts": { "type": "string", "format": "date-time" },
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["path", "schema_version"],
+          "properties": {
+            "path": { "type": "string", "minLength": 1 },
+            "schema_version": { "const": "1" }
+          }
+        }
+      }
+    },
+    "LibraryImportProgress": {
+      "$comment": "Plan 28-06 \u2014 sidecar to renderer. Per-track or final library import progress.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "ts", "payload"],
+      "properties": {
+        "type": { "const": "ipc.library.import_progress" },
+        "ts": { "type": "string", "format": "date-time" },
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "total",
+            "done",
+            "current_track_name",
+            "cache_hits",
+            "cancelled",
+            "schema_version"
+          ],
+          "properties": {
+            "total": { "type": "integer", "minimum": 0 },
+            "done": { "type": "integer", "minimum": 0 },
+            "current_track_name": { "type": "string" },
+            "cache_hits": { "type": "integer", "minimum": 0 },
+            "cancelled": { "type": "boolean" },
+            "schema_version": { "const": "1" }
+          }
+        }
+      }
+    },
+    "LibraryImportCancel": {
+      "$comment": "Plan 28-06 \u2014 renderer to sidecar. Request cancellation of the in-flight library import.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "ts", "payload"],
+      "properties": {
+        "type": { "const": "ipc.library.import_cancel" },
+        "ts": { "type": "string", "format": "date-time" },
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["schema_version"],
+          "properties": {
+            "schema_version": { "const": "1" }
           }
         }
       }

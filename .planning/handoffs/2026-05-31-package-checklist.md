@@ -10799,3 +10799,45 @@ Proof before staging:
 - `cargo fmt --manifest-path tauri/src-tauri/Cargo.toml`
 - `cargo test --manifest-path tauri/src-tauri/Cargo.toml library_cmds::tests`
 - `git diff --check -- tauri/src-tauri/src/library_cmds.rs .planning/handoffs/2026-05-31-package-checklist.md`
+
+## Package 92 - Main-Bus Library Import Wiring
+
+Suggested commit: `fix(library): restore ipc import handler`
+
+Include:
+
+- `src/vibemix/runtime/session_loop.py`
+- `tests/runtime/test_session_loop.py`
+- `tauri/ui/src/ipc/messages.schema.json`
+- `tauri/ui/src/ipc/messages.ts`
+- `tauri/ui/src/ipc/validator.generated.mjs`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Library UI layout, standalone Library-window command behavior, model
+  installation, cache resets, and new source parser behavior. This package
+  restores the main app's existing `ipc.library.import` contract, using the
+  already-shipped folder/XML/catalog ingest paths and schema parity.
+
+Reason:
+
+- The Python `LibraryImport*` wrappers and UI schema tests still existed, but
+  the live `SessionLoop` registered no `ipc.library.import` handler and the
+  JSON schema had dropped the three import oneOf branches. A fresh user could
+  emit `ipc.library.import` from the main app and get no real import path or
+  progress validation. Register import/cancel handlers, route folders through
+  `ingest_folder`, infer known DJ catalog files before the XML fallback, route
+  XML through `import_library_async`, emit validated
+  `ipc.library.import_progress`, and regenerate the TS IPC validator.
+
+Proof before staging:
+
+- `uv run pytest -q tests/runtime/test_session_loop.py::test_register_handlers_covers_all_session_types tests/runtime/test_session_loop.py::test_parse_folder_import_progress_line tests/runtime/test_session_loop.py::test_library_import_routes_folder_to_ingest tests/runtime/test_session_loop.py::test_library_import_routes_xml_to_existing_importer tests/runtime/test_session_loop.py::test_library_import_routes_catalog_before_xml`
+- `uv run pytest -q tests/ui_bus/test_messages_schema.py tests/ipc/test_library_schemas.py`
+- `npm --prefix tauri/ui run codegen:ipc`
+- `npm --prefix tauri/ui run check:ipc`
+- `uv run python scripts/check_ipc_schema.py`
+- `uv run ruff check src/vibemix/runtime/session_loop.py tests/runtime/test_session_loop.py`
+- `uv run python -m compileall -q src/vibemix/runtime/session_loop.py tests/runtime/test_session_loop.py`
+- `git diff --check -- src/vibemix/runtime/session_loop.py tests/runtime/test_session_loop.py tauri/ui/src/ipc/messages.schema.json tauri/ui/src/ipc/messages.ts tauri/ui/src/ipc/validator.generated.mjs .planning/handoffs/2026-05-31-package-checklist.md`
