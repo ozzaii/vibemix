@@ -11623,6 +11623,40 @@ Proof before staging:
 - `git diff --check -- tauri/ui/src/learn/live-meter.ts tauri/ui/src/learn/styles/learn.css tauri/ui/tests/learn/live-meter.spec.ts .planning/handoffs/2026-05-31-package-checklist.md`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
 
+## Package 117 - Memory Ingest Sidecar Erasure Cascade
+
+Suggested commit: `fix(memory): purge ingest artifacts on session erase`
+
+Include:
+
+- `src/vibemix/memory/ingest.py`
+- `src/vibemix/memory/ingest_artifacts.py`
+- `src/vibemix/memory/store.py`
+- `tests/memory/test_store.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Retention policy changes, recall prompt behavior, UI settings, and new
+  embedding semantics. This package only makes `MemoryStore.delete_session()`
+  cascade into the ingest-owned marker/cache sidecar.
+
+Reason:
+
+- `memory_ingest.db` stores per-session idempotency markers and a content-hash
+  embed cache next to `memory.db`. Deleting a memory session erased moments and
+  vectors but left stale ingest artifacts behind. Delete the session marker,
+  clear the content-addressed cache conservatively after a real erasure, and
+  still purge stale markers when the live moments are already gone.
+
+Proof before staging:
+
+- `uv run pytest -q tests/memory/test_store.py`
+- `uv run ruff check src/vibemix/memory/ingest.py src/vibemix/memory/ingest_artifacts.py src/vibemix/memory/store.py tests/memory/test_store.py`
+- `uv run python -m compileall -q src/vibemix/memory/ingest.py src/vibemix/memory/ingest_artifacts.py src/vibemix/memory/store.py tests/memory/test_store.py`
+- `git diff --check -- src/vibemix/memory/ingest.py src/vibemix/memory/ingest_artifacts.py src/vibemix/memory/store.py tests/memory/test_store.py .planning/handoffs/2026-05-31-package-checklist.md`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+
 ## Package 115 - Learn Gallop Beat Trains
 
 Suggested commit: `feat(learn-ui): show gallop beat trains`

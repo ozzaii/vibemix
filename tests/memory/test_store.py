@@ -28,12 +28,14 @@ Ranking everywhere routes through ``cosine_topk`` (imported from
 
 from __future__ import annotations
 
+import sqlite3
 from pathlib import Path
 
 import numpy as np
 import pytest
 
 from vibemix.library._cosine import EMBEDDING_DIM, l2_normalize
+from vibemix.memory.ingest_artifacts import ensure_ingest_db_for_store_path
 from vibemix.memory.store import MemoryStore
 
 
@@ -113,6 +115,76 @@ def test_delete_cascade(tmp_path: Path) -> None:
     assert all(not r.record_id.startswith("s1:") for r in survivors)
     # Deleting an already-gone session is a no-op (idempotent), returns 0.
     assert store.delete_session("s1") == 0
+
+
+def _seed_ingest_sidecar(db_path: Path, *session_ids: str) -> None:
+    conn = ensure_ingest_db_for_store_path(db_path)
+    try:
+        for session_id in session_ids:
+            conn.execute(
+                "INSERT OR REPLACE INTO memory_ingested "
+                "(session_id, ingested_at, sig_template_version) VALUES (?, ?, ?)",
+                (session_id, 123.0, "test"),
+            )
+        for idx, session_id in enumerate(session_ids):
+            conn.execute(
+                "INSERT OR REPLACE INTO embed_cache (key, vector, ts) VALUES (?, ?, ?)",
+                (
+                    f"cache-{session_id}",
+                    np.zeros(EMBEDDING_DIM, dtype=np.float32).tobytes(),
+                    idx,
+                ),
+            )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def _sidecar_counts(db_path: Path) -> tuple[set[str], int]:
+    conn = sqlite3.connect(str(db_path.parent / "memory_ingest.db"))
+    try:
+        markers = {
+            str(row[0])
+            for row in conn.execute("SELECT session_id FROM memory_ingested").fetchall()
+        }
+        cache_count = int(conn.execute("SELECT COUNT(*) FROM embed_cache").fetchone()[0])
+        return markers, cache_count
+    finally:
+        conn.close()
+
+
+def test_delete_cascade_purges_ingest_marker_and_content_hash_cache(tmp_path: Path) -> None:
+    """STORE-03 — session erasure also clears ingest sidecar personal vectors.
+
+    ``embed_cache`` is content-addressed, not session-addressed, so deleting one
+    live session clears the whole ingest cache while leaving other session
+    markers intact. Cache hits are cheaper than privacy surprises.
+    """
+    db_path = tmp_path / "memory.db"
+    store = MemoryStore(db_path=db_path, prefer_sqlite_vec=False)
+    store.add_record("s1:0", "s1", 1.0, "moment", "s1", _vec(1))
+    store.add_record("s2:0", "s2", 2.0, "moment", "s2", _vec(2))
+    _seed_ingest_sidecar(db_path, "s1", "s2")
+
+    assert store.delete_session("s1") == 1
+
+    markers, cache_count = _sidecar_counts(db_path)
+    assert markers == {"s2"}
+    assert cache_count == 0
+    assert {row.session_id for row in store.query_topk(_vec(2), k=10)} == {"s2"}
+
+
+def test_delete_session_purges_stale_ingest_marker_without_live_moments(tmp_path: Path) -> None:
+    """STORE-03 — an already-evicted session can still shed stale ingest artifacts."""
+    db_path = tmp_path / "memory.db"
+    store = MemoryStore(db_path=db_path, prefer_sqlite_vec=False)
+    _seed_ingest_sidecar(db_path, "s1")
+
+    assert store.delete_session("s1") == 0
+
+    markers, cache_count = _sidecar_counts(db_path)
+    assert markers == set()
+    assert cache_count == 0
 
 
 @pytest.mark.parametrize(

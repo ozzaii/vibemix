@@ -19,11 +19,11 @@ Hard invariants (64-CONTEXT / 64-RESEARCH / 64-PATTERNS):
       the whole session) + a signature-keyed content-hash embed cache (skip the
       API call even on a marker loss / template bump). Re-ingest = 0 embeds, 0
       new records.
-    * A4 marker↔retention coupling — solved WITHOUT editing Phase-63 code: the
+    * A4 marker↔retention coupling — the
       idempotency short-circuit is gated on BOTH the marker row (with a matching
       ``SIG_TEMPLATE_VERSION``) AND ``COUNT(*) FROM moments WHERE session_id=?``
-      > 0, so a retention-evicted session (0 moments) re-ingests even though its
-      stale marker survives.
+      > 0, so a retention-evicted session (0 moments) re-ingests if a stale
+      marker ever survives an erasure cascade.
     * MIRROR, don't import: the ~12-line malformed-tolerant JSONL read is
       re-implemented here (no 5-min ``SessionTooShort`` floor); ``SESSION_DIR_RE``
       + ``is_relative_to(root.resolve())`` are copied for the sweep path defense.
@@ -52,6 +52,10 @@ from pathlib import Path
 import numpy as np
 
 from vibemix.library._cosine import EMBEDDING_DIM
+from vibemix.memory.ingest_artifacts import (
+    ensure_ingest_db_for_store_path,
+    ingest_db_path_for_store_path,
+)
 from vibemix.memory.store import MemoryStore
 from vibemix.state.deck_context import normalize_audio_window_context_text
 
@@ -289,34 +293,12 @@ def _ingest_db_path(store: MemoryStore) -> Path:
     backend connection (that would couple to Phase-63 internals; the marker +
     cache are a Phase-64 concern).
     """
-    return store._db_path.parent / "memory_ingest.db"
+    return ingest_db_path_for_store_path(store._db_path)
 
 
 def _open_ingest_db(store: MemoryStore) -> sqlite3.Connection:
     """Open the ingest sqlite DB and ensure both tables exist (idempotent)."""
-    db_path = _ingest_db_path(store)
-    db_path.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(str(db_path))
-    # memory_ingested marker (RESEARCH §idempotency marker schema; mirrors
-    # store.py's CREATE TABLE IF NOT EXISTS idiom).
-    conn.execute(
-        "CREATE TABLE IF NOT EXISTS memory_ingested ("
-        "session_id           TEXT PRIMARY KEY, "
-        "ingested_at          REAL NOT NULL, "
-        "sig_template_version TEXT NOT NULL"
-        ")"
-    )
-    # embed_cache — CLONE of embed.py:146-157 (shape verbatim). Lives in the
-    # memory layer; library/embed.py is UNMODIFIED.
-    conn.execute(
-        "CREATE TABLE IF NOT EXISTS embed_cache ("
-        "key TEXT PRIMARY KEY, "
-        "vector BLOB NOT NULL, "
-        "ts REAL NOT NULL"
-        ")"
-    )
-    conn.commit()
-    return conn
+    return ensure_ingest_db_for_store_path(store._db_path)
 
 
 def _embed_cache_key(signature: str, model_id: str) -> str:

@@ -7,7 +7,7 @@ the Phase 65 retrieval seam):
     store = MemoryStore()                       # durable memory.db, sqlite-vec primary
     store.add_record(rid, sid, ts, kind, sig, vec)
     hits = store.query_topk(query_vec, k=8)     # list[Record], raw signature verbatim
-    store.delete_session(sid)                   # cascade vectors + metadata
+    store.delete_session(sid)                   # cascade vectors + metadata + ingest sidecars
 
 Architecture (63-RESEARCH.md §Pattern 1, "compose-not-subclass"):
     * A ``library``-style vector backend (``SqliteVecMemoryStore`` primary,
@@ -343,7 +343,7 @@ class MemoryStore:
         return [self._join_moment(rid, cos) for rid, cos in hits]
 
     def delete_session(self, session_id: str) -> int:
-        """Remove every record of ``session_id`` from vectors + metadata.
+        """Remove every record of ``session_id`` from vectors, metadata, and ingest sidecars.
 
         Path-traversal-defended (T-63-07): a crafted ``session_id`` is rejected
         by ``_validate_session_id`` BEFORE any lookup or delete — it never
@@ -358,8 +358,15 @@ class MemoryStore:
         transaction is impossible; the order (moments-row delete first, then
         vector delete) leaves at worst a reconcilable orphan vector — never a
         metadata row pointing at a missing vector — which ``reconcile_orphans``
-        sweeps up (Pitfall 3). Idempotent: deleting an already-gone session
-        returns 0 without a write.
+        sweeps up (Pitfall 3).
+
+        Ingest sidecar cascade: the sibling ``memory_ingest.db`` holds an
+        idempotency marker and a content-hash embed cache for admitted
+        signatures. The cache is not keyed by session, so a real session erase
+        clears the whole ingest cache conservatively after the vector+metadata
+        delete succeeds. A stale marker for an already-gone session is also
+        removed; the method still returns 0 because no live moments were
+        deleted.
         """
         _validate_session_id(session_id, self._db_path)
         rows = self._moments.execute(
@@ -368,6 +375,7 @@ class MemoryStore:
         ).fetchall()
         record_ids = [r[0] for r in rows]
         if not record_ids:
+            self._purge_ingest_artifacts(session_id, clear_embed_cache=False)
             return 0
         # Delete the moments rows on the moments connection WITHOUT committing
         # yet, so that on the sqlite-vec path (shared connection) the backend's
@@ -384,7 +392,33 @@ class MemoryStore:
         # self._moments, so this single commit also flushes the moments delete
         # staged above — one atomic transaction, no orphaned vectors.
         self._backend.delete(record_ids)
+        self._purge_ingest_artifacts(session_id, clear_embed_cache=True)
         return len(record_ids)
+
+    def _purge_ingest_artifacts(self, session_id: str, *, clear_embed_cache: bool) -> None:
+        """Best-effort purge of ingest markers/cache for a session erasure."""
+        try:
+            from vibemix.memory.ingest_artifacts import purge_session_ingest_artifacts
+
+            result = purge_session_ingest_artifacts(
+                self._db_path,
+                session_id,
+                clear_embed_cache=clear_embed_cache,
+            )
+            if result.markers_deleted or result.cache_rows_deleted:
+                logger.info(
+                    "memory delete_session(%s): purged %d ingest marker(s), "
+                    "%d cache row(s)",
+                    session_id,
+                    result.markers_deleted,
+                    result.cache_rows_deleted,
+                )
+        except Exception as e:  # pragma: no cover - erasure sidecar is best-effort
+            logger.warning(
+                "memory delete_session(%s): ingest sidecar purge failed: %s",
+                session_id,
+                e,
+            )
 
     def reconcile_orphans(self) -> int:
         """Drop vec records that have no matching ``moments`` row.
