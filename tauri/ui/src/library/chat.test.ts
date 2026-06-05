@@ -1604,8 +1604,8 @@ describe("chat - real runChat path", () => {
       document.getElementById("vmx-lib-model-state")?.textContent ?? "";
 
     expect(search).toBe("local");
-    expect(setup).toContain("search ready");
-    expect(setup).toContain("cue export ready");
+    expect(setup).toContain("Sound match ready");
+    expect(setup).toContain("Cue finder ready");
     expect(search).not.toContain("sqlite-vec");
     expect(setup).not.toContain("CLAP ready");
     expect(setup).not.toContain("MOSS ready");

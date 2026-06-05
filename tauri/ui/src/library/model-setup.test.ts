@@ -75,7 +75,7 @@ describe("deriveModelSetupView", () => {
   it("hides the install button when CLAP, MOSS, and CUE are ready", () => {
     const view = deriveModelSetupView(payload());
 
-    expect(view.stateText).toBe("search ready · voice ready · cue export ready");
+    expect(view.stateText).toBe("Sound match ready · Voice ready · Cue finder ready");
     expect(view.installTarget).toBeNull();
     expect(view.installButtonHidden).toBe(true);
   });
@@ -93,10 +93,10 @@ describe("deriveModelSetupView", () => {
       }),
     );
 
-    expect(view.stateText).toBe("search missing · voice ready · cue export optional");
+    expect(view.stateText).toBe("Sound match missing · Voice ready · Cue finder optional");
     expect(view.installTarget).toBe("required");
     expect(view.installButtonHidden).toBe(false);
-    expect(view.installButtonText).toBe("Install Required Models");
+    expect(view.installButtonText).toBe("Install Sound Match + Voice");
   });
 
   it("routes missing MOSS through required setup without pretending it is CLAP", () => {
@@ -116,10 +116,10 @@ describe("deriveModelSetupView", () => {
       }),
     );
 
-    expect(view.stateText).toBe("search ready · voice manual setup · cue export ready");
+    expect(view.stateText).toBe("Sound match ready · Voice manual setup · Cue finder ready");
     expect(view.installTarget).toBe("required");
     expect(view.installButtonHidden).toBe(false);
-    expect(view.installButtonText).toBe("Install Required Models");
+    expect(view.installButtonText).toBe("Install Sound Match + Voice");
   });
 
   it("labels an operator-hosted MOSS install as missing when pins are configured", () => {
@@ -139,7 +139,7 @@ describe("deriveModelSetupView", () => {
       }),
     );
 
-    expect(view.stateText).toBe("search ready · voice missing · cue export ready");
+    expect(view.stateText).toBe("Sound match ready · Voice missing · Cue finder ready");
     expect(view.installTarget).toBe("required");
   });
 
@@ -155,7 +155,7 @@ describe("deriveModelSetupView", () => {
       }),
     );
 
-    expect(view.stateText).toBe("search ready · voice ready · cue export optional");
+    expect(view.stateText).toBe("Sound match ready · Voice ready · Cue finder optional");
     expect(view.installTarget).toBeNull();
     expect(view.installButtonHidden).toBe(true);
   });
@@ -176,9 +176,9 @@ describe("deriveModelSetupView", () => {
       }),
     );
 
-    expect(view.stateText).toBe("search ready · voice ready · cue export optional");
+    expect(view.stateText).toBe("Sound match ready · Voice ready · Cue finder optional");
     expect(view.installTarget).toBe("cue");
-    expect(view.installButtonText).toBe("Check Optional CUE");
+    expect(view.installButtonText).toBe("Check Cue Finder");
   });
 
   it("surfaces optional cue export repair separately from required CLAP setup", () => {
@@ -198,9 +198,9 @@ describe("deriveModelSetupView", () => {
       }),
     );
 
-    expect(view.stateText).toBe("search ready · voice ready · cue export repair");
+    expect(view.stateText).toBe("Sound match ready · Voice ready · Cue finder repair");
     expect(view.installTarget).toBe("cue");
-    expect(view.installButtonText).toBe("Repair CUE");
+    expect(view.installButtonText).toBe("Repair Cue Finder");
   });
 
   it("labels non-installable CUE mismatch as manual repair without a button", () => {
@@ -220,7 +220,7 @@ describe("deriveModelSetupView", () => {
       }),
     );
 
-    expect(view.stateText).toBe("search ready · voice ready · cue export manual repair");
+    expect(view.stateText).toBe("Sound match ready · Voice ready · Cue finder manual repair");
     expect(view.installTarget).toBeNull();
     expect(view.installButtonHidden).toBe(true);
   });
@@ -251,9 +251,9 @@ describe("deriveModelSetupView", () => {
       }),
     );
 
-    expect(view.stateText).toContain("Model setup failed: download failed");
+    expect(view.stateText).toContain("Sound match and voice setup failed: download failed");
     expect(view.installTarget).toBe("required");
-    expect(view.installButtonText).toBe("Retry Required Models");
+    expect(view.installButtonText).toBe("Retry Sound Match + Voice");
   });
 
   it("shows optional CUE retry copy without blocking required readiness", () => {
@@ -281,7 +281,7 @@ describe("deriveModelSetupView", () => {
       }),
     );
 
-    expect(view.stateText).toContain("Optional CUE setup unavailable");
+    expect(view.stateText).toContain("Cue finder setup unavailable");
     expect(view.installTarget).toBeNull();
     expect(view.installButtonHidden).toBe(true);
   });
@@ -316,7 +316,7 @@ describe("deriveModelSetupView", () => {
       }),
     );
 
-    expect(view.stateText).toContain("MOSS voice setup unavailable");
+    expect(view.stateText).toContain("Voice setup unavailable");
     expect(view.installTarget).toBe("required");
   });
 });

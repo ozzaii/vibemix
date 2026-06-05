@@ -819,7 +819,7 @@ function renderCueExport(result: LibraryCueResult): void {
     (entry): entry is [string, string] => typeof entry[1] === "string",
   );
   if (outputs.length === 0) {
-    rows.innerHTML = `<div class="vmx-lib-empty">No cue export written. Check the folder, CUE model setup, or try fewer cues.</div>`;
+    rows.innerHTML = `<div class="vmx-lib-empty">No cue export written. Check the folder, Cue finder setup, or try fewer cues.</div>`;
   } else {
     outputs.forEach(([format, output], index) => {
       rows.insertAdjacentHTML(
@@ -894,8 +894,8 @@ function embeddingLabel(stats: LibraryStats): string {
   const model =
     backend === "clap"
       ? stats.clap_model_installed === false
-        ? "search missing"
-        : "search ready"
+        ? "Sound match missing"
+        : "Sound match ready"
       : backend;
   const agent = (stats.agent_backend ?? "codex").toLowerCase();
   const agentLabel =
@@ -943,11 +943,15 @@ function installStatusLine(models: LibraryModelsResult): string | null {
   if (!install.ok) {
     const prefix =
       install.target === "cue"
-        ? "Optional CUE setup unavailable"
+        ? "Cue finder setup unavailable"
         : install.target === "moss"
-          ? "MOSS voice setup unavailable"
-        : "Model setup failed";
-    return errors[0] ? `${prefix}: ${errors[0]}` : prefix;
+          ? "Voice setup unavailable"
+          : install.target === "clap"
+            ? "Sound match setup failed"
+            : install.target === "all"
+              ? "Local setup failed"
+              : "Sound match and voice setup failed";
+    return errors[0] ? `${prefix}: ${modelSetupErrorCopy(errors[0])}` : prefix;
   }
 
   const files = install.results.flatMap((result) => result.files);
@@ -958,18 +962,25 @@ function installStatusLine(models: LibraryModelsResult): string | null {
   const verified = downloaded + skipped;
   const prefix =
     install.target === "required"
-      ? "Required models ready"
+      ? "Sound match and voice ready"
       : install.target === "cue"
-        ? "Optional CUE checked"
+        ? "Cue finder checked"
         : install.target === "moss"
-          ? "MOSS voice ready"
+          ? "Voice ready"
         : install.target === "all"
-          ? "Local models ready"
-          : "CLAP ready";
+          ? "Local tools ready"
+          : "Sound match ready";
   if (downloaded > 0)
     return `${prefix}: downloaded ${downloaded}/${files.length}`;
   if (verified > 0) return `${prefix}: verified ${verified} files`;
   return prefix;
+}
+
+function modelSetupErrorCopy(error: string): string {
+  if (/VIBEMIX_CUE_ONNX/i.test(error)) return "Cue finder setup path is not configured";
+  if (/VIBEMIX_MOSS/i.test(error)) return "Voice setup source is not configured";
+  if (/VIBEMIX_CLAP/i.test(error)) return "Sound match setup source is not configured";
+  return error.replace(/[A-Za-z0-9_.-]+\.onnx\b/g, "model file");
 }
 
 function formatModelBytes(bytes: number): string {
@@ -1035,28 +1046,28 @@ export function deriveModelSetupView(
   const hasInstallError =
     installErrors.length > 0 || (models.install ? !models.install.ok : false);
   const clapLabel = clap?.installed
-    ? "search ready"
+    ? "Sound match ready"
     : clapMismatched
-      ? "search repair"
-      : "search missing";
+      ? "Sound match repair"
+      : "Sound match missing";
   const mossLabel = moss
     ? moss.installed
-      ? "voice ready"
+      ? "Voice ready"
       : mossMismatched
         ? mossInstallable
-          ? "voice repair"
-          : "voice manual repair"
+          ? "Voice repair"
+          : "Voice manual repair"
         : mossInstallable
-          ? "voice missing"
-          : "voice manual setup"
+          ? "Voice missing"
+          : "Voice manual setup"
     : null;
   const cueLabel = cue?.installed
-    ? "cue export ready"
+    ? "Cue finder ready"
     : cueMismatched
       ? cueInstallable
-        ? "cue export repair"
-        : "cue export manual repair"
-      : "cue export optional";
+        ? "Cue finder repair"
+        : "Cue finder manual repair"
+      : "Cue finder optional";
   const needsRequired =
     clap?.installed === false ||
     clapMismatched ||
@@ -1073,15 +1084,15 @@ export function deriveModelSetupView(
   const installButtonText =
     installTarget === "required"
       ? hasInstallError
-        ? "Retry Required Models"
-        : "Install Required Models"
+        ? "Retry Sound Match + Voice"
+        : "Install Sound Match + Voice"
       : installTarget === "cue"
         ? hasInstallError
-          ? "Retry Optional CUE"
+          ? "Retry Cue Finder"
           : cueMismatched
-            ? "Repair CUE"
-            : "Check Optional CUE"
-        : "Install Required Models";
+            ? "Repair Cue Finder"
+            : "Check Cue Finder"
+        : "Install Sound Match + Voice";
 
   return {
     stateText: [clapLabel, mossLabel, cueLabel, installStatusLine(models)]
@@ -2080,10 +2091,11 @@ export function mountLibrary(root: ParentNode = document): void {
     const target = currentInstallTarget();
     installModelsBtn.disabled = true;
     installModelsBtn.textContent = "Installing…";
-    let runningLabel = "CLAP install running";
-    if (target === "required") runningLabel = "required model setup running";
-    else if (target === "all") runningLabel = "local model setup running";
-    else if (target === "cue") runningLabel = "CUE setup check running";
+    let runningLabel = "Sound match setup running";
+    if (target === "required") runningLabel = "Sound match and voice setup running";
+    else if (target === "all") runningLabel = "Local setup running";
+    else if (target === "cue") runningLabel = "Cue finder check running";
+    else if (target === "moss") runningLabel = "Voice setup running";
     $("vmx-lib-model-state").textContent = runningLabel;
     try {
       renderModelSetup(await libraryModels(target));
@@ -2097,10 +2109,11 @@ export function mountLibrary(root: ParentNode = document): void {
             : String(err);
       $("vmx-lib-model-state").textContent = `install failed · ${msg}`;
       installModelsBtn.disabled = false;
-      let retryLabel = "Retry CLAP";
-      if (target === "all") retryLabel = "Retry Local Models";
-      else if (target === "required") retryLabel = "Retry Required Models";
-      else if (target === "cue") retryLabel = "Retry Optional CUE";
+      let retryLabel = "Retry Sound Match";
+      if (target === "all") retryLabel = "Retry Local Tools";
+      else if (target === "required") retryLabel = "Retry Sound Match + Voice";
+      else if (target === "cue") retryLabel = "Retry Cue Finder";
+      else if (target === "moss") retryLabel = "Retry Voice";
       installModelsBtn.textContent = retryLabel;
     }
   }
@@ -2521,7 +2534,7 @@ export function mountLibrary(root: ParentNode = document): void {
     void refreshStats();
   });
 
-  // first-run CLAP/CUE model install progress from the real bridge. The final
+  // first-run local setup progress from the real bridge. The final
   // JSON still comes from libraryModels(); this only keeps the setup row alive
   // during long downloads on a clean machine.
   void onModelProgress((p: LibraryModelProgress) => {

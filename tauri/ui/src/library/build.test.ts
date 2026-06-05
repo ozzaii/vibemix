@@ -719,19 +719,19 @@ describe("build — real renderBuildSet path (jsdom, via mountLibrary)", () => {
     ) as HTMLButtonElement;
     expect(installBtn.hidden).toBe(false);
     expect(installBtn.dataset.installTarget).toBe("cue");
-    expect(installBtn.textContent).toBe("Check Optional CUE");
+    expect(installBtn.textContent).toBe("Check Cue Finder");
 
     installBtn.click();
     for (let i = 0; i < 6; i++) await Promise.resolve();
 
     expect(modelsMock).toHaveBeenCalledWith("cue");
     expect(document.getElementById("vmx-lib-model-state")?.textContent).toContain(
-      "Optional CUE setup unavailable",
+      "Cue finder setup unavailable",
     );
     expect(document.getElementById("vmx-lib-model-state")?.textContent).toContain(
-      "set VIBEMIX_CUE_ONNX_PATH",
+      "Cue finder setup path is not configured",
     );
-    expect(installBtn.textContent).toBe("Retry Optional CUE");
+    expect(installBtn.textContent).toBe("Retry Cue Finder");
   });
 
   it("routes first-run setup through required models, not strict all", async () => {
@@ -750,7 +750,7 @@ describe("build — real renderBuildSet path (jsdom, via mountLibrary)", () => {
     ) as HTMLButtonElement;
     expect(installBtn.hidden).toBe(false);
     expect(installBtn.dataset.installTarget).toBe("required");
-    expect(installBtn.textContent).toBe("Install Required Models");
+    expect(installBtn.textContent).toBe("Install Sound Match + Voice");
 
     installBtn.click();
     for (let i = 0; i < 6; i++) await Promise.resolve();
@@ -758,13 +758,13 @@ describe("build — real renderBuildSet path (jsdom, via mountLibrary)", () => {
     expect(modelsMock).toHaveBeenCalledWith("required");
     expect(modelsMock).not.toHaveBeenCalledWith("all");
     expect(document.getElementById("vmx-lib-model-state")?.textContent).toContain(
-      "search ready",
+      "Sound match ready",
     );
     expect(document.getElementById("vmx-lib-model-state")?.textContent).toContain(
-      "voice ready",
+      "Voice ready",
     );
     expect(document.getElementById("vmx-lib-model-state")?.textContent).toContain(
-      "Required models ready: downloaded 1/3",
+      "Sound match and voice ready: downloaded 1/3",
     );
   });
 
@@ -783,9 +783,9 @@ describe("build — real renderBuildSet path (jsdom, via mountLibrary)", () => {
     for (let i = 0; i < 6; i++) await Promise.resolve();
 
     const setupText = document.getElementById("vmx-lib-model-state")?.textContent ?? "";
-    expect(setupText).toContain("search ready");
-    expect(setupText).toContain("voice ready");
-    expect(setupText).toContain("cue export ready");
+    expect(setupText).toContain("Sound match ready");
+    expect(setupText).toContain("Voice ready");
+    expect(setupText).toContain("Cue finder ready");
     expect(setupText).not.toContain("codex login");
 
     const agentSetup = document.getElementById("vmx-lib-agent-setup") as HTMLElement;
