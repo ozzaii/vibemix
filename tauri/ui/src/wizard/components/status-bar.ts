@@ -110,7 +110,7 @@ export function StatusBar(props: StatusBarProps): HTMLElement {
       key: "gemini",
     },
     {
-      label: props.midi == null ? "midi" : `midi ${props.midi}`,
+      label: props.midi == null ? "controller" : `controller ${props.midi}`,
       state: props.midi == null ? "off" : props.midi > 0 ? "ok" : "down",
       key: "midi",
     },

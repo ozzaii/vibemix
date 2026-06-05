@@ -114,10 +114,10 @@ function renderRouteStatus(deviceName: string | null): HTMLElement {
   body.className = "cmp-bh-route__body";
   if (deckCapable) {
     body.innerHTML =
-      "<strong>BlackHole 16ch or aggregate routing is present.</strong> Keep your DJ app on a Multi-Output/Aggregate device with the FLX4, and route deck 1 to channels 1/2 and deck 2 to 3/4 for deck-aware proof.";
+      "<strong>BlackHole 16ch or aggregate routing is present.</strong> Keep your DJ app on a Multi-Output/Aggregate device with the FLX4, and route deck 1 to channels 1/2 and deck 2 to 3/4 so Sven can tell your decks apart.";
   } else {
     body.innerHTML =
-      "<strong>BlackHole 2ch lets vibemix hear the master output.</strong> For deck-aware proof, use a Multi-Output/Aggregate device that includes the FLX4 plus BlackHole 16ch.";
+      "<strong>BlackHole 2ch lets vibemix hear the master output.</strong> To let Sven tell decks apart, use a Multi-Output/Aggregate device that includes the FLX4 plus BlackHole 16ch.";
   }
   root.append(label, body);
   return root;

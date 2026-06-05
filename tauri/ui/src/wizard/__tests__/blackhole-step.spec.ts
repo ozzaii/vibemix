@@ -63,6 +63,8 @@ describe("BlackHole step renderer", () => {
     expect(route?.textContent).toContain("MASTER ROUTE READY");
     expect(route?.textContent).toContain("BlackHole 2ch lets vibemix hear the master output");
     expect(route?.textContent).toContain("FLX4 plus BlackHole 16ch");
+    expect(route?.textContent).toContain("let Sven tell decks apart");
+    expect(route?.textContent).not.toContain("proof");
     expect(root.querySelectorAll("button").length).toBe(0);
   });
 
@@ -82,6 +84,8 @@ describe("BlackHole step renderer", () => {
     expect(route?.textContent).toContain("DECK ROUTE READY");
     expect(route?.textContent).toContain("route deck 1 to channels 1/2");
     expect(route?.textContent).toContain("deck 2 to 3/4");
+    expect(route?.textContent).toContain("Sven can tell your decks apart");
+    expect(route?.textContent).not.toContain("proof");
   });
 
   it("post-click state surfaces the recheck caption", () => {

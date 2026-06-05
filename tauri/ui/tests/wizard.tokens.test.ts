@@ -83,8 +83,11 @@ describe("wizard surface tokens (wave 1)", () => {
     });
     document.body.append(rendered);
     expect(rendered.textContent).toContain("DDJ-FLX4 over USB");
-    expect(rendered.textContent).toContain("Enable MIDI output in your DJ app");
+    expect(rendered.textContent).toContain(
+      "Turn on controller output in your DJ app",
+    );
     expect(rendered.textContent).toContain("move a fader, knob, pad, cue, or play");
+    expect(rendered.textContent).not.toContain("no midi received");
   });
 
   it("DropdownDevice renders without legacy token refs", async () => {
@@ -107,7 +110,7 @@ describe("wizard surface tokens (wave 1)", () => {
     });
 
     expect(rendered.textContent).toContain("livekit");
-    expect(rendered.textContent).toContain("midi 1");
+    expect(rendered.textContent).toContain("controller 1");
     expect(rendered.textContent).not.toContain("made by bravoh");
     expect(rendered.querySelector(".cmp-status-bar__signature")).toBeNull();
   });
