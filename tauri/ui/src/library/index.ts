@@ -1658,7 +1658,7 @@ function chatArtifactCard(result: LibraryChatResult): HTMLElement | null {
   const led = document.createElement("span");
   led.className = "led";
   const label = document.createElement("span");
-  let labelText = "receipts";
+  let labelText = "result";
   if (result.playlist) labelText = "playlist";
   else if (result.export_path) labelText = "export";
   else if (clarification) labelText = "clarify";
@@ -2036,7 +2036,7 @@ export function mountLibrary(root: ParentNode = document): void {
               ? "Music"
               : "Pulled";
     $("vmx-lib-side-label").textContent =
-      state.mode === "chat" ? "Receipts" : "Vibe scope";
+      state.mode === "chat" ? "Context" : "Vibe scope";
     runBtn.textContent = runLabel(state.mode);
     echoEl.textContent = echoText(state);
     if (state.mode === "chat") {

@@ -565,6 +565,12 @@ describe("chat - real runChat path", () => {
     expect(document.getElementById("vmx-lib-chat-tools")?.textContent ?? "").toBe(
       "",
     );
+    expect(document.getElementById("vmx-lib-side-label")?.textContent).toBe(
+      "Context",
+    );
+    expect(document.getElementById("vmx-lib-side-label")?.textContent).not.toBe(
+      "Receipts",
+    );
   });
 
   it("does not turn live deck readiness into a permanent chat cockpit", async () => {
