@@ -357,6 +357,8 @@ def _focus_label_for(
         return "clean replay"
     if focus == "hardware":
         return "hardware rep"
+    if _source_total(row, "screen") > 0:
+        return "screen rep"
     if focus == "lock":
         return "lock drill"
     return "first rep"
@@ -377,6 +379,10 @@ def _challenge_for(
         return "Only cited live proof moves Mastery."
     if mode == "finish" and _strike_count(row) > 0:
         return "No hint this time; one clean move clears the loop."
+    if mode == "finish" and _source_total(row, "hardware") > 0:
+        return "Repeat the controller move inside the lesson."
+    if mode == "finish" and _source_total(row, "screen") > 0:
+        return "Repeat the banked move inside the lesson."
     if mode == "replay":
         return f"Make {skill_label} feel automatic before moving on."
     return "Touch the control before you read ahead."
@@ -432,6 +438,22 @@ def _meter_for(
             "meter_max": 1,
             "meter_state": "replay",
             "meter_caption": f"keep {skill_label} warm",
+        }
+    if _source_total(row, "hardware") > 0:
+        return {
+            "meter_label": "practice bank",
+            "meter_value": 1,
+            "meter_max": 1,
+            "meter_state": "armed",
+            "meter_caption": "hardware rep banked",
+        }
+    if _source_total(row, "screen") > 0:
+        return {
+            "meter_label": "practice bank",
+            "meter_value": 1,
+            "meter_max": 1,
+            "meter_state": "armed",
+            "meter_caption": "screen rep banked",
         }
     return {
         "meter_label": "first rep",
