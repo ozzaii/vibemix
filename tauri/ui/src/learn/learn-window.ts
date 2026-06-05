@@ -367,6 +367,7 @@ function mountLearnWindow(root: HTMLElement): {
           do one clean move and I'll confirm it.
         </strong>
       </div>
+      <div id="learn-booth-chain" class="learn-booth-chain" data-visible="false" aria-label="practice run"></div>
       <div id="learn-booth-pulse" class="learn-booth-pulse" data-state="ready" aria-live="polite">practice deck ready</div>
       <button id="learn-start-recommended" class="learn-booth-primary" type="button">start practice</button>
       <button id="learn-open-map" class="learn-booth-secondary" type="button">choose lesson</button>
@@ -444,6 +445,7 @@ function mountLearnWindow(root: HTMLElement): {
   const boothRewardFill = root.querySelector("#learn-booth-reward-fill") as HTMLElement;
   const boothRewardCaption = root.querySelector("#learn-booth-reward-caption") as HTMLElement;
   const boothCommandText = root.querySelector("#learn-booth-command-text") as HTMLElement;
+  const boothChain = root.querySelector("#learn-booth-chain") as HTMLElement;
   const boothPulse = root.querySelector("#learn-booth-pulse") as HTMLElement;
   const screenAction = root.querySelector("#learn-screen-action") as HTMLButtonElement;
   const openMapButton = root.querySelector("#learn-open-map") as HTMLButtonElement;
@@ -728,6 +730,7 @@ function mountLearnWindow(root: HTMLElement): {
     boothCommandText.textContent =
       cleanMissionText(mission?.command) ??
       practiceCommandLine(recommended, readiness, controllerDisplayName);
+    renderBoothChain(mission);
     renderBoothReward(mission);
     const cue = mission
       ? missionBoothCue(mission, recommended, readiness, controllerDisplayName)
@@ -757,6 +760,38 @@ function mountLearnWindow(root: HTMLElement): {
       "aria-label",
       `${label} ${value} of ${max}. ${caption}`,
     );
+  };
+  const renderBoothChain = (mission?: LearnPracticeMission): void => {
+    boothChain.textContent = "";
+    const steps = mission?.chain;
+    if (!Array.isArray(steps) || steps.length === 0) {
+      boothChain.dataset.visible = "false";
+      boothChain.removeAttribute("aria-label");
+      return;
+    }
+    boothChain.dataset.visible = "true";
+    const aria = steps.map((step) =>
+      `${step.label}: ${step.title}`,
+    ).join(". ");
+    boothChain.setAttribute("aria-label", `practice run. ${aria}`);
+    for (const step of steps.slice(0, 3)) {
+      const item = document.createElement("span");
+      item.className = "learn-booth-chain__step";
+      item.dataset.state = step.state;
+      item.dataset.lessonId = step.lesson_id;
+      item.title = `${step.course_label} · ${step.lesson_id}`;
+
+      const label = document.createElement("span");
+      label.className = "learn-booth-chain__label";
+      label.textContent = step.label;
+
+      const title = document.createElement("strong");
+      title.className = "learn-booth-chain__title";
+      title.textContent = step.title;
+
+      item.append(label, title);
+      boothChain.append(item);
+    }
   };
   renderLessonChooser();
 

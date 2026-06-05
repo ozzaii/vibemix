@@ -33,6 +33,10 @@ def test_fresh_mission_starts_with_useful_controller_practice() -> None:
     assert mission["meter_max"] == 1
     assert mission["meter_state"] == "armed"
     assert mission["meter_caption"] == "touch the control to begin"
+    assert [step["lesson_id"] for step in mission["chain"]] == ["L1.02", "L1.03", "L1.04"]
+    assert mission["chain"][0]["state"] == "now"
+    assert mission["chain"][0]["label"] == "first rep"
+    assert mission["chain"][1]["state"] == "next"
 
 
 def test_in_progress_mission_keeps_the_user_on_the_current_move() -> None:
@@ -55,6 +59,8 @@ def test_in_progress_mission_keeps_the_user_on_the_current_move() -> None:
     assert mission["meter_max"] == 3
     assert mission["meter_state"] == "retry"
     assert mission["meter_caption"] == "one clean move clears it"
+    assert mission["chain"][0]["lesson_id"] == "L1.03"
+    assert mission["chain"][0]["label"] == "retry 2/3"
 
 
 def test_locked_next_course_replays_cleared_open_course() -> None:

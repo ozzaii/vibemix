@@ -1807,6 +1807,71 @@ export interface LearnProgressState {
         focus: "first_rep" | "retry" | "proof" | "replay" | "hardware" | "lock" | "mastery";
         focus_label: string;
         challenge: string;
+        /**
+         * @minItems 1
+         * @maxItems 3
+         */
+        chain?:
+          | [
+              {
+                lesson_id: string;
+                course_id: string;
+                course_label: string;
+                title: string;
+                state: "now" | "next" | "locked";
+                mode: "start" | "finish" | "replay" | "prove" | "mastered";
+                label: string;
+              }
+            ]
+          | [
+              {
+                lesson_id: string;
+                course_id: string;
+                course_label: string;
+                title: string;
+                state: "now" | "next" | "locked";
+                mode: "start" | "finish" | "replay" | "prove" | "mastered";
+                label: string;
+              },
+              {
+                lesson_id: string;
+                course_id: string;
+                course_label: string;
+                title: string;
+                state: "now" | "next" | "locked";
+                mode: "start" | "finish" | "replay" | "prove" | "mastered";
+                label: string;
+              }
+            ]
+          | [
+              {
+                lesson_id: string;
+                course_id: string;
+                course_label: string;
+                title: string;
+                state: "now" | "next" | "locked";
+                mode: "start" | "finish" | "replay" | "prove" | "mastered";
+                label: string;
+              },
+              {
+                lesson_id: string;
+                course_id: string;
+                course_label: string;
+                title: string;
+                state: "now" | "next" | "locked";
+                mode: "start" | "finish" | "replay" | "prove" | "mastered";
+                label: string;
+              },
+              {
+                lesson_id: string;
+                course_id: string;
+                course_label: string;
+                title: string;
+                state: "now" | "next" | "locked";
+                mode: "start" | "finish" | "replay" | "prove" | "mastered";
+                label: string;
+              }
+            ];
         meter_label: string;
         meter_value: number;
         meter_max: number;

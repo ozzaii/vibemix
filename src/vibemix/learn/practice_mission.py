@@ -76,6 +76,12 @@ def next_practice_mission(
     focus_label = _focus_label_for(focus, row, skill_id, skill_row)
     challenge = _challenge_for(mode, row, skill_label, skill_row)
     meter = _meter_for(mode, focus, row, skill_id, skill_label, skill_row)
+    chain = _practice_chain_for(
+        progress,
+        lesson_id=lesson_id,
+        mode=mode,
+        focus_label=focus_label,
+    )
     return {
         "lesson_id": lesson_id,
         "course_id": meta.course_id,
@@ -92,6 +98,7 @@ def next_practice_mission(
         "focus": focus,
         "focus_label": focus_label,
         "challenge": challenge,
+        "chain": chain,
         **meter,
     }
 
@@ -433,6 +440,94 @@ def _meter_for(
         "meter_state": "armed",
         "meter_caption": "touch the control to begin",
     }
+
+
+def _practice_chain_for(
+    progress: Any,
+    *,
+    lesson_id: str,
+    mode: str,
+    focus_label: str,
+) -> list[dict[str, str]]:
+    """Return the short run the booth should make feel finishable now."""
+    chain: list[dict[str, str]] = []
+    current_meta = CURRICULUM.get(lesson_id)
+    if current_meta is None:
+        return chain
+    chain.append(
+        _chain_step(
+            lesson_id,
+            state="now",
+            mode=mode,
+            label=focus_label,
+        )
+    )
+    seen = {lesson_id}
+    for candidate_id in _lesson_ids_after(lesson_id):
+        if len(chain) >= 3:
+            break
+        meta = CURRICULUM[candidate_id]
+        row = _lesson_row(progress, candidate_id)
+        status = _lesson_status(row)
+        if not _course_unlocked(progress, meta.course_id) and status != "completed":
+            if len(chain) < 3:
+                chain.append(
+                    _chain_step(
+                        candidate_id,
+                        state="locked",
+                        mode="start",
+                        label=_locked_chain_label(meta.course_id),
+                    )
+                )
+            break
+        if candidate_id in seen or status == "completed":
+            continue
+        chain.append(
+            _chain_step(
+                candidate_id,
+                state="next",
+                mode="finish" if status == "in-progress" else "start",
+                label="next rep" if status == "empty" else "finish",
+            )
+        )
+        seen.add(candidate_id)
+    return chain
+
+
+def _lesson_ids_after(lesson_id: str) -> list[str]:
+    lesson_ids = [
+        lid for lid in CURRICULUM if not lid.startswith("L0.") and lid not in _INTRO_LESSON_IDS
+    ]
+    if lesson_id not in lesson_ids:
+        return lesson_ids
+    index = lesson_ids.index(lesson_id)
+    return lesson_ids[index + 1 :] + lesson_ids[:index]
+
+
+def _chain_step(
+    lesson_id: str,
+    *,
+    state: str,
+    mode: str,
+    label: str,
+) -> dict[str, str]:
+    meta = CURRICULUM[lesson_id]
+    return {
+        "lesson_id": lesson_id,
+        "course_id": meta.course_id,
+        "course_label": COURSE_REGISTRY[meta.course_id].label,
+        "title": meta.title,
+        "state": state,
+        "mode": mode,
+        "label": label,
+    }
+
+
+def _locked_chain_label(course_id: str) -> str:
+    course = COURSE_REGISTRY.get(course_id)
+    if course is None:
+        return "locked"
+    return course.lock_reason or "locked"
 
 
 def _plural_left(count: int, unit: str, target: str) -> str:

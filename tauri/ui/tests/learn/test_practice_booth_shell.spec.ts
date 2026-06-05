@@ -1499,6 +1499,35 @@ describe("practice booth shell", () => {
                 focus: "first_rep",
                 focus_label: "first rep",
                 challenge: "Touch the control before you read ahead.",
+                chain: [
+                  {
+                    lesson_id: "L1.03",
+                    course_id: "course_1_anatomy",
+                    course_label: "Course 1 · Anatomy",
+                    title: "channel strip",
+                    state: "now",
+                    mode: "start",
+                    label: "first rep",
+                  },
+                  {
+                    lesson_id: "L1.04",
+                    course_id: "course_1_anatomy",
+                    course_label: "Course 1 · Anatomy",
+                    title: "crossfader",
+                    state: "next",
+                    mode: "start",
+                    label: "next rep",
+                  },
+                  {
+                    lesson_id: "L1.05",
+                    course_id: "course_1_anatomy",
+                    course_label: "Course 1 · Anatomy",
+                    title: "pitch fader",
+                    state: "next",
+                    mode: "start",
+                    label: "next rep",
+                  },
+                ],
                 meter_label: "first rep",
                 meter_value: 0,
                 meter_max: 1,
@@ -1534,6 +1563,20 @@ describe("practice booth shell", () => {
       expect(
         root.querySelector<HTMLElement>("#learn-booth-reward-fill")?.style.width,
       ).toBe("0%");
+      const chain = Array.from(
+        root.querySelectorAll<HTMLElement>(".learn-booth-chain__step"),
+      );
+      expect(root.querySelector<HTMLElement>("#learn-booth-chain")?.dataset.visible).toBe(
+        "true",
+      );
+      expect(chain.map((step) => step.dataset.state)).toEqual(["now", "next", "next"]);
+      expect(chain.map((step) => step.dataset.lessonId)).toEqual([
+        "L1.03",
+        "L1.04",
+        "L1.05",
+      ]);
+      expect(chain[0]?.textContent).toContain("first rep");
+      expect(chain[1]?.textContent).toContain("crossfader");
       expect(
         root.querySelector<HTMLElement>("#learn-booth-pulse")?.getAttribute("aria-label"),
       ).toContain("Touch the control before you read ahead.");

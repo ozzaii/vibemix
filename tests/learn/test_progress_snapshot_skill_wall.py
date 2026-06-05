@@ -37,6 +37,10 @@ def test_snapshot_carries_next_practice_mission_without_persisting_it():
     snap = LearnProgress().snapshot()
     assert snap["next_practice_mission"]["lesson_id"] == "L1.02"
     assert snap["next_practice_mission"]["mode"] == "start"
+    assert [step["lesson_id"] for step in snap["next_practice_mission"]["chain"]][:2] == [
+        "L1.02",
+        "L1.03",
+    ]
 
     stored = LearnProgress().to_dict()
     assert "next_practice_mission" not in stored

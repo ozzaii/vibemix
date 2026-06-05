@@ -74,11 +74,22 @@ export interface LearnPracticeMission {
   focus: "first_rep" | "retry" | "proof" | "replay" | "hardware" | "lock" | "mastery";
   focus_label: string;
   challenge: string;
+  chain?: LearnPracticeChainStep[];
   meter_label: string;
   meter_value: number;
   meter_max: number;
   meter_state: "armed" | "retry" | "proof" | "mastered" | "replay";
   meter_caption: string;
+}
+
+export interface LearnPracticeChainStep {
+  lesson_id: string;
+  course_id: string;
+  course_label: string;
+  title: string;
+  state: "now" | "next" | "locked";
+  mode: "start" | "finish" | "replay" | "prove" | "mastered";
+  label: string;
 }
 
 /** Canonical lesson order generated from Python CURRICULUM. */
