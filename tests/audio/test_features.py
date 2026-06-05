@@ -14,6 +14,7 @@ from vibemix.audio import (
     AudioBuffer,
     energy_curve,
     estimate_bpm,
+    estimate_bpm_with_confidence,
     long_arc_curve,
     pcm_to_wav,
     snapshot_features,
@@ -120,20 +121,56 @@ def test_snapshot_wav_normalize_disabled() -> None:
 # ===== FEAT-07: estimate_bpm aliveness =====
 
 
+def _pulse_train_buffer(
+    tempos: list[tuple[float, float]],
+    *,
+    seconds: float = 8.0,
+    sr: int = 16000,
+) -> AudioBuffer:
+    buf = AudioBuffer(seconds=10.0, sr=sr)
+    t = np.arange(int(sr * seconds), dtype=np.float32) / sr
+    audio = np.zeros_like(t)
+    carrier = np.sin(2 * np.pi * 80.0 * t)
+    for bpm, amp in tempos:
+        pulse_freq = bpm / 60.0
+        env = (np.sin(2 * np.pi * pulse_freq * t) > 0.92).astype(np.float32)
+        audio += float(amp) * env * carrier
+    peak = float(np.max(np.abs(audio))) if audio.size else 0.0
+    if peak > 0.0:
+        audio = audio / peak * 0.5
+    buf.push((audio * 32767).astype(np.int16))
+    return buf
+
+
 def test_estimate_bpm_returns_float_in_range() -> None:
     """Synthetic pulse train yields a float in [0, 200]. Loose aliveness check —
     autocorr is not high-precision. v4:412-438."""
-    sr = 16000
-    buf = AudioBuffer(seconds=10.0, sr=sr)
-    # Build a pulse train: short bursts every ~480ms (~125 BPM)
-    t = np.arange(sr * 8, dtype=np.float32) / sr
-    pulse_freq = 125.0 / 60.0  # Hz
-    env = (np.sin(2 * np.pi * pulse_freq * t) > 0.9).astype(np.float32)
-    audio = (env * np.sin(2 * np.pi * 80.0 * t)).astype(np.float32)
-    buf.push((audio * 16000).astype(np.int16))
+    buf = _pulse_train_buffer([(125.0, 1.0)])
     bpm = estimate_bpm(buf, seconds=6.0)
     assert isinstance(bpm, float)
     assert 0.0 <= bpm <= 200.0
+
+
+def test_estimate_bpm_uses_sub_lag_interpolation_for_fast_tracks() -> None:
+    """Integer-lag autocorr drifted near fast tempos; sub-lag fit lands close."""
+    for target in (155.0, 161.0):
+        buf = _pulse_train_buffer([(target, 1.0)])
+        bpm, confidence = estimate_bpm_with_confidence(buf, seconds=6.0)
+
+        assert abs(bpm - target) < 0.4
+        assert confidence >= 0.70
+        assert estimate_bpm(buf, seconds=6.0) == bpm
+
+
+def test_estimate_bpm_suppresses_ambiguous_two_tempo_lock() -> None:
+    """A merged two-tempo autocorr peak must not publish a fake in-between BPM."""
+    buf = _pulse_train_buffer([(155.0, 1.0), (161.0, 1.0)])
+
+    bpm, confidence = estimate_bpm_with_confidence(buf, seconds=6.0)
+
+    assert 156.0 <= bpm <= 160.0
+    assert confidence < 0.70
+    assert estimate_bpm(buf, seconds=6.0) == 0.0
 
 
 # ===== FEAT-08: estimate_bpm short buffer returns 0.0 =====

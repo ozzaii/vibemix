@@ -23,6 +23,12 @@ import numpy as np
 from vibemix.audio.buffers import AudioBuffer
 from vibemix.audio.constants import SILENT_RMS
 
+_BPM_ENV_FPS: float = 100.0
+_BPM_LO_LAG: int = 30
+_BPM_HI_LAG: int = 60
+_BPM_CONFIDENCE_FLOOR: float = 0.70
+_BPM_CURVATURE_SHARP_PEAK: float = 0.28
+
 
 def snapshot_features(buf: AudioBuffer, seconds: float = 5.0) -> dict:
     """Compute RMS / onset rate / 4-band share for the most recent `seconds`.
@@ -172,38 +178,102 @@ def estimate_bpm(buf: AudioBuffer, seconds: float = 6.0) -> float:
     """Autocorrelation BPM estimate over the last `seconds`.
 
     Returns a float ~100-200 BPM (lag 30-60 frames @ 100Hz envelope) or 0.0
-    on insufficient data. Verbatim port of v4:412-438.
+    on insufficient or ambiguous data.
 
-    Note: low-precision — autocorr is meant to be a "is there a beat?"
-    signal, not a precise meter. Phase 3 filters via BPM_VALID_MIN/MAX
-    constants for the noise-reject gate.
+    Compatibility wrapper for callers that only accept a float. Use
+    ``estimate_bpm_with_confidence`` when the ambiguity score matters.
+    """
+    bpm, confidence = estimate_bpm_with_confidence(buf, seconds=seconds)
+    if confidence < _BPM_CONFIDENCE_FLOOR:
+        return 0.0
+    return round(bpm, 1)
+
+
+def estimate_bpm_with_confidence(buf: AudioBuffer, seconds: float = 6.0) -> tuple[float, float]:
+    """Return ``(bpm, confidence)`` from the live autocorrelation estimator.
+
+    The estimator still uses the historical 100 Hz RMS envelope and 30-60 lag
+    search, but refines the winning lag by a three-point parabolic fit. That
+    removes the integer-lag quantization that made fast tracks wobble between
+    neighboring readings. Confidence combines peak energy, curvature, and
+    competing-peak separation so broad or multi-tempo windows can be held as
+    ``0.0`` by the compatibility wrapper instead of becoming public BPM drift.
     """
     sr = buf._sr
     n = int(sr * seconds)
     arr_int16 = buf.snapshot(n)
     arr = arr_int16.astype(np.float32) / 32768.0
     if arr.size < sr * 2:
-        return 0.0
-    frame = sr // 100
+        return (0.0, 0.0)
+    frame = sr // int(_BPM_ENV_FPS)
     n_frames = arr.size // frame
     if n_frames < 100:
-        return 0.0
+        return (0.0, 0.0)
     env = np.array(
         [float(np.sqrt(np.mean(arr[i * frame : (i + 1) * frame] ** 2))) for i in range(n_frames)]
     )
     env = env - env.mean()
     ac = np.correlate(env, env, mode="full")
     ac = ac[ac.size // 2 :]
-    lo_lag = 30
-    hi_lag = 60
-    if hi_lag >= ac.size:
-        return 0.0
-    segment = ac[lo_lag:hi_lag]
+    if _BPM_HI_LAG >= ac.size:
+        return (0.0, 0.0)
+    segment = ac[_BPM_LO_LAG:_BPM_HI_LAG]
     if segment.size == 0 or segment.max() <= 0:
+        return (0.0, 0.0)
+    best_lag = _BPM_LO_LAG + int(np.argmax(segment))
+    refined_lag = _parabolic_peak_lag(ac, best_lag)
+    if refined_lag <= 0.0:
+        return (0.0, 0.0)
+    bpm = 60.0 * _BPM_ENV_FPS / refined_lag
+    confidence = _bpm_peak_confidence(ac, best_lag, _BPM_LO_LAG, _BPM_HI_LAG)
+    return (round(float(bpm), 1), round(float(confidence), 4))
+
+
+def _parabolic_peak_lag(ac: np.ndarray, lag: int) -> float:
+    if lag <= 0 or lag >= ac.size - 1:
+        return float(lag)
+    y0 = float(ac[lag - 1])
+    y1 = float(ac[lag])
+    y2 = float(ac[lag + 1])
+    denom = y0 - (2.0 * y1) + y2
+    if abs(denom) < 1e-12:
+        return float(lag)
+    offset = 0.5 * (y0 - y2) / denom
+    offset = max(-0.5, min(0.5, offset))
+    return float(lag) + offset
+
+
+def _bpm_peak_confidence(ac: np.ndarray, best_lag: int, lo_lag: int, hi_lag: int) -> float:
+    if ac.size == 0 or best_lag <= 0 or best_lag >= ac.size - 1:
         return 0.0
-    best_lag = lo_lag + int(np.argmax(segment))
-    bpm = 60.0 * 100.0 / best_lag
-    return round(bpm, 1)
+    best = float(ac[best_lag])
+    if best <= 0.0:
+        return 0.0
+
+    zero_lag = max(float(ac[0]), 1e-9)
+    peak_energy = max(0.0, min(1.0, best / zero_lag))
+
+    y0 = float(ac[best_lag - 1])
+    y2 = float(ac[best_lag + 1])
+    curvature = max(0.0, ((2.0 * best) - y0 - y2) / (best + 1e-9))
+    sharpness = max(0.0, min(1.0, curvature / _BPM_CURVATURE_SHARP_PEAK))
+
+    second_peak = 0.0
+    segment = ac[lo_lag:hi_lag]
+    for idx in range(1, max(1, segment.size - 1)):
+        lag = lo_lag + idx
+        if abs(lag - best_lag) <= 2:
+            continue
+        value = float(segment[idx])
+        if value <= 0.0:
+            continue
+        if value >= float(segment[idx - 1]) and value >= float(segment[idx + 1]):
+            second_peak = max(second_peak, value)
+    ambiguity = 1.0
+    if second_peak > 0.0:
+        ambiguity = max(0.0, min(1.0, (best - second_peak) / (best + 1e-9)))
+
+    return peak_energy * sharpness * (0.5 + 0.5 * ambiguity)
 
 
 # ---------------------------------------------------------------------------
