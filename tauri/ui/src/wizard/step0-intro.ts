@@ -1,7 +1,7 @@
 /* step0-intro.ts — wizard first-paint brand handshake (post-impeccable Wave 1.2).
  *
- * The mock's character moment ("PIONEER DECK / AT 2 AM / — A SIGN OF
- * LIFE —" at mocks/vibemix-direction-final.html:1195) had no equivalent
+ * The mock's character moment ("PIONEER DECK / AT 2 AM / A SIGN OF
+ * LIFE" at mocks/vibemix-direction-final.html:1195) had no equivalent
  * in the shipped wizard — the user opened a vibemix install to what
  * read as a generic settings dialog. This step ships the missing moment.
  *
@@ -79,132 +79,6 @@ const CSS = `
     mix-blend-mode: screen;
     opacity: 0.42;
     mask-image: linear-gradient(180deg, transparent 0%, black 28%, black 72%, transparent 100%);
-  }
-  .wizard-intro__field {
-    position: absolute;
-    inset: 22px 14px;
-    z-index: 1;
-    display: grid;
-    place-items: center;
-    pointer-events: none;
-  }
-  .wizard-intro__field::before,
-  .wizard-intro__field::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    background:
-      radial-gradient(circle at 8px 8px, var(--silk-22) 0 2px, transparent 2.5px),
-      radial-gradient(circle at calc(100% - 8px) 8px, var(--silk-12) 0 2px, transparent 2.5px),
-      radial-gradient(circle at 8px calc(100% - 8px), rgba(255, 165, 223, 0.18) 0 2px, transparent 2.5px),
-      radial-gradient(circle at calc(100% - 8px) calc(100% - 8px), var(--silk-12) 0 2px, transparent 2.5px);
-  }
-  .wizard-intro__field::after {
-    width: min(560px, 78vw);
-    height: 1px;
-    inset: auto;
-    border-radius: 0;
-    background: linear-gradient(90deg, transparent, rgba(255, 165, 223, 0.34), transparent);
-    box-shadow: none;
-    transform: none;
-    opacity: 0.48;
-  }
-  .wizard-intro__orbit {
-    position: relative;
-    width: min(430px, 70vw);
-    aspect-ratio: 1;
-    border-radius: 50%;
-    border: 1px solid rgba(255, 165, 223, 0.12);
-    background:
-      radial-gradient(circle, transparent 0 35%, rgba(255, 165, 223, 0.045) 35.5% 36.5%, transparent 37% 57%, rgba(214, 207, 199, 0.055) 57.5% 58.5%, transparent 59%),
-      conic-gradient(from 24deg, transparent 0 62deg, rgba(255, 165, 223, 0.24) 72deg, transparent 92deg 360deg);
-    box-shadow:
-      inset 0 0 42px rgba(0, 0, 0, 0.72),
-      0 0 44px rgba(255, 165, 223, 0.055);
-    opacity: 0.78;
-  }
-  .wizard-intro__orbit span {
-    position: absolute;
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: var(--amber);
-    box-shadow: 0 0 10px var(--amber-40);
-  }
-  .wizard-intro__orbit span:nth-child(1) { top: 13%; left: 49%; }
-  .wizard-intro__orbit span:nth-child(2) {
-    right: 17%;
-    bottom: 27%;
-    width: 5px;
-    height: 5px;
-    background: var(--silk-65);
-    box-shadow: 0 0 8px rgba(214, 207, 199, 0.28);
-  }
-  /* A softer rose than the lead dot (nth-1 is full --amber, nth-2 silk) — three
-   * sparks in the brand palette, no stray blue (was a stale v5 --rave-cyan). */
-  .wizard-intro__orbit span:nth-child(3) {
-    left: 20%;
-    bottom: 23%;
-    width: 5px;
-    height: 5px;
-    background: var(--brand-50);
-    box-shadow: 0 0 10px var(--brand-22);
-  }
-  .wizard-intro__rail {
-    position: absolute;
-    left: 50%;
-    bottom: 34px;
-    display: grid;
-    grid-template-columns: repeat(12, 1fr);
-    gap: 5px;
-    width: min(300px, 62vw);
-    transform: translateX(-50%);
-    padding: 7px 8px;
-    border: 1px solid rgba(255, 255, 255, 0.055);
-    border-radius: var(--rad-md);
-    background: rgba(0, 0, 0, 0.34);
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.04),
-      inset 0 -1px 0 rgba(0, 0, 0, 0.82);
-  }
-  .wizard-intro__rail i {
-    height: 6px;
-    border-radius: 999px;
-    background: rgba(214, 207, 199, 0.13);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
-  }
-  .wizard-intro__rail i:nth-child(3),
-  .wizard-intro__rail i:nth-child(7),
-  .wizard-intro__rail i:nth-child(10) {
-    background: rgba(255, 165, 223, 0.62);
-    box-shadow: 0 0 10px rgba(255, 165, 223, 0.22);
-  }
-  .wizard-intro__telemetry {
-    position: absolute;
-    top: 34px;
-    left: 50%;
-    display: flex;
-    gap: 8px;
-    transform: translateX(-50%);
-    font-family: var(--type-mono);
-    font-size: 9px;
-    letter-spacing: 0;
-    text-transform: uppercase;
-    color: var(--silk-40);
-  }
-  .wizard-intro__telemetry span {
-    padding: 5px 7px 4px;
-    border: 1px solid rgba(255, 255, 255, 0.055);
-    border-radius: var(--rad-sm);
-    background: rgba(0, 0, 0, 0.28);
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.035),
-      inset 0 -1px 0 rgba(0, 0, 0, 0.68);
-  }
-  .wizard-intro__telemetry span:first-child {
-    color: var(--amber);
-    border-color: rgba(255, 165, 223, 0.18);
-    text-shadow: 0 0 8px rgba(255, 165, 223, 0.24);
   }
   .wizard-intro__hero {
     position: relative;
@@ -286,58 +160,6 @@ const CSS = `
     z-index: 2;
     margin-top: var(--sp-2);
   }
-  .wizard-intro__contract {
-    position: relative;
-    z-index: 2;
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 1px;
-    width: min(560px, 86vw);
-    margin-top: var(--sp-2);
-    border: 1px solid rgba(255, 220, 240, 0.12);
-    border-radius: var(--rad-sm);
-    background:
-      linear-gradient(180deg, rgba(255, 251, 244, 0.024), transparent 48%, rgba(0, 0, 0, 0.22)),
-      rgba(0, 0, 0, 0.24);
-    box-shadow:
-      inset 0 1px 0 rgba(255, 251, 244, 0.032),
-      inset 0 -1px 0 rgba(0, 0, 0, 0.68),
-      0 16px 34px rgba(0, 0, 0, 0.26);
-    overflow: hidden;
-  }
-  .wizard-intro__contract-cell {
-    display: grid;
-    gap: 5px;
-    min-width: 0;
-    padding: 10px 11px 11px;
-    background: rgba(255, 251, 244, 0.014);
-  }
-  .wizard-intro__contract-cell span,
-  .wizard-intro__contract-cell b {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  .wizard-intro__contract-cell span {
-    font-family: var(--type-mono);
-    font-size: 9px;
-    font-weight: 600;
-    letter-spacing: 0.18em;
-    text-transform: uppercase;
-    color: var(--silk-40);
-  }
-  .wizard-intro__contract-cell b {
-    font-family: var(--type-display);
-    font-variation-settings: "wdth" 85, "wght" 650;
-    font-size: 12px;
-    letter-spacing: 0.04em;
-    color: var(--silk);
-  }
-  .wizard-intro__contract-cell:first-child b {
-    color: var(--amber);
-    text-shadow: 0 0 9px var(--amber-22);
-  }
   .wizard-intro__cta .cmp-btn {
     min-width: 184px;
     padding: 15px 28px 14px;
@@ -377,9 +199,7 @@ const CSS = `
    * same beat lands cleaner than three frames apart. */
   @media (prefers-reduced-motion: no-preference) {
     .wizard-intro__hero,
-    .wizard-intro__contract,
-    .wizard-intro__cta,
-    .wizard-intro__field {
+    .wizard-intro__cta {
       animation: vmx-intro-rise var(--motion-step) ease-out both;
     }
   }
@@ -395,27 +215,11 @@ const CSS = `
     }
     .wizard-intro::before { inset: 10px 0; }
     .wizard-intro::after { inset: 11px 1px; }
-    .wizard-intro__field { inset: 18px 4px; }
-    .wizard-intro__telemetry {
-      top: 24px;
-      width: min(320px, 82vw);
-      justify-content: center;
-      flex-wrap: wrap;
-    }
-    .wizard-intro__rail {
-      bottom: 24px;
-      width: min(270px, 76vw);
-    }
     .wizard-intro__wordmark { font-size: 52px; }
     .wizard-intro__phrase { font-size: 30px; }
     .wizard-intro__slogan { font-size: 11px; }
-    .wizard-intro__contract {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      width: min(420px, 86vw);
-    }
   }
   @media (max-width: 420px) {
-    .wizard-intro__telemetry span:nth-child(n + 3) { display: none; }
     .wizard-intro__wordmark { font-size: 42px; }
     .wizard-intro__phrase { font-size: 24px; }
     .wizard-intro__slogan {
@@ -427,19 +231,6 @@ const CSS = `
       min-width: 164px;
       padding-inline: 22px;
     }
-    .wizard-intro__contract {
-      width: min(320px, 86vw);
-    }
-    .wizard-intro__contract-cell {
-      padding: 9px 10px 10px;
-    }
-    .wizard-intro__contract-cell span {
-      font-size: 8px;
-      letter-spacing: 0.15em;
-    }
-    .wizard-intro__contract-cell b {
-      font-size: 11px;
-    }
   }
 `;
 
@@ -449,35 +240,6 @@ export function renderStep0Intro(cb: Step0IntroCallbacks): HTMLElement {
   const root = document.createElement("section");
   root.className = "wizard-intro";
   root.setAttribute("aria-label", "vibemix intro");
-
-  const field = document.createElement("div");
-  field.className = "wizard-intro__field";
-  field.setAttribute("aria-hidden", "true");
-
-  const orbit = document.createElement("div");
-  orbit.className = "wizard-intro__orbit";
-  orbit.append(
-    document.createElement("span"),
-    document.createElement("span"),
-    document.createElement("span"),
-  );
-
-  const rail = document.createElement("div");
-  rail.className = "wizard-intro__rail";
-  for (let i = 0; i < 12; i++) {
-    rail.append(document.createElement("i"));
-  }
-
-  const telemetry = document.createElement("div");
-  telemetry.className = "wizard-intro__telemetry";
-  for (const label of ["local index", "screen", "midi"]) {
-    const item = document.createElement("span");
-    item.textContent = label;
-    telemetry.append(item);
-  }
-
-  field.append(orbit, rail, telemetry);
-  root.append(field);
 
   const hero = document.createElement("div");
   hero.className = "wizard-intro__hero";
@@ -513,28 +275,6 @@ export function renderStep0Intro(cb: Step0IntroCallbacks): HTMLElement {
 
   hero.append(wordmark, phrase, slogan);
   root.append(hero);
-
-  const contract = document.createElement("div");
-  contract.className = "wizard-intro__contract";
-  contract.dataset.wire = "wizard.intro-contract";
-  contract.setAttribute("aria-label", "Sven live contract");
-  const contractItems: Array<[string, string]> = [
-    ["Voice", "local MOSS"],
-    ["Hear", "master audio"],
-    ["Read", "screen proof"],
-    ["Moves", "controller MIDI"],
-  ];
-  contractItems.forEach(([label, value]) => {
-    const cell = document.createElement("div");
-    cell.className = "wizard-intro__contract-cell";
-    const k = document.createElement("span");
-    k.textContent = label;
-    const v = document.createElement("b");
-    v.textContent = value;
-    cell.append(k, v);
-    contract.append(cell);
-  });
-  root.append(contract);
 
   const ctaWrap = document.createElement("div");
   ctaWrap.className = "wizard-intro__cta";

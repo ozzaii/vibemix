@@ -56,19 +56,17 @@ describe("wizard intro hero (impeccable Wave 1.2)", () => {
     expect(called).toBe(1);
   });
 
-  it("states the live contract before asking the user to begin", () => {
+  it("keeps first paint focused on the brand moment, not setup telemetry", () => {
     const rendered = renderStep0Intro({ onBegin: () => {} });
     host().append(rendered);
 
-    const contract = rendered.querySelector<HTMLElement>(
-      '[data-wire="wizard.intro-contract"]',
-    );
-    expect(contract).not.toBeNull();
-    expect(contract?.getAttribute("aria-label")).toBe("Sven live contract");
-    expect(contract?.textContent).toContain("local MOSS");
-    expect(contract?.textContent).toContain("master audio");
-    expect(contract?.textContent).toContain("screen proof");
-    expect(contract?.textContent).toContain("controller MIDI");
+    expect(rendered.querySelector(".wizard-intro__telemetry")).toBeNull();
+    expect(rendered.querySelector(".wizard-intro__orbit")).toBeNull();
+    expect(rendered.querySelector(".wizard-intro__rail")).toBeNull();
+    expect(rendered.querySelector('[data-wire="wizard.intro-contract"]')).toBeNull();
+    expect(rendered.textContent).not.toContain("local index");
+    expect(rendered.textContent).not.toContain("screen proof");
+    expect(rendered.textContent).not.toContain("controller MIDI");
   });
 
   it("has NO border-anim sweep, NO glass-tile shell (full-void brand surface)", () => {
