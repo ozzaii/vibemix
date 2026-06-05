@@ -1391,7 +1391,7 @@ def test_llm_node_direct_mode_5xx_surfaces_connection_error(
     assert conn_events[0]["route_active"] == "direct"
     assert conn_events[0]["route_hedge_action"] == "observe"
     assert conn_events[0]["route_switch_policy"] == "manual_only"
-    assert any("can't reach Gemini" in line for line in transcript_sink)
+    assert list(transcript_sink) == []
     assert not any(kind == "ai_text" for kind, _fields in recorder.events)
 
 
@@ -1422,7 +1422,7 @@ def test_llm_node_proxy_mode_503_marks_proxy_unavailable_without_speech(
 
     assert chunks == []
     assert agent._proxy_unavailable is True
-    assert list(transcript_sink) == ["Co-host unavailable this session"]
+    assert list(transcript_sink) == []
 
     proxy_events = [fields for kind, fields in recorder.events if kind == "proxy_unavailable"]
     assert len(proxy_events) == 1

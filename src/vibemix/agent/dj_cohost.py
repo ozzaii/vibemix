@@ -1687,14 +1687,15 @@ class DJCoHostAgent(Agent):
         # ipc.session.snapshot transcript sink (see __init__ kwarg docstring).
         self._transcript_sink: collections.deque | None = transcript_sink
 
-        # ---- Phase 69 Plan 69-03 (OSS-02) — proxy fallback state ----------
+        # ---- Phase 69 Plan 69-03 (OSS-02) — proxy outage state -----------
         # In proxy mode, when the upstream Bravoh proxy returns 5xx / times
         # out / refuses the connection / returns non-JSON body, the brain
-        # refuses to lie (anti-slop): a one-shot "Co-host unavailable this
-        # session" transcript line lands, LLM emission skips for the
-        # duration, and a 60s ``probe_proxy_health`` canary auto-clears the
-        # flag when /health returns 200 (or whenever a real LLM call next
-        # succeeds — whichever fires first).
+        # refuses to lie (anti-slop): LLM emission skips for the duration,
+        # diagnostics land in events.jsonl/route telemetry, and a 60s
+        # ``probe_proxy_health`` canary auto-clears the flag when /health
+        # returns 200 (or whenever a real LLM call next succeeds — whichever
+        # fires first). The transcript sink is reserved for genuinely spoken
+        # lines; outage diagnostics must not masquerade as Sven speech.
         #
         # All five attributes default-init to "not armed" so direct mode
         # (BYO) and tests that never touch the proxy path are byte-identical
@@ -1823,15 +1824,14 @@ class DJCoHostAgent(Agent):
         )
 
     def _maybe_emit_proxy_unavailable(self, reason: str) -> None:
-        """Arm the proxy-unavailable fallback flag + emit the one-shot
-        "Co-host unavailable this session" transcript line (Plan 69-03 / OSS-02).
+        """Arm the proxy-unavailable flag + log a one-shot diagnostic.
 
         Gates:
         - Only fires when ``self._proxy_base_url is not None`` (proxy mode).
           Direct mode (BYO) never arms — BYO users see their own network
           errors per existing v3.x behavior.
-        - The transcript line emits EXACTLY ONCE per unavailable-streak;
-          subsequent ticks while still unavailable do not spam the transcript.
+        - The diagnostic emits EXACTLY ONCE per unavailable-streak; subsequent
+          ticks while still unavailable do not spam events.jsonl.
 
         Best-effort: a recorder / transcript-sink hiccup must never perturb
         the LLM turn — every side-effect is wrapped.
@@ -1845,7 +1845,6 @@ class DJCoHostAgent(Agent):
             self._proxy_recovery_message_emitted = False
         if not self._proxy_unavailable_message_emitted:
             self._proxy_unavailable_message_emitted = True
-            self._push_transcript("Co-host unavailable this session")
             try:
                 self._recorder.log_event(
                     "proxy_unavailable",
@@ -1857,8 +1856,7 @@ class DJCoHostAgent(Agent):
                 pass
 
     def _maybe_emit_proxy_recovery(self) -> None:
-        """Emit the one-shot "Co-host back online" transcript line and clear
-        the proxy-unavailable flag (Plan 69-03 / OSS-02).
+        """Log one-shot proxy recovery and clear the proxy-unavailable flag.
 
         Called from two paths:
         1. After a successful LLM call when ``self._proxy_unavailable`` was
@@ -1877,7 +1875,6 @@ class DJCoHostAgent(Agent):
         self._proxy_unavailable_message_emitted = False
         if not self._proxy_recovery_message_emitted:
             self._proxy_recovery_message_emitted = True
-            self._push_transcript("Co-host back online")
             try:
                 self._recorder.log_event(
                     "proxy_recovered",
@@ -1888,23 +1885,23 @@ class DJCoHostAgent(Agent):
                 pass
 
     def _emit_connection_error(self, err: BaseException) -> None:
-        """LOUD, never-silent surfacing of an LLM connect/auth failure.
+        """LOUD, never-silent diagnostics for an LLM connect/auth failure.
 
         Fires from the ``llm_node`` exception handler for ANY error that the
         proxy classifier did NOT already handle. Covers the release-blocker
         case: a direct-mode session whose Gemini key is missing/invalid (or
         whose connection is refused) used to print ``[llm err]`` to stderr
         ONLY — no ``events.jsonl`` line, no UI signal — so the co-host fell
-        silent with zero diagnostics. Now we:
+        silent with zero diagnostics. Now we log a ``connection_error`` event
+        to ``events.jsonl`` with a coarse, key-free classification so logs never
+        leak secrets. The stderr banner remains for operator visibility.
 
-          1. log a ``connection_error`` event to ``events.jsonl`` (with a
-             coarse, key-free classification so logs never leak secrets), and
-          2. push a one-shot ``"Co-host can't reach Gemini — check API key /
-             connection"`` line onto the UI transcript sink.
-
-        One-shot per error streak (``_connection_error_emitted``) so a
-        persistent failure logs once, not 10×/second. Cleared on the next
-        successful stream (see the ``else`` branch in ``llm_node``).
+        Deliberately does NOT push a transcript line: ``transcript_delta`` is
+        the co-host/spoken surface, and an outage diagnostic that was never
+        synthesized must not look like Sven said it. One-shot per error streak
+        (``_connection_error_emitted``) so a persistent failure logs once, not
+        10×/second. Cleared on the next successful stream (see the ``else``
+        branch in ``llm_node``).
 
         Best-effort: every side-effect is wrapped — surfacing the error must
         never itself crash the turn.
@@ -1968,11 +1965,10 @@ class DJCoHostAgent(Agent):
             flush=True,
         )
 
-        # 3. UI transcript sink — the user-visible "it's broken" signal.
-        try:
-            self._push_transcript("Co-host can't reach Gemini — check API key / connection")
-        except Exception:
-            pass
+        # No transcript injection here: the transcript_delta channel is the
+        # spoken/cohost surface, and diagnostics that were never synthesized
+        # must not look like Sven said them. The durable user/developer signal
+        # is the connection_error event plus the stderr banner above.
 
     async def _check_proxy_health_canary(self, now_monotonic: float) -> None:
         """Pre-call gate: if the fallback is armed AND 60s have elapsed since
@@ -3163,8 +3159,8 @@ class DJCoHostAgent(Agent):
             # ---- end quick task 260525-fuv -------------------------------------
             # ---- Plan 69-03 (OSS-02) — pre-call 60s /health canary -----------
             # If the proxy fallback is armed, fire a single canary GET against
-            # /health every 60s. On 200, the recovery one-shot transcript line
-            # lands and the flag clears. NEVER raises (probe is best-effort).
+            # /health every 60s. On 200, the recovery diagnostic event lands
+            # and the flag clears. NEVER raises (probe is best-effort).
             # Phase 69 review WR-01 — the blocking ``probe_proxy_health`` GET is
             # offloaded to a thread executor inside the (now async) canary so the
             # reaction path NEVER stalls on the 5s timeout while the proxy is down
@@ -3328,8 +3324,8 @@ class DJCoHostAgent(Agent):
                 # ---- Plan 69-03 (OSS-02) — proxy unavailable classification ---
                 # Classify the exception against the 4 documented trigger classes
                 # (5xx / timeout / connection_refused / bad_body). On match, arm
-                # the fallback flag + emit the one-shot "Co-host unavailable
-                # this session" transcript line; the LLM-turn skip is implicit
+                # the unavailable flag + emit the one-shot diagnostic event;
+                # the LLM-turn skip is implicit
                 # (full_text stays "" → downstream silence-short-circuit fires
                 # naturally → no TTS, no playback). 4xx / 429 / programming
                 # errors fall through to the original [llm err] path so the
@@ -3393,10 +3389,9 @@ class DJCoHostAgent(Agent):
                         self._recorder.log_event("connection_recovered", path="live_coach")
                     except Exception:
                         pass
-                    try:
-                        self._push_transcript("Co-host reconnected")
-                    except Exception:
-                        pass
+                    # No transcript injection for diagnostics. A recovered
+                    # connection is observable via events/status; only actual
+                    # spoken model output enters transcript_delta.
             # === end Plan 41-04 streaming pipe-through ===
 
             print()

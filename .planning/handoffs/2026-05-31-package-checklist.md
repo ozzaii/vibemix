@@ -10879,3 +10879,37 @@ Proof before staging:
 - `uv run ruff check src/vibemix/__main__.py src/vibemix/state/track_resolver.py src/vibemix/state/refresh.py tests/coach/test_main_anti_slop_wiring.py tests/state/test_track_resolver.py tests/state/test_refresh.py`
 - `uv run python -m compileall -q src/vibemix/__main__.py src/vibemix/state/track_resolver.py src/vibemix/state/refresh.py tests/coach/test_main_anti_slop_wiring.py tests/state/test_track_resolver.py tests/state/test_refresh.py`
 - `git diff --check -- src/vibemix/__main__.py src/vibemix/state/track_resolver.py src/vibemix/state/refresh.py tests/coach/test_main_anti_slop_wiring.py tests/state/test_track_resolver.py tests/state/test_refresh.py .planning/handoffs/2026-05-31-package-checklist.md`
+
+## Package 94 - Proxy Outage Transcript Silence
+
+Suggested commit: `fix(cohost): keep outage diagnostics out of transcript`
+
+Include:
+
+- `src/vibemix/agent/dj_cohost.py`
+- `tests/agent/test_dj_cohost.py`
+- `tests/integration/test_proxy_fallback.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Proxy routing policy, model selection, local voice playback, LiveKit status,
+  UI badges, and citation prompt rewrites. This package only removes canned
+  outage/recovery diagnostics from the transcript surface while preserving the
+  existing `events.jsonl`, stderr, and route telemetry diagnostics.
+
+Reason:
+
+- Proxy and connection failure helpers still pushed canned lines such as
+  `Co-host unavailable this session`, `Co-host back online`, and connection
+  error hints into the `transcript_delta` sink. Those were not model output and
+  were not synthesized by Sven, but the UI could display them as co-host speech.
+  Keep the loud diagnostics in recorder events/stderr while reserving transcript
+  for genuine spoken/model lines.
+
+Proof before staging:
+
+- `uv run pytest -q tests/agent/test_dj_cohost.py::test_llm_node_direct_mode_5xx_surfaces_connection_error tests/agent/test_dj_cohost.py::test_llm_node_proxy_mode_503_marks_proxy_unavailable_without_speech tests/integration/test_proxy_fallback.py`
+- `uv run ruff check src/vibemix/agent/dj_cohost.py tests/agent/test_dj_cohost.py tests/integration/test_proxy_fallback.py`
+- `uv run python -m compileall -q src/vibemix/agent/dj_cohost.py tests/agent/test_dj_cohost.py tests/integration/test_proxy_fallback.py`
+- `git diff --check -- src/vibemix/agent/dj_cohost.py tests/agent/test_dj_cohost.py tests/integration/test_proxy_fallback.py .planning/handoffs/2026-05-31-package-checklist.md`

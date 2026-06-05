@@ -23,7 +23,6 @@ import asyncio
 import json
 from pathlib import Path
 from typing import Any
-from unittest.mock import MagicMock
 
 import httpx
 import pytest
@@ -37,7 +36,6 @@ from vibemix.agent.proxy_client import (
     probe_proxy_health,
 )
 from vibemix.state import MusicState
-
 
 # ---------- shared helpers ----------
 
@@ -294,10 +292,9 @@ def test_probe_proxy_health_returns_false_on_non_200(monkeypatch) -> None:
 def test_agent_emits_unavailable_one_shot(
     mocker, tmp_path, monkeypatch, reason: str
 ) -> None:
-    """In proxy mode, calling ``_maybe_emit_proxy_unavailable`` lands EXACTLY
-    ONE "Co-host unavailable this session" transcript line per
-    unavailable-streak, regardless of how many additional unavailable ticks
-    fire.
+    """In proxy mode, calling ``_maybe_emit_proxy_unavailable`` logs EXACTLY
+    ONE diagnostic event per unavailable-streak, regardless of how many
+    additional unavailable ticks fire.
 
     Drives the helper directly (rather than constructing a full
     generate_content_stream mock) — the helper is the single chokepoint the
@@ -309,22 +306,23 @@ def test_agent_emits_unavailable_one_shot(
     assert agent._proxy_base_url is not None, "proxy mode must arm _proxy_base_url"
     assert agent._proxy_unavailable is False
 
-    # First unavailable event → emits the line + sets the flag.
+    # First unavailable event -> logs the event + sets the flag, but does not
+    # masquerade as co-host speech in transcript_delta.
     agent._maybe_emit_proxy_unavailable(reason)
     assert agent._proxy_unavailable is True
     assert agent._proxy_unavailable_message_emitted is True
-    assert list(transcript_sink) == ["Co-host unavailable this session"]
-    assert any(k == "proxy_unavailable" for k, _ in recorder.events)
+    assert list(transcript_sink) == []
+    assert sum(k == "proxy_unavailable" for k, _ in recorder.events) == 1
 
-    # Second unavailable event → NO duplicate (one-shot).
+    # Second unavailable event -> NO duplicate (one-shot).
     agent._maybe_emit_proxy_unavailable(reason)
-    assert list(transcript_sink) == ["Co-host unavailable this session"], (
-        "duplicate emission — the one-shot guard failed"
-    )
+    assert list(transcript_sink) == []
+    assert sum(k == "proxy_unavailable" for k, _ in recorder.events) == 1
 
-    # Third event for a different reason → still one-shot.
+    # Third event for a different reason -> still one-shot.
     agent._maybe_emit_proxy_unavailable("timeout")
-    assert list(transcript_sink) == ["Co-host unavailable this session"]
+    assert list(transcript_sink) == []
+    assert sum(k == "proxy_unavailable" for k, _ in recorder.events) == 1
 
 
 @pytest.mark.integration
@@ -332,8 +330,9 @@ def test_agent_recovery_emits_back_online_one_shot(
     mocker, tmp_path, monkeypatch
 ) -> None:
     """After the fallback is armed, calling ``_maybe_emit_proxy_recovery``
-    emits "Co-host back online" exactly once + clears the flag. A second
-    call is a no-op (flag already cleared).
+    logs "back online" exactly once + clears the flag. A second call is a
+    no-op (flag already cleared). Recovery diagnostics do not enter the
+    spoken transcript.
     """
     agent, transcript_sink, recorder = _build_agent(
         mocker, tmp_path, mode="proxy", monkeypatch=monkeypatch
@@ -341,24 +340,19 @@ def test_agent_recovery_emits_back_online_one_shot(
     # Arm the fallback first.
     agent._maybe_emit_proxy_unavailable("5xx")
     assert agent._proxy_unavailable is True
-    assert list(transcript_sink) == ["Co-host unavailable this session"]
+    assert list(transcript_sink) == []
 
-    # Recovery fires the one-shot back-online line + clears the flag.
+    # Recovery fires the one-shot back-online event + clears the flag.
     agent._maybe_emit_proxy_recovery()
     assert agent._proxy_unavailable is False
     assert agent._proxy_recovery_message_emitted is True
-    assert list(transcript_sink) == [
-        "Co-host unavailable this session",
-        "Co-host back online",
-    ]
-    assert any(k == "proxy_recovered" for k, _ in recorder.events)
+    assert list(transcript_sink) == []
+    assert sum(k == "proxy_recovered" for k, _ in recorder.events) == 1
 
     # Second call is a no-op (flag is already cleared).
     agent._maybe_emit_proxy_recovery()
-    assert list(transcript_sink) == [
-        "Co-host unavailable this session",
-        "Co-host back online",
-    ]
+    assert list(transcript_sink) == []
+    assert sum(k == "proxy_recovered" for k, _ in recorder.events) == 1
 
 
 @pytest.mark.integration
@@ -408,17 +402,14 @@ def test_agent_canary_60s_debounce_and_recovery(
     asyncio.run(agent._check_proxy_health_canary(now_monotonic=60.0))
     assert len(probe_calls) == 1
     assert agent._proxy_unavailable is True
-    assert list(transcript_sink) == ["Co-host unavailable this session"]
+    assert list(transcript_sink) == []
 
     # Drive the canary at t=121.0 — another 61s, probe fires + returns True.
     # Recovery one-shot fires.
     asyncio.run(agent._check_proxy_health_canary(now_monotonic=121.0))
     assert len(probe_calls) == 2
     assert agent._proxy_unavailable is False
-    assert list(transcript_sink) == [
-        "Co-host unavailable this session",
-        "Co-host back online",
-    ]
+    assert list(transcript_sink) == []
 
 
 @pytest.mark.integration
@@ -457,17 +448,17 @@ def test_agent_direct_mode_never_arms_fallback(
 
 
 @pytest.mark.integration
-def test_emit_connection_error_logs_event_and_transcript(
+def test_emit_connection_error_logs_event_without_transcript(
     mocker, tmp_path, monkeypatch
 ) -> None:
     """RELEASE-AUTH Fix 2: an UNCLASSIFIED LLM failure (auth/DNS/connect) must
-    surface LOUDLY — a ``connection_error`` event to events.jsonl AND a UI
-    transcript line — instead of dying to stderr only (the "events fire but
-    the co-host never speaks and nothing is logged" release blocker).
+    surface LOUDLY as a ``connection_error`` event to events.jsonl instead of
+    dying to stderr only (the "events fire but the co-host never speaks and
+    nothing is logged" release blocker).
 
     Works in direct (BYO) mode too — this is the path classify_proxy_error
     deliberately does NOT cover (4xx auth errors), which is exactly the
-    missing-key class.
+    missing-key class. It must not inject a fake spoken transcript line.
     """
     agent, transcript_sink, recorder = _build_agent(
         mocker, tmp_path, mode="direct", monkeypatch=monkeypatch
@@ -482,8 +473,9 @@ def test_emit_connection_error_logs_event_and_transcript(
     assert conn_events[0]["error_kind"] == "auth"
     assert conn_events[0]["error"] == "RuntimeError"
 
-    # UI transcript got the user-visible "it's broken" signal.
-    assert any("can't reach Gemini" in line for line in transcript_sink)
+    # Diagnostics are event/stderr only; transcript_delta stays reserved for
+    # actual co-host speech.
+    assert list(transcript_sink) == []
 
 
 @pytest.mark.integration
@@ -491,7 +483,7 @@ def test_emit_connection_error_is_one_shot(
     mocker, tmp_path, monkeypatch
 ) -> None:
     """The loud surface fires ONCE per error streak — a persistent auth
-    failure (10Hz coach loop) must not spam events.jsonl / the transcript."""
+    failure (10Hz coach loop) must not spam events.jsonl or transcript_delta."""
     agent, transcript_sink, recorder = _build_agent(
         mocker, tmp_path, mode="direct", monkeypatch=monkeypatch
     )
@@ -500,7 +492,7 @@ def test_emit_connection_error_is_one_shot(
 
     conn_events = [f for k, f in recorder.events if k == "connection_error"]
     assert len(conn_events) == 1, "must be one-shot per streak"
-    assert sum("can't reach Gemini" in line for line in transcript_sink) == 1
+    assert list(transcript_sink) == []
 
 
 @pytest.mark.integration
