@@ -252,7 +252,7 @@ describe("DesktopShell", () => {
     expect(body.getAttribute("aria-hidden")).toBeNull();
   });
 
-  it("renders the grounding panel as honest empty slots when live", () => {
+  it("renders the deck notes panel as honest empty slots when live", () => {
     shell = mountDesktopShell(host);
     shell.store.setActivation("live");
     const sections = host.querySelectorAll(".shell-panel .panel-section");
@@ -260,10 +260,11 @@ describe("DesktopShell", () => {
     const labels = Array.from(host.querySelectorAll(".shell-panel .panel-label")).map(
       (el) => el.textContent,
     );
-    expect(labels).toContain("Evidence");
+    expect(host.querySelector(".shell-panel .panel-head")?.textContent).toBe("Deck notes");
+    expect(labels).toContain("What I heard");
     expect(labels).not.toContain("Cited");
     expect(host.querySelector(".shell-panel .panel-armed")).toBeNull();
-    // Back to idle returns to the honest prose state (no leftover receipt slots).
+    // Back to idle returns to the honest prose state (no leftover detail slots).
     shell.store.setActivation("idle");
     expect(host.querySelectorAll(".shell-panel .panel-section").length).toBe(0);
   });

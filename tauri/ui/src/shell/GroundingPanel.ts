@@ -2,7 +2,7 @@
 //
 // The contextual right panel. It opens on Ctrl+] or whenever activation goes
 // "live" (the store auto-opens it). Until a real citation/suggestion feed is
-// wired here, the live state must remain empty-state copy, not a fake receipt.
+// wired here, the live state must remain empty-state copy, not fake detail.
 
 import type { ShellStore } from "./shell-store.js";
 
@@ -10,11 +10,11 @@ export function createGroundingPanel(store: ShellStore): HTMLElement {
   const aside = document.createElement("aside");
   aside.className = "shell-panel";
   aside.setAttribute("data-wire", "shell.panel");
-  aside.setAttribute("aria-label", "Receipts");
+  aside.setAttribute("aria-label", "Deck notes");
 
   const head = document.createElement("div");
   head.className = "panel-head";
-  head.textContent = "Receipts";
+  head.textContent = "Deck notes";
 
   const body = document.createElement("div");
   body.className = "panel-body";
@@ -22,9 +22,9 @@ export function createGroundingPanel(store: ShellStore): HTMLElement {
 
   aside.append(head, body);
 
-  // Tracks the prior activation so the receipt "prints in" ONLY on the
+  // Tracks the prior activation so the slots "print in" ONLY on the
   // idle/listening -> live transition, not on every re-render (the store fires
-  // render() on any state change — surface switch, collapse — and a receipt
+  // render() on any state change — surface switch, collapse — and a panel
   // that re-animated on each of those would flicker).
   let prevActivation: string | null = null;
 
@@ -37,8 +37,8 @@ export function createGroundingPanel(store: ShellStore): HTMLElement {
       // writes the slot.
       body.innerHTML =
         '<div class="panel-section">' +
-        '<div class="panel-label">Evidence</div>' +
-        '<p class="panel-placeholder">No cited move yet.</p>' +
+        '<div class="panel-label">What I heard</div>' +
+        '<p class="panel-placeholder">No deck read yet.</p>' +
         "</div>" +
         '<div class="panel-section">' +
         '<div class="panel-label">What\'s next</div>' +
@@ -52,7 +52,7 @@ export function createGroundingPanel(store: ShellStore): HTMLElement {
         });
       }
     } else {
-      body.textContent = "Nothing to ground yet. I cite what the deck does, the moment it does it.";
+      body.textContent = "No deck note yet. I call it when the mix gives me something real.";
     }
     prevActivation = activation;
   };

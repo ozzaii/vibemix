@@ -73,7 +73,7 @@ describe("command palette — accelerators teach the shortcuts", () => {
     const deck = rowFor(palette, "Go to Deck");
     expect(deck.querySelector(".pi-state")?.textContent?.trim()).toBe("current");
 
-    const togglePanel = rowFor(palette, "Toggle grounding panel");
+    const togglePanel = rowFor(palette, "Toggle deck notes");
     expect(togglePanel.querySelector(".pi-state")?.textContent?.trim()).toBe("closed");
   });
 
@@ -102,7 +102,7 @@ describe("command palette — accelerators teach the shortcuts", () => {
   it("shows command rows' chords in the accelerator slot", () => {
     shell = mountDesktopShell(host);
     const palette = openPalette();
-    const toggle = rowFor(palette, "Toggle grounding panel");
+    const toggle = rowFor(palette, "Toggle deck notes");
     expect(toggle.querySelector(".pi-accel")?.textContent).toContain("]");
   });
 
@@ -126,7 +126,7 @@ describe("command palette — accelerators teach the shortcuts", () => {
     expect(labels).toContain("Go to Deck");
   });
 
-  it("filters by product aliases such as Viber and proof", () => {
+  it("filters by product aliases such as Viber and deck notes", () => {
     shell = mountDesktopShell(host);
     const palette = openPalette();
     const input = palette.querySelector<HTMLInputElement>(".palette-input")!;
@@ -136,10 +136,9 @@ describe("command palette — accelerators teach the shortcuts", () => {
     let labels = Array.from(palette.querySelectorAll(".pi-label")).map((e) => e.textContent?.trim());
     expect(labels).toEqual(["Go to Viber"]);
 
-    input.value = "proof";
+    input.value = "deck notes";
     input.dispatchEvent(new Event("input"));
     labels = Array.from(palette.querySelectorAll(".pi-label")).map((e) => e.textContent?.trim());
-    expect(labels).toContain("Go to Debrief");
-    expect(labels).toContain("Toggle grounding panel");
+    expect(labels).toContain("Toggle deck notes");
   });
 });

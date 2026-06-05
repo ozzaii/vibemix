@@ -1,8 +1,8 @@
 /**
  * @vitest-environment jsdom
  *
- * The grounding panel must not pretend to hold citations before it has a real
- * citation feed. Activation can open it, but the empty state stays explicit.
+ * The deck-notes panel must not pretend to hold live reads before it has a real
+ * feed. Activation can open it, but the empty state stays explicit.
  */
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -24,20 +24,23 @@ afterEach(() => {
   host.remove();
 });
 
-describe("grounding panel receipt", () => {
-  it("is honest prose at idle with no receipt slots", () => {
+describe("deck notes panel", () => {
+  it("is honest prose at idle with no detail slots", () => {
     shell = mountDesktopShell(host);
+    const panel = host.querySelector<HTMLElement>(".shell-panel");
     const body = host.querySelector<HTMLElement>(".panel-body");
-    expect(body?.textContent).toContain("Nothing to ground yet");
+    expect(panel?.getAttribute("aria-label")).toBe("Deck notes");
+    expect(host.querySelector(".panel-head")?.textContent).toBe("Deck notes");
+    expect(body?.textContent).toContain("No deck note yet");
     expect(host.querySelector(".panel-section")).toBeNull();
   });
 
-  it("keeps live slots honest until real citations and suggestions are wired", () => {
+  it("keeps live slots honest until real deck reads and suggestions are wired", () => {
     shell = mountDesktopShell(host);
     shell.store.setActivation("live");
 
     const labels = Array.from(host.querySelectorAll(".panel-label")).map((e) => e.textContent);
-    expect(labels).toContain("Evidence");
+    expect(labels).toContain("What I heard");
     expect(labels.some((l) => l?.toLowerCase().includes("next"))).toBe(true);
     expect(labels.some((l) => l?.includes("Cited"))).toBe(false);
     expect(host.querySelector(".panel-section .panel-armed")).toBeNull();
@@ -47,22 +50,22 @@ describe("grounding panel receipt", () => {
       (e) => e.textContent?.trim(),
     );
     expect(placeholders).not.toContain("—");
-    expect(placeholders).toContain("No cited move yet.");
+    expect(placeholders).toContain("No deck read yet.");
     expect(placeholders).toContain("No suggestion yet.");
     expect(placeholders.every((p) => (p?.length ?? 0) > 1)).toBe(true);
   });
 
-  it("prints the receipt in ONLY on the live transition, not on re-renders while live", () => {
+  it("prints the slots in ONLY on the live transition, not on re-renders while live", () => {
     shell = mountDesktopShell(host);
     shell.store.setActivation("live");
-    // Going live: the receipt slots carry the one-shot entry class (they
+    // Going live: the slots carry the one-shot entry class (they
     // materialize/print in as the drawer arrives).
     const printed = Array.from(host.querySelectorAll(".panel-section"));
     expect(printed.length).toBe(2);
     expect(printed.every((s) => s.classList.contains("panel-section--enter"))).toBe(true);
 
     // A later re-render while STILL live (e.g. switching surfaces) rebuilds the
-    // receipt but must NOT replay the entry — it was already on screen.
+    // panel but must NOT replay the entry — it was already on screen.
     shell.store.setActiveSurface("viber");
     const rerendered = Array.from(host.querySelectorAll(".panel-section"));
     expect(rerendered.length).toBe(2);
