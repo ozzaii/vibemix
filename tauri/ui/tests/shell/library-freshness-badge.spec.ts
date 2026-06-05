@@ -154,7 +154,8 @@ describe("library freshness badge", () => {
     await handle.refresh();
 
     expect(handle.element.dataset.state).toBe("unknown");
-    expect(handle.element.textContent).toBe("library unknown");
+    expect(handle.element.hidden).toBe(true);
+    expect(handle.element.textContent).toBe("");
     expect(handle.element.title).toContain("library stats offline");
   });
 });

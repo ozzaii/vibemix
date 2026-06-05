@@ -84,7 +84,7 @@ export function libraryFreshnessBadgeModel(
   if (error) {
     return {
       state: "unknown",
-      label: "library unknown",
+      label: "",
       title: `Library freshness unavailable: ${error instanceof Error ? error.message : String(error)}`,
     };
   }
@@ -108,7 +108,7 @@ export function libraryFreshnessBadgeModel(
   const ageText = typeof age === "number" ? `, ${age}d cache` : "";
   return {
     state,
-    label: `library ${readableStatus(status)}`,
+    label: state === "unknown" ? "" : `library ${readableStatus(status)}`,
     title: `Library freshness: ${readableStatus(reason)}${ageText}`,
   };
 }
@@ -157,7 +157,7 @@ export function mountLibraryFreshnessBadge(
   badge.setAttribute("data-wire", "shell.library-freshness");
   badge.innerHTML =
     '<span class="library-freshness-dot" aria-hidden="true"></span>' +
-    '<span class="library-freshness-label">library unknown</span>';
+    '<span class="library-freshness-label"></span>';
   renderBadge(badge, separator, libraryFreshnessBadgeModel(null));
   footer.append(separator, badge);
 

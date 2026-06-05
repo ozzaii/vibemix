@@ -900,10 +900,11 @@ function embeddingLabel(stats: LibraryStats): string {
   const agent = (stats.agent_backend ?? "codex").toLowerCase();
   const agentLabel =
     stats.agent_ready === false ? `Viber setup` : `Viber ready`;
-  const freshness = stats.library_freshness_status
-    ? `library ${stats.library_freshness_status.replace(/_/g, " ")}`
-    : "library unknown";
-  return `${agentLabel} / ${model} / ${freshness}`;
+  const parts = [agentLabel, model];
+  if (stats.library_freshness_status) {
+    parts.push(`library ${stats.library_freshness_status.replace(/_/g, " ")}`);
+  }
+  return parts.join(" / ");
 }
 
 function libraryBackendLabel(backend: string): string {

@@ -58,7 +58,7 @@ export function voiceReadinessBadgeModel(
   if (error) {
     return {
       state: "unknown",
-      label: "voice unknown",
+      label: "",
       title: `MOSS voice status unavailable: ${
         error instanceof Error ? error.message : String(error)
       }`,
@@ -69,7 +69,7 @@ export function voiceReadinessBadgeModel(
   if (!moss) {
     return {
       state: "unknown",
-      label: "voice unknown",
+      label: "",
       title: "MOSS voice status unavailable: model row missing",
     };
   }
@@ -147,7 +147,7 @@ export function mountVoiceReadinessBadge(
   badge.setAttribute("data-wire", "shell.voice-readiness");
   badge.innerHTML =
     '<span class="voice-readiness-dot" aria-hidden="true"></span>' +
-    '<span class="voice-readiness-label">voice unknown</span>';
+    '<span class="voice-readiness-label"></span>';
   renderBadge(badge, separator, voiceReadinessBadgeModel(null));
   footer.append(separator, badge);
 
