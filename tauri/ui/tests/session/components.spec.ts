@@ -713,9 +713,14 @@ describe("SessionLayout", () => {
     mountSessionLayout(root, state);
 
     const bpm = root.querySelector<HTMLElement>(".vmx-read__num");
-    expect(bpm?.textContent).toBe("—");
+    const key = root.querySelector<HTMLElement>(".vmx-read__key");
+    expect(bpm?.textContent).toBe("");
+    expect(bpm?.dataset.empty).toBe("true");
     expect(bpm?.getAttribute("title")).toBe("BPM waits for audio from eqMac Export.");
     expect(bpm?.getAttribute("aria-label")).toBe("BPM waits for audio from eqMac Export.");
+    expect(key?.textContent).toBe("");
+    expect(key?.dataset.empty).toBe("true");
+    expect(key?.getAttribute("title")).toBe("Key not detected yet.");
   });
 
   it("hides redundant all-ready idle readouts once capture is audible", () => {

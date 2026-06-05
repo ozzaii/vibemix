@@ -1330,12 +1330,15 @@ function applyState(mounted: Mounted, next: SessionState, isMount: boolean): voi
   }
 
   // --- foot readouts ---
-  const bpmText = next.timecode.bpm != null ? next.timecode.bpm.toFixed(1) : "—";
+  const bpmValue = next.timecode.bpm;
+  const bpmMissing = bpmValue == null;
+  const bpmText = bpmMissing ? "" : bpmValue.toFixed(1);
   if (mounted.bpm.textContent !== bpmText) mounted.bpm.textContent = bpmText;
+  mounted.bpm.dataset.empty = bpmMissing ? "true" : "false";
   // A null BPM is usually read as "the counter is broken" when the deck is
-  // visually alive. Name the honest cause on the readout itself: no grounded
-  // audio has reached the detector yet, so the BPM must stay blank.
-  if (next.timecode.bpm == null) {
+  // visually alive. Name the honest cause on the readout itself, but keep the
+  // visible value blank: no grounded audio has reached the detector yet.
+  if (bpmMissing) {
     const bpmTitle = bpmWaitingTitle(next.status.captureDevice, next.meters.music);
     if (mounted.bpm.getAttribute("aria-label") !== bpmTitle) {
       mounted.bpm.setAttribute("title", bpmTitle);
@@ -1345,12 +1348,14 @@ function applyState(mounted: Mounted, next: SessionState, isMount: boolean): voi
     mounted.bpm.removeAttribute("title");
     mounted.bpm.removeAttribute("aria-label");
   }
-  const keyText = next.timecode.key ?? "—";
+  const keyValue = next.timecode.key;
+  const keyMissing = keyValue == null;
+  const keyText = keyMissing ? "" : keyValue;
   if (mounted.key.textContent !== keyText) mounted.key.textContent = keyText;
-  // A null key shows the dash glyph; name it so the dim slot reads as
-  // "not detected yet", not "broken". The value itself stays dark until
-  // the backend reports a key (not a frontend bug to fabricate around).
-  if (next.timecode.key == null) {
+  mounted.key.dataset.empty = keyMissing ? "true" : "false";
+  // A null key stays visually blank; name it so the reserved slot reads as
+  // "not detected yet", not "broken". The value appears only when grounded.
+  if (keyMissing) {
     if (mounted.key.getAttribute("aria-label") !== "Key not detected yet.") {
       mounted.key.setAttribute("title", "Key not detected yet.");
       mounted.key.setAttribute("aria-label", "Key not detected yet.");
