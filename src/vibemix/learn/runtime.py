@@ -712,7 +712,7 @@ class LessonRuntime(StateMachine):
         self._beatmatch_practice_ack_prehandled = False
         self._beatmatch_practice_player: Any | None = None
         self._beatmatch_practice_player_active = False
-        self._free_practice_receipts: set[tuple[str, str]] = set()
+        self._free_practice_receipts: set[tuple[str, str, str]] = set()
         self._waveform_ready_lesson_id: str | None = None
         self._active_harmonic_pair: HarmonicPracticePair | None = None
         self._recovery_drill_armed_step_key: tuple[str, int] | None = None
@@ -2392,7 +2392,7 @@ class LessonRuntime(StateMachine):
         source_key = _practice_source_key(midi.get("source"))
         if source_key is None:
             return
-        receipt_key = (lesson_id, source_key)
+        receipt_key = (lesson_id, source_key, control)
         if receipt_key in self._free_practice_receipts:
             return
         try:

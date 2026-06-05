@@ -322,6 +322,50 @@ def test_free_practice_receipt_dedupes_repeated_drag_frames(monkeypatch) -> None
     }
 
 
+def test_free_practice_distinct_controls_fill_practice_bank(monkeypatch) -> None:
+    saved: list[LearnProgress] = []
+    monkeypatch.setattr("vibemix.learn.progress.save_progress", saved.append)
+    progress = LearnProgress()
+    ipc = MagicMock(name="ipc_router")
+    runtime = LessonRuntime(
+        learn_state=LearnState(),
+        midi_mirror=MagicMock(name="midi_mirror"),
+        controller_state=MagicMock(name="controller_state"),
+        ipc_router=ipc,
+        progress_store=progress,
+        beatmatch_practice_action_recorder=lambda _lesson_id, _midi: False,
+        waveform_payload_loader=lambda: {"sample_rate": 44_100, "decks": {}},
+    )
+    runtime.set_beatmatch_practice_player(_FakePracticePlayer())
+
+    for control, value in (("eq_hi", 90), ("eq_mid", 88), ("vol", 127)):
+        runtime.handle_practice_audio_ack(
+            {
+                "type": "cc",
+                "control": control,
+                "deck": "A",
+                "value": value,
+                "prev_value": 64,
+                "source": "click",
+            }
+        )
+
+    assert len(saved) == 3
+    assert progress.lessons["L1.03"]["practice_sources"] == {
+        "hardware": 0,
+        "screen": 3,
+    }
+    progress_snapshots = [
+        call.args[0]
+        for call in ipc.emit.call_args_list
+        if call.args and call.args[0].get("type") == "ipc.learn.progress_state"
+    ]
+    mission = progress_snapshots[-1]["payload"]["progress"]["next_practice_mission"]
+    assert mission["focus_label"] == "practice bank 3/3"
+    assert mission["meter_value"] == 3
+    assert mission["meter_caption"] == "3 screen reps banked"
+
+
 def test_loading_another_lesson_stops_active_practice_player() -> None:
     runtime = _runtime()
     player = _FakePracticePlayer()
