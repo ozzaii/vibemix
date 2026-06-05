@@ -43,8 +43,6 @@ import httpx
 
 from vibemix.agent._streaming_pipe import last_balanced_position
 from vibemix.agent.dj_cohost import (
-    _grounded_event_fallback_line,
-    _grounded_voice_payload_fallback_line,
     _has_unclosed_bracket_tail,
     repair_finished_headphone_line,
 )
@@ -133,13 +131,16 @@ SCENARIOS = [
     {
         "name": "heartbeat_with_grounded_payload", "event": "HEARTBEAT",
         "extra": {"next_suggestion_voice_line": _FORWARD_READ_RECEIPT},
-        "expect": "speak",
+        "expect": "silent",
         "evidence": (
             f"{_HEAR} | track=unknown | deck=A | recent_moves[8s]: NONE | "
             "next_track_ready=true track_id=track-42 camelot=9A | "
             f'next_suggestion_voice_line="{_FORWARD_READ_RECEIPT}"'
         ),
-        "task": "You have a grounded next-track suggestion (see payload). Hand it to Kaan as one forward nudge.",
+        "task": (
+            "You have a grounded next-track suggestion (see payload), but no live "
+            "interruption-worthy change. Keep it on the pill; do not speak it."
+        ),
     },
     {
         "name": "filter_cut_move", "event": "MIX_MOVE", "extra": {}, "expect": "speak",
@@ -337,66 +338,33 @@ def _spoken_line_for_judge(model_line: str) -> str:
     return model_text_for_tts(clipped, normalize=True)
 
 
-def _line_or_grounded_fallback(raw_line: str, *, gate_reason: str, ev_extra: dict) -> tuple[str, str, str | None]:
+def _line_or_silence(raw_line: str) -> tuple[str, str, bool]:
     model_line = repair_finished_headphone_line(raw_line) or ""
     line = _spoken_line_for_judge(model_line)
-    fallback_line = None
-    if gate_reason == "grounded_voice_payload" and (
-        not line or _has_unclosed_bracket_tail(model_line)
-    ):
-        fallback_line = _grounded_voice_payload_fallback_line(ev_extra)
-        if fallback_line:
-            model_line = fallback_line
-            line = _spoken_line_for_judge(model_line)
-    return line, model_line, fallback_line
+    broken = bool(raw_line and (not line or _has_unclosed_bracket_tail(model_line)))
+    if broken:
+        return "", "", True
+    return line, model_line, False
 
 
 def _live_linter_checked_line(
     line: str,
     model_line: str,
-    fallback_line: str | None,
     *,
-    event_type: str,
-    gate_reason: str,
-    ev_extra: dict,
     registry: EvidenceRegistry,
-) -> tuple[str, str, str | None, dict]:
+) -> tuple[str, str, dict]:
     """Mirror the live response-level citation gate for sim scoring.
 
-    The live linter checks the full model text, not the TTS-stripped audience
-    text. When a grounded payload already exists and the model omitted or
-    mangled citations, the sim may use the same grounded receipt fallback only
-    if that fallback itself resolves against the seeded registry.
+    The live linter checks the full model text, not the TTS-stripped audience text.
+    It never substitutes canned fallback speech: an invalid or uncited model turn
+    strips to silence so the replay cannot pass with lines the live app would not say.
     """
 
     lint = CitationLinter().check(model_line, registry.snapshot(), mode="live")
     if lint.valid:
-        return line, model_line, fallback_line, _lint_payload(lint, "emit")
+        return line, model_line, _lint_payload(lint, "emit")
 
-    if gate_reason == "grounded_voice_payload":
-        candidate = fallback_line or _grounded_voice_payload_fallback_line(ev_extra)
-        if candidate:
-            fallback_lint = CitationLinter().check(candidate, registry.snapshot(), mode="live")
-            if fallback_lint.valid:
-                return (
-                    _spoken_line_for_judge(candidate),
-                    candidate,
-                    candidate,
-                    _lint_payload(fallback_lint, "fallback_emit"),
-                )
-
-    candidate = _grounded_event_fallback_line(event_type, ev_extra, registry.snapshot())
-    if candidate:
-        fallback_lint = CitationLinter().check(candidate, registry.snapshot(), mode="live")
-        if fallback_lint.valid:
-            return (
-                _spoken_line_for_judge(candidate),
-                candidate,
-                candidate,
-                _lint_payload(fallback_lint, "event_fallback_emit"),
-            )
-
-    return "", "", fallback_line, _lint_payload(lint, "strip")
+    return "", "", _lint_payload(lint, "strip")
 
 
 def _lint_payload(lint_result, action: str) -> dict:
@@ -632,24 +600,16 @@ def main() -> int:
         user = f"{sc['evidence']}\n\n{sc['task']}"
         _st, line = _chat(persona, user, key)
         raw_line = (line or "").strip()
-        line, model_line, fallback_line = _line_or_grounded_fallback(
-            raw_line,
-            gate_reason=gate.reason,
-            ev_extra=ev_extra,
-        )
+        line, model_line, suppressed_model_line = _line_or_silence(raw_line)
         live_linter = None
         if args.match_live_linter:
             registry = _registry_for_sim(sc, ev_extra)
-            line, model_line, fallback_line, live_linter = _live_linter_checked_line(
+            line, model_line, live_linter = _live_linter_checked_line(
                 line,
                 model_line,
-                fallback_line,
-                event_type=sc["event"],
-                gate_reason=gate.reason,
-                ev_extra=ev_extra,
                 registry=registry,
             )
-        suppressed_model_line = bool(raw_line and not model_line and not line)
+            suppressed_model_line = bool(raw_line and not model_line and not line)
         if line:
             scores = _judge(sc["evidence"], line, key)
         elif raw_line and not suppressed_model_line:
@@ -665,8 +625,6 @@ def main() -> int:
             row["live_linter"] = live_linter
         if suppressed_model_line:
             row["suppressed_model_line"] = True
-        if fallback_line is not None:
-            row["fallback_line"] = fallback_line
         sd = "/".join(str(scores.get(d, "-")) for d in DIMS)
         print(f"{sc['name']:<32} {sc['event']:<16} {gate.verdict:<8} {ok:<4} {sd}")
         print(f"    -> {line[:140]}")
@@ -699,6 +657,11 @@ def main() -> int:
     )
     gate_ok = int(quality["gate_ok"])
     print(f"gate routing: {gate_ok}/{len(results)} matched expectation")
+    gate_failures = [
+        failure
+        for failure in quality["failures"]
+        if failure.startswith("gate routing mismatch") or failure.startswith("expected ")
+    ]
     if args.out:
         with open(args.out, "w") as f:
             json.dump(
@@ -728,6 +691,11 @@ def main() -> int:
                 print(f"  - {failure}", file=sys.stderr)
             return 1
         print("quality gate: PASS")
+    elif args.gate_only and gate_failures:
+        print("gate-only routing: FAIL", file=sys.stderr)
+        for failure in gate_failures:
+            print(f"  - {failure}", file=sys.stderr)
+        return 1
     if args.heartbeat_session:
         return _run_heartbeat_judge(
             session=args.heartbeat_session,

@@ -216,106 +216,48 @@ def test_kick_density_target_seeds_live_linter_event_ref() -> None:
     assert lint.valid is True
 
 
-def test_line_or_grounded_fallback_uses_cue_receipt_when_model_is_empty() -> None:
-    ev_extra = {
-        "next_suggestion_voice_line": (
-            "Forward cue receipt: the next citable phrase boundary is about 4 bars ahead. "
-            "Use it as one forward timing nudge for what comes next if the live sound "
-            "supports it. Copy this citation exactly: [cue:phrase_boundary@108.0]."
-        )
-    }
+def test_line_or_silence_keeps_empty_model_silent() -> None:
+    line, model_line, suppressed = sim._line_or_silence("")
 
-    line, model_line, fallback_line = sim._line_or_grounded_fallback(
-        "",
-        gate_reason="grounded_voice_payload",
-        ev_extra=ev_extra,
+    assert line == ""
+    assert model_line == ""
+    assert suppressed is False
+
+
+def test_line_or_silence_strips_broken_model_fragment() -> None:
+    line, model_line, suppressed = sim._line_or_silence(
+        ':* "This sub is heavy--hold this groove until the phrase breaks at 10'
     )
 
-    assert fallback_line == (
-        "Hold this for about 4 bars; make the move on the next phrase. "
-        "[cue:phrase_boundary@108.0]"
-    )
-    assert model_line == fallback_line
-    assert line == "Hold this for about 4 bars; make the move on the next phrase."
+    assert line == ""
+    assert model_line == ""
+    assert suppressed is True
 
 
-def test_line_or_grounded_fallback_replaces_broken_model_fragment() -> None:
-    ev_extra = {
-        "next_suggestion_voice_line": (
-            "Forward cue receipt: the next citable phrase boundary is about 4 bars ahead. "
-            "Use it as one forward timing nudge for what comes next if the live sound "
-            "supports it. Copy this citation exactly: [cue:phrase_boundary@108.0]."
-        )
-    }
-
-    line, model_line, fallback_line = sim._line_or_grounded_fallback(
-        ':* "This sub is heavy--hold this groove until the phrase breaks at 10',
-        gate_reason="grounded_voice_payload",
-        ev_extra=ev_extra,
+def test_line_or_silence_strips_unclosed_citation_tail() -> None:
+    line, model_line, suppressed = sim._line_or_silence(
+        "Hold this heavy sub until the next phrase boundary [cue:phrase_boundary@10"
     )
 
-    assert fallback_line is not None
-    assert model_line == fallback_line
-    assert line == "Hold this for about 4 bars; make the move on the next phrase."
+    assert line == ""
+    assert model_line == ""
+    assert suppressed is True
 
 
-def test_line_or_grounded_fallback_replaces_unclosed_citation_tail() -> None:
-    ev_extra = {
-        "next_suggestion_voice_line": (
-            "Forward cue receipt: the next citable phrase boundary is about 4 bars ahead. "
-            "Use it as one forward timing nudge for what comes next if the live sound "
-            "supports it. Copy this citation exactly: [cue:phrase_boundary@108.0]."
-        )
-    }
-
-    line, model_line, fallback_line = sim._line_or_grounded_fallback(
-        "Hold this heavy sub until the next phrase boundary [cue:phrase_boundary@10",
-        gate_reason="grounded_voice_payload",
-        ev_extra=ev_extra,
-    )
-
-    assert fallback_line is not None
-    assert model_line == fallback_line
-    assert line == "Hold this for about 4 bars; make the move on the next phrase."
-
-
-def test_line_or_grounded_fallback_replaces_incomplete_next_track_tail() -> None:
-    line, model_line, fallback_line = sim._line_or_grounded_fallback(
-        "Let the sub ride, then pull back before you bring in that 1",
-        gate_reason="grounded_voice_payload",
-        ev_extra={
-            "next_suggestion_voice_line": (
-                "Forward read: a darker rolling 9A track pairs next - keeps the build. "
-                "Copy these citations exactly: [track:track-42] [mix:next_suggestion=track-42]."
-            )
-        },
-    )
-
-    assert fallback_line is not None
-    assert model_line == fallback_line
-    assert line == "Line up a darker rolling 9A track next to keep this build moving."
-
-
-def test_live_linter_mode_uses_valid_grounded_receipt_fallback() -> None:
+def test_live_linter_mode_strips_uncited_grounded_receipt_instead_of_substituting() -> None:
     ev_extra = {"next_suggestion_voice_line": sim._FORWARD_READ_RECEIPT}
     registry = sim._registry_for_sim({"evidence": ""}, ev_extra)
 
-    line, model_line, fallback_line, live_linter = sim._live_linter_checked_line(
+    line, model_line, live_linter = sim._live_linter_checked_line(
         "That darker 9A roller is ready next.",
         "That darker 9A roller is ready next.",
-        None,
-        event_type="TRACK_CHANGE",
-        gate_reason="grounded_voice_payload",
-        ev_extra=ev_extra,
         registry=registry,
     )
 
-    assert live_linter["action"] == "fallback_emit"
-    assert live_linter["valid"] is True
-    assert "[track:track-42]" in model_line
-    assert "[mix:next_suggestion=track-42]" in model_line
-    assert line == "Line up a darker rolling 9A track next to keep this build moving."
-    assert fallback_line == model_line
+    assert line == ""
+    assert model_line == ""
+    assert live_linter["action"] == "strip"
+    assert live_linter["valid"] is False
 
 
 def test_live_linter_mode_strips_uncitable_model_citation_without_fallback() -> None:
@@ -324,46 +266,33 @@ def test_live_linter_mode_strips_uncitable_model_citation_without_fallback() -> 
         {},
     )
 
-    line, model_line, fallback_line, live_linter = sim._live_linter_checked_line(
+    line, model_line, live_linter = sim._live_linter_checked_line(
         "Let this roll [track:Raik - Trio d'Acid].",
         "Let this roll [track:Raik - Trio d'Acid].",
-        None,
-        event_type="MIX_MOVE",
-        gate_reason="event_priority",
-        ev_extra={},
         registry=registry,
     )
 
     assert line == ""
     assert model_line == ""
-    assert fallback_line is None
     assert live_linter["action"] == "strip"
     assert live_linter["valid"] is False
     assert live_linter["reason"] == "no_citations"
 
 
-def test_live_linter_mode_uses_registered_kick_event_fallback() -> None:
+def test_live_linter_mode_strips_registered_kick_event_instead_of_substituting() -> None:
     ev_extra = {"prev_density": 6.0, "new_density": 4.5, "delta": -1.5}
     registry = sim._registry_for_sim(sim.KICK_DENSITY_TARGET, ev_extra)
 
-    line, model_line, fallback_line, live_linter = sim._live_linter_checked_line(
+    line, model_line, live_linter = sim._live_linter_checked_line(
         "Bring a bright layer into the space. [",
         "Bring a bright layer into the space. [",
-        None,
-        event_type="KICK_DENSITY_SHIFT",
-        gate_reason="event_priority",
-        ev_extra=ev_extra,
         registry=registry,
     )
 
-    assert live_linter["action"] == "event_fallback_emit"
-    assert live_linter["valid"] is True
-    assert model_line == (
-        "Use this added space for the next layer before the lows get busy again. "
-        "[ev:KICK_DENSITY_SHIFT@1281.0]"
-    )
-    assert line == "Use this added space for the next layer before the lows get busy again."
-    assert fallback_line == model_line
+    assert line == ""
+    assert model_line == ""
+    assert live_linter["action"] == "strip"
+    assert live_linter["valid"] is False
 
 
 def test_run_heartbeat_judge_propagates_required_quality_gate(monkeypatch) -> None:
