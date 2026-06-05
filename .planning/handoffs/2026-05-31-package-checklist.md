@@ -10659,3 +10659,40 @@ Proof before staging:
 - `uv run ruff check src/vibemix/agent/dj_cohost.py tests/agent/test_dj_cohost_linter.py`
 - `uv run python -m compileall -q src/vibemix/agent/dj_cohost.py tests/agent/test_dj_cohost_linter.py`
 - `git diff --check -- src/vibemix/agent/dj_cohost.py tests/agent/test_dj_cohost_linter.py .planning/handoffs/2026-05-31-package-checklist.md`
+
+## Package 88 - Live Prompt No Listening Fallback
+
+Suggested commit: `fix(cohost): omit listening fallback from live prompt`
+
+Include:
+
+- `src/vibemix/agent/dj_cohost.py`
+- `src/vibemix/agent/persona.py`
+- `src/vibemix/prompts/matrix.py`
+- `tests/agent/test_dj_cohost.py`
+- `tests/agent/test_dj_cohost_matrix_dispatch.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Generic prompt-matrix defaults, prompt cell rewrites, citation grammar
+  changes, provider switching, UI behavior, Learn runtime changes, tracker
+  telemetry semantics, and new dependencies. This package only makes the live
+  co-host dispatcher opt out of `IM_LISTENING_FRAGMENT`.
+
+Reason:
+
+- The live co-host path already suppresses fail-soft fallback before TTS, but
+  `_resolve_prompt_cell()` still let the generic builder append the prompt rule
+  that tells the model to answer "I'm listening" when it cannot cite. That
+  keeps priming the exact anti-slop failure class. The runtime prompt should
+  still include citation grammar and the audio-vibe contract, but not the
+  uncited listening fallback.
+
+Proof before staging:
+
+- `uv run pytest -q tests/agent/test_dj_cohost.py::test_resolve_prompt_cell_uses_shared_lens tests/agent/test_dj_cohost.py::test_resolve_prompt_cell_cold_path_byte_identical tests/agent/test_dj_cohost.py::test_resolve_prompt_cell_lens_wins_over_live_mood tests/agent/test_dj_cohost.py::test_resolve_prompt_cell_corrupt_lens_falls_back_no_crash tests/agent/test_dj_cohost_matrix_dispatch.py tests/prompts/test_matrix.py tests/agent/test_coach_mood_template.py`
+- `uv run pytest -q tests/state/test_coach_anti_slop.py tests/state/test_hype_anti_slop.py tests/agent/test_citation_strip_emit.py tests/agent/test_dj_cohost_grounding.py tests/agent/test_dj_cohost_linter.py tests/state/test_evidence_registry.py tests/coach/test_citation_linter.py tests/coach/test_citation_zero_orphan_replay.py`
+- `uv run ruff check src/vibemix/agent/dj_cohost.py src/vibemix/agent/persona.py src/vibemix/prompts/matrix.py tests/agent/test_dj_cohost.py tests/agent/test_dj_cohost_matrix_dispatch.py`
+- `uv run python -m compileall -q src/vibemix/agent/dj_cohost.py src/vibemix/agent/persona.py src/vibemix/prompts/matrix.py tests/agent/test_dj_cohost.py tests/agent/test_dj_cohost_matrix_dispatch.py`
+- `git diff --check -- src/vibemix/agent/dj_cohost.py src/vibemix/agent/persona.py src/vibemix/prompts/matrix.py tests/agent/test_dj_cohost.py tests/agent/test_dj_cohost_matrix_dispatch.py .planning/handoffs/2026-05-31-package-checklist.md`

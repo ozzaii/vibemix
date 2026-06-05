@@ -25,10 +25,11 @@ from vibemix.prompts.matrix import HYPE_INTERMEDIATE, build_system_instruction
 # appends (citation-grammar block, fail-soft IM_LISTENING_FRAGMENT, TTS
 # tag DSL block) so SYSTEM_INSTRUCTION stays byte-identical to the v4
 # cell constant. All three additions are made at the dispatcher
-# boundary (DJCoHostAgent's prompt_body via the default
-# include_*=True params), not at this backward-compat re-export — this
-# keeps the v4-byte-identity invariant green AND lets the live agent
-# get every addition via the dispatcher's default path.
+# boundary (DJCoHostAgent's prompt_body via explicit dispatcher kwargs), not
+# at this backward-compat re-export — this keeps the v4-byte-identity
+# invariant green while letting the live agent choose which additions are safe
+# for spoken runtime. The live cohost intentionally opts out of
+# IM_LISTENING_FRAGMENT.
 SYSTEM_INSTRUCTION: str = build_system_instruction(
     "intermediate",
     "hype",

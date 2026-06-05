@@ -15,9 +15,9 @@ import pytest
 from livekit.agents import Agent
 
 from vibemix.agent import DJCoHostAgent
+from vibemix.coach import IM_LISTENING_FRAGMENT
 from vibemix.prompts.matrix import (
     COACH_BEGINNER,
-    COACH_INTERMEDIATE,
     COACH_PRO,
     HYPE_BEGINNER,
     HYPE_INTERMEDIATE,
@@ -25,6 +25,7 @@ from vibemix.prompts.matrix import (
     MOOD_PERSONAS,
     SVEN_COACH_INTERMEDIATE,
 )
+from vibemix.state import MusicState
 
 
 def _coach_rendered(template: str, mood: str = "hype-man") -> str:
@@ -35,7 +36,6 @@ def _coach_rendered(template: str, mood: str = "hype-man") -> str:
     dispatch tests below — they never set VIBEMIX_MOOD).
     """
     return template.replace("{mood_persona}", MOOD_PERSONAS[mood])
-from vibemix.state import MusicState
 
 # ---------- shared minimal stubs (mirror tests/agent/test_dj_cohost.py) ----
 
@@ -105,6 +105,7 @@ def test_dispatch_01_defaults_to_intermediate_hype(mocker, tmp_path, _clean_env)
     instructions = _instructions_kw_for_env(mocker, tmp_path)
     assert instructions.startswith(HYPE_INTERMEDIATE)
     assert "[ev:" in instructions  # Plan 18-03 citation-grammar block present
+    assert IM_LISTENING_FRAGMENT not in instructions
 
 
 def test_dispatch_02_default_equals_persona_system_instruction(
@@ -119,6 +120,7 @@ def test_dispatch_02_default_equals_persona_system_instruction(
     assert instructions.startswith(SYSTEM_INSTRUCTION)
     assert instructions.startswith(HYPE_INTERMEDIATE)  # transitive
     assert "[ev:" in instructions
+    assert IM_LISTENING_FRAGMENT not in instructions
 
 
 # ---------- explicit env-var dispatch ------------------------------------
@@ -151,6 +153,7 @@ def test_dispatch_03_each_cell_selectable_via_env(
     instructions = _instructions_kw_for_env(mocker, tmp_path)
     assert instructions.startswith(expected_cell)
     assert "[ev:" in instructions
+    assert IM_LISTENING_FRAGMENT not in instructions
 
 
 def test_dispatch_04_pro_coach_via_env(mocker, tmp_path, monkeypatch) -> None:
@@ -204,6 +207,7 @@ def test_dispatch_06_gen_cfg_system_instruction_matches_dispatch(
     # grammar block's signature substring is present.
     assert agent._gen_cfg.system_instruction.startswith(_coach_rendered(COACH_BEGINNER))
     assert "[ev:" in agent._gen_cfg.system_instruction
+    assert IM_LISTENING_FRAGMENT not in agent._gen_cfg.system_instruction
 
 
 # ---------- Phase 61 COACH-02: ONE prompt body feeds BOTH paths -----------
@@ -238,6 +242,7 @@ def test_dispatch_61_coach_prompt_body_feeds_both_paths(
     assert agent._gen_cfg.system_instruction == agent._prompt_body
     # Both carry the rendered COACH_PRO persona as the prefix.
     assert agent._prompt_body.startswith(_coach_rendered(COACH_PRO))
+    assert IM_LISTENING_FRAGMENT not in agent._prompt_body
     # No-new-mode invariant — exactly hype + coach, nothing else.
     assert _VALID_MODES == frozenset({"hype", "coach"})
 

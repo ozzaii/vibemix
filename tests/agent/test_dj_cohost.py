@@ -2366,6 +2366,7 @@ def test_llm_node_threads_event_fired_set_seconds_to_record_said(mocker, tmp_pat
 # ---------------------------------------------------------------------------
 
 import vibemix.agent.dj_cohost as dj_mod  # noqa: E402
+from vibemix.coach import IM_LISTENING_FRAGMENT  # noqa: E402
 from vibemix.prompts.matrix import build_system_instruction  # noqa: E402
 
 
@@ -2392,6 +2393,7 @@ def test_resolve_prompt_cell_uses_shared_lens(tmp_path, monkeypatch) -> None:
     out = dj_mod._resolve_prompt_cell()
     # critique → (coach, coach): the coach persona fragment is substituted in.
     assert "post-mortem-anchored" in out
+    assert IM_LISTENING_FRAGMENT not in out
 
 
 def test_resolve_prompt_cell_cold_path_byte_identical(tmp_path, monkeypatch) -> None:
@@ -2418,11 +2420,13 @@ def test_resolve_prompt_cell_cold_path_byte_identical(tmp_path, monkeypatch) -> 
         "intermediate",
         "hype",
         "hype-man",
+        include_listening_fallback=False,
         include_tag_dsl=False,
         include_audio_vibe_contract=True,
         include_coach_closing=True,
     )
     assert AUDIO_VIBE_CONTRACT_BLOCK in out
+    assert IM_LISTENING_FRAGMENT not in out
     for tag in TTS_TAGS:
         assert tag not in out
 
@@ -2458,10 +2462,12 @@ def test_resolve_prompt_cell_lens_wins_over_live_mood(tmp_path, monkeypatch) -> 
         "intermediate",
         "coach",
         "teacher",
+        include_listening_fallback=False,
         include_tag_dsl=False,
         include_audio_vibe_contract=True,
         include_coach_closing=True,
     )
+    assert IM_LISTENING_FRAGMENT not in out
     for tag in TTS_TAGS:
         assert tag not in out
 
@@ -2494,9 +2500,11 @@ def test_resolve_prompt_cell_corrupt_lens_falls_back_no_crash(tmp_path, monkeypa
         "intermediate",
         "hype",
         "hype-man",
+        include_listening_fallback=False,
         include_tag_dsl=False,
         include_audio_vibe_contract=True,
         include_coach_closing=True,
     )
+    assert IM_LISTENING_FRAGMENT not in out
     for tag in TTS_TAGS:
         assert tag not in out

@@ -959,9 +959,9 @@ def build_system_instruction(
         include_listening_fallback: Plan 20-02 — when True (default), the
             ``IM_LISTENING_FRAGMENT`` (GROUND-08 prompt-side mitigation) is
             appended AFTER the citation-grammar block so the grammar primes
-            the "if you cannot cite" clause. The live ``DJCoHostAgent`` rides
-            the default to learn the fail-soft rule automatically. When
-            False, the fragment is suppressed — used by
+            the "if you cannot cite" clause. Live ``DJCoHostAgent`` calls pass
+            False so uncitable turns fail to silence instead of suggested
+            fallback speech. When False, the fragment is suppressed — used by
             ``vibemix.agent.persona`` together with
             ``include_citation_grammar=False`` to preserve the v4-byte-
             identity invariant on ``SYSTEM_INSTRUCTION``.
@@ -1039,9 +1039,10 @@ def build_system_instruction(
     # the grammar context primes its "if you cannot cite" opening clause.
     # IM_LISTENING_FRAGMENT already starts with "\n\n--- FAIL-SOFT RULE..."
     # — no extra separator needed (mirror of the locked copy in
-    # src/vibemix/coach/prompt_fragments.py). Default-on so every live
-    # system instruction carries the rule; explicit opt-out preserves the
-    # v4-byte-identity invariant when paired with
+    # src/vibemix/coach/prompt_fragments.py). Default-on for historical prompt
+    # matrix callers; the live cohost opts out so citation failures stay
+    # silent. Explicit opt-out also preserves the v4-byte-identity invariant
+    # when paired with
     # ``include_citation_grammar=False`` (used by persona.SYSTEM_INSTRUCTION).
     if include_listening_fallback:
         body = body + IM_LISTENING_FRAGMENT
