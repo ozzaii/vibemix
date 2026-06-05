@@ -68,6 +68,24 @@ describe("tldr-player asset URLs", () => {
       "asset://localhost//recordings/set-001/tldr.mp3",
     );
   });
+
+  it("keeps file metadata out of the visible review chrome", () => {
+    mountTldrPlayer(
+      container,
+      {
+        audio_relative_path: "tldr.mp3",
+        duration_s: 74,
+        tldr_sha256: "abcdef0123456789",
+        mime_type: "audio/mpeg",
+      },
+      "/recordings/set-001",
+    );
+
+    expect(container.textContent).toContain("74s recap");
+    expect(container.textContent).not.toContain("audio/mpeg");
+    expect(container.textContent).not.toContain("abcdef");
+    expect(container.querySelector(".vmx-debrief-tldr-hud")).toBeNull();
+  });
 });
 
 function setTauriInternals(): void {

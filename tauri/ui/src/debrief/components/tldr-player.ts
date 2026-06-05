@@ -43,24 +43,7 @@ export function mountTldrPlayer(
 
   const duration = document.createElement("p");
   duration.className = "vmx-debrief-tldr-meta";
-  duration.textContent = `${Math.round(payload.duration_s)}s • ${payload.mime_type}`;
-
-  const hud = document.createElement("div");
-  hud.className = "vmx-debrief-tldr-hud";
-  // File-integrity metadata (Format / Hash) is QA tooling, not a DJ's review;
-  // the peak-end moment shows the summary, not the MIME type or the SHA.
-  for (const [label, value] of [
-    ["Summary", `${Math.round(payload.duration_s)}s`],
-  ] as const) {
-    const cell = document.createElement("span");
-    cell.className = "vmx-debrief-tldr-hud-cell";
-    const key = document.createElement("small");
-    key.textContent = label;
-    const readout = document.createElement("strong");
-    readout.textContent = value;
-    cell.append(key, readout);
-    hud.append(cell);
-  }
+  duration.textContent = `${Math.round(payload.duration_s)}s recap`;
 
   const audio = document.createElement("audio");
   audio.controls = true;
@@ -93,7 +76,7 @@ export function mountTldrPlayer(
     audio.addEventListener("ended", () => sync(false));
   }
 
-  container.append(duration, hud, audio);
+  container.append(duration, audio);
 }
 
 /**
@@ -150,10 +133,6 @@ function formatDuration(totalS: number): string {
   if (h > 0) return m > 0 ? `${h}H ${m}M` : `${h}H`;
   if (m > 0) return `${m}M`;
   return `${Math.round(totalS)}S`;
-}
-
-function shortHash(value: string): string {
-  return value ? value.slice(0, 10) : "pending";
 }
 
 function buildAssetUrl(path: string): string {
