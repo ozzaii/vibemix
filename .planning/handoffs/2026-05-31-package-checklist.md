@@ -10768,3 +10768,34 @@ Proof before staging:
 - `uv run ruff check src/vibemix/runtime/session_loop.py tests/memory/test_ingest_wiring.py`
 - `uv run python -m compileall -q src/vibemix/runtime/session_loop.py tests/memory/test_ingest_wiring.py`
 - `git diff --check -- src/vibemix/runtime/session_loop.py tests/memory/test_ingest_wiring.py .planning/handoffs/2026-05-31-package-checklist.md`
+
+## Package 91 - Library Embed Folder Error Detail
+
+Suggested commit: `fix(library-ui): surface embed-folder stderr`
+
+Include:
+
+- `tauri/src-tauri/src/library_cmds.rs`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Python ingest behavior, model installation behavior, UI layout/copy rewrites,
+  and library cache resets. This package only preserves a bounded stderr tail
+  from the existing Python child process and includes it in the existing Tauri
+  command error.
+
+Reason:
+
+- Fresh-user folder import can fail before any progress line reaches the UI
+  (missing folder, model/dependency hint, stale index, or other CLI fatal). The
+  Rust bridge logged stderr but returned only `embed-folder exited N`, leaving
+  the Library window with an opaque error. Keep the last non-empty stderr lines,
+  cap them to avoid dumping a full traceback, and append them to the returned
+  error so the UI can show the actionable Python message it already produced.
+
+Proof before staging:
+
+- `cargo fmt --manifest-path tauri/src-tauri/Cargo.toml`
+- `cargo test --manifest-path tauri/src-tauri/Cargo.toml library_cmds::tests`
+- `git diff --check -- tauri/src-tauri/src/library_cmds.rs .planning/handoffs/2026-05-31-package-checklist.md`

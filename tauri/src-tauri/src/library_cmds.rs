@@ -70,6 +70,7 @@ const LIBRARY_MIN_WIDTH: f64 = 920.0;
 const LIBRARY_MIN_HEIGHT: f64 = 600.0;
 const LIBRARY_AGENT_BACKEND: &str = "codex";
 const MODEL_PROGRESS_PREFIX: &str = "VIBEMIX_MODEL_PROGRESS ";
+const EMBED_FOLDER_STDERR_TAIL_LINES: usize = 8;
 
 use crate::sidecar::{resolve_sidecar_invocation_for_library, FORWARDED_ENV_KEYS};
 
@@ -1430,6 +1431,27 @@ fn parse_embed_done_line(line: &str) -> Option<EmbedDone> {
     })
 }
 
+fn push_embed_stderr_tail(tail: &mut Vec<String>, chunk: &str) {
+    for line in chunk.lines() {
+        let trimmed = line.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+        tail.push(trimmed.to_string());
+        if tail.len() > EMBED_FOLDER_STDERR_TAIL_LINES {
+            let overflow = tail.len() - EMBED_FOLDER_STDERR_TAIL_LINES;
+            tail.drain(0..overflow);
+        }
+    }
+}
+
+fn embed_folder_exit_error(code: i32, stderr_tail: &[String]) -> String {
+    if stderr_tail.is_empty() {
+        return format!("embed-folder exited {code}");
+    }
+    format!("embed-folder exited {code}: {}", stderr_tail.join(" | "))
+}
+
 /// `library_embed_folder` — ingest a raw audio folder, streaming progress.
 ///
 /// Spawns `library embed-folder <path> --strategy <strategy>` WITHOUT `--json`
@@ -1475,6 +1497,7 @@ pub async fn library_embed_folder(
     // CommandEvent::Stdout may still chunk mid-line, so we buffer + split on
     // newlines to keep progress parsing robust.
     let mut line_buf = String::new();
+    let mut stderr_tail: Vec<String> = Vec::new();
 
     while let Some(event) = rx.recv().await {
         match event {
@@ -1489,6 +1512,7 @@ pub async fn library_embed_folder(
                 // embed-folder prints diagnostics (embedder, strategy, ...)
                 // + [FATAL] errors to stderr — forward to the parent log.
                 let s = String::from_utf8_lossy(&b);
+                push_embed_stderr_tail(&mut stderr_tail, &s);
                 tracing::info!("[library embed-folder] {}", s.trim_end());
             }
             CommandEvent::Terminated(payload) => {
@@ -1504,7 +1528,7 @@ pub async fn library_embed_folder(
     }
 
     if code != 0 {
-        return Err(format!("embed-folder exited {code}"));
+        return Err(embed_folder_exit_error(code, &stderr_tail));
     }
     Ok(())
 }
@@ -1597,6 +1621,38 @@ mod tests {
             "embed-folder done: embedded=1 skipped_cached=0 failed=0 total=1  ~€0.01"
         )
         .is_none());
+    }
+
+    #[test]
+    fn stderr_tail_keeps_last_nonempty_lines() {
+        let mut tail = Vec::new();
+        push_embed_stderr_tail(
+            &mut tail,
+            "one\n\n two \nthree\nfour\nfive\nsix\nseven\neight\nnine\n",
+        );
+        assert_eq!(tail.len(), EMBED_FOLDER_STDERR_TAIL_LINES);
+        assert_eq!(tail.first().map(String::as_str), Some("two"));
+        assert_eq!(tail.last().map(String::as_str), Some("nine"));
+    }
+
+    #[test]
+    fn embed_folder_exit_error_includes_stderr_tail() {
+        let err = embed_folder_exit_error(
+            1,
+            &[
+                "[FATAL] embed-folder: '/missing' is not a directory.".to_string(),
+                "Install it with: uv run python -m vibemix library models --install clap"
+                    .to_string(),
+            ],
+        );
+        assert!(err.starts_with("embed-folder exited 1: "));
+        assert!(err.contains("[FATAL] embed-folder"));
+        assert!(err.contains("models --install clap"));
+    }
+
+    #[test]
+    fn embed_folder_exit_error_without_stderr_stays_code_only() {
+        assert_eq!(embed_folder_exit_error(2, &[]), "embed-folder exited 2");
     }
 
     #[test]
