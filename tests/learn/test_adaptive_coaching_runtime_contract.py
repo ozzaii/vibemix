@@ -21,6 +21,7 @@ def _runtime(
     *,
     evidence_registry: EvidenceRegistry | None = None,
     evidence_clock_value: float | None = None,
+    session_events: list[tuple[str, dict]] | None = None,
 ) -> tuple[LessonRuntime, MagicMock, LearnProgress]:
     ipc = MagicMock(name="ipc_router")
     progress = LearnProgress()
@@ -34,6 +35,11 @@ def _runtime(
         evidence_clock=(lambda: evidence_clock_value)
         if evidence_clock_value is not None
         else None,
+        session_event_logger=(
+            (lambda kind, fields: session_events.append((kind, dict(fields))))
+            if session_events is not None
+            else None
+        ),
     )
     return runtime, ipc, progress
 
@@ -132,6 +138,72 @@ def test_wrong_screen_action_adapts_without_advancing_through_ipc(
     assert loop["turn_kind"] == "adapt"
     assert loop["verification"]["kind"] == "cc_delta"
     assert loop["verification"]["observable_control_ids"] == ["eq_hi:A"]
+
+
+def test_repeated_wrong_control_records_evidence_without_repeating_voice(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Same wrong control should not make the tutor repeat one canned correction."""
+    monkeypatch.setattr(
+        "vibemix.learn.progress.progress_path",
+        lambda: tmp_path / "learn-progress.json",
+    )
+    now = [100.0]
+    monkeypatch.setattr("vibemix.learn.runtime.time.monotonic", lambda: now[0])
+    session_events: list[tuple[str, dict]] = []
+    runtime, ipc, _progress = _runtime(session_events=session_events)
+    runtime.send(
+        "load",
+        lesson_id="L1.03",
+        course_id="course_1_anatomy",
+        controller_id="pioneer_ddj_flx4",
+    )
+    runtime.send("begin")
+
+    wrong_move = {
+        "type": "cc",
+        "control": "eq_mid",
+        "deck": "A",
+        "value": 127,
+        "prev_value": 0,
+        "source": "midi",
+        "direction": "down",
+    }
+    now[0] = 101.0
+    assert runtime.handle_mismatch_ack(wrong_move) is True
+    now[0] = 103.0
+    assert runtime.handle_mismatch_ack(wrong_move) is True
+
+    hints = _hint_payloads(ipc)
+    assert [hint["text"] for hint in hints] == [
+        "that was deck A mid EQ. use deck A high EQ."
+    ]
+    observed = [
+        fields
+        for kind, fields in session_events
+        if kind == "learn_action_observed"
+    ]
+    assert len(observed) == 2
+    assert all(row["observed_control_id"] == "eq_mid:A" for row in observed)
+    assert all(row["expected_control_id"] == "eq_hi:A" for row in observed)
+    suppressed = [
+        fields
+        for kind, fields in session_events
+        if kind == "learn_mismatch_hint_suppressed"
+    ]
+    assert suppressed == [
+        {
+            "reason": "repeat_same_wrong_control",
+            "lesson_id": "L1.03",
+            "course_id": "course_1_anatomy",
+            "step_id": "L1.03.practice",
+            "observed_control_id": "eq_mid:A",
+            "expected_control_id": "eq_hi:A",
+            "source": "midi",
+            "evidence_time": 3.0,
+        }
+    ]
 
 
 def test_small_midi_move_uses_registry_citation_and_shared_verification(

@@ -10486,3 +10486,35 @@ Proof before staging:
 - `uv run ruff check src/vibemix/llm/route_chain.py src/vibemix/agent/dj_cohost.py tests/llm/test_route_chain.py tests/agent/test_dj_cohost.py`
 - `uv run python -m compileall -q src/vibemix/llm/route_chain.py src/vibemix/agent/dj_cohost.py tests/llm/test_route_chain.py tests/agent/test_dj_cohost.py`
 - `git diff --check -- src/vibemix/llm/route_chain.py src/vibemix/agent/dj_cohost.py tests/llm/test_route_chain.py tests/agent/test_dj_cohost.py .planning/handoffs/2026-05-31-package-checklist.md`
+
+## Package 83 - Learn Repeat Mismatch Silence
+
+Suggested commit: `fix(learn): silence repeated mismatch hints`
+
+Include:
+
+- `src/vibemix/learn/runtime.py`
+- `tests/learn/test_adaptive_coaching_runtime_contract.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Learn ground-up rebuild, curriculum transcript rewrites, frontend Learn UI,
+  GSD/beginner-path suites, practice-player audio synthesis changes, co-host
+  Sven speech, and new dependencies. This package only changes repeated
+  identical wrong-control feedback in the Learn runtime.
+
+Reason:
+
+- Live Learn logs showed authored mismatch hints repeating the same correction
+  on repeated wrong controls. Keep the evidence path intact by recording every
+  observed action, but suppress duplicate tutor speech/subtitle until the
+  observed or expected control changes. Correct-but-too-small moves still keep
+  their feedback path.
+
+Proof before staging:
+
+- `uv run pytest -q tests/learn/test_adaptive_coaching_runtime_contract.py tests/learn/test_tutor_voice_callback.py tests/learn/test_lesson_runtime_smoke.py tests/learn/test_advancement_gates.py`
+- `uv run ruff check src/vibemix/learn/runtime.py tests/learn/test_adaptive_coaching_runtime_contract.py`
+- `uv run python -m compileall -q src/vibemix/learn/runtime.py tests/learn/test_adaptive_coaching_runtime_contract.py`
+- `git diff --check -- src/vibemix/learn/runtime.py tests/learn/test_adaptive_coaching_runtime_contract.py .planning/handoffs/2026-05-31-package-checklist.md`

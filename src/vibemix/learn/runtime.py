@@ -352,6 +352,32 @@ def _mismatch_citations(
     return tuple(citations[:4])
 
 
+def _mismatch_feedback_signature(
+    *,
+    expected: dict[str, Any],
+    midi: dict[str, Any],
+) -> tuple[str, str, str] | None:
+    """Return a repeat-suppression key for wrong-control feedback.
+
+    Correct control but insufficient movement is intentionally not latched:
+    the learner may need another "move farther" cue after trying again. The
+    noisy live class is a repeated wrong control against the same highlighted
+    target, which should keep recording evidence but not keep speaking the
+    same authored correction.
+    """
+    expected_control, expected_deck = _control_and_deck(expected)
+    midi_control, midi_deck = _control_and_deck(midi)
+    if midi_control == expected_control and (
+        not expected_deck or midi_deck == expected_deck
+    ):
+        return None
+    return (
+        _observable_control_id(expected_control, expected_deck),
+        _observable_control_id(midi_control, midi_deck),
+        str(midi.get("source", "midi") or "midi"),
+    )
+
+
 def _adaptive_mismatch_hint(
     *,
     expected: dict[str, Any],
@@ -650,6 +676,7 @@ class LessonRuntime(StateMachine):
         self._active_flow: LessonFlow | None = None
         self._active_step_index: int = 0
         self._last_mismatch_hint_at: float = 0.0
+        self._last_mismatch_hint_signature: tuple[str, str, str] | None = None
         self._beatmatch_practice_lock_active = False
         self._last_beatmatch_live_grade_verdict: str | None = None
         self._last_beatmatch_live_grade_signature: tuple[str, float, float, str | None] | None = (
@@ -966,6 +993,7 @@ class LessonRuntime(StateMachine):
         self._active_step_index += 1
         self._learn.current_beat_index = self._active_step_index
         self._learn.strike_count = 0
+        self._last_mismatch_hint_signature = None
         self._state_entered_at = time.monotonic()
         self._emit_advance(reason="action_matched")
         self._emit_highlight(next_step.expected_action)
@@ -1114,6 +1142,23 @@ class LessonRuntime(StateMachine):
             matched=False,
         )
         self._mark_progress_practice_source(midi)
+        signature = _mismatch_feedback_signature(expected=expected, midi=midi)
+        if signature is not None and signature == self._last_mismatch_hint_signature:
+            observed_id = signature[1]
+            expected_id = signature[0]
+            self._log_session_event(
+                "learn_mismatch_hint_suppressed",
+                reason="repeat_same_wrong_control",
+                lesson_id=self._learn.current_lesson_id or "",
+                course_id=self._learn.current_course_id or "",
+                step_id=self._current_step_id(),
+                observed_control_id=observed_id,
+                expected_control_id=expected_id,
+                source=signature[2],
+                evidence_time=evidence_time,
+            )
+            return True
+        self._last_mismatch_hint_signature = signature
         self._emit_adaptive_mismatch_hint(
             expected=expected,
             midi=midi,
@@ -1873,6 +1918,7 @@ class LessonRuntime(StateMachine):
         self._state_entered_at = self._learn.lesson_started_at
         self._active_flow = None
         self._active_step_index = 0
+        self._last_mismatch_hint_signature = None
         self._active_harmonic_pair = None
         self._recovery_drill_armed_step_key = None
         self._recovery_drill_armed_citation = None
@@ -1991,6 +2037,7 @@ class LessonRuntime(StateMachine):
         self._arm_recovery_drill_if_needed()
         # Reset the strike timer's state-entry anchor.
         self._state_entered_at = time.monotonic()
+        self._last_mismatch_hint_signature = None
 
         # Plan 94-03 — notify any registered lesson observer that the
         # awaiting_action state has been entered. Observers extend the
