@@ -16,7 +16,7 @@
 // idle with connection "disconnected" is EXPECTED, never a fault (cardinal
 // invariant #5). The store never conflates "no music yet" with "broken".
 
-export type SurfaceId = "deck" | "crate" | "learn" | "debrief" | "settings";
+export type SurfaceId = "deck" | "viber" | "learn" | "debrief" | "settings";
 export type ActivationState = "idle" | "listening" | "live";
 export type ConnectionState = "connected" | "reconnecting" | "disconnected";
 
@@ -32,11 +32,18 @@ export interface ShellModel {
 type Listener = (model: Readonly<ShellModel>) => void;
 
 const STORAGE_KEY = "vibemix:shell";
-const SURFACE_IDS: readonly SurfaceId[] = ["deck", "crate", "learn", "debrief", "settings"];
+const SURFACE_IDS: readonly SurfaceId[] = ["deck", "viber", "learn", "debrief", "settings"];
 
 interface PersistedShape {
   collapsed?: boolean;
   activeSurface?: SurfaceId;
+}
+
+function normalizePersistedSurface(value: unknown): SurfaceId | undefined {
+  if (value === "crate") return "viber";
+  return typeof value === "string" && SURFACE_IDS.includes(value as SurfaceId)
+    ? (value as SurfaceId)
+    : undefined;
 }
 
 function readPersisted(): PersistedShape {
@@ -46,10 +53,7 @@ function readPersisted(): PersistedShape {
     const parsed = JSON.parse(raw) as PersistedShape;
     return {
       collapsed: typeof parsed.collapsed === "boolean" ? parsed.collapsed : undefined,
-      activeSurface:
-        parsed.activeSurface && SURFACE_IDS.includes(parsed.activeSurface)
-          ? parsed.activeSurface
-          : undefined,
+      activeSurface: normalizePersistedSurface(parsed.activeSurface),
     };
   } catch {
     // Corrupt or unavailable storage is non-fatal; fall back to defaults.

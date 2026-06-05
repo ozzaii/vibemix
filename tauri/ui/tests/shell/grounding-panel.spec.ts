@@ -63,7 +63,7 @@ describe("grounding panel receipt", () => {
 
     // A later re-render while STILL live (e.g. switching surfaces) rebuilds the
     // receipt but must NOT replay the entry — it was already on screen.
-    shell.store.setActiveSurface("crate");
+    shell.store.setActiveSurface("viber");
     const rerendered = Array.from(host.querySelectorAll(".panel-section"));
     expect(rerendered.length).toBe(2);
     expect(rerendered.some((s) => s.classList.contains("panel-section--enter"))).toBe(false);

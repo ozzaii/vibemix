@@ -11,7 +11,7 @@
 // owned by concurrent sessions.
 
 import "./shell.css"; // bundle the shell styles when loaded via index.html (shell.html also links them)
-import "../library/library.css"; // the crate interior's styles (library.html links these separately)
+import "../library/library.css"; // the Viber interior's styles (library.html links these separately)
 
 // The library/Viber page markup, lifted from its own entry `?raw` so the
 // injected scaffold never drifts from library.html (they are edited together by
@@ -50,12 +50,12 @@ const appDeps: SurfaceMountDeps = {
   mountDeck: async (stage) => {
     await routeSession(stage);
   },
-  // The crate is the library/Viber surface. Its module self-boots against fixed
+  // Viber is the library/set-prep surface. Its module self-boots against fixed
   // ids from library.html, so: import the module first (its auto-boot guard
   // finds no #vmx-lib-runbtn yet and no-ops), then inject the page scaffold and
   // mount explicitly — exactly one mount, zero edits to the (concurrently owned)
   // library module.
-  mountCrate: async (mount) => {
+  mountViber: async (mount) => {
     const { mountLibrary } = await import("../library/index.js");
     mount.innerHTML = extractSurfaceMarkup(libraryHtmlRaw, ".vmx-lib-app");
     mountLibrary(mount);
@@ -153,12 +153,12 @@ export async function mountShellApp(host: HTMLElement): Promise<MountedShellApp>
   const footer = host.querySelector<HTMLElement>(".shell-footer");
   const freshnessBadge = footer
     ? mountLibraryFreshnessBadge(footer, {
-        onOpenCrate: () => shell.store.setActiveSurface("crate"),
+        onOpenViber: () => shell.store.setActiveSurface("viber"),
       })
     : null;
   const voiceBadge = footer
     ? mountVoiceReadinessBadge(footer, {
-        onOpenCrate: () => shell.store.setActiveSurface("crate"),
+        onOpenViber: () => shell.store.setActiveSurface("viber"),
       })
     : null;
   // Feed the live session onto the shell's self-arranging activation +

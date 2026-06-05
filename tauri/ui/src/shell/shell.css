@@ -310,7 +310,7 @@
 /* The co-host foot pill carries an honest activation state — quiet at idle,
  * warming as it starts listening, fully present once it is live in your ear.
  * This is the persistent "who's with you" mark: it stays lit while you browse
- * the crate or learn, so the co-host never silently disappears. It mirrors the
+ * Viber or Learn, so the co-host never silently disappears. It mirrors the
  * deck energy-field step (0.5 -> 0.85) and adds NO new animation: the deck tail
  * cursor stays the screen's single live breath, so the pill's ear only
  * brightens, it never pulses (PRODUCT principle 3: one breathing mark at once). */
@@ -506,7 +506,7 @@
 #shell-root[data-state="live"] .deck-live-line { display: block; }
 #shell-root[data-state="live"] .deck-scene { opacity: 1; }
 
-/* Surface empty state (crate/learn/debrief/settings) — a powered deck at rest:
+/* Surface empty state (Viber/Learn/Debrief/Settings) — a powered deck at rest:
  * one dim engraved glyph, the state in serif, one grounded co-host line. No
  * card, no hero metric, no CTA grid (PRODUCT.md anti-references). */
 .surface--stub { align-items: center; justify-content: center; }
@@ -600,7 +600,7 @@
  * but when no controller is detected (its `data-empty` flag) the bar would be an
  * empty strip, so collapse the whole titlebar in that case. The `.learn-titlebar-*`
  * classes are unique to the learn interior, so scoping to `.surface--mounted` can
- * never touch the crate stub. */
+ * never touch the Viber stub. */
 .surface--mounted .learn-titlebar-wordmark,
 .surface--mounted .learn-titlebar-clock { display: none; }
 .surface--mounted .learn-titlebar:has(.learn-titlebar-controller[data-empty="true"]) { display: none; }
@@ -827,11 +827,11 @@
 .surface--deck .vmx-titlebar { display: none; } /* shell chrome owns the titlebar */
 /* Suppress the folded session's own mode-picker row (COHOST/LEARN/BUILD/DEBRIEF).
  * In the standalone window it was the surface switcher; folded into the shell the
- * sidebar IS the surface switcher (deck↔cohost, crate↔build, learn, debrief — the
+ * sidebar IS the surface switcher (deck/cohost, Viber/build, Learn, Debrief, the
  * same axis), so leaving the modebar visible is a redundant second nav. Worse, its
  * onChange runs openModeSurface() which spawns the STANDALONE library/learn/debrief
  * windows — clicking BUILD here would open a detached library window while the shell
- * shows the in-frame crate (two surfaces). Hiding the modebar removes that only
+ * shows the in-frame Viber controls. Hiding the modebar removes that only
  * trigger; the sidebar (with Cmd+1..5 + palette) reaches every surface. Mirrors the
  * .vmx-titlebar suppression above — additive CSS, no edit to the session module. */
 .surface--deck .vmx-modebar { display: none; }

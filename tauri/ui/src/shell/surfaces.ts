@@ -12,7 +12,7 @@
 // phase without moving the structure.
 
 import {
-  GLYPH_CRATE,
+  GLYPH_VIBER,
   GLYPH_DEBRIEF,
   GLYPH_DECK,
   GLYPH_LEARN,
@@ -60,12 +60,12 @@ export interface SurfaceDef {
 export const SURFACES: readonly SurfaceDef[] = [
   { id: "deck", label: "Deck", kbd: "1", glyph: GLYPH_DECK, hint: "the live co-host", wire: "shell.surface.deck" },
   {
-    id: "crate",
+    id: "viber",
     label: "Viber",
     kbd: "2",
-    glyph: GLYPH_CRATE,
+    glyph: GLYPH_VIBER,
     hint: "library and set prep",
-    wire: "shell.surface.crate",
+    wire: "shell.surface.viber",
     empty: {
       title: "Viber is ready for your library.",
       sub: "Add a music folder or bring in a DJ library. I can build sets and solve transitions.",

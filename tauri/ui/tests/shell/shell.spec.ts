@@ -51,14 +51,14 @@ describe("DesktopShell", () => {
 
   it("switches the active surface while keeping every surface mounted", () => {
     shell = mountDesktopShell(host);
-    const crateNav = host.querySelector<HTMLElement>('.sb-nav-item[data-surface="crate"]')!;
-    crateNav.click();
-    expect(shell.store.getState().activeSurface).toBe("crate");
+    const viberNav = host.querySelector<HTMLElement>('.sb-nav-item[data-surface="viber"]')!;
+    viberNav.click();
+    expect(shell.store.getState().activeSurface).toBe("viber");
     // Keep-alive: all regions still in the DOM, exactly one active.
     expect(host.querySelectorAll(".surface").length).toBe(SURFACES.length);
     expect(host.querySelectorAll(".surface.is-active").length).toBe(1);
-    expect(host.querySelector(".surface.is-active")?.getAttribute("data-surface")).toBe("crate");
-    expect(crateNav.getAttribute("aria-current")).toBe("true");
+    expect(host.querySelector(".surface.is-active")?.getAttribute("data-surface")).toBe("viber");
+    expect(viberNav.getAttribute("aria-current")).toBe("true");
     expect(
       host.querySelector<HTMLElement>('.sb-nav-item[data-surface="deck"]')?.getAttribute(
         "aria-current",
@@ -98,19 +98,19 @@ describe("DesktopShell", () => {
 
   it("makes the Viber empty state an operator preview, not a dead void", () => {
     shell = mountDesktopShell(host);
-    const crate = host.querySelector<HTMLElement>('.surface[data-surface="crate"]')!;
+    const viber = host.querySelector<HTMLElement>('.surface[data-surface="viber"]')!;
 
-    expect(crate.querySelector(".se-title")?.textContent).toBe(
+    expect(viber.querySelector(".se-title")?.textContent).toBe(
       "Viber is ready for your library.",
     );
-    expect(crate.textContent).toContain("build sets and solve transitions");
-    expect(crate.textContent).toContain("Build");
-    expect(crate.textContent).toContain("set arcs from indexed tracks");
-    expect(crate.textContent).toContain("Mix");
-    expect(crate.textContent).toContain("deck-backed transitions only");
-    expect(crate.textContent).toContain("Find");
-    expect(crate.textContent).toContain("deep cuts without repeats");
-    expect(crate.textContent).not.toContain("Nothing loaded yet.");
+    expect(viber.textContent).toContain("build sets and solve transitions");
+    expect(viber.textContent).toContain("Build");
+    expect(viber.textContent).toContain("set arcs from indexed tracks");
+    expect(viber.textContent).toContain("Mix");
+    expect(viber.textContent).toContain("deck-backed transitions only");
+    expect(viber.textContent).toContain("Find");
+    expect(viber.textContent).toContain("deep cuts without repeats");
+    expect(viber.textContent).not.toContain("Nothing loaded yet.");
   });
 
   it("carries the deck tail cursor as the live speaking sign-of-life", () => {
@@ -130,6 +130,15 @@ describe("DesktopShell", () => {
     expect(host.dataset.collapsed).toBe("true");
     // Persisted: a fresh store reads the collapsed state back.
     expect(new ShellStore().getState().collapsed).toBe(true);
+  });
+
+  it("migrates the legacy Crate route to Viber on boot", () => {
+    globalThis.localStorage?.setItem(
+      "vibemix:shell",
+      JSON.stringify({ activeSurface: "crate" }),
+    );
+
+    expect(new ShellStore().getState().activeSurface).toBe("viber");
   });
 
   it("opens the Cmd+K palette, filters, and runs an action", () => {

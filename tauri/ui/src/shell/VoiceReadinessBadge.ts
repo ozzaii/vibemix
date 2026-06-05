@@ -33,7 +33,7 @@ export interface VoiceReadinessBadgeOptions {
   autoload?: boolean;
   pollMs?: number | null;
   subscribeStatusTick?: boolean;
-  onOpenCrate?: () => void;
+  onOpenViber?: () => void;
 }
 
 const DEFAULT_POLL_MS = 120_000;
@@ -129,20 +129,20 @@ export function mountVoiceReadinessBadge(
   const autoload = options.autoload ?? true;
   const pollMs = options.pollMs === undefined ? DEFAULT_POLL_MS : options.pollMs;
   const subscribeStatusTick = options.subscribeStatusTick ?? true;
-  const onOpenCrate = options.onOpenCrate;
+  const onOpenViber = options.onOpenViber;
 
   const separator = document.createElement("span");
   separator.className = "footer-separator";
   separator.setAttribute("aria-hidden", "true");
 
   const badge =
-    onOpenCrate === undefined
+    onOpenViber === undefined
       ? document.createElement("span")
       : document.createElement("button");
   badge.className = "voice-readiness-badge";
-  if (onOpenCrate !== undefined && badge instanceof HTMLButtonElement) {
+  if (onOpenViber !== undefined && badge instanceof HTMLButtonElement) {
     badge.type = "button";
-    badge.addEventListener("click", onOpenCrate);
+    badge.addEventListener("click", onOpenViber);
   }
   badge.setAttribute("data-wire", "shell.voice-readiness");
   badge.innerHTML =

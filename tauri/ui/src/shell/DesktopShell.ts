@@ -2,7 +2,7 @@
 //
 // The cohesive DesktopShell composition. This is the structural lever that
 // makes vibemix's scattered surfaces read as ONE app instead of a scatter of
-// separate windows: it folds the five interior surfaces (deck/crate/learn/
+// separate windows: it folds the five interior surfaces (deck/viber/learn/
 // debrief/settings) into one frame, while the pill/overlay/mascot stay separate
 // transparent windows. Composition:
 // fixed sidebar furniture, an offset recessed main with keep-alive surfaces, a
@@ -88,7 +88,7 @@ function createSurfaceRegion(def: SurfaceDef): HTMLElement {
 
 const SURFACE_ALIASES: Readonly<Record<SurfaceId, readonly string[]>> = {
   deck: ["live", "sven", "cohost", "voice", "moss", "play"],
-  crate: ["library", "viber", "set prep", "search", "tracks", "transitions"],
+  viber: ["library", "viber", "set prep", "search", "tracks", "transitions"],
   learn: ["lesson", "practice", "controller", "hands"],
   debrief: ["review", "timeline", "receipts", "proof", "set review"],
   settings: ["setup", "audio", "output", "hotkey", "persona", "recordings"],

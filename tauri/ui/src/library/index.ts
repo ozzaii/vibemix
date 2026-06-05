@@ -205,7 +205,7 @@ const AGENT_FAILURE_COPY: Record<string, AgentFailureCopy> = {
   no_playlist: {
     title: "No grounded tracks survived",
     detail: "The agent output did not resolve to real tracks in this library.",
-    next: "Search the crate first, then use those words in the set brief.",
+    next: "Search your library first, then use those words in the set brief.",
   },
   max_iters: {
     title: "Viber stopped before a set",
@@ -642,7 +642,7 @@ function buildExportHint(result: BuildSetResult): string {
     return "Import the XML in Rekordbox. Serato and Mixxx read the VM tags after reload.";
   }
   if (result.export_outputs?.m3u8) {
-    return "Import the XML in Rekordbox. Use the M3U8 for other crates.";
+    return "Import the XML in Rekordbox. Use the M3U8 in another DJ app.";
   }
   return "File → Import Collection in Rekordbox, then drag the set into a playlist.";
 }
@@ -767,7 +767,7 @@ function renderBuildSet(result: BuildSetResult): void {
  *  Replaced wholesale by renderBuildSet / renderError when the run lands. */
 function renderBuildSetLoading(brief: string): void {
   $("vmx-lib-rationale-body").textContent = `Building a set for "${brief}"…`;
-  $("vmx-lib-rationale-meta").textContent = "autocrate · working";
+  $("vmx-lib-rationale-meta").textContent = "set prep · working";
   $("vmx-lib-export").style.display = "none";
   $("vmx-lib-export-path").textContent = "";
   const hint = $maybe("vmx-lib-export-hint");
@@ -805,7 +805,7 @@ function renderCueExport(result: LibraryCueResult): void {
     exportEl.style.display = "";
     $("vmx-lib-export-path").textContent = path;
     const hint = $maybe("vmx-lib-export-hint");
-    if (hint) hint.textContent = "Import the XML in Rekordbox, or load the M3U8 in your crate.";
+    if (hint) hint.textContent = "Import the XML in Rekordbox, or load the M3U8 in another DJ app.";
   } else {
     exportEl.style.display = "none";
     $("vmx-lib-export-path").textContent = "";

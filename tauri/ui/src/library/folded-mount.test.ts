@@ -2,7 +2,7 @@
 /**
  * @vitest-environment jsdom
  *
- * Viber's library page also folds into the cohesive shell's Crate surface. This
+ * Viber's library page also folds into the cohesive shell's Viber surface. This
  * pins the root-scoped mount contract so the standalone page cannot accidentally
  * reach into shell/session DOM when mounted as an interior.
  */

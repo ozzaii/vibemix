@@ -38,7 +38,7 @@ afterEach(() => {
 
 describe("surface-mount layer", () => {
   it("resolves a stub surface's hidden mount without blanking its empty state", () => {
-    const region = host.querySelector<HTMLElement>('.surface[data-surface="crate"]')!;
+    const region = host.querySelector<HTMLElement>('.surface[data-surface="viber"]')!;
     const mount = region.querySelector<HTMLElement>(".surface-mount")!;
     expect(mount.hidden).toBe(true);
 
@@ -61,11 +61,11 @@ describe("surface-mount layer", () => {
   });
 
   it("resolves a stub surface's mount target without revealing it early", () => {
-    const mount = prepareSurfaceMount(host, "crate");
+    const mount = prepareSurfaceMount(host, "viber");
     expect(mount.classList.contains("surface-mount")).toBe(true);
     expect(mount.hidden).toBe(true);
     expect(
-      host.querySelector('.surface[data-surface="crate"]')!.classList.contains(
+      host.querySelector('.surface[data-surface="viber"]')!.classList.contains(
         "surface--mounted",
       ),
     ).toBe(false);
@@ -77,8 +77,8 @@ describe("surface-mount layer", () => {
       mountDeck: (el) => {
         got.deck = el;
       },
-      mountCrate: (el) => {
-        got.crate = el;
+      mountViber: (el) => {
+        got.viber = el;
       },
       mountLearn: (el) => {
         got.learn = el;
@@ -95,19 +95,19 @@ describe("surface-mount layer", () => {
       host.querySelector('.surface[data-surface="deck"] .deck-stage'),
     );
     // Viber, Learn, and Debrief fold into their revealed keep-alive mounts.
-    const crateMount = got.crate;
+    const viberMount = got.viber;
     const learnMount = got.learn;
     const debriefMount = got.debrief;
-    expect(crateMount).toBeDefined();
+    expect(viberMount).toBeDefined();
     expect(learnMount).toBeDefined();
     expect(debriefMount).toBeDefined();
-    expect(crateMount!.classList.contains("surface-mount")).toBe(true);
-    expect(crateMount!.hidden).toBe(false);
+    expect(viberMount!.classList.contains("surface-mount")).toBe(true);
+    expect(viberMount!.hidden).toBe(false);
     expect(learnMount!.classList.contains("surface-mount")).toBe(true);
     expect(learnMount!.hidden).toBe(false);
     expect(debriefMount!.classList.contains("surface-mount")).toBe(true);
     expect(debriefMount!.hidden).toBe(false);
-    for (const id of ["crate", "learn", "debrief"]) {
+    for (const id of ["viber", "learn", "debrief"]) {
       expect(
         host.querySelector(`.surface[data-surface="${id}"]`)!.classList.contains(
           "surface--mounted",
@@ -122,10 +122,10 @@ describe("surface-mount layer", () => {
     // empty state (mount stays hidden, no surface--mounted flag) rather than
     // revealing a blank mount. Deck-only is a valid intermediate app state.
     await mountSurfacesInto(host, { mountDeck: () => {} });
-    const crate = host.querySelector<HTMLElement>('.surface[data-surface="crate"]')!;
-    expect(crate.classList.contains("surface--mounted")).toBe(false);
-    expect(crate.querySelector<HTMLElement>(".surface-mount")!.hidden).toBe(true);
-    expect(crate.querySelector(".surface-empty")).toBeTruthy();
+    const viber = host.querySelector<HTMLElement>('.surface[data-surface="viber"]')!;
+    expect(viber.classList.contains("surface--mounted")).toBe(false);
+    expect(viber.querySelector<HTMLElement>(".surface-mount")!.hidden).toBe(true);
+    expect(viber.querySelector(".surface-empty")).toBeTruthy();
   });
 
   it("never throws if one interior's mount fails (a surface failing must not blank the app)", async () => {
@@ -133,7 +133,7 @@ describe("surface-mount layer", () => {
       mountDeck: () => {
         throw new Error("deck boom");
       },
-      mountCrate: () => {},
+      mountViber: () => {},
       mountLearn: () => {},
     };
     // The shell must survive a single surface's mount failure — partial app
@@ -144,15 +144,15 @@ describe("surface-mount layer", () => {
   it("keeps a stub surface readable when its heavy mount fails", async () => {
     await mountSurfacesInto(host, {
       mountDeck: () => {},
-      mountCrate: () => {
-        throw new Error("crate boom");
+      mountViber: () => {
+        throw new Error("viber boom");
       },
     });
 
-    const crate = host.querySelector<HTMLElement>('.surface[data-surface="crate"]')!;
-    expect(crate.classList.contains("surface--mounted")).toBe(false);
-    expect(crate.querySelector<HTMLElement>(".surface-mount")!.hidden).toBe(true);
-    expect(crate.querySelector(".surface-empty")?.textContent).toContain(
+    const viber = host.querySelector<HTMLElement>('.surface[data-surface="viber"]')!;
+    expect(viber.classList.contains("surface--mounted")).toBe(false);
+    expect(viber.querySelector<HTMLElement>(".surface-mount")!.hidden).toBe(true);
+    expect(viber.querySelector(".surface-empty")?.textContent).toContain(
       "Viber is ready for your library.",
     );
   });

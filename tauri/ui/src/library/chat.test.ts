@@ -493,7 +493,7 @@ function mountSkeleton(): void {
           <span>What mixes next</span>
           <b>Current track out</b>
         </button>
-        <button type="button" data-chat="find deep cuts in my crate that fit this set but avoid the obvious repeats">
+        <button type="button" data-chat="find deep cuts in my library that fit this set but avoid the obvious repeats">
           <span>Rediscover</span>
           <b>Find deep cuts, no repeats</b>
         </button>
@@ -1627,7 +1627,7 @@ describe("chat - real runChat path", () => {
     expect(indexed).not.toContain("1547");
   });
 
-  it("keeps the idle Crate face product-readable, not backend-readable", async () => {
+  it("keeps the idle Viber face product-readable, not backend-readable", async () => {
     await mountChat();
 
     const search =

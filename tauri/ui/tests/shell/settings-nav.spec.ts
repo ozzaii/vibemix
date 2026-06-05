@@ -92,11 +92,11 @@ afterEach(() => {
 
 describe("wireSettingsNav", () => {
   it("opens Settings over the last real surface so no blank Settings route appears", () => {
-    shell!.store.setActiveSurface("crate");
+    shell!.store.setActiveSurface("viber");
     shell!.store.setActiveSurface("settings");
 
     expect(settings.openSettings).toHaveBeenCalledTimes(1);
-    expect(shell!.store.getState().activeSurface).toBe("crate");
+    expect(shell!.store.getState().activeSurface).toBe("viber");
     expect(shell!.store.getState().settingsOpen).toBe(true);
     expect(host.dataset.settings).toBe("open");
     expect(
@@ -105,18 +105,18 @@ describe("wireSettingsNav", () => {
       ),
     ).toBe("true");
     expect(
-      host.querySelector<HTMLElement>('.sb-nav-item[data-surface="crate"]')?.getAttribute(
+      host.querySelector<HTMLElement>('.sb-nav-item[data-surface="viber"]')?.getAttribute(
         "aria-current",
       ),
     ).toBeNull();
 
     settings.setOpen(false);
 
-    expect(shell!.store.getState().activeSurface).toBe("crate");
+    expect(shell!.store.getState().activeSurface).toBe("viber");
     expect(shell!.store.getState().settingsOpen).toBe(false);
     expect(host.dataset.settings).toBe("closed");
     expect(
-      host.querySelector<HTMLElement>('.sb-nav-item[data-surface="crate"]')?.getAttribute(
+      host.querySelector<HTMLElement>('.sb-nav-item[data-surface="viber"]')?.getAttribute(
         "aria-current",
       ),
     ).toBe("true");
@@ -124,7 +124,7 @@ describe("wireSettingsNav", () => {
     shell!.store.setActiveSurface("settings");
 
     expect(settings.openSettings).toHaveBeenCalledTimes(2);
-    expect(shell!.store.getState().activeSurface).toBe("crate");
+    expect(shell!.store.getState().activeSurface).toBe("viber");
   });
 
   it("closes the drawer on later real-surface navigation", () => {

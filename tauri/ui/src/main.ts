@@ -196,7 +196,7 @@ async function boot(): Promise<void> {
   }
 
   // v6 tozpembe path — mount the cohesive shell app. The deck surface IS the
-  // live session (routeSession folds onto the deck stage); crate/learn/settings
+  // live session (routeSession folds onto the deck stage); Viber/Learn/Settings
   // fold in alongside. The shell takes over the window body, so the crash banner
   // is hoisted out of #wizard-app first (its refs are cached in crash-banner.ts,
   // so a later sidecar crash still surfaces), then the static wizard skeleton is

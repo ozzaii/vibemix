@@ -12,7 +12,7 @@
 // Mount protocol (docs/design/vibemix-translation-layer.md "Mount protocol"):
 //   - The deck wires onto its VISIBLE stage (.deck-stage); it owns its own
 //     idle/live hero, so there is no hidden mount and no empty state to drop.
-//   - The four stub surfaces (crate/learn/debrief/settings) each mount into a
+//   - The four stub surfaces (Viber/Learn/Debrief/Settings) each mount into a
 //     hidden `.surface-mount`; revealing one clears its `hidden` and flags the
 //     region `.surface--mounted` so CSS drops the sibling `.surface-empty`
 //     (a previous-sibling selector isn't expressible in CSS, so the class is
@@ -26,9 +26,9 @@ import type { SurfaceId } from "./shell-store.js";
 export interface SurfaceMountDeps {
   /** Mount the live session onto the deck's visible stage (the hero — always). */
   mountDeck(stage: HTMLElement): void | Promise<void>;
-  /** Mount the library / Viber interior into the crate keep-alive mount. When
-   *  absent, the crate keeps its designed at-rest empty state (folds in later). */
-  mountCrate?(mount: HTMLElement): void | Promise<void>;
+  /** Mount the library / Viber interior into Viber's keep-alive mount. When
+   *  absent, Viber keeps its designed at-rest empty state (folds in later). */
+  mountViber?(mount: HTMLElement): void | Promise<void>;
   /** Mount the Learn interior into the learn keep-alive mount. When absent, the
    *  learn surface keeps its designed at-rest empty state (folds in later). */
   mountLearn?(mount: HTMLElement): void | Promise<void>;
@@ -106,7 +106,7 @@ async function mountOne(
 
 /**
  * Fold the real interiors into the shell. Each interior is mounted independently
- * and non-fatally; the deck is the hero (visible stage), crate + learn fold into
+ * and non-fatally; the deck is the hero (visible stage), Viber + Learn fold into
  * their revealed keep-alive mounts. Settings is wired at the app level because
  * it is the drawer overlay.
  */
@@ -118,8 +118,8 @@ export async function mountSurfacesInto(
   await mountOne("deck", prepareSurfaceMount(shellRoot, "deck"), deps.mountDeck);
   // Stub surfaces fold in only when an interior is provided; otherwise they keep
   // their designed at-rest empty state (so the mount is never revealed blank).
-  if (deps.mountCrate) {
-    await mountOne("crate", prepareSurfaceMount(shellRoot, "crate"), deps.mountCrate);
+  if (deps.mountViber) {
+    await mountOne("viber", prepareSurfaceMount(shellRoot, "viber"), deps.mountViber);
   }
   if (deps.mountLearn) {
     await mountOne("learn", prepareSurfaceMount(shellRoot, "learn"), deps.mountLearn);

@@ -31,8 +31,8 @@ export const GLYPH_DECK = mark(
     '<circle cx="12" cy="12" r="2.4" fill="currentColor" stroke="none"/>',
 );
 
-// crate — records filed in a box (the library + Viber surface).
-export const GLYPH_CRATE = mark(
+// Viber — records filed in a box (the library + set-prep surface).
+export const GLYPH_VIBER = mark(
   '<rect x="3.5" y="6" width="17" height="12" rx="1.6"/>' +
     '<path d="M8 9.5v5M12 9.5v5M16 9.5v5"/>',
 );

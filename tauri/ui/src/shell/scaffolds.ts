@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// Surface-scaffold extraction. Some surfaces (the library/Viber crate) were
+// Surface-scaffold extraction. Some surfaces (Viber's library page) were
 // built as standalone windows whose module self-boots against fixed DOM ids
 // defined in their own HTML entry (library.html). To fold such a surface into
 // the shell WITHOUT editing its module, the shell injects that page's body

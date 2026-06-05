@@ -104,12 +104,12 @@ describe("voice readiness badge", () => {
 
   it("routes first-run users from the shell badge into Viber setup", async () => {
     const footer = document.createElement("footer");
-    const onOpenCrate = vi.fn();
+    const onOpenViber = vi.fn();
     const handle = mountVoiceReadinessBadge(footer, {
       autoload: false,
       pollMs: null,
       subscribeStatusTick: false,
-      onOpenCrate,
+      onOpenViber,
       getModels: async () =>
         payload({
           models: [
@@ -131,7 +131,7 @@ describe("voice readiness badge", () => {
     expect(handle.element.tagName).toBe("BUTTON");
     expect(handle.element.dataset.state).toBe("warn");
     expect(handle.element.textContent).toBe("voice missing");
-    expect(onOpenCrate).toHaveBeenCalledOnce();
+    expect(onOpenViber).toHaveBeenCalledOnce();
     handle.setVoiceStatus("muted");
     expect(handle.element.dataset.state).toBe("warn");
     expect(handle.element.textContent).toBe("voice muted");
