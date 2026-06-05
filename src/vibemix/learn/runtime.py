@@ -193,6 +193,24 @@ _PRACTICE_AUDIO_CONTROLS = frozenset(
         "xfader",
     }
 )
+_FREE_PRACTICE_CONTROL_LESSON_IDS = {
+    "cue": "L1.06",
+    "eq_hi": "L1.03",
+    "eq_low": "L1.03",
+    "eq_mid": "L1.03",
+    "filter": "L1.03",
+    "headphone_cue": "L1.08",
+    "jog": "L1.07",
+    "jog_touch": "L1.07",
+    "jog_touched": "L1.07",
+    "master_vol": "L1.09",
+    "play": "L1.06",
+    "sync": "L1.06",
+    "tap_tempo": "L1.05",
+    "tempo": "L1.05",
+    "vol": "L1.03",
+    "xfader": "L1.04",
+}
 _PRACTICE_AUDIO_DEMO_LESSONS = frozenset(
     {
         "L1.09",
@@ -263,6 +281,15 @@ def _control_and_deck(action: dict[str, Any]) -> tuple[str, str]:
         control, _, parsed_deck = control.rpartition(":")
         deck = parsed_deck.strip()
     return control, deck
+
+
+def _practice_source_key(source: Any) -> str | None:
+    raw = str(source or "midi").strip().lower()
+    if raw in {"midi", "hardware", "controller"}:
+        return "hardware"
+    if raw in {"click", "screen", "onscreen", "on_screen"}:
+        return "screen"
+    return None
 
 
 def _observable_control_id(control: str, deck: str) -> str:
@@ -685,6 +712,7 @@ class LessonRuntime(StateMachine):
         self._beatmatch_practice_ack_prehandled = False
         self._beatmatch_practice_player: Any | None = None
         self._beatmatch_practice_player_active = False
+        self._free_practice_receipts: set[tuple[str, str]] = set()
         self._waveform_ready_lesson_id: str | None = None
         self._active_harmonic_pair: HarmonicPracticePair | None = None
         self._recovery_drill_armed_step_key: tuple[str, int] | None = None
@@ -1116,6 +1144,7 @@ class LessonRuntime(StateMachine):
         if self._learn.current_lesson_id is None:
             self._start_practice_sandbox_player()
             self._apply_beatmatch_practice_action(midi)
+            self._record_free_practice_receipt(midi)
             return
         if not self._is_beatmatch_practice_audio_lesson():
             return
@@ -2350,6 +2379,47 @@ class LessonRuntime(StateMachine):
                 f"[learn.runtime] mark_practice_source failed: {exc!r}",
                 file=sys.stderr,
             )
+
+    def _record_free_practice_receipt(self, midi: dict[str, Any]) -> None:
+        """Persist one sandbox practice receipt without completing a lesson."""
+        control, deck = _control_and_deck(midi)
+        lesson_id = _FREE_PRACTICE_CONTROL_LESSON_IDS.get(control)
+        if not lesson_id:
+            return
+        meta = CURRICULUM.get(lesson_id)
+        if meta is None:
+            return
+        source_key = _practice_source_key(midi.get("source"))
+        if source_key is None:
+            return
+        receipt_key = (lesson_id, source_key)
+        if receipt_key in self._free_practice_receipts:
+            return
+        try:
+            from vibemix.learn.progress import LearnProgress, save_progress
+
+            if not isinstance(self._progress, LearnProgress):
+                return
+            self._progress.mark_practice_source(meta.course_id, lesson_id, source_key)
+            save_progress(self._progress)
+            self._free_practice_receipts.add(receipt_key)
+        except Exception as exc:  # pragma: no cover — defensive
+            import sys
+
+            print(
+                f"[learn.runtime] free practice receipt failed: {exc!r}",
+                file=sys.stderr,
+            )
+            return
+        self._emit_progress_snapshot()
+        self._log_session_event(
+            "learn_free_practice_receipt",
+            lesson_id=lesson_id,
+            course_id=meta.course_id,
+            control=control,
+            deck=deck,
+            source=source_key,
+        )
 
     def _emit_progress_snapshot(self) -> None:
         """Emit the current progress snapshot when it is schema-shaped."""

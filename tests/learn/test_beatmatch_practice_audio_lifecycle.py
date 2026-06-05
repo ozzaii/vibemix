@@ -218,19 +218,24 @@ def test_practice_audio_ack_applies_before_lesson_gate() -> None:
     ]
 
 
-def test_free_practice_ack_starts_player_without_lesson_progress() -> None:
+def test_free_practice_ack_records_practice_receipt_without_completion(
+    monkeypatch,
+) -> None:
     calls: list[tuple[str | None, dict]] = []
+    saved: list[LearnProgress] = []
 
     def recorder(lesson_id: str | None, midi: dict) -> bool:
         calls.append((lesson_id, dict(midi)))
         return False
 
+    monkeypatch.setattr("vibemix.learn.progress.save_progress", saved.append)
     progress = LearnProgress()
+    ipc = MagicMock(name="ipc_router")
     runtime = LessonRuntime(
         learn_state=LearnState(),
         midi_mirror=MagicMock(name="midi_mirror"),
         controller_state=MagicMock(name="controller_state"),
-        ipc_router=MagicMock(name="ipc_router"),
+        ipc_router=ipc,
         progress_store=progress,
         beatmatch_practice_action_recorder=recorder,
         waveform_payload_loader=lambda: {"sample_rate": 44_100, "decks": {}},
@@ -264,7 +269,57 @@ def test_free_practice_ack_starts_player_without_lesson_progress() -> None:
             },
         )
     ]
-    assert progress.lessons == {}
+    assert len(saved) == 1
+    assert progress.lessons["L1.03"]["completed"] is False
+    assert progress.lessons["L1.03"]["practice_sources"] == {
+        "hardware": 0,
+        "screen": 1,
+    }
+    assert progress.lessons["L1.03"]["last_practice_source"] == "screen"
+    assert progress.lessons["L1.03"]["completed_at"] is None
+    progress_snapshots = [
+        call.args[0]
+        for call in ipc.emit.call_args_list
+        if call.args and call.args[0].get("type") == "ipc.learn.progress_state"
+    ]
+    assert progress_snapshots
+    mission = progress_snapshots[-1]["payload"]["progress"]["next_practice_mission"]
+    assert mission["lesson_id"] == "L1.03"
+    assert mission["mode"] == "finish"
+
+
+def test_free_practice_receipt_dedupes_repeated_drag_frames(monkeypatch) -> None:
+    saved: list[LearnProgress] = []
+    monkeypatch.setattr("vibemix.learn.progress.save_progress", saved.append)
+    progress = LearnProgress()
+    runtime = LessonRuntime(
+        learn_state=LearnState(),
+        midi_mirror=MagicMock(name="midi_mirror"),
+        controller_state=MagicMock(name="controller_state"),
+        ipc_router=MagicMock(name="ipc_router"),
+        progress_store=progress,
+        beatmatch_practice_action_recorder=lambda _lesson_id, _midi: False,
+        waveform_payload_loader=lambda: {"sample_rate": 44_100, "decks": {}},
+    )
+    runtime.set_beatmatch_practice_player(_FakePracticePlayer())
+
+    for value in (72, 96, 127):
+        runtime.handle_practice_audio_ack(
+            {
+                "type": "cc",
+                "control": "eq_hi",
+                "deck": "A",
+                "value": value,
+                "prev_value": 64,
+                "source": "click",
+            }
+        )
+
+    assert len(saved) == 1
+    assert progress.lessons["L1.03"]["practice_sources"] == {
+        "hardware": 0,
+        "screen": 1,
+    }
 
 
 def test_loading_another_lesson_stops_active_practice_player() -> None:
