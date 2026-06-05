@@ -615,7 +615,7 @@ describe("build — real renderBuildSet path (jsdom, via mountLibrary)", () => {
     expect(document.getElementById("vmx-lib-rcount")?.textContent).toBe("0 in set");
   });
 
-  it("renders AutoCrate setup errors as a no-set state with the setup hint", async () => {
+  it("renders Viber setup errors as a no-set state with the setup hint", async () => {
     const setupNeeded: BuildSetResult = {
       name: "warehouse",
       stop_reason: "setup_error",
@@ -634,7 +634,7 @@ describe("build — real renderBuildSet path (jsdom, via mountLibrary)", () => {
       "Index a music folder first",
     );
     expect(document.getElementById("vmx-lib-rationale-body")?.textContent).toContain(
-      "AutoCrate could not open the indexed library cache",
+      "Viber could not open the indexed library cache",
     );
   });
 

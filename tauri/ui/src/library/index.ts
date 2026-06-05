@@ -221,13 +221,13 @@ const AGENT_FAILURE_COPY: Record<string, AgentFailureCopy> = {
 
 const AUTO_CRATE_FAILURE_COPY: Record<string, AgentFailureCopy> = {
   no_intent: {
-    title: "AutoCrate needs a brief",
+    title: "Viber needs a brief",
     detail: "The set builder needs a query or reference track before it can choose real tracks.",
     next: "Write one concrete direction, then run Build a Set again.",
   },
   setup_error: {
     title: "Library setup needed",
-    detail: "AutoCrate could not open the indexed library cache.",
+    detail: "Viber could not open the indexed library cache.",
     next: "Index a music folder first, then run the same brief again.",
   },
   no_pool: {
@@ -237,12 +237,12 @@ const AUTO_CRATE_FAILURE_COPY: Record<string, AgentFailureCopy> = {
   },
   no_sequence: {
     title: "No clean order",
-    detail: "AutoCrate found candidates, but could not trust an ordered sequence.",
+    detail: "Viber found candidates, but could not trust an ordered sequence.",
     next: "Ask for fewer slots or use a simpler energy curve.",
   },
   export_error: {
     title: "Export failed",
-    detail: "AutoCrate chose tracks, but Rekordbox XML was not written.",
+    detail: "Viber chose tracks, but Rekordbox XML was not written.",
     next: "Check the export folder, then retry the same set.",
   },
 };
@@ -256,7 +256,7 @@ function agentFailureCopy(stopReason: string, mode: AgentFailureMode): AgentFail
       title: "No trusted set yet",
       detail:
         mode === "build"
-          ? "AutoCrate did not return a grounded set from this run."
+          ? "Viber did not return a grounded set from this run."
           : "Viber did not return a grounded set from this run.",
       next: "Try a narrower brief, or run Search first and reuse the strongest terms.",
     }
