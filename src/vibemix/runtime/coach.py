@@ -926,6 +926,11 @@ async def coach_loop(
         )
         if not speak_gate.should_speak:
             grounded_keys = grounded_voice_payload_keys(ev)
+            pill_route = (
+                "live_next_pill"
+                if "next_suggestion_voice_line" in grounded_keys
+                else "none"
+            )
             try:
                 recorder.log_event(
                     "speak_gate",
@@ -942,6 +947,8 @@ async def coach_loop(
                     rms=round(float(getattr(state, "rms", 0.0) or 0.0), 4),
                     bpm=round(float(getattr(state, "bpm", 0.0) or 0.0), 1),
                     coach_grounded_keys=list(grounded_keys),
+                    tts_route="suppressed",
+                    pill_route=pill_route,
                     schema_version="1",
                 )
             except Exception:

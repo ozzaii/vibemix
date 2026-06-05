@@ -62,3 +62,35 @@ def test_quality_summary_fails_minimum_rows_and_errors() -> None:
     assert "judged rows 0 below minimum 2" in summary["failures"]
     assert "judge errors 1 > 0" in summary["failures"]
     assert "no judged dim means" in summary["failures"]
+
+
+def test_describe_bank_census_replay_silence_summary_passes_all_suppressed() -> None:
+    kept, report = judge.describe_bank_census(
+        [
+            {"id": "0001_HEARTBEAT", "event": "HEARTBEAT", "line": "describe-bank"},
+            {"id": "0002_PHASE", "event": "PHASE", "line": "more narration"},
+            {"id": "0003_KICK_SWAP", "event": "KICK_SWAP", "line": "bare priority"},
+        ]
+    )
+    summary = judge.census_silence_summary(report, min_rows=3)
+
+    assert kept == []
+    assert report["silenced_by_describe_bank_census"] == 3
+    assert summary["pass"] is True
+    assert summary["failures"] == []
+
+
+def test_describe_bank_census_replay_silence_summary_fails_kept_rows() -> None:
+    _kept, report = judge.describe_bank_census(
+        [
+            {
+                "id": "0001_DROP",
+                "event": "DROP",
+                "line": "this priority event still needs a judge",
+            },
+        ]
+    )
+    summary = judge.census_silence_summary(report, min_rows=1)
+
+    assert summary["pass"] is False
+    assert "kept_for_judge 1 > 0" in summary["failures"]

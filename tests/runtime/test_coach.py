@@ -1126,6 +1126,71 @@ def test_coach_14_plain_heartbeat_stays_silent(
     assert kwargs["track"] == music_state.audible_track
     assert kwargs["phase"] == music_state.phase
     assert kwargs["coach_grounded_keys"] == []
+    assert kwargs["tts_route"] == "suppressed"
+    assert kwargs["pill_route"] == "none"
+
+
+def test_coach_low_worth_next_suggestion_routes_to_pill_not_tts(
+    mocker,
+    fake_session,
+    fake_agent,
+    fake_levels,
+    fake_recorder,
+    fake_event_detector,
+    music_state,
+):
+    class _SuggestionService:
+        def current_for_state(self, state):
+            return {
+                "track_id": "track-42",
+                "title": "Ananta Gathering",
+                "artist": "Crew",
+                "transition": {
+                    "candidate_id": "tr_001",
+                    "to_track_id": "track-42",
+                    "score": 0.83,
+                    "confidence": 0.72,
+                    "risk_flags": [],
+                },
+            }
+
+    fake_event_detector.detect.return_value = Event(
+        "PHASE",
+        music_state,
+        extra={"prev_phase": "groove", "new_phase": "build"},
+    )
+    mocker.patch("vibemix.runtime.coach.time.time", side_effect=_auto_time())
+
+    stop_event = asyncio.Event()
+    fake_sleep, _ = _make_stop_after(2, stop_event)
+    mocker.patch("vibemix.runtime.coach.asyncio.sleep", side_effect=fake_sleep)
+
+    asyncio.run(
+        coach_loop(
+            fake_session,
+            fake_agent,
+            music_state,
+            fake_levels,
+            fake_event_detector,
+            fake_recorder,
+            asyncio.Event(),
+            {"in_flight": False},
+            stop_event,
+            suggestion_service=_SuggestionService(),
+            evidence_registry=EvidenceRegistry(),
+        )
+    )
+
+    assert fake_agent.set_next_event.call_count == 0
+    assert fake_session.generate_reply.call_count == 0
+    args, kwargs = fake_recorder.log_event.call_args
+    assert args == ("speak_gate",)
+    assert kwargs["type"] == "PHASE"
+    assert kwargs["verdict"] == "silent"
+    assert kwargs["reason"] == "below_worthiness"
+    assert kwargs["coach_grounded_keys"] == ["next_suggestion_voice_line"]
+    assert kwargs["tts_route"] == "suppressed"
+    assert kwargs["pill_route"] == "live_next_pill"
 
 
 def test_coach_14_plain_phase_stays_silent(

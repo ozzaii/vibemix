@@ -44,6 +44,17 @@ _DESCRIBE_BANK_EVENT_TYPES = frozenset(
 WORTHINESS_MIN_DESCRIBE_BANK = 0.38
 WORTHINESS_MIN_PRIORITY = 0.24
 
+_PRIORITY_EVENT_REQUIRED_EXTRA_KEYS: dict[str, tuple[str, ...]] = {
+    "MIX_MOVE": ("moves",),
+    "TRANSITION_OPPORTUNITY": ("a_side", "a_camelot", "b_side", "b_camelot", "clash"),
+    "KICK_DENSITY_SHIFT": ("prev_density", "new_density", "delta"),
+    "DISTORTION_CLIMB": ("chain_position", "distortion_db"),
+    "ACID_LINE_ENTRY": ("formant_hz", "resonance_q"),
+    "KICK_SWAP": ("prev_centroid_hz", "new_centroid_hz", "delta_hz"),
+    "BREAKDOWN_KICK_KILL": ("prev_sub", "new_sub", "sub_drop"),
+    "REENTRY_KICK_LAND": ("kill_age_s", "sub_at_reentry", "beat_phase"),
+}
+
 _EVENT_BASE_WORTHINESS: dict[str, float] = {
     "HEARTBEAT": 0.02,
     "PHASE": 0.12,
@@ -94,6 +105,22 @@ class SpeakGateDecision:
 
 def _has_grounded_voice_payload(ev: Event) -> bool:
     return bool(grounded_voice_payload_keys(ev))
+
+
+def _payload_value_present(value: object) -> bool:
+    if isinstance(value, str):
+        return bool(value.strip())
+    if isinstance(value, dict | list | tuple | set | frozenset):
+        return bool(value)
+    return value is not None
+
+
+def _has_required_priority_payload(ev: Event) -> bool:
+    required_keys = _PRIORITY_EVENT_REQUIRED_EXTRA_KEYS.get(ev.type)
+    if not required_keys:
+        return True
+    extra = ev.extra if isinstance(ev.extra, dict) else {}
+    return all(_payload_value_present(extra.get(key)) for key in required_keys)
 
 
 def grounded_voice_payload_keys(ev: Event) -> tuple[str, ...]:
@@ -212,6 +239,8 @@ def decide_speak_gate(
         if worthiness < WORTHINESS_MIN_DESCRIBE_BANK:
             return SpeakGateDecision("silent", "below_worthiness", worthiness=worthiness)
         return SpeakGateDecision("speak", "grounded_voice_payload", worthiness=worthiness)
+    if not _has_required_priority_payload(ev):
+        return SpeakGateDecision("hold", "priority_missing_payload", worthiness=worthiness)
     if worthiness < WORTHINESS_MIN_PRIORITY:
         return SpeakGateDecision("hold", "priority_below_floor", worthiness=worthiness)
     return SpeakGateDecision("speak", "event_priority", worthiness=worthiness)

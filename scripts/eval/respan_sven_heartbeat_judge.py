@@ -143,6 +143,29 @@ def describe_bank_census(rows: list[dict]) -> tuple[list[dict], dict]:
     return kept, summary
 
 
+def census_silence_summary(report: dict, *, min_rows: int) -> dict:
+    """Return a no-network gate summary for replay rows that should not hit TTS."""
+
+    input_rows = int(report.get("input_spoken_rows") or 0)
+    kept = int(report.get("kept_for_judge") or 0)
+    silenced = int(report.get("silenced_by_describe_bank_census") or 0)
+    failures: list[str] = []
+    if input_rows < min_rows:
+        failures.append(f"input spoken rows {input_rows} below minimum {min_rows}")
+    if kept:
+        failures.append(f"kept_for_judge {kept} > 0")
+    if silenced != input_rows:
+        failures.append(f"silenced {silenced} != input spoken rows {input_rows}")
+    return {
+        "pass": not failures,
+        "input_spoken_rows": input_rows,
+        "kept_for_judge": kept,
+        "silenced_by_describe_bank_census": silenced,
+        "min_rows": min_rows,
+        "failures": failures,
+    }
+
+
 # The evidence Sven ACTUALLY had is the leading bracket bundle in prompt.txt
 # line 1 (hearing/track/deck/recent_moves/grounding_refs). meta.json omits
 # recent_moves, so a meta-only digest would mis-score a line that cites a REAL
@@ -422,6 +445,20 @@ def main() -> int:
             "does not reconstruct event.extra payloads"
         ),
     )
+    ap.add_argument(
+        "--require-census-silence",
+        action="store_true",
+        help=(
+            "with --describe-bank-census, exit nonzero unless every input spoken "
+            "row is suppressed before TTS; no network required"
+        ),
+    )
+    ap.add_argument(
+        "--min-census-rows",
+        type=int,
+        default=1,
+        help="minimum input spoken rows required for --require-census-silence",
+    )
     ap.add_argument("--dry-run", action="store_true", help="assemble rows, no network")
     ap.add_argument("--no-log", action="store_true", help="judge but do not log to Respan")
     ap.add_argument("--out", type=Path, default=None)
@@ -435,6 +472,11 @@ def main() -> int:
     describe_bank_report = None
     if args.describe_bank_census:
         rows, describe_bank_report = describe_bank_census(rows)
+        if args.require_census_silence:
+            describe_bank_report["census_silence"] = census_silence_summary(
+                describe_bank_report,
+                min_rows=args.min_census_rows,
+            )
         print(
             "-> describe-bank census (no event.extra payload replay): "
             f"{describe_bank_report['silenced_by_describe_bank_census']} silenced, "
@@ -456,6 +498,15 @@ def main() -> int:
                     )
                 )
                 print(f"-> wrote {args.out}", file=sys.stderr)
+            if args.require_census_silence:
+                failures = describe_bank_report["census_silence"]["failures"]
+                if failures:
+                    print("census silence gate: FAIL", file=sys.stderr)
+                    for failure in failures:
+                        print(f"  - {failure}", file=sys.stderr)
+                    return 1
+                print("census silence gate: PASS")
+                return 0
             if args.require_quality and args.min_judged > 0:
                 print("quality gate: FAIL", file=sys.stderr)
                 print(f"  - judged rows 0 below minimum {args.min_judged}", file=sys.stderr)
@@ -468,6 +519,15 @@ def main() -> int:
         if describe_bank_report is not None:
             print(json.dumps({"describe_bank_census": describe_bank_report}, indent=2))
         print(f"\n(dry-run) {len(rows)} rows ready; no network.", file=sys.stderr)
+        if args.require_census_silence and describe_bank_report is not None:
+            failures = describe_bank_report["census_silence"]["failures"]
+            if failures:
+                print("census silence gate: FAIL", file=sys.stderr)
+                for failure in failures:
+                    print(f"  - {failure}", file=sys.stderr)
+                return 1
+            print("census silence gate: PASS")
+            return 0
         if args.require_quality:
             print("--require-quality needs judged rows; dry-run cannot prove quality", file=sys.stderr)
             return 1

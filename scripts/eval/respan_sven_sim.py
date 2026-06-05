@@ -143,12 +143,14 @@ SCENARIOS = [
         ),
     },
     {
-        "name": "filter_cut_move", "event": "MIX_MOVE", "extra": {}, "expect": "speak",
+        "name": "filter_cut_move", "event": "MIX_MOVE",
+        "extra": {"moves": ["A_filter: flat->cut (big twist)"]}, "expect": "speak",
         "evidence": f"{_HEAR} | track=unknown | deck=A | recent_moves[8s]: 0.6s ago A_filter: flat->cut (big twist) | grounding_refs[[midi:A_filter:_flat_to_cut_big_twist@612.4]] | move_effect_context[moves=1 deltas=high energy fell 31% (notable) rule=dsp_delta_not_causal_proof]",
         "task": "You just twisted the filter to a hard cut on deck A (recent_moves). Read what it did to the sound and hand one next-time nudge.",
     },
     {
-        "name": "low_kill_move", "event": "MIX_MOVE", "extra": {}, "expect": "speak",
+        "name": "low_kill_move", "event": "MIX_MOVE",
+        "extra": {"moves": ["A_low: flat->kill (big twist)"]}, "expect": "speak",
         "evidence": f"{_HEAR} | track=\"Raik - Trio d'Acid\" | deck=A | recent_moves[8s]: 0.5s ago A_low: flat->kill (big twist) | grounding_refs[[midi:A_low:_flat_to_kill_big_twist@880.1]] | move_effect_context[moves=1 deltas=low energy fell 44% (notable) rule=dsp_delta_not_causal_proof] | mixer_context[A(low=killed mid=flat hi=flat filter=flat)]",
         "task": "You just killed the lows on deck A (recent_moves). Read what that did and hand one next-time nudge.",
     },

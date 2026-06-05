@@ -142,6 +142,31 @@ def test_priority_event_in_dead_air_holds_below_floor() -> None:
     assert decision.worthiness < 0.24
 
 
+def test_priority_event_without_detector_payload_holds() -> None:
+    for event_type in ("KICK_SWAP", "KICK_DENSITY_SHIFT"):
+        decision = decide_speak_gate(_event(event_type))
+
+        assert decision.verdict == "hold"
+        assert decision.reason == "priority_missing_payload"
+
+
+def test_priority_event_with_detector_payload_reaches_sven() -> None:
+    kick_swap = decide_speak_gate(
+        _event(
+            "KICK_SWAP",
+            {"prev_centroid_hz": 120.0, "new_centroid_hz": 180.0, "delta_hz": 60.0},
+        )
+    )
+    density = decide_speak_gate(
+        _event("KICK_DENSITY_SHIFT", {"prev_density": 6.0, "new_density": 4.5, "delta": -1.5})
+    )
+
+    assert kick_swap.verdict == "speak"
+    assert kick_swap.reason == "event_priority"
+    assert density.verdict == "speak"
+    assert density.reason == "event_priority"
+
+
 def test_plain_track_change_stays_silent_by_default() -> None:
     decision = decide_speak_gate(_event("TRACK_CHANGE", {"new_track": "B"}))
 

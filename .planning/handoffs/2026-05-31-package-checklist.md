@@ -10518,3 +10518,44 @@ Proof before staging:
 - `uv run ruff check src/vibemix/learn/runtime.py tests/learn/test_adaptive_coaching_runtime_contract.py`
 - `uv run python -m compileall -q src/vibemix/learn/runtime.py tests/learn/test_adaptive_coaching_runtime_contract.py`
 - `git diff --check -- src/vibemix/learn/runtime.py tests/learn/test_adaptive_coaching_runtime_contract.py .planning/handoffs/2026-05-31-package-checklist.md`
+
+## Package 84 - Sven Replay-Fitted Speak Gate
+
+Suggested commit: `fix(cohost): require payload for priority speech`
+
+Include:
+
+- `src/vibemix/runtime/speak_gate.py`
+- `src/vibemix/runtime/coach.py`
+- `scripts/eval/respan_sven_heartbeat_judge.py`
+- `scripts/eval/respan_sven_sim.py`
+- `tests/runtime/test_speak_gate.py`
+- `tests/runtime/test_coach.py`
+- `tests/eval/test_respan_sven_heartbeat_quality_gate.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- LLM prompt rewrites, provider switching, TTS voice changes, new UI channels,
+  generic text-to-pill rendering, detector deletion, Learn runtime changes, and
+  new dependencies. This package only prevents bare priority event names from
+  reaching Sven without detector payload and adds replay proof for no-TTS
+  suppression.
+
+Reason:
+
+- The 20260602 137-line Sven replay had 135 lines already suppressed by the
+  describe-bank gate, but two no-payload priority events still reached the
+  judge path. Require detector payload for structural priority speech while
+  preserving payload-backed KICK/MIX events, and record suppressed turns as
+  `tts_route=suppressed` with `pill_route=live_next_pill` only when an existing
+  grounded next-suggestion receipt belongs on the pill.
+
+Proof before staging:
+
+- `uv run pytest -q tests/runtime/test_speak_gate.py tests/runtime/test_coach.py::test_coach_14_plain_heartbeat_stays_silent tests/runtime/test_coach.py::test_coach_low_worth_next_suggestion_routes_to_pill_not_tts tests/eval/test_respan_sven_heartbeat_quality_gate.py tests/eval/test_respan_sven_sim_quality_gate.py`
+- `uv run python scripts/eval/respan_sven_heartbeat_judge.py --session "/Users/ozai/Library/Application Support/vibemix/recordings/20260602-075843" --events ALL --describe-bank-census --dry-run --require-census-silence --min-census-rows 137 --out /tmp/vmx-137-census-after.json`
+- `uv run python scripts/eval/respan_sven_sim.py --strict-sven-gate --gate-only --out /tmp/vmx-sven-gate-after.json`
+- `uv run ruff check src/vibemix/runtime/speak_gate.py src/vibemix/runtime/coach.py scripts/eval/respan_sven_heartbeat_judge.py scripts/eval/respan_sven_sim.py tests/runtime/test_speak_gate.py tests/runtime/test_coach.py tests/eval/test_respan_sven_heartbeat_quality_gate.py tests/eval/test_respan_sven_sim_quality_gate.py`
+- `uv run python -m compileall -q src/vibemix/runtime/speak_gate.py src/vibemix/runtime/coach.py scripts/eval/respan_sven_heartbeat_judge.py scripts/eval/respan_sven_sim.py tests/runtime/test_speak_gate.py tests/runtime/test_coach.py tests/eval/test_respan_sven_heartbeat_quality_gate.py tests/eval/test_respan_sven_sim_quality_gate.py`
+- `git diff --check -- src/vibemix/runtime/speak_gate.py src/vibemix/runtime/coach.py scripts/eval/respan_sven_heartbeat_judge.py scripts/eval/respan_sven_sim.py tests/runtime/test_speak_gate.py tests/runtime/test_coach.py tests/eval/test_respan_sven_heartbeat_quality_gate.py tests/eval/test_respan_sven_sim_quality_gate.py .planning/handoffs/2026-05-31-package-checklist.md`
