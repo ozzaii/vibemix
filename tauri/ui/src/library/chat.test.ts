@@ -481,6 +481,10 @@ function mountSkeleton(): void {
         <div class="body">I can build a set, solve a transition, or find deep cuts.</div>
       </div>
       <div id="vmx-lib-chat-starters" data-wire="library.chat-starters">
+        <button type="button" data-mode-jump="ingest">
+          <span>Add music</span>
+          <b>Index a folder</b>
+        </button>
         <button type="button" data-chat="build a 45-minute psytrance set from my library, clean energy arc, nothing invented">
           <span>Build a set</span>
           <b>45 min psytrance</b>
@@ -621,6 +625,34 @@ describe("chat - real runChat path", () => {
     expect(setupCard?.textContent).toContain("waiting for approval");
     expect(setupCard?.textContent).toContain("Index folder");
     expect(emitIpcMock).not.toHaveBeenCalled();
+  });
+
+  it("routes the add-music starter into ingest without starting indexing", async () => {
+    await mountChat();
+
+    const addMusic = document.querySelector<HTMLButtonElement>(
+      '[data-mode-jump="ingest"]',
+    );
+    expect(addMusic).not.toBeNull();
+    addMusic?.click();
+    for (let i = 0; i < 4; i++) await Promise.resolve();
+
+    expect(document.body.dataset.mode).toBe("ingest");
+    expect(
+      document
+        .querySelector<HTMLButtonElement>(
+          '.vmx-lib-modeswitch button[data-mode="ingest"]',
+        )
+        ?.getAttribute("aria-selected"),
+    ).toBe("true");
+    expect(document.getElementById("vmx-lib-center-label")?.textContent).toBe(
+      "Embed",
+    );
+    expect(document.getElementById("vmx-lib-runbtn")?.textContent).toBe(
+      "▸ Embed folder",
+    );
+    expect(embedFolderMock).not.toHaveBeenCalled();
+    expect(document.activeElement).toBe(document.getElementById("vmx-lib-folder"));
   });
 
   it("does not surface catalog-database setup candidates as actionable", async () => {

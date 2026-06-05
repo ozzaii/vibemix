@@ -2087,6 +2087,54 @@ export function mountLibrary(root: ParentNode = document): void {
     cancel?.();
   }
 
+  function libraryModeFromDataset(value: string | undefined): LibraryMode | null {
+    switch (value) {
+      case "search":
+      case "similar":
+      case "ingest":
+      case "cue":
+      case "curate":
+      case "build":
+      case "chat":
+        return value;
+      default:
+        return null;
+    }
+  }
+
+  function activateMode(mode: LibraryMode): void {
+    const previousMode = state.mode;
+    if (mode !== previousMode) cancelRun();
+    state = setMode(state, mode);
+    applyModeVisibility();
+    // The set-notes block is shared by curate + build; only clear it when
+    // leaving BOTH so a fresh build/curate keeps its own working state.
+    if (mode !== "curate" && mode !== "build" && mode !== "cue")
+      clearRationale();
+    if (
+      (mode === "curate" || mode === "build" || mode === "cue") &&
+      previousMode !== mode
+    ) {
+      renderAgentIdle(mode);
+    }
+    if (mode === "build") {
+      syncCurvePicker();
+      syncBuildTagToggle();
+    }
+    if (mode === "ingest") {
+      // Idle ingest view: show the ready state and focus the source path. The
+      // user still has to click Embed folder, so this never starts indexing by
+      // surprise from the Viber home surface.
+      $("vmx-lib-loglist").innerHTML = "";
+      setProgress(0, 0, 0, "");
+      folderInput.focus();
+    } else if (mode === "chat") {
+      ensureChatIntro(chatThread);
+    } else if (mode === "search" || mode === "similar") {
+      void run();
+    }
+  }
+
   async function installLocalModels(): Promise<void> {
     const target = currentInstallTarget();
     installModelsBtn.disabled = true;
@@ -2378,34 +2426,7 @@ export function mountLibrary(root: ParentNode = document): void {
 
   $all(".vmx-lib-modeswitch button").forEach((b) => {
     b.addEventListener("click", () => {
-      const previousMode = state.mode;
-      const mode = (b.dataset.mode ?? "search") as LibraryMode;
-      if (mode !== previousMode) cancelRun();
-      state = setMode(state, mode);
-      applyModeVisibility();
-      // The set-notes block is shared by curate + build; only clear it when
-      // leaving BOTH so a fresh build/curate keeps its own working state.
-      if (mode !== "curate" && mode !== "build" && mode !== "cue")
-        clearRationale();
-      if (
-        (mode === "curate" || mode === "build" || mode === "cue") &&
-        previousMode !== mode
-      ) {
-        renderAgentIdle(mode);
-      }
-      if (mode === "build") {
-        syncCurvePicker();
-        syncBuildTagToggle();
-      }
-      if (mode === "ingest") {
-        // idle ingest view: show the ready state, don't auto-run
-        $("vmx-lib-loglist").innerHTML = "";
-        setProgress(0, 0, 0, "");
-      } else if (mode === "chat") {
-        ensureChatIntro(chatThread);
-      } else if (mode === "search" || mode === "similar") {
-        void run();
-      }
+      activateMode(libraryModeFromDataset(b.dataset.mode) ?? "search");
     });
   });
 
@@ -2491,6 +2512,14 @@ export function mountLibrary(root: ParentNode = document): void {
       chatInput.value = message;
       state = setChatMessage(state, message);
       void run();
+    });
+  });
+
+  $all("[data-mode-jump]").forEach((button) => {
+    button.addEventListener("click", () => {
+      if (state.mode !== "chat") return;
+      const mode = libraryModeFromDataset(button.dataset.modeJump);
+      if (mode) activateMode(mode);
     });
   });
 
