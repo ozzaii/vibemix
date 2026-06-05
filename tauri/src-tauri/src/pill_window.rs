@@ -16,6 +16,7 @@
 //!     visible lozenge; the window itself has no opaque background.
 //!   * `always_on_top(true)` — the pill floats over the user's DJ app.
 //!   * `decorations(false)` — no titlebar/close box; lifecycle is tray-owned.
+//!   * `shadow(true)` — native undecorated shadow on macOS/Windows.
 //!   * `resizable(false)` — users cannot resize the pill. The renderer may
 //!     programmatically adjust height through `set_pill_height` so the expanded
 //!     receipt and hover peek are not clipped; width stays fixed.
@@ -58,6 +59,13 @@
 //! built app; if it ever needs the panel mask, the correct path is the
 //! crates.io `objc2-app-kit` NSPanel subclass (a real subclass, allocated as
 //! NSPanel from the start) — NOT an in-place class swap on a live wry window.
+//!
+//! ## macOS native material
+//!
+//! The safe native chrome path is `window-vibrancy`: an NSVisualEffectView
+//! backdrop clipped to the collapsed Pill radius. It adds native material under
+//! the existing explicit CSS glass fallback. It does NOT use the rejected CR-01
+//! class swizzle, and it does NOT switch the process to Accessory activation.
 
 // Plan 62-02 wires `create_pill_window` into the `main.rs` setup branch (the
 // `primary_surface` switch), so the module is no longer dead code — the
@@ -84,6 +92,7 @@ const KEY_PILL_WINDOW: &str = "pill_window";
 // these in a test makes any future change a deliberate test edit.
 const PILL_COLLAPSED_W: f64 = 280.0;
 const PILL_COLLAPSED_H: f64 = 44.0;
+const PILL_NATIVE_RADIUS: f64 = PILL_COLLAPSED_H / 2.0;
 
 // Default placement: top-right, fully on-screen.
 const DEFAULT_TOP_OFFSET: i32 = 80;
@@ -97,6 +106,25 @@ const DEBOUNCE_MS: u64 = 200;
 // Off-screen guard margin — keep at least a 48px sliver grabbable (matches
 // the mascot's build-time off-screen fallback margin).
 const ONSCREEN_MARGIN: f64 = 48.0;
+
+#[cfg(target_os = "macos")]
+fn apply_pill_native_material(window: &tauri::WebviewWindow) {
+    use window_vibrancy::{apply_vibrancy, NSVisualEffectMaterial, NSVisualEffectState};
+
+    if let Err(e) = apply_vibrancy(
+        window,
+        NSVisualEffectMaterial::HudWindow,
+        Some(NSVisualEffectState::Active),
+        Some(PILL_NATIVE_RADIUS),
+    ) {
+        tracing::warn!("pill native vibrancy failed: {e}");
+    }
+}
+
+#[cfg(not(target_os = "macos"))]
+fn apply_pill_native_material(window: &tauri::WebviewWindow) {
+    let _ = window;
+}
 
 /// Persisted pill window geometry. Mirrors the mascot's window-state shape
 /// but pill-scoped (its own `pill_window` store key). All fields optional →
@@ -189,6 +217,7 @@ pub fn create_pill_window(app: &AppHandle) -> tauri::Result<Option<tauri::Webvie
             .transparent(true)
             .always_on_top(true)
             .decorations(false)
+            .shadow(true)
             .resizable(false) // User-fixed; renderer controls bounded height.
             .skip_taskbar(true)
             .visible_on_all_workspaces(true)
@@ -199,6 +228,7 @@ pub fn create_pill_window(app: &AppHandle) -> tauri::Result<Option<tauri::Webvie
             .build()?;
     // DELTA vs mascot: DO NOT clone the click-through block — the pill is
     // interactive (it must receive the drag mousedown + chip clicks).
+    apply_pill_native_material(&window);
 
     install_geometry_listener(app.clone(), window.clone());
 
@@ -416,6 +446,7 @@ mod tests {
         // UI-SPEC §Pill Dimensions LOCKED: collapsed 280×44.
         assert_eq!(PILL_COLLAPSED_W, 280.0);
         assert_eq!(PILL_COLLAPSED_H, 44.0);
+        assert_eq!(PILL_NATIVE_RADIUS, 22.0);
     }
 
     #[test]

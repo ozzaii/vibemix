@@ -23,10 +23,11 @@
       desktop. The !important is justified — the overlay MUST composite over
       the desktop (62-UI-SPEC §Color / RESEARCH Pitfall 4).
 
-      The VISIBLE surface is painted by CSS `--glass-3` = rgba(2,3,6,0.88)
-      (62-UI-SPEC §Color), NOT OS vibrancy — guarantees mac+win parity +
-      dodges the DMG white-box regression (tauri#13415). backdrop-filter is a
-      progressive enhancement layered ON TOP, never the sole opacity source.
+      The VISIBLE surface keeps a CSS `--glass-3` rgba fallback even when the
+      macOS shell adds native NSVisualEffectView vibrancy underneath it. The
+      explicit fill guarantees mac+win parity + dodges the DMG white-box
+      regression (tauri#13415). backdrop-filter is a progressive enhancement
+      layered ON TOP, never the sole opacity source.
       (The explicit rgba glass surface + deck-context chips land in Plan 62-05;
       this scaffold lays out the structure + the core idle/listening/speaking/
       expand surface.)

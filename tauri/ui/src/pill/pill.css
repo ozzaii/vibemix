@@ -4,9 +4,10 @@
  * (frontend-enforcement hard rule: only tokens.css carries literal colors).
  *
  * TRANSPARENCY PARITY (PILL-01 / 62-UI-SPEC §Color, the load-bearing rule):
- * the pill's VISIBLE surface is painted by an EXPLICIT `background: var(--glass-3)`
- * (= rgba(2,3,6,0.88)) — the near-opaque dark glass the user actually sees. This
- * is NOT OS vibrancy. The explicit rgba fill:
+ * the pill's VISIBLE surface keeps an EXPLICIT `background: var(--glass-3)`
+ * (= rgba(26,22,24,0.88)) — the near-opaque dark glass fallback the user
+ * actually sees, even when macOS adds native vibrancy underneath. The explicit
+ * rgba fill:
  *   - guarantees mac+win parity (Windows has no vibrancy → no opaque white box),
  *   - dodges the DMG transparency regression (tauri issue 13415, OPEN, no
  *     upstream fix — the built .dmg can drop OS vibrancy and render a white box;
@@ -63,10 +64,11 @@
 }
 
 /* ── Pill surface — the dominant ~80% dark-glass tone (20/80 rule) ───────── *
- * 62-UI-SPEC: collapsed 280×44, --rad-lg lozenge, explicit --glass-3 fill,
+ * 62-UI-SPEC: collapsed 280×44, 22px lozenge, explicit --glass-3 fill,
  * hairline silk edge + top inner-light seam (the "sealed glass" read). Expands
  * DOWN only (height grows; the window does not resize horizontally). */
 .pill {
+  --pill-native-radius: 22px;
   position: fixed;
   z-index: 10;
   top: 0;
@@ -78,10 +80,10 @@
   min-height: 44px;
   height: 44px;
   max-height: min(100vh, 300px);
-  /* EXPLICIT rgba glass surface — what the user sees. NOT OS vibrancy. */
+  /* EXPLICIT rgba glass surface — fallback over optional native vibrancy. */
   background: var(--glass-3);
   border: 1px solid var(--glass-edge);
-  border-radius: var(--rad-lg);
+  border-radius: var(--pill-native-radius);
   /* LIQUID-GLASS material (2026-05-25 pilot). The pill is the floating
    * navigation layer Apple's Liquid Glass is reserved for — so this surface
    * earns the full material: a specular crown on the top edge (light raking
@@ -249,7 +251,7 @@
   left: 0;
   right: 0;
   height: 44px;
-  border-radius: var(--rad-lg) var(--rad-lg) 0 0;
+  border-radius: var(--pill-native-radius) var(--pill-native-radius) 0 0;
   background:
     radial-gradient(120% 84% at 18% 0%, var(--lg-spec-hi), transparent 46%),
     linear-gradient(
@@ -269,7 +271,7 @@
   content: "";
   position: absolute;
   inset: 1px;
-  border-radius: calc(var(--rad-lg) - 1px);
+  border-radius: calc(var(--pill-native-radius) - 1px);
   background:
     linear-gradient(180deg, var(--lg-spec-lo), transparent 44%, var(--lg-rim-void)),
     linear-gradient(90deg, transparent, var(--glass-edge-up) 50%, transparent);

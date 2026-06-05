@@ -73,6 +73,8 @@ accessibility-sys = "0.1"       # AXUIElementCreateApplication / kAX* attributes
 # revoke watcher (INSTALL-06 / P71). macOS-only — Windows degrades to
 # OS-managed runtime grant on first capture.
 tauri-plugin-macos-permissions = "2.3.0"
+# Native NSVisualEffectView backdrop for the Pill HUD; no objc2 class swizzle.
+window-vibrancy = "0.6.0"
 # Phase 62 / PILL-04 — the focus-non-steal STRETCH that required a direct
 # `objc2` dep (NSWindow → NSPanel class swizzle) was DROPPED in code review
 # (CR-01, 2026-05-22): the swizzle violated `set_class`'s subclass + no-added-
