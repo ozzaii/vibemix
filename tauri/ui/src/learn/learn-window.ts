@@ -779,8 +779,6 @@ function mountLearnWindow(root: HTMLElement): {
       renderLessonChooser();
       sr.setAttribute("aria-live", "polite");
       sr.textContent = "controller disconnected.";
-      stage.clear();
-      repaintCurrentLessonHighlight();
       void (async () => {
         await renderPracticeDeck();
         repaintCurrentLessonHighlight();

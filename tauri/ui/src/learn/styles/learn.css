@@ -1184,6 +1184,42 @@
   display: none;
 }
 
+.tutor-dock .receipt .voice-state {
+  display: none;
+}
+
+.tutor-dock .receipt .voice-state[data-active] {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  flex: 0 0 auto;
+  color: var(--silk-65);
+  border: 1px solid var(--glass-edge);
+  background: rgba(255, 255, 255, 0.035);
+  padding: 2px var(--sp-2);
+  font-family: var(--type-mono);
+  font-size: 11px;
+  line-height: 1.2;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  border-radius: var(--rad-sm);
+}
+
+.tutor-dock .receipt .voice-state[data-active]::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--amber);
+  box-shadow: 0 0 10px var(--amber-40);
+  animation: learnVoicePulse 960ms ease-in-out infinite;
+}
+
+.tutor-dock .receipt .voice-state[data-active="hint"] {
+  color: var(--amber-pale);
+  border-color: var(--amber-22);
+}
+
 .tutor-dock .receipt .take-pulse {
   display: none;
 }
@@ -1230,6 +1266,17 @@
 @keyframes learnReceiptDraw {
   to {
     transform: scaleX(1);
+  }
+}
+
+@keyframes learnVoicePulse {
+  0%, 100% {
+    opacity: 0.45;
+    transform: scale(0.86);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.12);
   }
 }
 
@@ -1386,6 +1433,12 @@
 
   .tutor-dock .receipt .cite[data-active] {
     animation: none;
+  }
+
+  .tutor-dock .receipt .voice-state[data-active]::before {
+    animation: none;
+    opacity: 1;
+    transform: none;
   }
 
   .tutor-dock .receipt .take-pulse[data-active],

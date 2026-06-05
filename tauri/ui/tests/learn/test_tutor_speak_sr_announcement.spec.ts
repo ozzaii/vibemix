@@ -94,8 +94,11 @@ describe("test_tutor_speak_sr_announcement.spec.ts (LESSON-05 a11y)", () => {
       await Promise.resolve();
 
       const sr = root.querySelector<HTMLElement>('[data-sr-region="tutor"]');
+      const voice = root.querySelector<HTMLElement>(".tutor-dock .voice-state");
       expect(sr?.textContent).toBe("find deck A play button");
       expect(sr?.getAttribute("aria-live")).toBe("polite");
+      expect(voice?.textContent).toBe("speaking");
+      expect(voice?.getAttribute("data-active")).toBe("true");
     } finally {
       ws.close();
     }
@@ -119,8 +122,11 @@ describe("test_tutor_speak_sr_announcement.spec.ts (LESSON-05 a11y)", () => {
       await Promise.resolve();
 
       const sr = root.querySelector<HTMLElement>('[data-sr-region="tutor"]');
+      const voice = root.querySelector<HTMLElement>(".tutor-dock .voice-state");
       expect(sr?.textContent).toBe("turn the same knob farther");
       expect(sr?.getAttribute("aria-live")).toBe("assertive");
+      expect(voice?.textContent).toBe("speaking");
+      expect(voice?.getAttribute("data-active")).toBe("hint");
     } finally {
       ws.close();
     }
@@ -204,12 +210,15 @@ describe("test_tutor_speak_sr_announcement.spec.ts (LESSON-05 a11y)", () => {
       const pulse = root.querySelector<HTMLElement>(
         ".tutor-dock .take-pulse",
       );
+      const voice = root.querySelector<HTMLElement>(".tutor-dock .voice-state");
       const sr = root.querySelector<HTMLElement>('[data-sr-region="tutor"]');
       expect(pulse?.textContent).toBe("clean touch · 01");
       expect(pulse?.getAttribute("aria-label")).toBe(
         "matched clean touch · 01",
       );
       expect(pulse?.getAttribute("data-active")).toBe("true");
+      expect(voice?.hasAttribute("data-active")).toBe(false);
+      expect(voice?.textContent).toBe("");
       expect(sr?.textContent).toBe("matched clean touch · 01");
     } finally {
       ws.close();

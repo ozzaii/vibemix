@@ -1282,6 +1282,8 @@ describe("practice booth shell", () => {
         }),
       );
 
+      expect(root.querySelector('[data-control-id="play:A"]')).not.toBeNull();
+
       const remountedTarget = await waitForMountedControl(root, "play:A");
       await vi.waitFor(() => {
         expect(remountedTarget.getAttribute("data-cue-color")).toBe("amber");

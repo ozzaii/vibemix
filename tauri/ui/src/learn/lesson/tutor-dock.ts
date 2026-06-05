@@ -112,6 +112,10 @@ export function TutorSpeakDock(): TutorSpeakHandle {
   const rule = document.createElement("span");
   rule.className = "rule";
   receipt.appendChild(rule);
+  const voiceState = document.createElement("span");
+  voiceState.className = "voice-state";
+  voiceState.setAttribute("aria-hidden", "true");
+  receipt.appendChild(voiceState);
   const takePulse = document.createElement("span");
   takePulse.className = "take-pulse";
   receipt.appendChild(takePulse);
@@ -139,6 +143,8 @@ export function TutorSpeakDock(): TutorSpeakHandle {
       line.className = "hint-line";
       line.textContent = payload.text;
       hintLines.appendChild(line);
+      voiceState.textContent = "speaking";
+      voiceState.setAttribute("data-active", "hint");
       renderCitation(payload.citations, cite);
       sr.setAttribute("aria-live", "assertive");
       sr.textContent = payload.text;
@@ -152,6 +158,8 @@ export function TutorSpeakDock(): TutorSpeakHandle {
     now.textContent = payload.text;
     // Clear prior hint lines — each new active beat starts hint-free.
     hintLines.textContent = "";
+    voiceState.textContent = "speaking";
+    voiceState.setAttribute("data-active", "true");
     takePulse.removeAttribute("data-active");
     takePulse.textContent = "";
     // Re-trigger the rise animation by removing+re-adding the class so
@@ -197,6 +205,8 @@ export function TutorSpeakDock(): TutorSpeakHandle {
       takePulse.removeAttribute("aria-label");
       takePulse.textContent = "";
     }
+    voiceState.removeAttribute("data-active");
+    voiceState.textContent = "";
     cite.removeAttribute("data-active");
     cite.textContent = "";
   };
@@ -207,6 +217,8 @@ export function TutorSpeakDock(): TutorSpeakHandle {
     g1.textContent = "";
     now.textContent = "";
     hintLines.textContent = "";
+    voiceState.removeAttribute("data-active");
+    voiceState.textContent = "";
     takePulse.removeAttribute("data-active");
     takePulse.removeAttribute("aria-label");
     takePulse.textContent = "";
