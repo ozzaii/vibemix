@@ -10913,3 +10913,35 @@ Proof before staging:
 - `uv run ruff check src/vibemix/agent/dj_cohost.py tests/agent/test_dj_cohost.py tests/integration/test_proxy_fallback.py`
 - `uv run python -m compileall -q src/vibemix/agent/dj_cohost.py tests/agent/test_dj_cohost.py tests/integration/test_proxy_fallback.py`
 - `git diff --check -- src/vibemix/agent/dj_cohost.py tests/agent/test_dj_cohost.py tests/integration/test_proxy_fallback.py .planning/handoffs/2026-05-31-package-checklist.md`
+
+## Package 95 - Consent-Gated Memory Accrual
+
+Suggested commit: `fix(memory): decouple accrual from recall`
+
+Include:
+
+- `src/vibemix/__main__.py`
+- `tests/memory/test_ingest_wiring.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Prompt recall policy, memory retrieval ranking, MemoryStore retention
+  algorithms, CLAP/embedder construction, and UI settings changes. This package
+  only changes the live main-path enable condition for the already-built
+  off-loop ingest/hygiene worker.
+
+Reason:
+
+- Live memory ingest was tied to `recall_enabled`, which controls whether Sven
+  may read past-session memory into prompts. That meant installs with profile
+  consent but recall still OFF did not accrue memory at boot/close. Split the
+  gates: memory accrual follows profile consent (with an explicit dev env
+  override), while recall remains the separate prompt-read opt-in.
+
+Proof before staging:
+
+- `uv run pytest -q tests/memory/test_ingest_wiring.py tests/memory/test_retention.py tests/memory/test_store.py`
+- `uv run ruff check src/vibemix/__main__.py tests/memory/test_ingest_wiring.py`
+- `uv run python -m compileall -q src/vibemix/__main__.py tests/memory/test_ingest_wiring.py`
+- `git diff --check -- src/vibemix/__main__.py tests/memory/test_ingest_wiring.py .planning/handoffs/2026-05-31-package-checklist.md`

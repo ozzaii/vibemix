@@ -946,6 +946,25 @@ def _resolve_recall_enabled(config: Any | None = None) -> bool:
     return bool(getattr(config, "recall_enabled", False) is True)
 
 
+def _resolve_memory_ingest_enabled() -> bool:
+    """Resolve whether finished sessions may accrue into local memory.
+
+    Accrual is deliberately separate from recall. ``recall_enabled`` controls
+    whether Sven may read past-session memory into a live prompt; this gate only
+    controls the off-hot-path ingest/retention hygiene worker. By default it
+    follows the user's profile consent, so a consenting install can build memory
+    over time while recall remains OFF until separately opted in.
+    """
+    raw = os.environ.get("VIBEMIX_MEMORY_INGEST_ENABLED")
+    if raw is not None:
+        return raw.strip().lower() in {"1", "true", "yes", "on"}
+    try:
+        return bool(load_consent())
+    except Exception as exc:
+        print(f"-> memory ingest consent read skipped: {exc!r}", file=sys.stderr)
+        return False
+
+
 def _maybe_upgrade_input_device_for_deck_audio(
     audio_backend: AudioMacOS,
     *,
@@ -2252,10 +2271,15 @@ async def main() -> None:
     ipc_router: IpcRouterBus | None = IpcRouterBus()
     _settings_config = _boot_settings_config
     recall_enabled = _resolve_recall_enabled(_settings_config)
+    memory_ingest_enabled = _resolve_memory_ingest_enabled()
     if recall_enabled:
         print("-> memory recall: enabled (explicit opt-in)")
     else:
         print("-> memory recall: OFF")
+    if memory_ingest_enabled:
+        print("-> memory ingest: enabled (profile consent)")
+    else:
+        print("-> memory ingest: OFF")
     _live_settings_applier = SettingsApplier(
         config_store=_settings_config,
         cascade_agent=None,
@@ -2276,13 +2300,13 @@ async def main() -> None:
         recordings_root=recordings_root,
         active_recorder=recorder,
         evidence_registry=evidence_registry,
-        memory_ingest_enabled=recall_enabled,
+        memory_ingest_enabled=memory_ingest_enabled,
         session_start=_start_live_session,
         session_stop=_stop_live_session,
         session_is_active=_is_live_session_active,
     )
     _session_ipc.register_handlers()
-    if recall_enabled:
+    if memory_ingest_enabled:
         boot_ingest_task = asyncio.create_task(_session_ipc._fire_ingest("boot"))
         _background_tasks.add(boot_ingest_task)
         boot_ingest_task.add_done_callback(_background_tasks.discard)
@@ -2740,7 +2764,7 @@ async def main() -> None:
             recorder.close()
         except Exception as exc:
             print(f"[close recorder err] {exc}", file=sys.stderr)
-        if recall_enabled:
+        if memory_ingest_enabled:
             try:
                 await _session_ipc._fire_ingest("close", session_dir=recorder.session_dir)
             except Exception as exc:

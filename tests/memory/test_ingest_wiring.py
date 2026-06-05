@@ -36,6 +36,7 @@ from types import SimpleNamespace
 
 import pytest
 
+import vibemix.__main__ as main_mod
 import vibemix.memory.ingest as ingest_mod
 import vibemix.memory.store as store_mod
 from vibemix.runtime import session_loop as session_loop_mod
@@ -413,19 +414,44 @@ def test_main_fires_boot_and_close_ingest() -> None:
     assert "session_dir=" in src
 
 
-def test_main_ingest_is_gated_behind_recall_enabled() -> None:
-    """The main()-path ingest is gated on recall_enabled (additive no-op default)."""
+def test_memory_ingest_resolver_follows_profile_consent(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Memory accrual is profile-consent gated, separate from recall."""
+    monkeypatch.delenv("VIBEMIX_MEMORY_INGEST_ENABLED", raising=False)
+    monkeypatch.setattr(main_mod, "load_consent", lambda: True)
+    assert main_mod._resolve_memory_ingest_enabled() is True
+    monkeypatch.setattr(main_mod, "load_consent", lambda: False)
+    assert main_mod._resolve_memory_ingest_enabled() is False
+
+
+def test_memory_ingest_resolver_honors_dev_env_override(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Dev/CI may override ingest without flipping recall."""
+    monkeypatch.setattr(main_mod, "load_consent", lambda: False)
+    monkeypatch.setenv("VIBEMIX_MEMORY_INGEST_ENABLED", "yes")
+    assert main_mod._resolve_memory_ingest_enabled() is True
+    monkeypatch.setattr(main_mod, "load_consent", lambda: True)
+    monkeypatch.setenv("VIBEMIX_MEMORY_INGEST_ENABLED", "0")
+    assert main_mod._resolve_memory_ingest_enabled() is False
+
+
+def test_main_ingest_is_gated_behind_memory_ingest_enabled() -> None:
+    """The main-path ingest is gated on profile-consent accrual, not recall."""
     src = _main_source()
     assert "recall_enabled" in src
     assert "recall_enabled = _resolve_recall_enabled" in src
-    assert "memory_ingest_enabled=recall_enabled" in src
-    # Heuristic proximity gate: a recall_enabled guard appears in the same
-    # source region as the _fire_ingest call (additive-gated cold path).
+    assert "memory_ingest_enabled = _resolve_memory_ingest_enabled()" in src
+    assert "memory_ingest_enabled=memory_ingest_enabled" in src
+    assert "memory_ingest_enabled=recall_enabled" not in src
+    # Heuristic proximity gate: a memory_ingest_enabled guard appears in the
+    # same source region as the _fire_ingest call (additive-gated cold path).
     idx = src.find("_fire_ingest")
     assert idx != -1, "_fire_ingest not present in main() yet"
     window = src[max(0, idx - 1200) : idx + 1200]
-    assert "recall_enabled" in window, (
-        "_fire_ingest on the main() path must be gated behind recall_enabled"
+    assert "memory_ingest_enabled" in window, (
+        "_fire_ingest on the main() path must be gated behind memory_ingest_enabled"
     )
 
 
