@@ -79,11 +79,7 @@ const STATIC_SURFACE_PRODUCER_FILES: Partial<
 > = {
   library: ["src/library/api.ts", "src/library/index.ts"],
   pill: ["src/pill/index.ts"],
-  debrief: [
-    "src/debrief/ws-client.ts",
-    "src/debrief/debrief-window.ts",
-    "src/debrief/components/ear-test-toggle.ts",
-  ],
+  debrief: ["src/debrief/ws-client.ts", "src/debrief/debrief-window.ts"],
   overlay: ["src/overlay/overlay-highlight.ts", "src/overlay/overlay-runtime.ts"],
   mascot: ["src/mascot/index.ts", "src/mascot/event-dispatcher.ts"],
 };
@@ -425,7 +421,11 @@ describe("mock transfer contract", () => {
         files: STATIC_SURFACE_PRODUCER_FILES.library ?? [],
         label: "library",
       },
-      { root: "src/pill", files: STATIC_SURFACE_PRODUCER_FILES.pill ?? [], label: "pill" },
+      {
+        root: "src/pill",
+        files: STATIC_SURFACE_PRODUCER_FILES.pill ?? [],
+        label: "pill",
+      },
       {
         root: "src/debrief",
         files: STATIC_SURFACE_PRODUCER_FILES.debrief ?? [],

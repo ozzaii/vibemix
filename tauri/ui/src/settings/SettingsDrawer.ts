@@ -391,7 +391,7 @@ const CSS = `
   /* VIS-02 — Plan 43-03. --glow-faint appended comma-separated; preserves
    * the inset amber bleed (mock §02 .btn.on body) while applying the
    * outer faint glow uniformly across every drawer affordance (Recheck,
-   * mascot-group buttons, library-panel actions, ear-test toggle host). */
+   * mascot-group buttons, library-panel actions). */
   .vmx-settings-drawer__btn:hover,
   .vmx-settings-drawer__btn:focus-visible {
     color: var(--brand-glow);

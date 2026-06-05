@@ -52,13 +52,6 @@ export const MOCK_TRANSFER_CONTRACT: readonly MockTransferSurface[] = [
       { wire: "wizard.step-strip", purpose: "first-run calibration step strip" },
       { wire: "wizard.cta", purpose: "first-run calibration command row" },
     ],
-    dynamicWires: [
-      {
-        wire: "wizard.intro-contract",
-        purpose: "first-run Sven proof contract",
-        producerFile: "src/wizard/step0-intro.ts",
-      },
-    ],
     inbound: [
       "ipc.session.snapshot",
       "ipc.status.tick",
@@ -226,8 +219,6 @@ export const MOCK_TRANSFER_CONTRACT: readonly MockTransferSurface[] = [
       { wire: "debrief.waveform", purpose: "timeline waveform" },
       { wire: "debrief.drills", purpose: "practice drills section" },
       { wire: "debrief.drills-list", purpose: "practice drills" },
-      { wire: "debrief.ear-test", purpose: "ear-test sign-off section" },
-      { wire: "debrief.ear-test-toggle", purpose: "ear-test sign-off" },
       { wire: "debrief.error-banner", purpose: "sidecar errors" },
       { wire: "debrief.tooltip", purpose: "citation tooltip" },
     ],
@@ -248,8 +239,6 @@ export const MOCK_TRANSFER_CONTRACT: readonly MockTransferSurface[] = [
     ],
     outbound: [
       "ipc.debrief.citation-tooltip-request",
-      "ipc.debrief.ear-test-submit",
-      "write_ear_test_log",
     ],
   },
   {

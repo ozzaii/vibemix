@@ -17,18 +17,9 @@ import {
   showCitationTooltip,
   type CitationTooltipPayload,
 } from "./components/citation-tooltip.js";
-import {
-  mountEarTestToggle,
-  type EarTestSubmission,
-} from "./components/ear-test-toggle.js";
 import { showErrorBanner } from "./components/error-banner.js";
 import { DebriefWsClient } from "./ws-client.js";
 import { parseDebriefBootUrl } from "./url-state.js";
-
-// Type-only re-export so external callers can reference the submission
-// shape via the debrief-window module surface (mirrors the
-// CitationTooltipPayload re-export pattern used elsewhere).
-export type { EarTestSubmission };
 
 // ---------------------------------------------------------------------------
 // Bootstrap
@@ -50,7 +41,6 @@ const tldrEl = document.getElementById("vmx-debrief-tldr-player");
 // headline (P1-a uplift 3) is inserted here, above the player.
 const tldrPanelEl = document.getElementById("vmx-debrief-tldr");
 const waveformEl = document.getElementById("vmx-debrief-waveform");
-const earTestToggleEl = document.getElementById("vmx-debrief-ear-test-toggle");
 
 if (isMockMode) {
   mountMockDebrief();
@@ -70,30 +60,6 @@ if (isMockMode) {
       genre?: string;
     };
     totalDurationS = detail.duration_s;
-    // Plan 42-03 — mount the ear-test toggle once the session loads so
-    // the form has a real duration_s for the submission payload.
-    // The ear-test sign-off is a single-developer release-gate QA instrument
-    // ("30min minimum, >=2 genres"), not a DJ control. Gated to dev builds via
-    // import.meta.env.DEV; shipped builds skip the mount and the DJ never sees it.
-    if (earTestToggleEl && import.meta.env.DEV) {
-      mountEarTestToggle(
-        earTestToggleEl,
-        {
-          session_id: sessionId,
-          duration_s: totalDurationS,
-          genre: detail.genre ?? "other",
-        },
-        {
-          errorBannerEl: errorBanner,
-          wsSink: {
-            send: (msg) =>
-              client.sendEarTestSubmit(
-                msg.payload as unknown as Record<string, unknown>,
-              ),
-          },
-        },
-      );
-    }
   });
 
   client.addEventListener("chapter-list", (e: Event) => {
@@ -321,20 +287,6 @@ function mountMockDebrief(): void {
       },
     ]);
   }
-  if (earTestToggleEl) {
-    mountEarTestToggle(
-      earTestToggleEl,
-      {
-        session_id: sessionId,
-        duration_s: totalDurationS,
-        genre: "techno",
-      },
-      {
-        errorBannerEl: errorBanner,
-        wsSink: { send: () => undefined },
-      },
-    );
-  }
 }
 
 function mountMockTldrPlayer(totalDurationS: number, regionCount: number): void {
@@ -378,4 +330,3 @@ function formatMockDuration(totalS: number): string {
   const minutes = Math.round(totalS / 60);
   return `${minutes}m`;
 }
-
