@@ -1045,32 +1045,55 @@ class SessionLoop:
                 from vibemix.memory.ingest import ingest_session, run_ingest_sweep
                 from vibemix.memory.store import MemoryStore
 
-                embedder = self._build_ingest_embedder()
-                if embedder is None:
-                    # No usable embedder (no key / no proxy) — skip, no raise.
-                    return
                 store = MemoryStore(db_path=None)
                 # Always release the store's sqlite connection(s) (and, on the
                 # numpy fallback, the sibling memory_moments.db handle): without
                 # this every session-close/boot ingest leaks an fd on the
                 # executor thread (WR-01).
                 try:
-                    if trigger == "close" and session_dir is not None:
-                        result = ingest_session(session_dir, store, embedder)
-                        log.info(
-                            "memory ingest (close): session=%s records=%s embeds=%s skipped=%s",
-                            getattr(result, "session_id", "?"),
-                            getattr(result, "records_written", "?"),
-                            getattr(result, "embeds_made", "?"),
-                            getattr(result, "skipped", "?"),
-                        )
+                    if trigger == "boot":
+                        try:
+                            dropped = store.reconcile_orphans()
+                            if dropped:
+                                log.info(
+                                    "memory orphan sweep (boot): dropped %d record(s)",
+                                    dropped,
+                                )
+                        except Exception:
+                            log.exception("memory orphan sweep (boot) failed")
+
+                    embedder = self._build_ingest_embedder()
+                    if embedder is None:
+                        # No usable embedder (no key / no proxy) — skip ingest, no raise.
+                        pass
                     else:
-                        ingested = run_ingest_sweep(recordings_root, store, embedder)
-                        log.info(
-                            "memory ingest (%s sweep): %d session(s) ingested",
-                            trigger,
-                            len(ingested or []),
-                        )
+                        if trigger == "close" and session_dir is not None:
+                            result = ingest_session(session_dir, store, embedder)
+                            log.info(
+                                "memory ingest (close): session=%s records=%s embeds=%s skipped=%s",
+                                getattr(result, "session_id", "?"),
+                                getattr(result, "records_written", "?"),
+                                getattr(result, "embeds_made", "?"),
+                                getattr(result, "skipped", "?"),
+                            )
+                        else:
+                            ingested = run_ingest_sweep(recordings_root, store, embedder)
+                            log.info(
+                                "memory ingest (%s sweep): %d session(s) ingested",
+                                trigger,
+                                len(ingested or []),
+                            )
+                    try:
+                        result = store.run_retention_sweep()
+                        if getattr(result, "deleted", 0):
+                            log.info(
+                                "memory retention (%s): deleted %s moment(s) from %d session(s)",
+                                trigger,
+                                getattr(result, "deleted", "?"),
+                                len(getattr(result, "deleted_sessions", []) or []),
+                            )
+                    except Exception:
+                        log.exception("memory retention (%s) failed", trigger)
                 finally:
                     store.close()
             except Exception:

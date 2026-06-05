@@ -10733,3 +10733,38 @@ Proof before staging:
 - `uv run ruff check src/vibemix/__main__.py tests/memory/test_ingest_wiring.py tests/test_main_smoke.py`
 - `uv run python -m compileall -q src/vibemix/__main__.py tests/memory/test_ingest_wiring.py tests/test_main_smoke.py`
 - `git diff --check -- src/vibemix/__main__.py tests/memory/test_ingest_wiring.py tests/test_main_smoke.py .planning/handoffs/2026-05-31-package-checklist.md`
+
+## Package 90 - Memory Ingest Hygiene Sweeps
+
+Suggested commit: `fix(memory): run ingest hygiene sweeps`
+
+Include:
+
+- `src/vibemix/runtime/session_loop.py`
+- `tests/memory/test_ingest_wiring.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Memory retention policy changes, schema changes, UI controls, new recall
+  producers, prompt rewrites, and `__main__` orchestration changes. This package
+  only wires the existing `MemoryStore` hygiene primitives into the existing
+  off-loop memory ingest worker.
+
+Reason:
+
+- `MemoryStore.reconcile_orphans()` and `MemoryStore.run_retention_sweep()`
+  existed, but the live boot/close ingest worker never called them. That left
+  dangling vectors and over-budget memory rows to persist until a manual test or
+  future tool invoked the primitives. Run orphan reconciliation on boot before
+  ingest, run memory retention after boot/close ingest, keep all work inside the
+  executor worker, and swallow hygiene failures so cleanup can never block the
+  live session loop or prevent ingest.
+
+Proof before staging:
+
+- `uv run pytest -q tests/memory/test_ingest_wiring.py tests/memory/test_retention.py tests/memory/test_store.py tests/memory/test_thread_safety.py`
+- `uv run pytest -q tests/memory/test_no_live_path_import.py tests/memory/test_no_extraction.py`
+- `uv run ruff check src/vibemix/runtime/session_loop.py tests/memory/test_ingest_wiring.py`
+- `uv run python -m compileall -q src/vibemix/runtime/session_loop.py tests/memory/test_ingest_wiring.py`
+- `git diff --check -- src/vibemix/runtime/session_loop.py tests/memory/test_ingest_wiring.py .planning/handoffs/2026-05-31-package-checklist.md`

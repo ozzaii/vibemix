@@ -32,6 +32,7 @@ from __future__ import annotations
 import asyncio
 import threading
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -115,6 +116,10 @@ def test_wiring_dispatches_through_run_in_executor() -> None:
     assert "from vibemix.memory.ingest import ingest_session, run_ingest_sweep" in src
     assert "ingest_session(session_dir, store, embedder)" in src
     assert "run_ingest_sweep(recordings_root, store, embedder)" in src
+    # Memory DB hygiene runs inside that same executor worker, never on the
+    # asyncio reaction loop.
+    assert "store.reconcile_orphans()" in src
+    assert "store.run_retention_sweep()" in src
 
 
 # ---------------------------------------------------------------------------
@@ -129,7 +134,14 @@ def _stub_ingest(monkeypatch: pytest.MonkeyPatch) -> dict:
     Records the thread id each entrypoint ran on so the test can assert it was
     an executor thread (off the event loop). Returns a dict the test reads.
     """
-    rec: dict = {"close_tid": None, "boot_tid": None, "loop_tid": None}
+    rec: dict = {
+        "close_tid": None,
+        "boot_tid": None,
+        "loop_tid": None,
+        "orphan_tids": [],
+        "retention_tids": [],
+        "stores_closed": 0,
+    }
 
     def fake_ingest_session(session_dir, store, embedder):
         rec["close_tid"] = threading.get_ident()
@@ -144,7 +156,20 @@ def _stub_ingest(monkeypatch: pytest.MonkeyPatch) -> dict:
     monkeypatch.setattr(ingest_mod, "ingest_session", fake_ingest_session)
     monkeypatch.setattr(ingest_mod, "run_ingest_sweep", fake_run_ingest_sweep)
     # The lazy store/embedder builders must never touch sqlite-vec or genai.
-    monkeypatch.setattr(store_mod, "MemoryStore", lambda *a, **k: object())
+
+    class FakeMemoryStore:
+        def reconcile_orphans(self) -> int:
+            rec["orphan_tids"].append(threading.get_ident())
+            return 0
+
+        def run_retention_sweep(self):
+            rec["retention_tids"].append(threading.get_ident())
+            return SimpleNamespace(deleted=0, deleted_sessions=[])
+
+        def close(self) -> None:
+            rec["stores_closed"] += 1
+
+    monkeypatch.setattr(store_mod, "MemoryStore", lambda *a, **k: FakeMemoryStore())
     monkeypatch.setattr(
         SessionLoop, "_build_ingest_embedder", lambda self: FakeEmbedder()
     )
@@ -174,6 +199,10 @@ def test_close_seam_dispatches_off_loop_thread(
         "run_in_executor"
     )
     assert _stub_ingest["close_session_dir"] == session_dir
+    assert _stub_ingest["orphan_tids"] == []
+    assert _stub_ingest["retention_tids"], "memory retention was not swept on close"
+    assert _stub_ingest["retention_tids"][0] != _stub_ingest["loop_tid"]
+    assert _stub_ingest["stores_closed"] == 1
 
 
 def test_boot_seam_dispatches_off_loop_thread(
@@ -194,6 +223,11 @@ def test_boot_seam_dispatches_off_loop_thread(
         "run_in_executor"
     )
     assert _stub_ingest["boot_root"] == tmp_path
+    assert _stub_ingest["orphan_tids"], "memory orphan reconciliation was not swept on boot"
+    assert _stub_ingest["retention_tids"], "memory retention was not swept on boot"
+    assert _stub_ingest["orphan_tids"][0] != _stub_ingest["loop_tid"]
+    assert _stub_ingest["retention_tids"][0] != _stub_ingest["loop_tid"]
+    assert _stub_ingest["stores_closed"] == 1
 
 
 def test_none_recordings_root_skips_ingest(_stub_ingest: dict) -> None:
@@ -205,6 +239,8 @@ def test_none_recordings_root_skips_ingest(_stub_ingest: dict) -> None:
 
     assert _stub_ingest["boot_tid"] is None
     assert _stub_ingest["close_tid"] is None
+    assert _stub_ingest["orphan_tids"] == []
+    assert _stub_ingest["retention_tids"] == []
 
 
 def test_disabled_memory_ingest_skips_boot_and_close(
@@ -222,6 +258,8 @@ def test_disabled_memory_ingest_skips_boot_and_close(
 
     assert _stub_ingest["boot_tid"] is None
     assert _stub_ingest["close_tid"] is None
+    assert _stub_ingest["orphan_tids"] == []
+    assert _stub_ingest["retention_tids"] == []
 
 
 def test_disabled_memory_ingest_keeps_retention_sweep_live(
@@ -258,7 +296,17 @@ def test_ingest_failure_is_swallowed(
 
     monkeypatch.setattr(ingest_mod, "run_ingest_sweep", boom)
     monkeypatch.setattr(ingest_mod, "ingest_session", boom)
-    monkeypatch.setattr(store_mod, "MemoryStore", lambda *a, **k: object())
+    class FakeMemoryStore:
+        def reconcile_orphans(self) -> int:
+            return 0
+
+        def run_retention_sweep(self):
+            return SimpleNamespace(deleted=0, deleted_sessions=[])
+
+        def close(self) -> None:
+            pass
+
+    monkeypatch.setattr(store_mod, "MemoryStore", lambda *a, **k: FakeMemoryStore())
     monkeypatch.setattr(
         SessionLoop, "_build_ingest_embedder", lambda self: FakeEmbedder()
     )
@@ -270,6 +318,40 @@ def test_ingest_failure_is_swallowed(
     # Neither seam may raise — the best-effort try/except swallows the failure.
     asyncio.run(loop._fire_ingest("boot"))
     asyncio.run(loop._fire_ingest("close", session_dir=session_dir))
+
+
+def test_memory_hygiene_failure_is_swallowed_before_ingest(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A failing hygiene pass cannot prevent the boot ingest sweep."""
+    calls: dict[str, int] = {"boot": 0, "retention": 0}
+
+    def fake_run_ingest_sweep(recordings_root, store, embedder):
+        calls["boot"] += 1
+        return []
+
+    class FakeMemoryStore:
+        def reconcile_orphans(self) -> int:
+            raise RuntimeError("orphan sweep exploded")
+
+        def run_retention_sweep(self):
+            calls["retention"] += 1
+            raise RuntimeError("retention sweep exploded")
+
+        def close(self) -> None:
+            pass
+
+    monkeypatch.setattr(ingest_mod, "run_ingest_sweep", fake_run_ingest_sweep)
+    monkeypatch.setattr(store_mod, "MemoryStore", lambda *a, **k: FakeMemoryStore())
+    monkeypatch.setattr(
+        SessionLoop, "_build_ingest_embedder", lambda self: FakeEmbedder()
+    )
+
+    loop = SessionLoop(FakeBus(), recordings_root=tmp_path)
+
+    asyncio.run(loop._fire_ingest("boot"))
+
+    assert calls == {"boot": 1, "retention": 1}
 
 
 def test_close_seam_falls_back_to_sweep_without_recorder(
