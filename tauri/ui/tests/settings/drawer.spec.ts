@@ -101,17 +101,27 @@ describe("mountSettingsDrawer", () => {
     ).toBe(1);
   });
 
-  it("gates citation diagnostics to dev builds (shipped builds strip it)", () => {
-    // The DIAGNOSTICS group (slop ratio / stripped rate / bypass) is internal
-    // anti-slop telemetry, gated on import.meta.env.DEV: present in dev (vitest
-    // runs in dev mode), stripped from the shipped drawer a paying user sees.
+  it("gates internal settings tools to dev builds", () => {
+    // Profile view, citation diagnostics, calibration rerun, and Learn reset
+    // are support/tuning surfaces. They are present in dev builds and stripped
+    // from the shipped drawer a paying user sees.
     mountSettingsDrawer(document.body);
     if (import.meta.env.DEV) {
       expect(document.querySelector(".vmx-citation-diag")).not.toBeNull();
+      expect(document.body.textContent).toContain("PROFILE");
       expect(document.body.textContent).toContain("DIAGNOSTICS");
+      expect(document.body.textContent).toContain("CALIBRATION");
+      expect(document.body.textContent).toContain("LEARN");
+      expect(document.body.textContent).toContain("RE-RUN WIZARD");
+      expect(document.body.textContent).toContain("reset learn progress");
     } else {
       expect(document.querySelector(".vmx-citation-diag")).toBeNull();
+      expect(document.body.textContent).not.toContain("PROFILE");
       expect(document.body.textContent).not.toContain("DIAGNOSTICS");
+      expect(document.body.textContent).not.toContain("CALIBRATION");
+      expect(document.body.textContent).not.toContain("LEARN");
+      expect(document.body.textContent).not.toContain("RE-RUN WIZARD");
+      expect(document.body.textContent).not.toContain("reset learn progress");
     }
   });
 
@@ -208,6 +218,12 @@ describe("openSettings / closeSettings", () => {
     expect(profileCalls().length).toBe(0);
 
     openSettings();
+    if (!import.meta.env.DEV) {
+      expect(profileCalls().length).toBe(0);
+      closeSettings();
+      expect(profileCalls().length).toBe(0);
+      return;
+    }
     expect(profileCalls().length).toBe(1);
 
     closeSettings();
@@ -285,7 +301,7 @@ describe("dismiss paths", () => {
 });
 
 describe("group rendering", () => {
-  it("renders all five groups: PERSONA / OUTPUT / HOTKEY / RECORDING / CALIBRATION", () => {
+  it("renders always-on groups and dev-only internal groups for the active build", () => {
     mountSettingsDrawer(document.body);
     openSettings();
     const groupHeaders = Array.from(
@@ -295,10 +311,14 @@ describe("group rendering", () => {
     expect(groupHeaders.some((h) => h.includes("OUTPUT"))).toBe(true);
     expect(groupHeaders.some((h) => h.includes("HOTKEY"))).toBe(true);
     expect(groupHeaders.some((h) => h.includes("RECORDING"))).toBe(true);
-    expect(groupHeaders.some((h) => h.includes("CALIBRATION"))).toBe(true);
+    expect(groupHeaders.some((h) => h.includes("LIBRARY"))).toBe(true);
+    expect(groupHeaders.some((h) => h.includes("MASCOT"))).toBe(true);
+    expect(groupHeaders.some((h) => h.includes("PERFORMANCE"))).toBe(true);
+    expect(groupHeaders.some((h) => h.includes("HELP"))).toBe(true);
+    expect(groupHeaders.some((h) => h.includes("CALIBRATION"))).toBe(import.meta.env.DEV);
   });
 
-  it("PERSONA group shows the hotkey-capture component", () => {
+  it("HOTKEY group shows the hotkey-capture component", () => {
     mountSettingsDrawer(document.body);
     openSettings();
     expect(document.querySelectorAll(".vmx-hotkey-capture").length).toBe(1);

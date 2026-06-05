@@ -495,6 +495,10 @@ describe("Phase 12 — session + drawer integration", () => {
     const reRunBtn = buttons.find((b) =>
       (b.textContent ?? "").includes("RE-RUN"),
     );
+    if (!import.meta.env.DEV) {
+      expect(reRunBtn).toBeUndefined();
+      return;
+    }
     expect(reRunBtn).toBeTruthy();
     reRunBtn?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
 

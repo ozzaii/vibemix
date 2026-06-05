@@ -32,8 +32,10 @@ import {
   ACTIVE_MOCK_ITERATION_TEMPLATE,
   MOCK_TRANSFER_CONTRACT,
   MOCK_TRANSFER_RUNTIME_CONTRACT,
+  SETTINGS_ALWAYS_GROUP_WIRES,
   SETTINGS_BRAIN_CONTROL_WIRES,
   SETTINGS_GROUP_WIRES,
+  SETTINGS_INTERNAL_GROUP_WIRES,
   SETTINGS_PERSONA_CONTROL_WIRES,
   wireSelector,
   type MockTransferSurface,
@@ -219,7 +221,10 @@ function mountedDataWireValues(): string[] {
 function expectedRuntimeWireValues(surface: MockTransferRuntimeSurface): string[] {
   const values = new Set(surface.requiredWires.map((entry) => entry.wire));
   if (surface.surface === "settings") {
-    for (const wire of SETTINGS_GROUP_WIRES) {
+    const groups = import.meta.env.DEV
+      ? SETTINGS_GROUP_WIRES
+      : SETTINGS_ALWAYS_GROUP_WIRES;
+    for (const wire of groups) {
       values.add(wire);
       values.add(`${wire}.header`);
       values.add(`${wire}.body`);
@@ -338,15 +343,21 @@ describe("mock transfer contract", () => {
     }
   });
 
-  it("keeps every live settings group transfer anchor mounted", () => {
+  it("keeps every live settings group transfer anchor mounted for the active build", () => {
     document.body.replaceChildren();
     mountSettingsDrawer(document.body);
 
-    for (const wire of SETTINGS_GROUP_WIRES) {
+    for (const wire of SETTINGS_ALWAYS_GROUP_WIRES) {
       expect(
         document.querySelectorAll(wireSelector(wire)).length,
         `settings drawer group ${wire} must mount exactly once`,
       ).toBe(1);
+    }
+    for (const wire of SETTINGS_INTERNAL_GROUP_WIRES) {
+      expect(
+        document.querySelectorAll(wireSelector(wire)).length,
+        `settings drawer internal group ${wire} should follow DEV gating`,
+      ).toBe(import.meta.env.DEV ? 1 : 0);
     }
   });
 

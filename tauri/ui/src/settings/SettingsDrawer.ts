@@ -1209,37 +1209,29 @@ function renderDrawerBody(body: HTMLElement, modalSlot: HTMLElement): void {
     }),
   );
 
-  // --- PROFILE (Phase 32 / PROFILE-07) -------------------------------------
-  // Long-term DJ profile (~2KB JSON, content-allowlisted). View / regenerate
-  // / delete + consent toggle. Lives between LIBRARY and CALIBRATION because
-  // both are user-data groups; PROFILE is the more sensitive one so it sits
-  // adjacent to LIBRARY for findability (32-RESEARCH §"Settings panel
-  // insertion"). The panel renders synchronously with an empty state and
-  // fires ipc.profile.view only once per open cycle. The handle is preserved
-  // across open-drawer body refreshes (recordings loading, settings pushes), so
-  // those refreshes do not spam the sidecar or UI log.
-  if (!profilePanelHandle) {
-    profilePanelHandle = renderProfilePanel({ autoload: false });
-  }
-  if (ui.open && !profilePanelLoadedThisOpen) {
-    profilePanelLoadedThisOpen = true;
-    void profilePanelHandle.refresh();
-  }
-  body.append(
-    renderSettingsGroup({
-      header: "PROFILE",
-      children: profilePanelHandle.element,
-    }),
-  );
-
-  // --- DIAGNOSTICS ---------------------------------------------------------
-  // Anti-slop telemetry from ipc.session.citation. The handle subscribes to
-  // the component-local diagnostics store and updates in place, so the 0.5Hz
-  // co-host telemetry stream does not rebuild the entire drawer.
-  // Anti-slop citation telemetry (slop ratio / stripped rate / bypass) is a dev
-  // instrument, not a paying-user control. Shipped builds strip this branch via
-  // import.meta.env.DEV; dev builds keep it for tuning.
+  // --- INTERNAL TOOLS -------------------------------------------------------
+  // Profile, citation diagnostics, wizard rerun, and learn reset are support
+  // and tuning tools. Keep them available in dev while shipped builds strip the
+  // whole cluster through Vite's import.meta.env.DEV replacement.
   if (import.meta.env.DEV) {
+    // --- PROFILE (Phase 32 / PROFILE-07) -----------------------------------
+    if (!profilePanelHandle) {
+      profilePanelHandle = renderProfilePanel({ autoload: false });
+    }
+    if (ui.open && !profilePanelLoadedThisOpen) {
+      profilePanelLoadedThisOpen = true;
+      void profilePanelHandle.refresh();
+    }
+    body.append(
+      renderSettingsGroup({
+        header: "PROFILE",
+        children: profilePanelHandle.element,
+      }),
+    );
+
+    // --- DIAGNOSTICS -------------------------------------------------------
+    // Anti-slop citation telemetry (slop ratio / stripped rate / bypass) is a
+    // dev instrument, not a paying-user control.
     const citationDiagnostics = mountCitationDiagnostics();
     bodyDisposers.push(() => citationDiagnostics.dispose());
     body.append(
@@ -1249,40 +1241,35 @@ function renderDrawerBody(body: HTMLElement, modalSlot: HTMLElement): void {
         children: citationDiagnostics.root,
       }),
     );
+
+    // --- CALIBRATION --------------------------------------------------------
+    const calibrationBody = document.createElement("div");
+    calibrationBody.style.cssText = "display:flex; flex-direction:column; gap: var(--sp-2);";
+    const reRunBtn = document.createElement("button");
+    reRunBtn.type = "button";
+    reRunBtn.className = "vmx-settings-drawer__btn";
+    reRunBtn.textContent = "↻ RE-RUN WIZARD";
+    reRunBtn.addEventListener("click", (e) => {
+      e.preventDefault();
+      openConfirmReRun(modalSlot);
+    });
+    calibrationBody.append(reRunBtn);
+    body.append(
+      renderSettingsGroup({
+        header: "CALIBRATION",
+        children: calibrationBody,
+      }),
+    );
+
+    // --- LEARN (Phase 92 / LESSON-03) --------------------------------------
+    // Reset Learn progress is destructive recovery, not a normal Settings row.
+    body.append(LearnGroup());
   }
-
-  // --- CALIBRATION ----------------------------------------------------------
-  const calibrationBody = document.createElement("div");
-  calibrationBody.style.cssText = "display:flex; flex-direction:column; gap: var(--sp-2);";
-  const reRunBtn = document.createElement("button");
-  reRunBtn.type = "button";
-  reRunBtn.className = "vmx-settings-drawer__btn";
-  reRunBtn.textContent = "↻ RE-RUN WIZARD";
-  reRunBtn.addEventListener("click", (e) => {
-    e.preventDefault();
-    openConfirmReRun(modalSlot);
-  });
-  calibrationBody.append(reRunBtn);
-  body.append(
-    renderSettingsGroup({
-      header: "CALIBRATION",
-      children: calibrationBody,
-    }),
-  );
-
-  // --- LEARN (Phase 92 — LESSON-03) ----------------------------------------
-  // "Reset Learn Progress" row. Per UI-SPEC §Component Inventory the LEARN
-  // group sits between RECORDING and MASCOT; with PROFILE + CALIBRATION
-  // already occupying that span (Phases 32 + 12), LearnGroup joins the
-  // data-user-sensitive cluster just before MASCOT — the closest available
-  // slot honoring the spec's "before MASCOT" half. Click → destructive
-  // confirm → ipc.learn.progress_state { action: "reset" }.
-  body.append(LearnGroup());
 
   // --- MASCOT (Phase 13-03) -------------------------------------------------
   // Appended per Plan 13-03 §Task 2; per Plan 14-04 the new PERFORMANCE
-  // group sits AFTER MASCOT. Final order: PERSONA / OUTPUT / HOTKEY /
-  // RECORDING / CALIBRATION / LEARN / MASCOT / PERFORMANCE.
+  // group sits AFTER MASCOT. Internal dev tools mount just before MASCOT when
+  // import.meta.env.DEV is true.
   body.append(MascotGroup());
 
   // --- PERFORMANCE (Phase 14-04) -------------------------------------------

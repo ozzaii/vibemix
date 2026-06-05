@@ -314,20 +314,28 @@ export const SETTINGS_RUNTIME_WIRES = [
   "settings.modal-slot",
 ] as const;
 
-export const SETTINGS_GROUP_WIRES = [
+export const SETTINGS_ALWAYS_GROUP_WIRES = [
   "settings.group.persona",
   "settings.group.brain",
   "settings.group.output",
   "settings.group.hotkey",
   "settings.group.recording",
   "settings.group.library",
+  "settings.group.mascot",
+  "settings.group.performance",
+  "settings.group.help",
+] as const;
+
+export const SETTINGS_INTERNAL_GROUP_WIRES = [
   "settings.group.profile",
   "settings.group.diagnostics",
   "settings.group.calibration",
   "settings.group.learn",
-  "settings.group.mascot",
-  "settings.group.performance",
-  "settings.group.help",
+] as const;
+
+export const SETTINGS_GROUP_WIRES = [
+  ...SETTINGS_ALWAYS_GROUP_WIRES,
+  ...SETTINGS_INTERNAL_GROUP_WIRES,
 ] as const;
 
 export const SETTINGS_PERSONA_CONTROL_WIRES = [
