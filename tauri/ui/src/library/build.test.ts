@@ -631,7 +631,7 @@ describe("build — real renderBuildSet path (jsdom, via mountLibrary)", () => {
       "setup_error",
     );
     expect(results.querySelector(".vmx-lib-agent-failure")?.textContent).toContain(
-      "Import or embed the library first",
+      "Index a music folder first",
     );
     expect(document.getElementById("vmx-lib-rationale-body")?.textContent).toContain(
       "AutoCrate could not open the indexed library cache",

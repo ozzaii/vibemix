@@ -11,7 +11,7 @@
  * The modes (mocks/vibemix-library-ui.html + curate/build/chat extensions):
  *   - search   ← text vibe query → ranked tracks + scope
  *   - similar  ← seed track (id or dropped file) → nearest neighbours + scope
- *   - ingest   ← folder path + strategy → embed progress + live log
+ *   - ingest   ← folder path + strategy → indexing progress + live log
  *   - cue      ← folder path + export format → auto-cued XML/M3U8 receipt
  *   - curate   ← theme → AI-curated playlist (numbered set + rationale)
  *   - build    ← brief + energy curve → set-prep co-host: discovered + sequenced
@@ -41,9 +41,9 @@ export interface LibraryState {
   query: string;
   /** Seed for similar mode — a track_id or a dropped file path/basename. */
   seed: string;
-  /** Folder path to embed (ingest mode). */
+  /** Music folder path to index (ingest mode). */
   folder: string;
-  /** Embed strategy chip (ingest mode). */
+  /** Indexing strategy chip (ingest mode). */
   strategy: EmbedStrategy;
   /** Folder path to auto-cue (cue mode). */
   cueFolder: string;
@@ -82,7 +82,7 @@ export function fieldLabel(mode: LibraryMode): string {
     case "similar":
       return "Seed track";
     case "ingest":
-      return "Folder to embed";
+      return "Music folder";
     case "cue":
       return "Folder to cue";
     case "curate":
@@ -103,7 +103,7 @@ export function runLabel(mode: LibraryMode): string {
     case "similar":
       return "▸ Find similar";
     case "ingest":
-      return "▸ Embed folder";
+      return "▸ Index folder";
     case "cue":
       return "▸ Export cues";
     case "curate":

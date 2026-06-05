@@ -444,7 +444,7 @@ function mountSkeleton(): void {
       <button data-mode="build" aria-selected="false">Build</button>
       <button data-mode="cue" aria-selected="false">Cue</button>
       <button data-mode="chat" aria-selected="true">Viber</button>
-      <button data-mode="ingest" aria-selected="false">Ingest</button>
+      <button data-mode="ingest" aria-selected="false">Music</button>
     </div>
     <span id="vmx-lib-qlabel"></span>
     <input id="vmx-lib-q" />
@@ -646,10 +646,10 @@ describe("chat - real runChat path", () => {
         ?.getAttribute("aria-selected"),
     ).toBe("true");
     expect(document.getElementById("vmx-lib-center-label")?.textContent).toBe(
-      "Embed",
+      "Music",
     );
     expect(document.getElementById("vmx-lib-runbtn")?.textContent).toBe(
-      "▸ Embed folder",
+      "▸ Index folder",
     );
     expect(embedFolderMock).not.toHaveBeenCalled();
     expect(document.activeElement).toBe(document.getElementById("vmx-lib-folder"));

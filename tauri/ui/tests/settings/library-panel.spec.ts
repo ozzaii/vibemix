@@ -267,7 +267,7 @@ describe("library-panel — programmatic refresh", () => {
 
     expect(libraryApiMocks.libraryEmbedFolder).not.toHaveBeenCalled();
     expect(handle.element.querySelector(".vmx-library-status")?.textContent).toBe(
-      "Choose a music folder. Catalog import was removed.",
+      "Choose a music folder, not a database file.",
     );
   });
 

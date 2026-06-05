@@ -191,7 +191,7 @@ export async function renderLibraryPanel(
 
   async function beginImport(path: string): Promise<void> {
     if (looksLikeFilePath(path)) {
-      setStatus("Choose a music folder. Catalog import was removed.");
+      setStatus("Choose a music folder, not a database file.");
       return;
     }
     await beginLibraryJob(

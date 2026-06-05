@@ -38,7 +38,7 @@ describe("mode switch + labels", () => {
   it("maps each mode to its field label", () => {
     expect(fieldLabel("search")).toBe("Vibe query");
     expect(fieldLabel("similar")).toBe("Seed track");
-    expect(fieldLabel("ingest")).toBe("Folder to embed");
+    expect(fieldLabel("ingest")).toBe("Music folder");
     expect(fieldLabel("cue")).toBe("Folder to cue");
     expect(fieldLabel("chat")).toBe("Talk to Viber");
   });
@@ -46,7 +46,7 @@ describe("mode switch + labels", () => {
   it("maps each mode to its run-button label", () => {
     expect(runLabel("search")).toBe("Run search");
     expect(runLabel("similar")).toBe("▸ Find similar");
-    expect(runLabel("ingest")).toBe("▸ Embed folder");
+    expect(runLabel("ingest")).toBe("▸ Index folder");
     expect(runLabel("cue")).toBe("▸ Export cues");
     expect(runLabel("chat")).toBe("Send");
   });

@@ -195,7 +195,7 @@ const AGENT_FAILURE_COPY: Record<string, AgentFailureCopy> = {
   tool_starvation: {
     title: "Library search starved",
     detail: "Viber asked the grounded tools, but they returned too little usable material.",
-    next: "Broaden the vibe, embed more tracks, or start from a reference track.",
+    next: "Broaden the vibe, index more tracks, or start from a reference track.",
   },
   empty_output: {
     title: "Viber returned no usable plan",
@@ -228,12 +228,12 @@ const AUTO_CRATE_FAILURE_COPY: Record<string, AgentFailureCopy> = {
   setup_error: {
     title: "Library setup needed",
     detail: "AutoCrate could not open the indexed library cache.",
-    next: "Import or embed the library first, then run the same brief again.",
+    next: "Index a music folder first, then run the same brief again.",
   },
   no_pool: {
     title: "No playable pool",
     detail: "Discovery returned no grounded candidates for this brief.",
-    next: "Broaden the vibe, remove narrow BPM limits, or embed more playable tracks.",
+    next: "Broaden the vibe, remove narrow BPM limits, or index more playable tracks.",
   },
   no_sequence: {
     title: "No clean order",
@@ -539,7 +539,7 @@ function renderResults(result: SearchResult, mode: LibraryMode): void {
   const el = $("vmx-lib-results");
   el.innerHTML = "";
   if (result.results.length === 0) {
-    el.innerHTML = `<div class="vmx-lib-empty">No tracks pulled. Embed a folder first, or widen the query.</div>`;
+    el.innerHTML = `<div class="vmx-lib-empty">No tracks pulled. Index a music folder first, or widen the query.</div>`;
   } else {
     result.results.forEach((r, i) => {
       const top = i === 0 ? " top" : "";
@@ -1161,7 +1161,7 @@ function setProgress(
   $("vmx-lib-prog-n").innerHTML =
     total > 0
       ? `${n}<small> / ${total}${note ? ` · ${esc(note)}` : ""}</small>`
-      : `<small>Ready to embed</small>`;
+      : `<small>Ready to index</small>`;
   $("vmx-lib-prog-cost").textContent = total > 0 ? `~€${costEur.toFixed(2)}` : "";
 }
 
@@ -2033,7 +2033,7 @@ export function mountLibrary(root: ParentNode = document): void {
           : state.mode === "curate"
             ? "Curated"
             : state.mode === "ingest"
-              ? "Embed"
+              ? "Music"
               : "Pulled";
     $("vmx-lib-side-label").textContent =
       state.mode === "chat" ? "Receipts" : "Vibe scope";
@@ -2118,7 +2118,7 @@ export function mountLibrary(root: ParentNode = document): void {
     }
     if (mode === "ingest") {
       // Idle ingest view: show the ready state and focus the source path. The
-      // user still has to click Embed folder, so this never starts indexing by
+      // user still has to click Index folder, so this never starts indexing by
       // surprise from the Viber home surface.
       $("vmx-lib-loglist").innerHTML = "";
       setProgress(0, 0, 0, "");
