@@ -780,7 +780,7 @@ describe("chat - real runChat path", () => {
     );
   });
 
-  it("renders the live read verifier beside a Viber chat reply", async () => {
+  it("renders the deck check verifier beside a Viber chat reply", async () => {
     chatMock.mockResolvedValueOnce({
       ...CHAT_WITH_PLAYLIST,
       reply:
@@ -811,9 +811,9 @@ describe("chat - real runChat path", () => {
 
     const toolText =
       document.getElementById("vmx-lib-chat-tools")?.textContent ?? "";
-    expect(toolText).toContain("live read");
-    expect(toolText).toContain("fresh");
-    expect(toolText).toContain("live move checked");
+    expect(toolText).toContain("deck check");
+    expect(toolText).toContain("current");
+    expect(toolText).toContain("move checked");
     expect(toolText).toContain("backed");
     expect(toolText).not.toContain("live_reply_verify");
     expect(toolText).not.toContain("guard");
@@ -826,8 +826,8 @@ describe("chat - real runChat path", () => {
 
     const artifactText =
       document.getElementById("vmx-lib-chat-thread")?.textContent ?? "";
-    expect(artifactText).toContain("live read");
-    expect(artifactText).toContain("live move checked");
+    expect(artifactText).toContain("deck check");
+    expect(artifactText).toContain("move checked");
     expect(artifactText).not.toContain("guard");
     expect(artifactText).not.toContain("unsupported_live_outcome_claim");
   });
@@ -873,21 +873,21 @@ describe("chat - real runChat path", () => {
 
     const toolText =
       document.getElementById("vmx-lib-chat-tools")?.textContent ?? "";
-    expect(toolText).toContain("live read");
-    expect(toolText).toContain("fresh");
+    expect(toolText).toContain("deck check");
+    expect(toolText).toContain("current");
     expect(toolText).toContain("scoring backed");
     expect(toolText).not.toContain("supported_verdict");
 
     const artifactText =
       document.getElementById("vmx-lib-chat-thread")?.textContent ?? "";
-    expect(artifactText).toContain("live read");
+    expect(artifactText).toContain("deck check");
     expect(artifactText).toContain("scoring backed");
-    expect(artifactText).toContain("move scoring backed by live read");
+    expect(artifactText).toContain("move scoring backed by deck evidence");
     expect(artifactText).not.toContain("claim_policy");
     expect(artifactText).not.toContain("supported_verdict");
   });
 
-  it("hides internal live read failure labels from the chat chrome", async () => {
+  it("hides internal deck check failure labels from the chat chrome", async () => {
     chatMock.mockResolvedValueOnce({
       ...CHAT_WITH_PLAYLIST,
       reply:
@@ -924,7 +924,7 @@ describe("chat - real runChat path", () => {
 
     const toolText =
       document.getElementById("vmx-lib-chat-tools")?.textContent ?? "";
-    expect(toolText).toContain("live read");
+    expect(toolText).toContain("deck check");
     expect(toolText).toContain("waiting");
     expect(toolText).toContain("listening");
     expect(toolText).not.toContain("live_context_required");
@@ -933,23 +933,23 @@ describe("chat - real runChat path", () => {
 
     expect(document.querySelectorAll(".vmx-lib-chat-tool")).toHaveLength(1);
     expect(document.getElementById("vmx-lib-scope-state")?.textContent).toBe(
-      "live read waiting",
+      "deck check waiting",
     );
 
     const artifactText =
       document.getElementById("vmx-lib-chat-thread")?.textContent ?? "";
-    expect(artifactText).toContain("live read");
+    expect(artifactText).toContain("deck check");
     expect(artifactText).toContain("listening");
     expect(artifactText).not.toContain("live_context_required");
     expect(artifactText).not.toContain("requires_more_evidence");
   });
 
-  it("keeps the library setup action visible while the live read is waiting", async () => {
+  it("keeps the library setup action visible while the deck check is waiting", async () => {
     statsMock.mockResolvedValueOnce(statsWithSetupCandidate());
     chatMock.mockResolvedValueOnce({
       ...CHAT_WITH_PLAYLIST,
       reply:
-        "I need a stronger live read before I can grade that, and I found a likely library source.",
+        "I need stronger deck evidence before I can grade that, and I found a likely library source.",
       tool_trace: [
         {
           name: "live_context_required",
@@ -984,7 +984,7 @@ describe("chat - real runChat path", () => {
     expect(cards).toHaveLength(2);
     const firstCard = cards?.item(0);
     expect(firstCard).not.toBeNull();
-    expect(firstCard?.textContent).toContain("live read");
+    expect(firstCard?.textContent).toContain("deck check");
     expect(firstCard?.textContent).toContain("listening");
 
     const setupCard = artifact?.querySelector<HTMLElement>(

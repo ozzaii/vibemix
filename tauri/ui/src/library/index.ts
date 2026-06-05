@@ -1422,7 +1422,7 @@ function liveProofStatus(context: LibraryLiveContext | null): {
       "live_evidence",
     ].every((capability) => capabilities.has(capability));
   if (!transportOk) {
-    return { ok: false, state: "partial", detail: "deck feed warming" };
+    return { ok: false, state: "warming", detail: "deck feed warming" };
   }
   const missing: string[] = [];
   if (!context.deck_lanes_context || !context.deck_reference_context) {
@@ -1474,14 +1474,14 @@ function liveProofStatus(context: LibraryLiveContext | null): {
   if (missing.length > 0) {
     return {
       ok: false,
-      state: "partial",
+      state: "waiting",
       detail: missing.slice(0, 2).join(" + "),
     };
   }
   return {
     ok: true,
-    state: "armed",
-    detail: deckLaneSummary(context) ?? "deck lanes armed",
+    state: "ready",
+    detail: deckLaneSummary(context) ?? "deck lanes ready",
   };
 }
 
@@ -1500,7 +1500,7 @@ function appendLiveProofStatusToolRow(
   const text = document.createElement("div");
   const name = document.createElement("div");
   name.className = "name";
-  name.textContent = "live read";
+  name.textContent = "deck check";
   const arg = document.createElement("div");
   arg.className = "arg";
   arg.textContent = `${status.state} · ${status.detail}`;
@@ -1542,17 +1542,17 @@ function updateLiveToolStatus(event: LibraryViberToolEvent): void {
 function liveVerificationStateText(v: LibraryLiveVerification): string {
   const transport =
     v.transport_status === "fresh_schema_v2"
-      ? "fresh"
+      ? "current"
       : v.transport_status === "missing_live_context"
         ? "waiting"
         : v.transport_status === "stale_or_pre_schema_v2"
-          ? "partial"
+          ? "warming"
           : "checked";
   const policy =
     v.claim_policy === "requires_more_evidence"
       ? "listening"
       : v.claim_policy === "blocked" || v.claim_policy === "watch_not_claim"
-        ? "live move checked"
+        ? "move checked"
         : v.claim_policy === "candidate_not_verdict"
           ? "setup noted"
           : v.claim_policy === "supported_verdict"
@@ -1575,7 +1575,7 @@ function appendLiveVerificationToolRow(
   const text = document.createElement("div");
   const name = document.createElement("div");
   name.className = "name";
-  name.textContent = "live read";
+  name.textContent = "deck check";
   const arg = document.createElement("div");
   arg.className = "arg";
   arg.textContent = liveVerificationStateText(verification);
@@ -1588,7 +1588,7 @@ function chatScopeStateText(result: LibraryChatResult): string {
   if (isChatSetupStop(result.stop_reason))
     return `setup · ${result.stop_reason}`;
   if (result.stop_reason === "live_context_required")
-    return "live read waiting";
+    return "deck check waiting";
   return `${result.iterations} iter · ${result.stop_reason}`;
 }
 
@@ -1658,19 +1658,14 @@ function chatArtifactCard(result: LibraryChatResult): HTMLElement | null {
   const led = document.createElement("span");
   led.className = "led";
   const label = document.createElement("span");
-  label.textContent = result.playlist
-    ? "playlist"
-    : result.export_path
-      ? "export"
-      : clarification
-        ? "clarify"
-        : setupStop
-          ? "setup"
-          : result.live_verification
-            ? "live read"
-            : result.move_grades.length > 0
-              ? "moves"
-              : "receipts";
+  let labelText = "receipts";
+  if (result.playlist) labelText = "playlist";
+  else if (result.export_path) labelText = "export";
+  else if (clarification) labelText = "clarify";
+  else if (setupStop) labelText = "setup";
+  else if (result.live_verification) labelText = "deck check";
+  else if (result.move_grades.length > 0) labelText = "moves";
+  label.textContent = labelText;
   cap.append(led, label);
   card.append(cap);
 
@@ -1714,13 +1709,13 @@ function appendChatLiveVerificationLines(
 ): void {
   appendChatCardLine(
     card,
-    `live read: ${liveVerificationStateText(verification)}`,
+    `deck check: ${liveVerificationStateText(verification)}`,
   );
   if (verification.move_grades_seen > 0 && !verification.move_grades_allowed) {
-    appendChatCardLine(card, "move scoring waits for a stronger live read");
+    appendChatCardLine(card, "move scoring waits for stronger deck evidence");
   }
   if (verification.move_grades_seen > 0 && verification.move_grades_allowed) {
-    appendChatCardLine(card, "move scoring backed by live read");
+    appendChatCardLine(card, "move scoring backed by deck evidence");
   }
 }
 
