@@ -10450,3 +10450,39 @@ Proof before staging:
 - `npm --prefix tauri/ui run build`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
 - `git diff --check -- tauri/ui/src/wizard/step0-intro.ts tauri/ui/tests/wizard/step0-intro.spec.ts tauri/ui/src/mock-transfer/contract.ts .planning/handoffs/2026-05-31-package-checklist.md`
+
+## Package 82 - Live Coach Route Chain Telemetry
+
+Suggested commit: `fix(cohost): report live route chain telemetry`
+
+Include:
+
+- `src/vibemix/llm/route_chain.py`
+- `src/vibemix/agent/dj_cohost.py`
+- `tests/llm/test_route_chain.py`
+- `tests/agent/test_dj_cohost.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Automatic provider switching, prompt rewrites, OpenRouter client construction,
+  proxy auth changes, TTS voice routing, UI settings behavior, Viber tooling,
+  and new dependencies. This package only exposes the runtime live-coach route
+  chain and TTFT/proxy hedge state as telemetry; switch policy stays manual.
+
+Reason:
+
+- The live app can be in direct, proxy, or dormant OpenRouter-capable states,
+  and proxy 503s already silence safely. Add a small read-only route-chain
+  descriptor so `llm_invoke`, `proxy_unavailable`, and `connection_error`
+  events explain the active route, TTFT pressure, and whether a provider hedge
+  requires Kaan/operator decision, without changing dispatch.
+
+Proof before staging:
+
+- `uv run pytest -q tests/llm/test_route_chain.py tests/runtime/test_ttft.py tests/agent/test_dj_cohost.py::test_llm_node_direct_mode_5xx_surfaces_connection_error tests/agent/test_dj_cohost.py::test_llm_node_proxy_mode_503_marks_proxy_unavailable_without_speech tests/agent/test_dj_cohost.py::test_llm_invoke_logs_route_chain_with_manual_ttft_hedge`
+- `uv run pytest -q tests/integration/test_proxy_fallback.py tests/agent/test_proxy_client.py tests/agent/test_llm_factory.py`
+- `uv run pytest -q tests/agent/test_dj_cohost.py`
+- `uv run ruff check src/vibemix/llm/route_chain.py src/vibemix/agent/dj_cohost.py tests/llm/test_route_chain.py tests/agent/test_dj_cohost.py`
+- `uv run python -m compileall -q src/vibemix/llm/route_chain.py src/vibemix/agent/dj_cohost.py tests/llm/test_route_chain.py tests/agent/test_dj_cohost.py`
+- `git diff --check -- src/vibemix/llm/route_chain.py src/vibemix/agent/dj_cohost.py tests/llm/test_route_chain.py tests/agent/test_dj_cohost.py .planning/handoffs/2026-05-31-package-checklist.md`

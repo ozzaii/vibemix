@@ -77,6 +77,7 @@ from vibemix.audio import (
 )
 from vibemix.coach import CitationLinter, StrippedRateTracker
 from vibemix.library.budget import get_session_meter
+from vibemix.llm.route_chain import LiveCoachRouteChain, resolve_live_coach_chain
 from vibemix.llm.thinking_gate import validate_live_config
 from vibemix.prompts import build_parts_description, build_system_instruction, filter_for_slop
 from vibemix.runtime.ai_observability import (
@@ -1789,6 +1790,36 @@ class DJCoHostAgent(Agent):
         except Exception:
             pass
 
+    def _live_coach_route_chain(self) -> LiveCoachRouteChain:
+        """Return the current brain route chain for telemetry only.
+
+        This is intentionally non-dispatching. Slow TTFT or proxy outage may
+        produce an ``operator_decision_required`` hedge signal, but provider
+        switching stays a user/runtime setting decision.
+        """
+        ttft_ms: float | None = None
+        if self._ttft_meter is not None:
+            try:
+                raw_ttft_ms = self._ttft_meter.rolling_avg_ms()
+                if isinstance(raw_ttft_ms, (int, float)):
+                    ttft_ms = float(raw_ttft_ms)
+            except Exception:
+                ttft_ms = None
+        active_provider = "openrouter" if self._or_client is not None else "gemini"
+        active_model = self._or_model if self._or_client is not None else LLM_MODEL
+        openrouter_configured = self._or_client is not None or bool(
+            os.environ.get("OPENROUTER_API_KEY")
+        )
+        return resolve_live_coach_chain(
+            active_provider=active_provider,
+            active_model=active_model,
+            llm_mode="proxy" if self._proxy_base_url is not None else "direct",
+            proxy_configured=self._proxy_base_url is not None,
+            proxy_unavailable=self._proxy_unavailable,
+            openrouter_configured=openrouter_configured,
+            ttft_ms=ttft_ms,
+        )
+
     def _maybe_emit_proxy_unavailable(self, reason: str) -> None:
         """Arm the proxy-unavailable fallback flag + emit the one-shot
         "Co-host unavailable this session" transcript line (Plan 69-03 / OSS-02).
@@ -1814,7 +1845,12 @@ class DJCoHostAgent(Agent):
             self._proxy_unavailable_message_emitted = True
             self._push_transcript("Co-host unavailable this session")
             try:
-                self._recorder.log_event("proxy_unavailable", reason=reason, path="live_coach")
+                self._recorder.log_event(
+                    "proxy_unavailable",
+                    reason=reason,
+                    path="live_coach",
+                    **self._live_coach_route_chain().event_fields(),
+                )
             except Exception:
                 pass
 
@@ -1841,7 +1877,11 @@ class DJCoHostAgent(Agent):
             self._proxy_recovery_message_emitted = True
             self._push_transcript("Co-host back online")
             try:
-                self._recorder.log_event("proxy_recovered", path="live_coach")
+                self._recorder.log_event(
+                    "proxy_recovered",
+                    path="live_coach",
+                    **self._live_coach_route_chain().event_fields(),
+                )
             except Exception:
                 pass
 
@@ -1908,6 +1948,7 @@ class DJCoHostAgent(Agent):
                 # str() is the safer surface and we've already classified.
                 detail=msg[:300],
                 path="live_coach",
+                **self._live_coach_route_chain().event_fields(),
             )
         except Exception:
             pass
@@ -2846,6 +2887,7 @@ class DJCoHostAgent(Agent):
 
             ai_provider = "openrouter" if self._or_client is not None else "gemini"
             ai_model = self._or_model if self._or_client is not None else LLM_MODEL
+            route_chain = self._live_coach_route_chain()
             manual_no_evidence_skip = _should_skip_manual_no_evidence_llm(
                 ev_tag,
                 live_claim_state,
@@ -2897,6 +2939,7 @@ class DJCoHostAgent(Agent):
                     "head_yielded": False,
                     "pre_llm_short_circuit": True,
                     "avoided_audio_tokens_est": audio_tokens_est,
+                    **route_chain.event_fields(),
                 }
                 try:
                     response_path.write_text("")
@@ -3009,6 +3052,7 @@ class DJCoHostAgent(Agent):
                 cache_state=cache_state,
                 provider=ai_provider,
                 model=ai_model,
+                **route_chain.event_fields(),
                 prompt=text_prompt,
                 invoke_dir=str(invoke_dir),
             )

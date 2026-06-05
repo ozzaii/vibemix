@@ -1359,10 +1359,14 @@ def test_llm_node_11_exception_does_not_propagate(mocker, tmp_path) -> None:
     assert "boom" in meta["llm_error"]
 
 
-def test_llm_node_direct_mode_5xx_surfaces_connection_error(mocker, tmp_path) -> None:
+def test_llm_node_direct_mode_5xx_surfaces_connection_error(
+    mocker, tmp_path, monkeypatch
+) -> None:
     """Direct-mode transient LLM outages must not vanish as LISTENING silence."""
     from tests.integration.test_proxy_fallback import _make_5xx_exc
 
+    monkeypatch.setenv("VIBEMIX_LLM_MODE", "direct")
+    monkeypatch.delenv("VIBEMIX_PROXY_BASE_URL", raising=False)
     transcript_sink: collections.deque[str] = collections.deque()
     agent, gen_client, recorder, state = _build_agent(
         mocker,
@@ -1384,6 +1388,9 @@ def test_llm_node_direct_mode_5xx_surfaces_connection_error(mocker, tmp_path) ->
     conn_events = [fields for kind, fields in recorder.events if kind == "connection_error"]
     assert len(conn_events) == 1
     assert conn_events[0]["path"] == "live_coach"
+    assert conn_events[0]["route_active"] == "direct"
+    assert conn_events[0]["route_hedge_action"] == "observe"
+    assert conn_events[0]["route_switch_policy"] == "manual_only"
     assert any("can't reach Gemini" in line for line in transcript_sink)
     assert not any(kind == "ai_text" for kind, _fields in recorder.events)
 
@@ -1421,6 +1428,13 @@ def test_llm_node_proxy_mode_503_marks_proxy_unavailable_without_speech(
     assert len(proxy_events) == 1
     assert proxy_events[0]["reason"] == "5xx"
     assert proxy_events[0]["path"] == "live_coach"
+    assert proxy_events[0]["route_active"] == "proxy"
+    assert proxy_events[0]["route_hedge_action"] == "operator_decision_required"
+    assert proxy_events[0]["route_hedge_reason"] == "proxy_unavailable"
+    assert proxy_events[0]["route_switch_policy"] == "manual_only"
+    assert proxy_events[0]["route_chain"][0]["route"] == "proxy"
+    assert proxy_events[0]["route_chain"][0]["active"] is True
+    assert proxy_events[0]["route_chain"][0]["available"] is False
 
     assert not any(kind == "ai_text" for kind, _fields in recorder.events)
     assert not any(kind == "connection_error" for kind, _fields in recorder.events)
@@ -2141,6 +2155,49 @@ def test_ttft_llm_node_records_first_chunk_on_first_non_empty(mocker, tmp_path) 
 
     # Exactly one record_first_chunk call (on "hello" — the first non-empty).
     meter.record_first_chunk.assert_called_once()
+
+
+def test_llm_invoke_logs_route_chain_with_manual_ttft_hedge(
+    mocker, tmp_path, monkeypatch
+) -> None:
+    """High TTFT plus an OpenRouter key is telemetry, not an auto-switch."""
+
+    class _SlowMeter:
+        def record_event_fired(self) -> None:
+            pass
+
+        def record_first_chunk(self) -> None:
+            pass
+
+        def rolling_avg_ms(self) -> float:
+            return 2400.0
+
+    monkeypatch.setenv("VIBEMIX_LLM_MODE", "direct")
+    monkeypatch.setenv("OPENROUTER_API_KEY", "present-for-route-test")
+    agent, gen_client, recorder, state = _build_agent(
+        mocker,
+        tmp_path,
+        ttft_meter=_SlowMeter(),
+    )
+    mocker.patch("vibemix.agent.dj_cohost.snapshot_wav", return_value=b"FAKEWAV")
+    mocker.patch.object(AICoach, "build_prompt", return_value="EVIDENCE: x")
+    gen_client.aio.models.generate_content_stream = mocker.AsyncMock(
+        return_value=_async_iter(["tight", " cue"])
+    )
+
+    agent.set_next_event(Event(type="HEARTBEAT", state=state, extra={}))
+    _drive_llm_node(agent)
+
+    invoke = next(fields for kind, fields in recorder.events if kind == "llm_invoke")
+    assert invoke["route_active"] == "direct"
+    assert invoke["route_ttft_ms"] == 2400.0
+    assert invoke["route_hedge_action"] == "operator_decision_required"
+    assert invoke["route_hedge_reason"] == "ttft_over_budget_openrouter_configured"
+    assert invoke["route_switch_policy"] == "manual_only"
+    assert any(
+        candidate["route"] == "openrouter" and candidate["active"] is False
+        for candidate in invoke["route_chain"]
+    )
 
 
 # ---------- Phase 66 review WR-04 regression — set_s_at_event threading ----------
