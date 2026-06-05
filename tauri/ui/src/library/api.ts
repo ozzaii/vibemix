@@ -95,14 +95,6 @@ export interface LibraryStats {
   failed: number;
 }
 
-export interface LibraryImportAction {
-  type: "ipc.library.import";
-  payload: {
-    path: string;
-    schema_version: "1";
-  };
-}
-
 export interface LibrarySetupCandidate {
   kind: string;
   path: string;
@@ -110,7 +102,6 @@ export interface LibrarySetupCandidate {
   reason?: string;
   command?: string;
   audio_files_seen?: number;
-  import_action?: LibraryImportAction;
 }
 
 export type LibraryModelInstallTarget =
@@ -2084,33 +2075,12 @@ export function normalizeChatResult(value: unknown): LibraryChatResult {
   return result;
 }
 
-function normalizeLibraryImportAction(
-  value: unknown,
-  label: string,
-): LibraryImportAction | undefined {
-  if (value === undefined || value === null) return undefined;
-  const action = asRecord(value, label);
-  if (action.type !== "ipc.library.import") return undefined;
-  const payload = asRecord(action.payload, `${label}.payload`);
-  const path = stringOrNull(payload.path);
-  if (!path) return undefined;
-  const version =
-    payload.schema_version === undefined || payload.schema_version === null
-      ? "1"
-      : asString(payload.schema_version, `${label}.payload.schema_version`);
-  if (version !== "1") return undefined;
-  return {
-    type: "ipc.library.import",
-    payload: { path, schema_version: "1" },
-  };
-}
-
 function normalizeLibrarySetupCandidate(
   value: unknown,
   label: string,
 ): LibrarySetupCandidate {
   const row = asRecord(value, label);
-  const candidate: LibrarySetupCandidate = {
+  return {
     kind: asString(row.kind, `${label}.kind`),
     path: asString(row.path, `${label}.path`),
     confidence: optionalString(row, "confidence"),
@@ -2118,12 +2088,6 @@ function normalizeLibrarySetupCandidate(
     command: optionalString(row, "command"),
     audio_files_seen: optionalNumber(row, "audio_files_seen"),
   };
-  const importAction = normalizeLibraryImportAction(
-    row.import_action,
-    `${label}.import_action`,
-  );
-  if (importAction) candidate.import_action = importAction;
-  return candidate;
 }
 
 function normalizeLibrarySetupCandidates(

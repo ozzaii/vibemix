@@ -53,7 +53,6 @@ import {
   type LibraryChatToolTrace,
   type LibraryChatTurn,
   type LibraryCueResult,
-  type LibraryImportAction,
   type LibraryLiveDeck,
   type LibraryLiveContext,
   type LibraryLiveEvidence,
@@ -67,7 +66,6 @@ import {
   type LibraryStats,
   type SearchResult,
 } from "./api.js";
-import { emitIpc } from "../ipc/client.js";
 import { renderScope } from "./scope.js";
 import {
   echoText,
@@ -1870,15 +1868,14 @@ function bestLibrarySetupCandidate(
   stats: LibraryStats | null,
 ): LibrarySetupCandidate | null {
   return (
-    stats?.library_setup_candidates?.find(
-      (candidate) => candidate.import_action?.type === "ipc.library.import",
-    ) ?? null
+    stats?.library_setup_candidates?.find((candidate) => candidate.kind === "music_folder") ??
+    null
   );
 }
 
 function chatLibrarySetupCard(stats: LibraryStats | null): HTMLElement | null {
   const candidate = bestLibrarySetupCandidate(stats);
-  if (!candidate?.import_action) return null;
+  if (!candidate) return null;
 
   const card = document.createElement("div");
   card.className = "vmx-lib-chat-card vmx-lib-chat-card--setup";
@@ -1908,10 +1905,9 @@ function chatLibrarySetupCard(stats: LibraryStats | null): HTMLElement | null {
   const button = document.createElement("button");
   button.type = "button";
   button.className = "vmx-lib-chat-action";
-  button.textContent =
-    candidate.kind === "music_folder" ? "Index folder" : "Import source";
+  button.textContent = "Index folder";
   button.addEventListener("click", () => {
-    void runLibrarySetupImport(candidate.import_action as LibraryImportAction, {
+    void runLibrarySetupImport(candidate, {
       button,
       status,
     });
@@ -1922,21 +1918,21 @@ function chatLibrarySetupCard(stats: LibraryStats | null): HTMLElement | null {
 }
 
 async function runLibrarySetupImport(
-  action: LibraryImportAction,
+  candidate: LibrarySetupCandidate,
   els: { button: HTMLButtonElement; status: HTMLElement },
 ): Promise<void> {
   els.button.disabled = true;
   els.status.textContent = "indexing queued";
   $("vmx-lib-scope-state").textContent = "indexing library";
   try {
-    await emitIpc(action.type, { ...action.payload });
+    await libraryEmbedFolder(candidate.path, "mean_excerpt");
     els.status.textContent = "indexing started";
   } catch (err) {
     els.button.disabled = false;
     els.status.textContent = "setup action unavailable";
     $("vmx-lib-scope-state").textContent = "setup unavailable";
     // eslint-disable-next-line no-console
-    console.warn("[library] setup import emit failed", err);
+    console.warn("[library] setup folder embed failed", err);
   }
 }
 

@@ -72,6 +72,8 @@ const modelsMock = vi.fn(
 );
 const emitIpcMock =
   vi.fn<(type: string, payload: Record<string, unknown>) => Promise<void>>();
+const embedFolderMock =
+  vi.fn<(path: string, strategy: "mean_excerpt" | "cue_anchored") => Promise<boolean>>();
 
 const STATS_READY: LibraryStats = {
   indexed: 12,
@@ -134,13 +136,6 @@ function statsWithSetupCandidate(): LibraryStats {
         confidence: "high",
         reason: "bounded scan saw 42 supported audio files",
         audio_files_seen: 42,
-        import_action: {
-          type: "ipc.library.import",
-          payload: {
-            path: "/Users/ozai/Music/PSYMIND",
-            schema_version: "1",
-          },
-        },
       },
     ],
   };
@@ -161,10 +156,6 @@ function statsWithEngineSetupCandidate(): LibraryStats {
         path,
         confidence: "high",
         reason: "standard Engine DJ Database2/m.db path exists",
-        import_action: {
-          type: "ipc.library.import",
-          payload: { path, schema_version: "1" },
-        },
       },
     ],
   };
@@ -416,7 +407,7 @@ function doMockApi(): void {
       libraryStats: () => statsMock(),
       libraryModels: (install?: LibraryModelInstallTarget) =>
         modelsMock(install),
-      libraryEmbedFolder: vi.fn(async () => false),
+      libraryEmbedFolder: embedFolderMock,
       onEmbedProgress: vi.fn(async () => () => {}),
       onEmbedDone: vi.fn(async () => () => {}),
       onModelProgress: vi.fn(async () => () => {}),
@@ -543,6 +534,8 @@ describe("chat - real runChat path", () => {
     modelsMock.mockResolvedValue(MODELS_READY);
     emitIpcMock.mockReset();
     emitIpcMock.mockResolvedValue(undefined);
+    embedFolderMock.mockReset();
+    embedFolderMock.mockResolvedValue(true);
     vi.resetModules();
     document.body.innerHTML = "";
   });
@@ -630,7 +623,7 @@ describe("chat - real runChat path", () => {
     expect(emitIpcMock).not.toHaveBeenCalled();
   });
 
-  it("labels Engine DJ setup candidates as importable databases", async () => {
+  it("does not surface catalog-database setup candidates as actionable", async () => {
     statsMock.mockResolvedValueOnce(statsWithEngineSetupCandidate());
 
     await mountChat();
@@ -638,17 +631,10 @@ describe("chat - real runChat path", () => {
     const setupCard = document.querySelector<HTMLElement>(
       '[data-wire="library.setup-candidate"]',
     );
-    expect(setupCard).not.toBeNull();
-    expect(setupCard?.textContent).toContain(
-      "Viber found a likely Engine DJ database.",
-    );
-    expect(setupCard?.textContent).toContain(
-      "/Users/ozai/Music/Engine Library/Database2/m.db",
-    );
-    expect(setupCard?.textContent).toContain("Import source");
+    expect(setupCard).toBeNull();
   });
 
-  it("sends the safe library import action only after the user clicks it", async () => {
+  it("starts the folder embed only after the user clicks it", async () => {
     statsMock.mockResolvedValueOnce(statsWithSetupCandidate());
 
     await mountChat();
@@ -660,11 +646,12 @@ describe("chat - real runChat path", () => {
     button?.click();
     for (let i = 0; i < 4; i++) await Promise.resolve();
 
-    expect(emitIpcMock).toHaveBeenCalledTimes(1);
-    expect(emitIpcMock).toHaveBeenCalledWith("ipc.library.import", {
-      path: "/Users/ozai/Music/PSYMIND",
-      schema_version: "1",
-    });
+    expect(embedFolderMock).toHaveBeenCalledTimes(1);
+    expect(embedFolderMock).toHaveBeenCalledWith(
+      "/Users/ozai/Music/PSYMIND",
+      "mean_excerpt",
+    );
+    expect(emitIpcMock).not.toHaveBeenCalled();
     expect(button?.disabled).toBe(true);
     expect(
       document.querySelector('[data-wire="library.setup-candidate"]')?.textContent,

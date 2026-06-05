@@ -1451,18 +1451,10 @@ describe("runtime response normalizers", () => {
             confidence: "high",
             reason: "bounded scan saw 42 supported audio files",
             audio_files_seen: 42,
-            import_action: {
-              type: "ipc.library.import",
-              payload: { path: "/Music/PSYMIND", schema_version: "1" },
-            },
           },
           {
             kind: "music_folder",
             path: "/Music/unsafe",
-            import_action: {
-              type: "ipc.settings.set",
-              payload: { path: "/Music/unsafe", schema_version: "1" },
-            },
           },
         ],
         spent_eur: 0.25,
@@ -1482,10 +1474,6 @@ describe("runtime response normalizers", () => {
           confidence: "high",
           reason: "bounded scan saw 42 supported audio files",
           audio_files_seen: 42,
-          import_action: {
-            type: "ipc.library.import",
-            payload: { path: "/Music/PSYMIND", schema_version: "1" },
-          },
         },
         {
           kind: "music_folder",

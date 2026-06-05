@@ -1195,11 +1195,7 @@ function renderDrawerBody(body: HTMLElement, modalSlot: HTMLElement): void {
           });
           return;
         }
-        if (libraryPanelHandle) {
-          await libraryPanelHandle.beginImport(path);
-          return;
-        }
-        await emitIpc("ipc.library.import", { path, schema_version: "1" });
+        if (libraryPanelHandle) await libraryPanelHandle.beginImport(path);
       },
     });
   }

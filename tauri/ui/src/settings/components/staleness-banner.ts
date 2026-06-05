@@ -10,7 +10,6 @@
  *                                           schema_version }
  *   outbound: ipc.library.staleness_action { action: "dismiss" | "snooze_7d"
  *                                            | "reindex_folder", schema_version }
- *   outbound: ipc.library.import { path, schema_version } when the stale source is refreshable
  *
  * Visual direction follows project_visual_direction_cdj_whisper:
  *   - amber-2 background tint, amber-3 1px border-bottom
@@ -40,7 +39,7 @@ export function renderStalenessBanner(
   root.innerHTML = `
     <span class="vmx-staleness-text">
       Library is <em class="vmx-staleness-age">…</em> old.
-      <span class="vmx-staleness-copy">Re-import to keep me grounded.</span>
+      <span class="vmx-staleness-copy">Re-index to keep me grounded.</span>
     </span>
     <div class="vmx-staleness-actions">
       <button type="button" class="vmx-staleness-refresh hidden">Refresh library</button>
@@ -76,36 +75,37 @@ export function renderStalenessBanner(
     reason: string | null,
   ): void => {
     refreshPath = sourcePath;
-    refreshKind = sourceKind === "folder" ? "folder" : sourcePath ? "xml" : null;
+    refreshKind = sourceKind === "folder" ? "folder" : null;
     const discoveredButNotIndexed = reason === "source_detected_not_indexed";
     const folderRefresh = refreshKind === "folder";
     ageEl.textContent = discoveredButNotIndexed
       ? "source found"
       : `${ageDays} day${ageDays === 1 ? "" : "s"}`;
     copyEl.textContent = discoveredButNotIndexed
-      ? "Import it so Viber can use your tracks."
+      ? "Index it so Viber can use your tracks."
       : folderRefresh
         ? "Re-index this folder so Viber uses your latest tracks."
         : sourcePath
-          ? "Refresh to keep Viber grounded."
-          : "Drop the Rekordbox XML or import a folder below.";
+          ? "Choose a music folder below so Viber can listen locally."
+          : "Drop a music folder below.";
     refreshBtn.textContent = discoveredButNotIndexed
-      ? "Import library"
-      : folderRefresh
-        ? "Re-index folder"
-        : "Refresh library";
-    refreshBtn.classList.toggle("hidden", !sourcePath);
-    refreshBtn.disabled = !sourcePath;
+      ? "Index folder"
+      : "Re-index folder";
+    refreshBtn.classList.toggle("hidden", !folderRefresh || !sourcePath);
+    refreshBtn.disabled = !folderRefresh || !sourcePath;
     root.classList.remove("hidden");
   };
 
   refreshBtn.addEventListener("click", () => {
     if (disposed || !refreshPath) return;
     const path = refreshPath;
-    const kind = refreshKind || "xml";
+    const kind = refreshKind;
     refreshBtn.disabled = true;
     void (async () => {
       try {
+        if (!kind) {
+          return;
+        }
         if (opts.onRefresh) {
           await opts.onRefresh(path, kind);
         } else if (kind === "folder") {
@@ -113,8 +113,6 @@ export function renderStalenessBanner(
             action: "reindex_folder",
             schema_version: "1",
           });
-        } else {
-          await emitIpc("ipc.library.import", { path, schema_version: "1" });
         }
         if (!disposed) hide();
       } catch {

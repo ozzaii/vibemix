@@ -72,9 +72,8 @@ function librarySetupCandidateLabel(kind: string): string {
 
 function bestLibrarySetupCandidate(stats: LibraryStats | null): LibrarySetupCandidate | null {
   return (
-    stats?.library_setup_candidates?.find(
-      (candidate) => candidate.import_action?.type === "ipc.library.import",
-    ) ?? null
+    stats?.library_setup_candidates?.find((candidate) => candidate.kind === "music_folder") ??
+    null
   );
 }
 

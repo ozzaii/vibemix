@@ -98,13 +98,6 @@ describe("library freshness badge", () => {
               kind: "music_folder",
               path: "/Users/ozai/Downloads/Music",
               reason: "187 audio files",
-              import_action: {
-                type: "ipc.library.import",
-                payload: {
-                  path: "/Users/ozai/Downloads/Music",
-                  schema_version: "1",
-                },
-              },
             },
           ],
         }),
@@ -118,13 +111,11 @@ describe("library freshness badge", () => {
     expect(handle.element.title).toContain("/Users/ozai/Downloads/Music");
   });
 
-  it("can route first-run users from the shell badge into Crate setup", async () => {
+  it("does not surface catalog-only dead import candidates as setup", async () => {
     const footer = document.createElement("footer");
-    const onOpenCrate = vi.fn();
     const handle = mountLibraryFreshnessBadge(footer, {
       autoload: false,
       pollMs: null,
-      onOpenCrate,
       getStats: async () =>
         stats({
           library_freshness: {
@@ -138,24 +129,15 @@ describe("library freshness badge", () => {
             {
               kind: "rekordbox_xml",
               path: "/Users/ozai/Library/Pioneer/rekordbox.xml",
-              import_action: {
-                type: "ipc.library.import",
-                payload: {
-                  path: "/Users/ozai/Library/Pioneer/rekordbox.xml",
-                  schema_version: "1",
-                },
-              },
             },
           ],
         }),
     });
 
     await handle.refresh();
-    handle.element.click();
 
-    expect(handle.element.tagName).toBe("BUTTON");
-    expect(handle.element.textContent).toBe("import library");
-    expect(onOpenCrate).toHaveBeenCalledOnce();
+    expect(handle.element.dataset.state).toBe("empty");
+    expect(handle.element.textContent).toBe("library not indexed");
     handle.teardown();
   });
 

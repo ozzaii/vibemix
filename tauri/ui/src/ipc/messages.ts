@@ -54,9 +54,6 @@ export type VibemixIPCMessages =
   | DebriefCitationTooltipReq
   | DebriefCitationTooltip
   | DebriefError
-  | LibraryImport
-  | LibraryImportProgress
-  | LibraryImportCancel
   | LibraryStalenessNudge
   | LibraryStalenessAction
   | ProfileSetConsent
@@ -640,33 +637,6 @@ export interface DebriefError {
       | "port_in_use"
       | "unknown_kind";
     message: string;
-  };
-}
-export interface LibraryImport {
-  type: "ipc.library.import";
-  ts: string;
-  payload: {
-    path: string;
-    schema_version: "1";
-  };
-}
-export interface LibraryImportProgress {
-  type: "ipc.library.import_progress";
-  ts: string;
-  payload: {
-    total: number;
-    done: number;
-    current_track_name: string;
-    cache_hits: number;
-    cancelled: boolean;
-    schema_version: "1";
-  };
-}
-export interface LibraryImportCancel {
-  type: "ipc.library.import_cancel";
-  ts: string;
-  payload: {
-    schema_version: "1";
   };
 }
 export interface LibraryStalenessNudge {
