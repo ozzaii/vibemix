@@ -1707,6 +1707,9 @@ async def main() -> None:
             and not active_task.done()
         )
 
+    def _is_brain_configured() -> bool:
+        return brain_unavailable_reason is None
+
     async def _activate_session(
         run_stop_event: asyncio.Event,
         started_event: asyncio.Event,
@@ -2255,7 +2258,7 @@ async def main() -> None:
             midi_mirror=midi_mirror,
             audio_capture_context=audio_capture_context,
             voice_muted=_DynamicBool(lambda: live_voice_muted),  # type: ignore[arg-type]
-            brain_available=_DynamicBool(_is_live_session_active),  # type: ignore[arg-type]
+            brain_available=_DynamicBool(_is_brain_configured),  # type: ignore[arg-type]
         )
 
     ws_task = asyncio.create_task(_run_ws_broadcast_supervised(_ws_broadcast_once, stop_event, tracer))

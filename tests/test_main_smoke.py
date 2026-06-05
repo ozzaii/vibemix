@@ -821,7 +821,7 @@ def test_smoke_03b_idle_is_cold_until_start(monkeypatch, mocker, tmp_path):
     monkeypatch.setenv("VIBEMIX_ENABLE_MIC", "1")
 
     audio_mocks = _build_audio_mocks(mocker)
-    sensor_mocks = _build_sensor_mocks(mocker)
+    _build_sensor_mocks(mocker)
     _build_state_refresh_noop(mocker)
     livekit_mocks = _build_livekit_mocks(mocker)
     _patch_voice_recorder(mocker, tmp_path)
@@ -1071,6 +1071,17 @@ def test_close_tts_chain_closes_nested_providers_once() -> None:
     assert parent.closed == 1
     assert child.closed == 1
     assert session.close_count == 1
+
+
+def test_status_tick_brain_badge_uses_brain_config_not_session_activity() -> None:
+    """The AI badge must not read as down just because Start has not run yet."""
+
+    src = Path("src/vibemix/__main__.py").read_text(encoding="utf-8")
+
+    assert "def _is_brain_configured() -> bool:" in src
+    assert "return brain_unavailable_reason is None" in src
+    assert "brain_available=_DynamicBool(_is_brain_configured)" in src
+    assert "brain_available=_DynamicBool(_is_live_session_active)" not in src
 
 
 # ---------------------------------------------------------------------------
