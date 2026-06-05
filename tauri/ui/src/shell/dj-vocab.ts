@@ -2,8 +2,7 @@
 //
 // The engine keeps its internal words (grounded, CLAP, sidecar, the ML model
 // ids); the UI prints only the DJ-facing phrases below. This generalizes the
-// proven pattern in session/components/cohost.ts::footLabelFor, so the deck
-// top-strip and the foot label can never drift to two different words for the
+// deck status language, so the shell and live deck never drift to two words for the
 // same concept. New user-visible copy should reach for these instead of
 // inventing a fresh synonym.
 //

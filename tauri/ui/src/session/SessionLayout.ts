@@ -32,7 +32,7 @@
 
 import { registerStyle } from "./components/_style-registry.js";
 import { renderTitlebar, setTitlebarClock, setTitlebarPill, type PillLevel } from "./components/titlebar.js";
-import { GROUNDING_FAILURE_MS, type CohostStatus, type ReactionsByTs, type TranscriptLine } from "./components/cohost.js";
+import { GROUNDING_FAILURE_MS, type CohostStatus, type ReactionsByTs, type TranscriptLine } from "./cohost-model.js";
 import { renderDropChip } from "./components/drop-chip.js";
 import type { CitationChip } from "./components/citation-strip.js";
 import { type PhaseChunk } from "./components/phase-tape.js";

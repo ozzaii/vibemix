@@ -7,8 +7,6 @@
  *   - Settings gear has aria-label + title with shortcut hint.
  *   - Status-bar badges (livekit/gemini/midi/screen) each have a title
  *     attribute describing their state.
- *   - Cohost status row has title + aria-label per state.
- *   - Cohost foot has title narrating grounded / warming / failed.
  *   - First-session hint chip mounts when localStorage flag is unset
  *     and dismisses after the auto-dismiss timeout.
  *   - Hint chip dismisses on `?` keypress.
@@ -16,7 +14,6 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { renderCohostPanel } from "../../src/session/components/cohost.js";
 import { renderStatusBar } from "../../src/session/components/status-bar.js";
 import {
   renderTitlebar,
@@ -114,52 +111,6 @@ describe("Status bar tooltips (H6)", () => {
     expect(midi?.getAttribute("title")).toContain("Controller");
     expect(screen?.getAttribute("title")).toContain("Screen capture");
     expect(screen?.getAttribute("title")).toContain("denied");
-  });
-});
-
-describe("Cohost tooltips (H6)", () => {
-  it("status row has title + aria-label per state", () => {
-    const panel = renderCohostPanel({
-      status: "TALKING",
-      transcript: [],
-      latencyMs: null,
-      grounded: true,
-    });
-    host().append(panel);
-    const status = panel.querySelector<HTMLElement>(".vmx-cohost__status");
-    expect(status?.getAttribute("title")).toContain("talking");
-    expect(status?.getAttribute("aria-label")).toBe(
-      status?.getAttribute("title"),
-    );
-  });
-
-  it("foot has title narrating listening state", () => {
-    // 2026-05-19 /impeccable critique fix: "GROUNDED ON AUDIO + SCREEN"
-    // (Bravoh-internal anti-hallucination jargon) renamed to a phrase
-    // a DJ would use. Tooltip now narrates the listening/watching
-    // behaviour without the "grounded" engineer-speak.
-    const grounded = renderCohostPanel({
-      status: "LISTENING",
-      transcript: [],
-      latencyMs: null,
-      grounded: true,
-    });
-    host().append(grounded);
-    const foot = grounded.querySelector<HTMLElement>(".vmx-cohost__foot");
-    expect(foot?.getAttribute("title")).toContain("listening");
-    expect(foot?.getAttribute("title")).toContain("watching");
-  });
-
-  it("foot has title narrating tuning-in state", () => {
-    const warming = renderCohostPanel({
-      status: "IDLE",
-      transcript: [],
-      latencyMs: null,
-      grounded: false,
-    });
-    host().append(warming);
-    const foot = warming.querySelector<HTMLElement>(".vmx-cohost__foot");
-    expect(foot?.getAttribute("title")).toContain("tuning in");
   });
 });
 

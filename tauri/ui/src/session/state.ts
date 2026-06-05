@@ -21,7 +21,7 @@
 
 import type { PhaseChunk } from "./components/phase-tape.js";
 import type { MidiEvent } from "./components/event-ribbon.js";
-import type { TranscriptLine, CohostStatus } from "./components/cohost.js";
+import type { TranscriptLine, CohostStatus } from "./cohost-model.js";
 import type { CitationChip } from "./components/citation-strip.js";
 
 export interface LevelPair {

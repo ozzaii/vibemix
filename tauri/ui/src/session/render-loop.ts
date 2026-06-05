@@ -28,7 +28,7 @@ import type {
   SessionState as BridgeSessionState,
 } from "./state.js";
 import { sendMute } from "./ws-bridge.js";
-import type { ReactionsByTs } from "./components/cohost.js";
+import type { ReactionsByTs } from "./cohost-model.js";
 import type { CitationChip } from "./components/citation-strip.js";
 
 let rafHandle: number | null = null;
@@ -211,7 +211,7 @@ function cohostChipClickHandler(chip: CitationChip): void {
 }
 
 /** Phase 44-03 / LAUNCH-02 — project the bridge's append-only reactions
- *  ring onto the ReactionsByTs map shape that the cohost panel expects.
+ *  ring onto the ReactionsByTs map shape that SessionLayout expects.
  *  O(N) over the ring (capped at 200), called once per render tick.
  *  Returns the SHARED empty map when no reactions exist so the cohost
  *  panel's diff path can ref-compare.

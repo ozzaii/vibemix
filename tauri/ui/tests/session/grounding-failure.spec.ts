@@ -2,20 +2,11 @@
  * recovery").
  *
  * Pins:
- *   - Default render shows "TUNING IN" when grounded=false, no retry.
- *   - After GROUNDING_FAILURE_MS elapse (failureElapsedMs >= 5000), the
- *     foot swaps to "AI SERVICE OFFLINE" + retry button.
- *   - Grounded=true clears the failure state regardless of elapsed.
- *   - Clicking retry invokes the onRetry handler.
  *   - SessionLayout's diff path crosses the 5s threshold automatically. */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import {
-  GROUNDING_FAILURE_MS,
-  renderCohostPanel,
-  setCohost,
-} from "../../src/session/components/cohost.js";
+import { GROUNDING_FAILURE_MS } from "../../src/session/cohost-model.js";
 import {
   defaultState,
   mountSessionLayout,
@@ -35,129 +26,6 @@ beforeEach(() => {
 afterEach(() => {
   document.body.replaceChildren();
   vi.useRealTimers();
-});
-
-describe("Cohost grounding-failure recovery (H9)", () => {
-  it("grounded=false + elapsed < 5s → shows TUNING IN, no retry", () => {
-    const panel = renderCohostPanel({
-      status: "IDLE",
-      transcript: [],
-      latencyMs: null,
-      grounded: false,
-      failureElapsedMs: 1000,
-    });
-    host().append(panel);
-    const foot = panel.querySelector<HTMLElement>(".vmx-cohost__foot");
-    expect(foot?.dataset.failed).toBe("false");
-    expect(foot?.textContent).toContain("TUNING IN");
-    expect(panel.querySelector(".vmx-cohost__foot-retry")).toBeNull();
-  });
-
-  it("grounded=false + elapsed >= 5s → shows AI SERVICE OFFLINE + retry", () => {
-    const panel = renderCohostPanel({
-      status: "IDLE",
-      transcript: [],
-      latencyMs: null,
-      grounded: false,
-      failureElapsedMs: GROUNDING_FAILURE_MS,
-      onRetry: () => {},
-    });
-    host().append(panel);
-    const foot = panel.querySelector<HTMLElement>(".vmx-cohost__foot");
-    expect(foot?.dataset.failed).toBe("true");
-    expect(foot?.textContent).toContain("AI SERVICE OFFLINE");
-    const retry = panel.querySelector<HTMLElement>(".vmx-cohost__foot-retry");
-    expect(retry).toBeTruthy();
-    // 2026-05-26 /impeccable critique P3: label tells the truth — the
-    // button restarts the co-host (restart_sidecar), it isn't a
-    // lightweight reconnect.
-    expect(retry?.textContent).toContain("RESTART COHOST");
-  });
-
-  it("grounded=true clears the failure state regardless of elapsed", () => {
-    const panel = renderCohostPanel({
-      status: "LISTENING",
-      transcript: [],
-      latencyMs: null,
-      grounded: true,
-      failureElapsedMs: 99999,
-    });
-    host().append(panel);
-    const foot = panel.querySelector<HTMLElement>(".vmx-cohost__foot");
-    expect(foot?.dataset.grounded).toBe("true");
-    expect(foot?.dataset.failed).toBe("false");
-    expect(foot?.textContent).toContain("READING THE ROOM");
-    expect(panel.querySelector(".vmx-cohost__foot-retry")).toBeNull();
-  });
-
-  it("retry button invokes onRetry on click", () => {
-    let fired = 0;
-    const panel = renderCohostPanel({
-      status: "IDLE",
-      transcript: [],
-      latencyMs: null,
-      grounded: false,
-      failureElapsedMs: GROUNDING_FAILURE_MS,
-      onRetry: () => fired++,
-    });
-    host().append(panel);
-    const retry = panel.querySelector<HTMLButtonElement>(
-      ".vmx-cohost__foot-retry",
-    );
-    expect(retry).toBeTruthy();
-    retry!.click();
-    expect(fired).toBe(1);
-  });
-
-  it("setCohost mounts the retry button when crossing the 5s threshold", () => {
-    const panel = renderCohostPanel({
-      status: "IDLE",
-      transcript: [],
-      latencyMs: null,
-      grounded: false,
-      failureElapsedMs: 2000,
-    });
-    host().append(panel);
-    expect(panel.querySelector(".vmx-cohost__foot-retry")).toBeNull();
-
-    setCohost(panel, {
-      status: "IDLE",
-      transcript: [],
-      latencyMs: null,
-      grounded: false,
-      failureElapsedMs: GROUNDING_FAILURE_MS + 100,
-      onRetry: () => {},
-    });
-    expect(panel.querySelector(".vmx-cohost__foot-retry")).toBeTruthy();
-    expect(
-      panel.querySelector<HTMLElement>(".vmx-cohost__foot")?.dataset.failed,
-    ).toBe("true");
-  });
-
-  it("setCohost unmounts the retry on grounded flip to true", () => {
-    const panel = renderCohostPanel({
-      status: "IDLE",
-      transcript: [],
-      latencyMs: null,
-      grounded: false,
-      failureElapsedMs: GROUNDING_FAILURE_MS + 500,
-      onRetry: () => {},
-    });
-    host().append(panel);
-    expect(panel.querySelector(".vmx-cohost__foot-retry")).toBeTruthy();
-
-    setCohost(panel, {
-      status: "LISTENING",
-      transcript: [],
-      latencyMs: null,
-      grounded: true,
-      failureElapsedMs: null,
-    });
-    expect(panel.querySelector(".vmx-cohost__foot-retry")).toBeNull();
-    expect(
-      panel.querySelector<HTMLElement>(".vmx-cohost__foot")?.dataset.failed,
-    ).toBe("false");
-  });
 });
 
 describe("SessionLayout grounding-failure → fault state (H9)", () => {

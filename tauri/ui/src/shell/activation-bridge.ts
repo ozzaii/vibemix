@@ -16,7 +16,7 @@
 //     whether music is playing (idle is connected-but-quiet, never a fault;
 //     cardinal invariant #5).
 
-import type { CohostStatus } from "../session/components/cohost.js";
+import type { CohostStatus } from "../session/cohost-model.js";
 import { getSessionState } from "../session/state.js";
 import { listenTauri } from "../tauri-runtime.js";
 import type { ActivationState, ConnectionState, ShellStore } from "./shell-store.js";

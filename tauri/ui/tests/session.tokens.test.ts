@@ -74,20 +74,6 @@ describe("session surface tokens (wave 2)", () => {
     expect(containsLegacyToken(renderedHtmlPlusStyles(rendered))).toBe(false);
   });
 
-  it("CohostPanel renders without legacy token refs", async () => {
-    const { renderCohostPanel } = await import(
-      "../src/session/components/cohost.js"
-    );
-    const rendered = renderCohostPanel({
-      status: "LISTENING",
-      transcript: [],
-      latencyMs: null,
-      grounded: false,
-    });
-    document.body.append(rendered);
-    expect(containsLegacyToken(renderedHtmlPlusStyles(rendered))).toBe(false);
-  });
-
   it("DropChip renders without legacy token refs", async () => {
     const { renderDropChip } = await import(
       "../src/session/components/drop-chip.js"

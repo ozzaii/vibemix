@@ -6,7 +6,6 @@
  *   - PhaseTape: chunks order + flex weights + nowPct marker positioning
  *   - DropChip: bars=null → null; bars=8 → renders; bars=0 → renders w/ rec-flash
  *   - EventRibbon: 15 events → 12 rendered (oldest 3 trimmed)
- *   - Cohost: 200 lines → last 200 rendered; last has .now; lines 6-10 .faded
  *   - StatusBar: livekit=down → click opens tooltip with Recheck button
  *
  * Plus the cross-cutting grep guard the plan demands: assert each
@@ -19,7 +18,6 @@ import { renderMeter, setMeterLevels } from "../../src/session/components/meter.
 import { renderPhaseTape } from "../../src/session/components/phase-tape.js";
 import { renderDropChip } from "../../src/session/components/drop-chip.js";
 import { renderEventRibbon, type MidiEvent } from "../../src/session/components/event-ribbon.js";
-import { renderCohostPanel, type TranscriptLine } from "../../src/session/components/cohost.js";
 import { renderStatusBar } from "../../src/session/components/status-bar.js";
 import { renderTitlebar } from "../../src/session/components/titlebar.js";
 import { renderRocker } from "../../src/session/components/rocker.js";
@@ -218,220 +216,6 @@ describe("renderEventRibbon", () => {
     const ribbon = renderEventRibbon({ events: [] });
     host().append(ribbon);
     expect(ribbon.querySelectorAll(".vmx-event-chip")).toHaveLength(0);
-  });
-});
-
-// === Cohost transcript =======================================================
-
-describe("renderCohostPanel", () => {
-  it("caps live transcript to MAX_LIVE_TRANSCRIPT_LINES (3); last has .now tier, prior 2 are .faded", () => {
-    // 2026-05-19 /impeccable critique round 4 (Kaan: "OVERHAUL"): live
-    // transcript is now a glance surface, capped at 3 lines. Full
-    // 200-line history lives in the debrief window only — the cohost
-    // panel renders the latest reaction + 2 faded peers + a "see all"
-    // footer link. State ring still holds every line so the debrief
-    // receives everything.
-    const lines: TranscriptLine[] = Array.from({ length: 200 }, (_, i) => ({
-      role: "ai",
-      text: `line-${i}`,
-      ts: "00:00:00",
-    }));
-    const panel = renderCohostPanel({
-      status: "TALKING",
-      transcript: lines,
-      latencyMs: 820,
-      grounded: true,
-    });
-    host().append(panel);
-    const msgs = panel.querySelectorAll<HTMLElement>(".vmx-cohost__msg");
-    expect(msgs).toHaveLength(3);
-    const last = msgs[msgs.length - 1];
-    expect(last?.dataset.tier).toBe("now");
-    expect(msgs[0]?.dataset.tier).toBe("faded");
-    expect(msgs[1]?.dataset.tier).toBe("faded");
-    expect(last?.textContent).toContain("line-199");
-  });
-
-  it("caps live transcript to 3 lines regardless of input length", () => {
-    const lines: TranscriptLine[] = Array.from({ length: 250 }, (_, i) => ({
-      role: "ai",
-      text: `line-${i}`,
-      ts: "",
-    }));
-    const panel = renderCohostPanel({
-      status: "TALKING",
-      transcript: lines,
-      latencyMs: null,
-      grounded: false,
-    });
-    host().append(panel);
-    expect(
-      panel.querySelectorAll<HTMLElement>(".vmx-cohost__msg").length,
-    ).toBe(3);
-  });
-
-  it("renders the see-all footer link when transcript has reactions + handler is wired", () => {
-    const lines: TranscriptLine[] = Array.from({ length: 12 }, (_, i) => ({
-      role: "ai",
-      text: `line-${i}`,
-      ts: "00:00:00",
-    }));
-    let opened = 0;
-    const panel = renderCohostPanel({
-      status: "LISTENING",
-      transcript: lines,
-      latencyMs: null,
-      grounded: true,
-      onOpenAllReactions: () => {
-        opened++;
-      },
-    });
-    host().append(panel);
-    const seeAll = panel.querySelector<HTMLElement>(".vmx-cohost__see-all");
-    expect(seeAll).toBeTruthy();
-    expect(seeAll?.dataset.state).toBe("linked");
-    const link = panel.querySelector<HTMLButtonElement>(
-      ".vmx-cohost__see-all-link",
-    );
-    expect(link?.textContent).toContain("12 reactions");
-    link?.click();
-    expect(opened).toBe(1);
-  });
-
-  it("see-all footer renders the empty-state placeholder when N=0", () => {
-    // 2026-05-19 critique round 5 (Kaan: "unique fun young"): the
-    // affordance teaches itself during the quiet opening of a session.
-    // The footer line stays visible at silk-25 with placeholder copy
-    // so the user knows the debrief path exists before the first
-    // reaction lands.
-    const panel = renderCohostPanel({
-      status: "LISTENING",
-      transcript: [],
-      latencyMs: null,
-      grounded: true,
-      onOpenAllReactions: () => {},
-    });
-    host().append(panel);
-    const seeAll = panel.querySelector<HTMLElement>(".vmx-cohost__see-all");
-    expect(seeAll?.dataset.state).toBe("empty");
-    const placeholder = panel.querySelector<HTMLElement>(
-      ".vmx-cohost__see-all-empty",
-    );
-    expect(placeholder?.textContent).toContain("no reactions yet");
-    expect(placeholder?.textContent).toContain("debrief opens after the first one");
-    // No clickable link in empty state.
-    expect(
-      panel.querySelector<HTMLButtonElement>(".vmx-cohost__see-all-link"),
-    ).toBeNull();
-  });
-
-  it("see-all footer renders a link even when N is below the live cap (rail height stays stable)", () => {
-    // 2026-05-19 critique round 5 (Kaan: "unique fun young"): the
-    // link is always-on at N>=1 so the affordance is observable from
-    // the first reaction. Two reactions visible in the glance still
-    // get the debrief link because debrief carries audio quote +
-    // citation context the live surface drops.
-    const lines: TranscriptLine[] = Array.from({ length: 2 }, (_, i) => ({
-      role: "ai",
-      text: `line-${i}`,
-      ts: "",
-    }));
-    const panel = renderCohostPanel({
-      status: "LISTENING",
-      transcript: lines,
-      latencyMs: null,
-      grounded: true,
-      onOpenAllReactions: () => {},
-    });
-    host().append(panel);
-    const seeAll = panel.querySelector<HTMLElement>(".vmx-cohost__see-all");
-    expect(seeAll?.dataset.state).toBe("linked");
-    const link = panel.querySelector<HTMLButtonElement>(
-      ".vmx-cohost__see-all-link",
-    );
-    expect(link?.textContent).toContain("2 reactions");
-  });
-
-  it("see-all footer is hidden when no click handler is wired", () => {
-    const lines: TranscriptLine[] = Array.from({ length: 5 }, (_, i) => ({
-      role: "ai",
-      text: `line-${i}`,
-      ts: "",
-    }));
-    const panel = renderCohostPanel({
-      status: "LISTENING",
-      transcript: lines,
-      latencyMs: null,
-      grounded: true,
-      // onOpenAllReactions intentionally omitted.
-    });
-    host().append(panel);
-    const seeAll = panel.querySelector<HTMLElement>(".vmx-cohost__see-all");
-    expect(seeAll?.dataset.empty).toBe("true");
-    expect(seeAll?.style.visibility).toBe("hidden");
-  });
-
-  // Critique 2026-05-14: the foot now renders LED + label only — the
-  // amber tabular-mono latency readout was retired (anti-slop, real DJs
-  // don't read latency). Latency stays on the prop interface for a
-  // future Settings → Debug pane.
-  it("foot shows READING THE ROOM (LED + label only, no latency readout) when grounded=true", () => {
-    // 2026-05-19 /impeccable critique fix round 2: "GROUNDED ON AUDIO
-    // + SCREEN" was Bravoh-internal anti-hallucination jargon visible
-    // 99% of the live session. Renamed to a DJ-vocabulary phrase that
-    // signals "the cohost is paying attention" without the engineer
-    // language. The grounded boolean prop is unchanged.
-    const panel = renderCohostPanel({
-      status: "LISTENING",
-      transcript: [],
-      latencyMs: 820,
-      grounded: true,
-    });
-    host().append(panel);
-    const foot = panel.querySelector<HTMLElement>(".vmx-cohost__foot");
-    expect(foot?.dataset.grounded).toBe("true");
-    expect(foot?.querySelector(".vmx-cohost__foot-lbl")?.textContent).toBe(
-      "READING THE ROOM",
-    );
-    expect(foot?.querySelector(".vmx-cohost__foot-latency")).toBeNull();
-  });
-
-  it("foot shows TUNING IN when grounded=false", () => {
-    const panel = renderCohostPanel({
-      status: "IDLE",
-      transcript: [],
-      latencyMs: null,
-      grounded: false,
-    });
-    host().append(panel);
-    const foot = panel.querySelector<HTMLElement>(".vmx-cohost__foot");
-    expect(foot?.dataset.grounded).toBe("false");
-    expect(foot?.querySelector(".vmx-cohost__foot-lbl")?.textContent).toBe(
-      "TUNING IN",
-    );
-    expect(foot?.title).toBe("tuning in. checking the decks.");
-  });
-
-  // Phase 13-03 — the 42×42 mascot placeholder bubble was dropped from the
-  // transcript header (CONTEXT.md Open Q 2). This assertion pins the
-  // deletion so a future revert can't silently reintroduce the corner.
-  it("header has NO mascot placeholder bubble (Phase 13 drop)", () => {
-    const panel = renderCohostPanel({
-      status: "LISTENING",
-      transcript: [],
-      latencyMs: null,
-      grounded: true,
-    });
-    host().append(panel);
-    expect(panel.querySelector(".vmx-cohost__mascot")).toBeNull();
-    // The header still mounts and carries the status row (no name span;
-    // AVERY moniker dropped — cohost is name-less, vibemix-as-instrument).
-    const header = panel.querySelector<HTMLElement>(".vmx-cohost__header");
-    expect(header).toBeTruthy();
-    expect(panel.querySelector(".vmx-cohost__name")).toBeNull();
-    expect(
-      panel.querySelector<HTMLElement>(".vmx-cohost__status")?.dataset.state,
-    ).toBe("LISTENING");
   });
 });
 
@@ -1038,6 +822,38 @@ describe("SessionLayout", () => {
     expect(muted).toBe(1);
   });
 
+  it("reflects status.muted on the deck mute control", () => {
+    const root = host();
+    const state = defaultState();
+    state.status.muted = true;
+    mountSessionLayout(root, state);
+    const mute = root.querySelector<HTMLElement>('[data-action="mute"]');
+    expect(mute?.dataset.on).toBe("true");
+    expect(mute?.textContent).toBe("muted");
+  });
+
+  it("renderSessionFrame flips the deck mute control on status.muted change", () => {
+    const root = host();
+    const initial = defaultState();
+    const mounted = mountSessionLayout(root, initial);
+    const mute = root.querySelector<HTMLElement>('[data-action="mute"]');
+    expect(mute?.dataset.on).toBe("false");
+
+    renderSessionFrame(mounted, {
+      ...defaultState(),
+      status: { ...initial.status, muted: true },
+    });
+    expect(mute?.dataset.on).toBe("true");
+    expect(mute?.textContent).toBe("muted");
+
+    renderSessionFrame(mounted, {
+      ...defaultState(),
+      status: { ...initial.status, muted: false },
+    });
+    expect(mute?.dataset.on).toBe("false");
+    expect(mute?.textContent).toBe("mute");
+  });
+
   it("down status-row inputs call the latest rendered recheck handler", () => {
     const root = host();
     const mounted = mountSessionLayout(root, defaultState());
@@ -1151,7 +967,6 @@ describe("hex grep guard", () => {
     void renderPhaseTape({ chunks: [], nowPct: 0 });
     void renderDropChip({ bars: 4 });
     void renderEventRibbon({ events: [] });
-    void renderCohostPanel({ status: "IDLE", transcript: [], latencyMs: null, grounded: false });
     void renderStatusBar({
       livekit: "ok", gemini: "ok", midi: 1, screen: "ok",
       muted: false, hotkey: "⌘⇧M",
