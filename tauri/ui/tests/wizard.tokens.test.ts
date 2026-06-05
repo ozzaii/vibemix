@@ -96,4 +96,19 @@ describe("wizard surface tokens (wave 1)", () => {
     document.body.append(rendered);
     expect(containsLegacyToken(renderedHtmlPlusStyles(rendered))).toBe(false);
   });
+
+  it("StatusBar keeps wizard status focused on system readiness", async () => {
+    const { StatusBar } = await import("../src/wizard/components/status-bar.js");
+    const rendered = StatusBar({
+      livekit: "ok",
+      gemini: "ok",
+      midi: 1,
+      screen: "ok",
+    });
+
+    expect(rendered.textContent).toContain("livekit");
+    expect(rendered.textContent).toContain("midi 1");
+    expect(rendered.textContent).not.toContain("made by bravoh");
+    expect(rendered.querySelector(".cmp-status-bar__signature")).toBeNull();
+  });
 });

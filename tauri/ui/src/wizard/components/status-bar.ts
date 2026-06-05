@@ -1,7 +1,6 @@
 /* status-bar.ts — bottom 40px strip with 4 LED dots (UI-SPEC §12 / CDJ Whisper v5).
  *
  * Left-to-right: livekit · gemini · midi · screen.
- * Right: "made by bravoh" Saira body 11px --silk-40.
  *
  * LED states:
  *   - "ok"          → --led-ok green dome
@@ -27,7 +26,7 @@ const CSS = `
   .cmp-status-bar {
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    justify-content: flex-start;
     width: 100%;
     height: 100%;
   }
@@ -80,13 +79,6 @@ const CSS = `
   .cmp-status-bar__item[data-state="down"],
   .cmp-status-bar__item[data-state="denied"] {
     color: var(--led-fault);
-  }
-  .cmp-status-bar__signature {
-    font-family: var(--type-body);
-    font-variation-settings: "wdth" 100, "wght" 400;
-    font-size: 11px;
-    color: var(--silk-40);
-    letter-spacing: 0.06em;
   }
   @keyframes cmp-status-pulse {
     0%, 100% { opacity: 1; }
@@ -143,11 +135,7 @@ export function StatusBar(props: StatusBarProps): HTMLElement {
     group.append(el);
   }
 
-  const sig = document.createElement("span");
-  sig.className = "cmp-status-bar__signature";
-  sig.textContent = "made by bravoh";
-
-  root.append(group, sig);
+  root.append(group);
   return root;
 }
 
