@@ -154,7 +154,7 @@ export function renderDropChip(props: DropChipProps): HTMLElement | null {
 
   const lbl = document.createElement("span");
   lbl.className = "vmx-drop-chip__lbl";
-  lbl.textContent = "BARS TO DROP";
+  lbl.textContent = "DROP IN";
   root.append(lbl);
 
   // 4-beat pip row — visualizes the sync period as a Pioneer-style

@@ -646,9 +646,9 @@ const LAYOUT_CSS = `
   /* --- FOOT: one steady master readout (BPM · key · live level) --- */
   .vmx-deck__foot {
     display: grid;
-    grid-template-columns: minmax(96px, max-content) minmax(72px, max-content) minmax(160px, 1fr);
+    grid-template-columns: minmax(12ch, max-content) minmax(9ch, max-content) minmax(120px, 1fr);
     align-items: center;
-    gap: clamp(20px, 3vw, 48px);
+    gap: clamp(14px, 2.4vw, 40px);
     margin: 0 clamp(0px, 1.2vw, 18px);
     /* One steady master readout engraved into the void behind a SINGLE hairline,
      * the docstring's "single master strip" — not a third bordered+shadowed slab.
@@ -656,9 +656,9 @@ const LAYOUT_CSS = `
     padding: 12px 2px 2px;
     border-top: 1px solid var(--glass-edge);
   }
-  .vmx-read { display: flex; align-items: baseline; gap: var(--sp-2); min-width: 0; white-space: nowrap; }
-  .vmx-read[data-readout="bpm"] { min-width: 96px; }
-  .vmx-read[data-readout="key"] { min-width: 72px; }
+  .vmx-read { display: flex; align-items: baseline; gap: var(--sp-2); min-width: 0; overflow: visible; white-space: nowrap; }
+  .vmx-read[data-readout="bpm"] { min-width: 12ch; }
+  .vmx-read[data-readout="key"] { min-width: 9ch; }
   .vmx-read__lab {
     font-family: var(--type-display); font-variation-settings: 'wdth' 85, 'wght' 600;
     font-size: 9px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--silk-22);
@@ -669,13 +669,14 @@ const LAYOUT_CSS = `
    * size (impeccable layout pass, hierarchy fix). */
   .vmx-read__num {
     font-family: var(--type-mono); font-weight: 500; font-size: 20px; letter-spacing: 0.02em;
+    font-variant-numeric: tabular-nums;
     color: var(--silk); transition: color 700ms ease-out;
-    display: inline-block; min-width: 5ch;
+    display: inline-block; min-width: 6ch; overflow: visible;
   }
   .vmx-read__key {
     font-family: var(--type-mono); font-weight: 500; font-size: 20px; letter-spacing: 0.04em;
     color: var(--amber-pale); transition: color 700ms ease-out;
-    display: inline-block; min-width: 4ch;
+    display: inline-block; min-width: 5ch; overflow: visible;
   }
   .vmx-fmeter {
     position: relative; height: 14px; border-radius: var(--rad-sm);
@@ -870,7 +871,7 @@ const LAYOUT_CSS = `
       width: min(30ch, 100%);
     }
     .vmx-deck__foot {
-      grid-template-columns: auto auto;
+      grid-template-columns: max-content max-content;
       gap: var(--sp-4);
       margin: 0 0 var(--sp-4);
       padding: 10px 12px;
@@ -1430,43 +1431,20 @@ function idleReadinessLines(state: SessionState): { inputs: string; action: stri
   const audioActive = musicSignalActive(state.meters.music);
   const audioWaiting = state.status.livekit === "ok" && !audioActive;
   const controllerWaiting = state.status.midi === 0;
-  const audio = state.status.livekit === "ok"
-    ? audioActive
-      ? "audio hearing"
-      : "audio waiting"
-    : state.status.livekit === "connecting"
-      ? "audio connecting"
-      : "audio checking";
-  const ai = state.status.voice === "muted"
-    ? "voice muted"
-    : state.status.gemini === "ok"
-      ? "co-host ready"
-      : state.status.gemini === "down"
-        ? "co-host offline"
-        : "co-host checking";
-  const controller = state.status.midi != null && state.status.midi > 0
-    ? "controller seen"
-    : state.status.midi === 0 && state.status.midiActivity === "connected_no_midi_traffic"
-      ? `${midiDeviceLabel(state.status.midiDevice)} waiting`
-    : state.status.midi === 0 && state.status.midiActivity === "midi_traffic_unmapped"
-      ? `${midiDeviceLabel(state.status.midiDevice)} unmapped`
-    : state.status.midi === 0
-      ? "controller not proven"
-      : "controller checking";
-  const screen = state.status.screen === "ok"
-    ? "screen proof ready"
-    : state.status.screen === "denied"
-      ? "screen proof denied"
-      : state.status.screen === "unavailable"
-        ? "screen proof unavailable"
-        : "screen proof checking";
+  const notes: string[] = [];
+  if (state.status.livekit === "connecting") notes.push("Audio connecting.");
+  else if (state.status.livekit !== "ok") notes.push("Audio checking.");
+  if (state.status.voice === "muted") notes.push("Voice muted.");
+  else if (state.status.gemini === "down") notes.push("Co-host offline.");
+  else if (state.status.gemini !== "ok") notes.push("Co-host checking.");
+  if (state.status.screen === "denied") notes.push("Screen proof denied.");
   const action = audioWaiting
-    ? `${captureDeviceLabel(state.status.captureDevice)} silent · ${captureRouteInstruction(state.status.captureDevice)}`
+    ? captureRouteAction(state.status.captureDevice)
     : controllerWaiting
-      ? `${screen} · ${midiProofAction(state.status.midiActivity, state.status.midiDevice)}`
-      : `${screen} · Start playback, I will not guess.`;
+      ? midiProofAction(state.status.midiActivity, state.status.midiDevice)
+      : "";
   return {
-    inputs: `${audio} · ${ai} · ${controller}`,
+    inputs: notes.join(" "),
     action,
   };
 }
@@ -1492,6 +1470,12 @@ function captureRouteInstruction(captureDevice?: string | null): string {
     return "Send DJ app to a Multi-Output/Aggregate that includes BlackHole; speaker output alone is not proof.";
   }
   return "Route DJ output into capture.";
+}
+
+function captureRouteAction(captureDevice?: string | null): string {
+  const label = captureDeviceLabel(captureDevice);
+  const instruction = captureRouteInstruction(captureDevice);
+  return label === "capture" ? instruction : `${label}: ${instruction}`;
 }
 
 function isBlackHoleCaptureDevice(device: string): boolean {
@@ -1533,13 +1517,13 @@ function midiProofAction(
 ): string {
   const device = midiDeviceLabel(midiDevice);
   if (midiActivity === "connected_no_midi_traffic") {
-    return `${device} waiting · Move mixer/deck control.`;
+    return `${device}: Move mixer/deck control.`;
   }
   if (midiActivity === "midi_traffic_unmapped") {
-    return `${device} unmapped · Run controller mapping.`;
+    return `${device}: Run controller mapping.`;
   }
   if (midiActivity === "midi_events_no_moves") {
-    return `${device} seen · Move a deck control.`;
+    return `${device}: Move a deck control.`;
   }
   return "Move a control once, I will not guess.";
 }
