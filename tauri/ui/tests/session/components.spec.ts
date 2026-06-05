@@ -781,19 +781,36 @@ describe("renderTimecode", () => {
 // === SessionLayout — composer smoke ===========================================
 
 describe("SessionLayout", () => {
-  it("mounts the deck: titlebar + rail/speak/foot + status row (no card, no screws)", () => {
+  it("mounts the deck: titlebar + rail/speak/foot + quiet fault row (no card, no screws)", () => {
     const root = host();
     mountSessionLayout(root);
-    expect(root.querySelector(".vmx-session")).toBeTruthy();
+    const session = root.querySelector<HTMLElement>(".vmx-session");
+    expect(session).toBeTruthy();
+    expect(session?.dataset.statusrow).toBe("quiet");
     expect(root.querySelector(".vmx-titlebar")).toBeTruthy();
     expect(root.querySelector(".vmx-deck__rail")).toBeTruthy();
     expect(root.querySelector(".vmx-deck__speak")).toBeTruthy();
     expect(root.querySelector(".vmx-deck__foot")).toBeTruthy();
-    expect(root.querySelector(".vmx-statusrow")).toBeTruthy();
+    expect(root.querySelector<HTMLElement>(".vmx-statusrow")?.hidden).toBe(true);
     // "The Deck Speaks" rebuild: open void — no glass card, no corner screws,
     // no 3-column grid.
     expect(root.querySelectorAll(".vmx-session__screw")).toHaveLength(0);
     expect(root.querySelectorAll(".vmx-session__col")).toHaveLength(0);
+  });
+
+  it("gives BPM and key stable readout slots in the footer", () => {
+    const root = host();
+    const state = defaultState();
+    state.timecode.bpm = 128.4;
+    state.timecode.key = "12A";
+    mountSessionLayout(root, state);
+
+    const bpmWrap = root.querySelector<HTMLElement>('.vmx-read[data-readout="bpm"]');
+    const keyWrap = root.querySelector<HTMLElement>('.vmx-read[data-readout="key"]');
+    expect(bpmWrap?.querySelector(".vmx-read__num")?.textContent).toBe("128.4");
+    expect(keyWrap?.querySelector(".vmx-read__key")?.textContent).toBe("12A");
+    expect(document.head.textContent).toContain('.vmx-read[data-readout="bpm"]');
+    expect(document.head.textContent).toContain('.vmx-read[data-readout="key"]');
   });
 
   it("mounts a visible Vibe Engine rail control", () => {
@@ -981,6 +998,8 @@ describe("SessionLayout", () => {
     });
 
     expect(voice?.hidden).toBe(false);
+    expect(root.querySelector<HTMLElement>(".vmx-session")?.dataset.statusrow).toBe("alert");
+    expect(root.querySelector<HTMLElement>(".vmx-statusrow")?.hidden).toBe(false);
     expect(voice?.disabled).toBe(true);
     expect(voice?.dataset.down).toBe("true");
     expect(voice?.dataset.actionable).toBe("false");
@@ -1029,6 +1048,8 @@ describe("SessionLayout", () => {
 
     const ai = root.querySelector<HTMLButtonElement>('.vmx-statusrow__i[data-input="ai"]');
     expect(ai).toBeTruthy();
+    expect(root.querySelector<HTMLElement>(".vmx-session")?.dataset.statusrow).toBe("alert");
+    expect(root.querySelector<HTMLElement>(".vmx-statusrow")?.hidden).toBe(false);
     expect(ai?.disabled).toBe(false);
     expect(ai?.dataset.down).toBe("true");
     expect(ai?.getAttribute("aria-label")).toBe("recheck ai status");

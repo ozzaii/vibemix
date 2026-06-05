@@ -190,6 +190,7 @@ export interface Mounted {
     screen: HTMLButtonElement;
     midi: HTMLButtonElement;
   };
+  statusRow: HTMLElement;
   statusRight: HTMLElement;
   current: SessionState;
   /** Timestamp (Date.now()) of the most-recent grounded true→false transition.
@@ -226,7 +227,7 @@ const METER_DB_CEIL = -6;
 const LAYOUT_CSS = `
   .vmx-session {
     display: grid;
-    grid-template-rows: var(--titlebar-h) 1fr var(--statusbar-h);
+    grid-template-rows: var(--titlebar-h) 1fr 0;
     height: 100vh;
     position: relative;
     overflow: hidden;
@@ -234,6 +235,9 @@ const LAYOUT_CSS = `
       linear-gradient(112deg, rgba(255, 165, 223, 0.040), transparent 34%),
       linear-gradient(180deg, rgba(255, 251, 244, 0.016), transparent 24%),
       var(--void-5);
+  }
+  .vmx-session[data-statusrow="alert"] {
+    grid-template-rows: var(--titlebar-h) 1fr var(--statusbar-h);
   }
   .vmx-drop-slot:empty { display: none; }
 
@@ -646,7 +650,9 @@ const LAYOUT_CSS = `
 
   /* --- FOOT: one steady master readout (BPM · key · live level) --- */
   .vmx-deck__foot {
-    display: grid; grid-template-columns: auto auto 1fr; align-items: center;
+    display: grid;
+    grid-template-columns: minmax(96px, max-content) minmax(72px, max-content) minmax(160px, 1fr);
+    align-items: center;
     gap: clamp(20px, 3vw, 48px);
     margin: 0 clamp(0px, 1.2vw, 18px);
     /* One steady master readout engraved into the void behind a SINGLE hairline,
@@ -655,7 +661,9 @@ const LAYOUT_CSS = `
     padding: 12px 2px 2px;
     border-top: 1px solid var(--glass-edge);
   }
-  .vmx-read { display: flex; align-items: baseline; gap: var(--sp-2); }
+  .vmx-read { display: flex; align-items: baseline; gap: var(--sp-2); min-width: 0; white-space: nowrap; }
+  .vmx-read[data-readout="bpm"] { min-width: 96px; }
+  .vmx-read[data-readout="key"] { min-width: 72px; }
   .vmx-read__lab {
     font-family: var(--type-display); font-variation-settings: 'wdth' 85, 'wght' 600;
     font-size: 9px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--silk-22);
@@ -667,10 +675,12 @@ const LAYOUT_CSS = `
   .vmx-read__num {
     font-family: var(--type-mono); font-weight: 500; font-size: 20px; letter-spacing: 0.02em;
     color: var(--silk); transition: color 700ms ease-out;
+    display: inline-block; min-width: 5ch;
   }
   .vmx-read__key {
     font-family: var(--type-mono); font-weight: 500; font-size: 20px; letter-spacing: 0.04em;
     color: var(--amber-pale); transition: color 700ms ease-out;
+    display: inline-block; min-width: 4ch;
   }
   .vmx-fmeter {
     position: relative; height: 14px; border-radius: var(--rad-sm);
@@ -715,6 +725,7 @@ const LAYOUT_CSS = `
     backdrop-filter: var(--blur-glass-light);
     -webkit-backdrop-filter: var(--blur-glass-light); border-top: 1px solid var(--glass-edge);
   }
+  .vmx-statusrow[hidden] { display: none; }
   .vmx-statusrow__inputs {
     display: flex; align-items: center;
     font-family: var(--type-mono); font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--silk-22);
@@ -909,6 +920,7 @@ export function mountSessionLayout(
   const root = document.createElement("div");
   root.className = "vmx-session";
   root.dataset.mode = "";
+  root.dataset.statusrow = "quiet";
   // SHIP-WIRE START-gate — seed run-state at creation so the armed gate paints
   // on first frame (no flash before applyState's mount pass corrects it).
   root.dataset.runstate = state.runState ?? "running";
@@ -1089,6 +1101,8 @@ export function mountSessionLayout(
   const statusRow = document.createElement("footer");
   statusRow.className = "vmx-statusrow";
   statusRow.dataset.wire = "session.status";
+  statusRow.hidden = true;
+  statusRow.setAttribute("aria-hidden", "true");
   const inputsEl = document.createElement("div");
   inputsEl.className = "vmx-statusrow__inputs";
   const inAudio = makeInput("audio", "livekit", () => mountedHandle);
@@ -1133,6 +1147,7 @@ export function mountSessionLayout(
       screen: inScreen,
       midi: inMidi,
     },
+    statusRow,
     statusRight,
     current: state,
     groundedFalseSinceMs: state.cohost.grounded ? null : Date.now(),
@@ -1163,6 +1178,7 @@ function makeLiveLabel(
 function makeReadout(label: string, isKey = false): { wrap: HTMLElement; value: HTMLElement } {
   const wrap = document.createElement("div");
   wrap.className = "vmx-read";
+  wrap.dataset.readout = isKey ? "key" : "bpm";
   const lab = document.createElement("span");
   lab.className = "vmx-read__lab";
   lab.textContent = label;
@@ -1393,6 +1409,20 @@ function applyState(mounted: Mounted, next: SessionState, isMount: boolean): voi
   mounted.statusInputs.voiceSep.hidden = next.status.voice !== "muted";
   setInputDown(mounted.statusInputs.screen, next.status.screen === "denied");
   setInputDown(mounted.statusInputs.midi, next.status.midi === 0);
+  const statusRowAlert =
+    next.status.livekit === "down" ||
+    next.status.gemini === "down" ||
+    downInput === "gemini" ||
+    next.status.voice === "muted" ||
+    next.status.screen === "denied";
+  const statusRowMode = statusRowAlert ? "alert" : "quiet";
+  if (mounted.root.dataset.statusrow !== statusRowMode) {
+    mounted.root.dataset.statusrow = statusRowMode;
+  }
+  if (mounted.statusRow.hidden === statusRowAlert) {
+    mounted.statusRow.hidden = !statusRowAlert;
+    mounted.statusRow.setAttribute("aria-hidden", statusRowAlert ? "false" : "true");
+  }
   // Just the live output route — the one fact here that can change mid-set and
   // matters at a glance (where the co-host's voice lands). Voice name + genre are
   // set-once Settings config, not live status; printing them in always-on chrome

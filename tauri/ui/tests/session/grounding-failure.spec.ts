@@ -242,6 +242,8 @@ describe("SessionLayout grounding-failure → fault state (H9)", () => {
       '.vmx-statusrow__i[data-input="screen"]',
     );
     expect(screenInput?.dataset.down).toBe("true");
+    expect(root.querySelector<HTMLElement>(".vmx-session")?.dataset.statusrow).toBe("alert");
+    expect(root.querySelector<HTMLElement>(".vmx-statusrow")?.hidden).toBe(false);
   });
 
   it("screen=unavailable is neutral and never faults the deck", () => {
@@ -259,6 +261,8 @@ describe("SessionLayout grounding-failure → fault state (H9)", () => {
       '.vmx-statusrow__i[data-input="screen"]',
     );
     expect(screenInput?.dataset.down).toBe("false");
+    expect(root.querySelector<HTMLElement>(".vmx-session")?.dataset.statusrow).toBe("quiet");
+    expect(root.querySelector<HTMLElement>(".vmx-statusrow")?.hidden).toBe(true);
   });
 
   it("grounded flip to true resets the timer (active co-host)", () => {
