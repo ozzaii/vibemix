@@ -866,7 +866,7 @@ function footTooltipFor(grounded: boolean, failed: boolean): string {
   if (failed) {
     return "AI service unreachable. restart the cohost to reconnect.";
   }
-  return "tuning in. initializing audio + screen capture.";
+  return "tuning in. checking the decks.";
 }
 
 /** Idempotent hot-update. Rebuilds transcript content but preserves the

@@ -408,6 +408,7 @@ describe("renderCohostPanel", () => {
     expect(foot?.querySelector(".vmx-cohost__foot-lbl")?.textContent).toBe(
       "TUNING IN",
     );
+    expect(foot?.title).toBe("tuning in. checking the decks.");
   });
 
   // Phase 13-03 — the 42×42 mascot placeholder bubble was dropped from the
