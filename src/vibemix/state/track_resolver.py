@@ -6,21 +6,16 @@ controller-derived "which deck am I hearing" inference and the
 nowplaying-cli-cross-referenced track label.
 
 KNOWN ISSUE (Phase 9):
-    The Pioneer DDJ-FLX4 firmware sometimes consumes the PLAY button press
-    locally without forwarding ``note_on`` to other listeners when djay Pro is
-    the active controlling app. That means ``deck['play']`` stays at the boot
-    default ``False``, so ``derive_audible_deck`` returns ``"none"``, so
-    ``derive_audible_track`` caps confidence at ``0.3``, so the
-    ``TRACK_CHANGE`` event (which requires ``audible_track_confidence >=
-    TRACK_CHANGE_MIN_CONFIDENCE = 0.5``) never fires.
+    The Pioneer DDJ-FLX4 firmware sometimes consumes the PLAY button press locally without
+    forwarding ``note_on`` to other listeners when djay Pro is the active controlling app.
+    That means ``deck['play']`` may stay at the boot default ``False``. Channel fader +
+    crossfader are therefore the primary audible-deck evidence; if that evidence cannot
+    name a deck confidently, ``derive_audible_track`` omits the nowplaying title.
 
-    Phase 3 reproduces this v4 behavior verbatim. Phase 9 will fix it by
-    cross-referencing with nowplaying-cli's playback-state or with an
-    audio-side "deck has signal energy" fallback.
-
-The TWO confidence thresholds (do not confuse):
-    - ``0.3`` (this module, line below): the floor for evidence-line track
-      quoting in ``AICoach``. Below 0.3 the prompt prints ``track=unknown``.
+The named-track gate:
+    - ``0.5`` (this module, line below): the floor for naming the
+      nowplaying title. Below that, we omit the title so prompt builders print
+      ``track=unknown`` instead of anchoring Sven on the wrong deck.
     - ``0.5`` (``TRACK_CHANGE_MIN_CONFIDENCE`` in ``vibemix.audio.constants``):
       the floor for ``EventDetector`` to fire a ``TRACK_CHANGE`` event.
 """
@@ -107,9 +102,11 @@ def derive_audible_track(
     if audible_deck == "none":
         # Audio is heard but controller says no deck is active — controller may
         # be disconnected or in a weird state. Don't anchor on the title.
-        return track_title, 0.3
+        return None, 0.0
     if audible_deck == "mix":
-        # Two decks playing — title may be either. Mark unsure.
-        return track_title, 0.4
+        # Two decks playing — nowplaying-cli may have latched either side.
+        return None, 0.0
     # Single dominant deck. Trust the title roughly proportional to confidence.
-    return track_title, min(0.85, max(0.5, deck_confidence))
+    if deck_confidence < 0.5:
+        return None, 0.0
+    return track_title, min(0.85, deck_confidence)

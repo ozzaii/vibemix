@@ -256,30 +256,30 @@ def test_evidence_line_audible_block_format(mocker):
     assert "recent_moves[8s]: NONE" in out
 
 
-def test_evidence_line_track_unknown_below_03():
-    """audible_track_confidence < 0.3 → 'track=unknown', title not quoted."""
+def test_evidence_line_track_unknown_below_named_gate():
+    """audible_track_confidence < 0.5 → 'track=unknown', title not quoted."""
     state = MusicState(
         audible=True,
         rms=0.05,
         bpm=120.0,
         bands={"sub": 0.2, "low": 0.3, "mid": 0.3, "high": 0.2},
         audible_track="X",
-        audible_track_confidence=0.25,
+        audible_track_confidence=0.49,
     )
     out = AICoach.evidence_line(state)
     assert "track=unknown" in out
     assert "'X'" not in out
 
 
-def test_evidence_line_track_quoted_at_exact_03_boundary():
-    """v4:1343 uses `>=` so 0.3 itself quotes the title."""
+def test_evidence_line_track_quoted_at_exact_named_gate():
+    """The prompt quotes only confidently named tracks."""
     state = MusicState(
         audible=True,
         rms=0.05,
         bpm=120.0,
         bands={"sub": 0.2, "low": 0.3, "mid": 0.3, "high": 0.2},
         audible_track="X",
-        audible_track_confidence=0.3,
+        audible_track_confidence=0.5,
     )
     out = AICoach.evidence_line(state)
     assert "track='X'" in out

@@ -17,11 +17,10 @@ LOAD-BEARING ANTI-HALLUCINATION INVARIANT (v4:1350-1351 comment):
     actually atmospheric. AI should hear the phase from the audio itself.
     v3 still had ``phase=``; v4 removed it. Do NOT reintroduce when porting.
 
-TWO confidence thresholds (do not confuse):
-    - 0.3 in evidence_line: the floor for quoting the track name.
-      Below 0.3 the prompt prints ``track=unknown``.
-    - 0.5 in EventDetector (``TRACK_CHANGE_MIN_CONFIDENCE``): the floor for
-      firing a TRACK_CHANGE event.
+Named-track confidence gate:
+    evidence_line quotes the track name only when
+    ``audible_track_confidence >= 0.5``. Below that, the prompt prints
+    ``track=unknown`` so Sven does not anchor on a stale nowplaying title.
 """
 
 from __future__ import annotations
@@ -453,7 +452,7 @@ class AICoach:
         else:
             e.append("hearing[silent]")
 
-        if state.audible_track and state.audible_track_confidence >= 0.3:
+        if state.audible_track and state.audible_track_confidence >= 0.5:
             e.append(f"track={state.audible_track!r}")
         else:
             e.append("track=unknown")
@@ -550,8 +549,7 @@ class AICoach:
         # decks[…] block above so the default MusicState (detected_genre=
         # "unknown") emits ZERO bytes and the v4/silent-state golden stays
         # byte-identical. Floor of 0.5 is the anti-hallucination confidence
-        # gate (above the 0.3 track/deck floor — a wrong genre label is more
-        # priming than a wrong title, so it demands more certainty). Below
+        # gate, matching the named-track quote floor. Below
         # floor / unknown → nothing. NOT added to _evidence_line_compact
         # (diet/ack path stays lean).
         source_genre = _source_genre_from_decks(state)
@@ -747,7 +745,7 @@ class AICoach:
         else:
             e.append("hearing[silent]")
 
-        if state.audible_track and state.audible_track_confidence >= 0.3:
+        if state.audible_track and state.audible_track_confidence >= 0.5:
             e.append(f"track={state.audible_track!r}")
         else:
             e.append("track=unknown")

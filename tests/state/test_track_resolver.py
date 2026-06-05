@@ -149,20 +149,19 @@ def test_track_empty_title_returns_none_zero():
     assert derive_audible_track("", "A", 0.8, True) == (None, 0.0)
 
 
-def test_track_deck_none_returns_03():
+def test_track_deck_none_returns_none_zero():
     out = derive_audible_track("X", "none", 0.0, True)
-    assert out == ("X", 0.3)
+    assert out == (None, 0.0)
 
 
-def test_track_deck_mix_returns_04():
+def test_track_deck_mix_returns_none_zero():
     out = derive_audible_track("X", "mix", 0.5, True)
-    assert out == ("X", 0.4)
+    assert out == (None, 0.0)
 
 
-def test_track_deck_dominant_clamps_to_min_05():
-    # deck_confidence=0.2 → clamped to 0.5 (the min(0.85, max(0.5, 0.2)) lower clamp).
+def test_track_deck_dominant_below_named_gate_returns_none_zero():
     out = derive_audible_track("X", "A", 0.2, True)
-    assert out == ("X", 0.5)
+    assert out == (None, 0.0)
 
 
 def test_track_deck_dominant_passes_through():

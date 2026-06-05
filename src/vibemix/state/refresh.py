@@ -1323,9 +1323,8 @@ def _tick_once(
 
         # Track inference (cross-reference with audible deck)
         tsnap = track_info.snapshot()
-        tt, tc = derive_audible_track(
-            tsnap.get("title") or None, aud_deck, deck_conf, state.audible
-        )
+        raw_nowplaying_title = tsnap.get("title") or None
+        tt, tc = derive_audible_track(raw_nowplaying_title, aud_deck, deck_conf, state.audible)
         track_changed = False
         if tt and tc >= 0.5:
             last_title = state.track_history[-1][1] if state.track_history else None
@@ -1486,7 +1485,7 @@ def _tick_once(
             if (
                 course3_position_s is None
                 and state.audible_deck == "mix"
-                and tt
+                and raw_nowplaying_title
                 and position_s is not None
             ):
                 course3_position_s = max(0.0, position_s)
@@ -1495,7 +1494,7 @@ def _tick_once(
                 section_source=section_source,
                 deck_snap=deck_snap,
                 audible_deck=state.audible_deck,
-                track_title=tt,
+                track_title=tt or raw_nowplaying_title,
                 position_s=course3_position_s,
                 position_confidence=course3_position_confidence,
                 now=now,

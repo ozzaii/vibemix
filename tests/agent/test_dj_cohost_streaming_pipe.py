@@ -183,8 +183,8 @@ def test_no_boundary_in_short_response_yields_after_stream(mocker, tmp_path) -> 
     assert "".join(chunks) == "Yeah."
 
 
-def test_grounded_cue_payload_replaces_incomplete_stream_tail(mocker, tmp_path) -> None:
-    """An unfinished model sentence must not reach speech when a citable cue receipt exists."""
+def test_grounded_cue_payload_does_not_replace_incomplete_stream_tail(mocker, tmp_path) -> None:
+    """An unfinished model sentence stays silent even when a citable receipt exists."""
 
     agent, gen, recorder, state = _build_agent_legacy(mocker, tmp_path)
     mocker.patch("vibemix.agent.dj_cohost.snapshot_wav", return_value=b"FAKEWAV")
@@ -209,14 +209,11 @@ def test_grounded_cue_payload_replaces_incomplete_stream_tail(mocker, tmp_path) 
 
     chunks = _drive(agent)
 
-    assert chunks == ["Hold this for about 4 bars; make the move on the next phrase. "]
-    fallback_events = [fields for kind, fields in recorder.events if kind == "grounded_voice_fallback"]
-    assert fallback_events
-    assert fallback_events[-1]["reason"] == "line_scaffold"
-    assert fallback_events[-1]["fallback_text"] == (
-        "Hold this for about 4 bars; make the move on the next phrase. "
-        "[cue:phrase_boundary@108.0]"
-    )
+    assert chunks == []
+    kinds = [kind for kind, _ in recorder.events]
+    assert "line_scaffold_suppressed" in kinds
+    assert "grounded_voice_fallback" not in kinds
+    assert "ai_text" not in kinds
 
 
 def test_silence_token_head_suppresses_all(mocker, tmp_path) -> None:

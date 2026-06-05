@@ -921,7 +921,7 @@ def test_tick_does_not_append_track_history_when_confidence_below_05():
     state = MusicState()
     state.audible = True
     buf = _audible_buf()
-    # Controller silent → audible_deck="none" → derive_audible_track returns conf=0.3.
+    # Controller silent → audible_deck="none" → derive_audible_track omits stale nowplaying.
     ctrl = MagicMock()
     ctrl.deck_snapshot.return_value = {
         "A": {"vol": 0, "play": False, "eq_low": 64, "eq_mid": 64, "eq_hi": 64, "filter": 64},
@@ -942,7 +942,8 @@ def test_tick_does_not_append_track_history_when_confidence_below_05():
         bpm_cache=130.0,
         last_bpm_at=999.0,
     )
-    # conf=0.3 < 0.5 → no track_history append.
+    assert state.audible_track is None
+    assert state.audible_track_confidence == 0.0
     assert state.track_history == []
 
 
@@ -1237,8 +1238,8 @@ def test_tick_marks_verified_dual_deck_audio_as_mix_when_controller_silent():
 
     assert state.audible_deck == "mix"
     assert state.deck_confidence >= 0.5
-    assert state.audible_track == "Either Deck"
-    assert state.audible_track_confidence == 0.4
+    assert state.audible_track is None
+    assert state.audible_track_confidence == 0.0
 
 
 def test_tick_refuses_unverified_deck_audio_fallback_when_controller_silent():
@@ -1263,8 +1264,8 @@ def test_tick_refuses_unverified_deck_audio_fallback_when_controller_silent():
 
     assert state.audible_deck == "none"
     assert state.deck_confidence == 0.0
-    assert state.audible_track == "Unproven Route"
-    assert state.audible_track_confidence == 0.3
+    assert state.audible_track is None
+    assert state.audible_track_confidence == 0.0
 
 
 def test_tick_uses_nowplaying_playback_deck_status_when_controller_silent():

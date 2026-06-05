@@ -3,14 +3,9 @@ from __future__ import annotations
 
 from vibemix.agent.dj_cohost import (
     _could_be_finished_line_meta_scaffold,
-    _grounded_event_fallback_line,
-    _grounded_receipt_fallback_line,
-    _grounded_voice_payload_fallback_line,
     _has_unclosed_bracket_tail,
     repair_finished_headphone_line,
 )
-from vibemix.coach.citation_linter import CitationLinter
-from vibemix.state import EvidenceRegistry
 
 
 def test_final_polish_fragment_after_citation_tail_is_suppressed() -> None:
@@ -187,99 +182,7 @@ def test_grounding_refs_meta_fragment_is_suppressed() -> None:
     assert repair_finished_headphone_line(raw) is None
 
 
-def test_grounded_cue_receipt_fallback_line_is_citable_and_spoken() -> None:
-    fallback = _grounded_receipt_fallback_line(
-        {
-            "next_suggestion_voice_line": (
-                "Forward cue receipt: the next citable phrase boundary is about 4 bars ahead. "
-                "Use it as one forward timing nudge for what comes next if the live sound "
-                "supports it. Copy this citation exactly: [cue:phrase_boundary@108.0]."
-            )
-        }
-    )
-
-    assert fallback == (
-        "Hold this for about 4 bars; make the move on the next phrase. "
-        "[cue:phrase_boundary@108.0]"
-    )
-
-
-def test_grounded_voice_payload_fallback_uses_next_suggestion_receipt() -> None:
-    fallback = _grounded_voice_payload_fallback_line(
-        {
-            "next_suggestion_voice_line": (
-                "Forward read: Ananta by Crew pairs next - keeps the build. "
-                "Hand it as one nudge if it fits the live sound. "
-                "Copy these citations exactly: [track:track-42] [mix:next_suggestion=track-42]."
-            )
-        }
-    )
-
-    assert fallback == (
-        "Line up Ananta by Crew next to keep this build moving. "
-        "[track:track-42] [mix:next_suggestion=track-42]"
-    )
-
-
-def test_grounded_voice_payload_fallback_prefers_cue_receipt() -> None:
-    fallback = _grounded_voice_payload_fallback_line(
-        {
-            "next_suggestion_voice_line": (
-                "Forward cue receipt: the next citable phrase boundary is about 4 bars ahead. "
-                "Use it as one forward timing nudge for what comes next if the live sound "
-                "supports it. Copy this citation exactly: [cue:phrase_boundary@108.0]."
-            )
-        }
-    )
-
-    assert fallback == (
-        "Hold this for about 4 bars; make the move on the next phrase. "
-        "[cue:phrase_boundary@108.0]"
-    )
-
-
-def test_grounded_event_fallback_uses_registered_kick_density_event() -> None:
-    registry = EvidenceRegistry()
-    registry.write("ev", "KICK_DENSITY_SHIFT", 1281.0)
-
-    fallback = _grounded_event_fallback_line(
-        "KICK_DENSITY_SHIFT",
-        {"prev_density": 6.0, "new_density": 4.5, "delta": -1.5},
-        registry.snapshot(),
-    )
-
-    assert fallback == (
-        "Use this added space for the next layer before the lows get busy again. "
-        "[ev:KICK_DENSITY_SHIFT@1281.0]"
-    )
-    assert CitationLinter().check(fallback, registry.snapshot(), mode="live").valid is True
-
-
-def test_grounded_event_fallback_abstains_without_registered_event() -> None:
-    assert (
-        _grounded_event_fallback_line(
-            "KICK_DENSITY_SHIFT",
-            {"prev_density": 6.0, "new_density": 4.5, "delta": -1.5},
-            {},
-        )
-        is None
-    )
-
-
-def test_grounded_cue_receipt_fallback_abstains_without_cue_atom() -> None:
-    assert (
-        _grounded_receipt_fallback_line(
-            {
-                "next_suggestion_voice_line": (
-                    "Forward read: a darker rolling 9A track pairs next - keeps the build."
-                )
-            }
-        )
-        is None
-    )
-
-
-def test_unclosed_citation_tail_is_detected_for_fallback() -> None:
+def test_unclosed_citation_tail_is_detected_for_suppression() -> None:
     assert _has_unclosed_bracket_tail(
         "Hold this until the next phrase [cue:phrase_boundary@10"
     )

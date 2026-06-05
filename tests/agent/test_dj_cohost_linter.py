@@ -1200,6 +1200,36 @@ def test_no_citations_response_strips(mocker, tmp_path) -> None:
     assert tracker.rate() == 1.0
 
 
+def test_empty_response_with_registered_event_stays_silent(mocker, tmp_path) -> None:
+    """A citable event must not synthesize a canned replacement when Gemini says nothing."""
+    registry = EvidenceRegistry()
+    registry.write("ev", "KICK_DENSITY_SHIFT", 1281.0)
+    agent, gen, recorder, state, _, tracker, playback = _build_agent_wired(
+        mocker, tmp_path, registry
+    )
+    mocker.patch("vibemix.agent.dj_cohost.snapshot_wav", return_value=b"FAKEWAV")
+    mocker.patch.object(AICoach, "build_prompt", return_value="EVIDENCE: x")
+    gen.aio.models.generate_content_stream = mocker.AsyncMock(return_value=_async_iter([]))
+
+    ev = Event(
+        type="KICK_DENSITY_SHIFT",
+        state=state,
+        extra={"prev_density": 6.0, "new_density": 4.5, "delta": -1.5},
+    )
+    agent.set_next_event(ev)
+    chunks = _drive(agent)
+
+    assert chunks == []
+    kinds = [k for k, _ in recorder.events]
+    assert "grounded_event_fallback" not in kinds
+    assert "ai_text" not in kinds
+    assert "citation_strip" in kinds
+    strip_log = next(f for k, f in recorder.events if k == "citation_strip")
+    assert strip_log["reason"] == "no_citations"
+    assert tracker.rate() == 1.0
+    playback.push.assert_not_called()
+
+
 # --------------------------------------------------------------------------
 # (e) Bypass emits with [unverified] marker
 # --------------------------------------------------------------------------
