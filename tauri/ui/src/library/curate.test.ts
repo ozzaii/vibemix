@@ -176,7 +176,6 @@ function mountSkeleton(): void {
     <div id="vmx-lib-prog-n"></div>
     <div id="vmx-lib-prog-cost"></div>
     <i id="vmx-lib-progress-fill"></i>
-    <div id="vmx-lib-loglist"></div>
     <span id="vmx-lib-side-label"></span>
     <span id="vmx-lib-scope-state"></span>
     <div id="vmx-lib-chat-tools"></div>

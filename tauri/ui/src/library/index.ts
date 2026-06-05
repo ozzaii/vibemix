@@ -1166,18 +1166,6 @@ function setProgress(
   $("vmx-lib-prog-cost").textContent = total > 0 ? `~€${costEur.toFixed(2)}` : "";
 }
 
-function appendLog(
-  status: EmbedProgress["status"],
-  filename: string,
-  costEur: number,
-): void {
-  const el = $("vmx-lib-loglist");
-  el.insertAdjacentHTML(
-    "afterbegin",
-    `<div class="ll"><span class="st ${status}">${status}</span><span class="fn">${esc(filename)}</span><span class="c">~€${costEur.toFixed(3)}</span></div>`,
-  );
-}
-
 function appendChatTurn(
   thread: HTMLElement,
   role: LibraryChatTurn["role"],
@@ -2121,7 +2109,6 @@ export function mountLibrary(root: ParentNode = document): void {
       // Idle ingest view: show the ready state and focus the source path. The
       // user still has to click Index folder, so this never starts indexing by
       // surprise from the Viber home surface.
-      $("vmx-lib-loglist").innerHTML = "";
       setProgress(0, 0, 0, "");
       folderInput.focus();
     } else if (mode === "chat") {
@@ -2295,7 +2282,6 @@ export function mountLibrary(root: ParentNode = document): void {
    *  replay the real subset-run log so the surface is demoable. */
   async function runIngest(runId: number): Promise<void> {
     state = setFolder(state, folderInput.value.trim() || state.folder);
-    $("vmx-lib-loglist").innerHTML = "";
     setProgress(0, 0, 0, "");
 
     const accepted = await libraryEmbedFolder(state.folder, state.strategy);
@@ -2316,8 +2302,7 @@ export function mountLibrary(root: ParentNode = document): void {
       }
       const entry = log[i];
       if (entry) {
-        const [status, filename, cost] = entry;
-        appendLog(status, filename, cost);
+        const [, filename, cost] = entry;
         setProgress(i + 1, total, cost, filename.replace(/\.[a-z0-9]+$/i, ""));
       }
       i++;
@@ -2543,7 +2528,6 @@ export function mountLibrary(root: ParentNode = document): void {
   // ingest progress from the real bridge (no-op listeners in dev)
   void onEmbedProgress((p: EmbedProgress) => {
     if (!busy || state.mode !== "ingest") return;
-    appendLog(p.status, p.filename, p.cost_eur);
     setProgress(
       p.n,
       p.total,
