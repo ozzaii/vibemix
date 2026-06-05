@@ -1,10 +1,10 @@
 /* DEMOCRATIZATION-1 — Settings drawer BRAIN group spec.
  *
- * The BRAIN group lets a non-dev reach the live co-host's model WITHOUT
- * hand-editing .env: a masked Gemini-key input (DIRECT mode) or a one-flip
- * toggle to the hosted Bravoh proxy. The secret is written by the BACKEND
- * (Lane B); this group only sends intent over ipc.settings.set_brain and
- * NEVER logs the key.
+ * The BRAIN group is a dev/support control for the live co-host brain path: a
+ * masked Gemini-key input (DIRECT mode) or a one-flip toggle to the hosted
+ * Bravoh proxy. Production Settings does not mount it. The secret is written
+ * by the BACKEND (Lane B); this group only sends intent over
+ * ipc.settings.set_brain and NEVER logs the key.
  *
  * Asserts:
  *   1. Renders the BRAIN group with a DIRECT/PROXY rocker + (direct) masked

@@ -1017,10 +1017,12 @@ function renderDrawerBody(body: HTMLElement, modalSlot: HTMLElement): void {
   );
 
   // --- BRAIN ----------------------------------------------------------------
-  // DEMOCRATIZATION-1 — mounted directly under PERSONA, before OUTPUT: the
-  // brain is the most consequential setting and the one a blocked stranger
-  // (no GEMINI_API_KEY) needs first. In-GUI key / proxy toggle, no .env edit.
-  body.append(BrainGroup());
+  // Direct/proxy brain controls include a BYO Gemini-key field. Keep them for
+  // local support builds only; shipped Settings uses the default hosted path
+  // and does not ask DJs for a Google key.
+  if (import.meta.env.DEV) {
+    body.append(BrainGroup());
+  }
 
   // --- OUTPUT ---------------------------------------------------------------
   const outputBody = document.createElement("div");

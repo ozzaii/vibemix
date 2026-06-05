@@ -1,9 +1,8 @@
 /* DEMOCRATIZATION-1 — Settings drawer BRAIN group.
  *
- * The single most consequential setting for a blocked stranger: which brain
- * the live co-host talks to. Today a non-dev with no GEMINI_API_KEY hits a
- * terminal "edit ~/Library/.../vibemix/.env then restart" wall (crash-banner
- * `api-key-missing`). This group gives them a way in WITHOUT touching .env:
+ * Dev/support control for the live co-host brain path. Production Settings
+ * does not mount this group; shipped builds use the default hosted path and
+ * keep Google-key setup in docs/env rather than a user-facing drawer field.
  *
  *   - DIRECT — paste your own Gemini key (masked). The key is written by the
  *     BACKEND (Lane B) to app_data_dir()/.env or the keychain. It is never
@@ -15,7 +14,7 @@
  * carries NO secret — only a coarse key_set boolean.
  *
  * Brain mode is held module-local (the cheap §3.4 fallback): there is no
- * SettingsView.llm_mode field yet, so a cold drawer shows DIRECT until the
+ * SettingsView.llm_mode field yet, so a dev drawer shows DIRECT until the
  * first toggle. The mode survives mid-session drawer rebuilds (module state),
  * and the brain_ack echo is authoritative.
  *

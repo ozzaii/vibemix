@@ -232,8 +232,10 @@ function expectedRuntimeWireValues(surface: MockTransferRuntimeSurface): string[
     for (const wire of SETTINGS_PERSONA_CONTROL_WIRES) {
       values.add(wire);
     }
-    for (const wire of SETTINGS_BRAIN_CONTROL_WIRES) {
-      values.add(wire);
+    if (import.meta.env.DEV) {
+      for (const wire of SETTINGS_BRAIN_CONTROL_WIRES) {
+        values.add(wire);
+      }
     }
   }
   return [...values].sort();

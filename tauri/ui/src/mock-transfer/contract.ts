@@ -316,7 +316,6 @@ export const SETTINGS_RUNTIME_WIRES = [
 
 export const SETTINGS_ALWAYS_GROUP_WIRES = [
   "settings.group.persona",
-  "settings.group.brain",
   "settings.group.output",
   "settings.group.hotkey",
   "settings.group.recording",
@@ -327,6 +326,7 @@ export const SETTINGS_ALWAYS_GROUP_WIRES = [
 ] as const;
 
 export const SETTINGS_INTERNAL_GROUP_WIRES = [
+  "settings.group.brain",
   "settings.group.profile",
   "settings.group.diagnostics",
   "settings.group.calibration",
@@ -345,9 +345,9 @@ export const SETTINGS_PERSONA_CONTROL_WIRES = [
   "settings.persona.skill",
 ] as const;
 
-// DEMOCRATIZATION-1 — the BRAIN group's inner controls (direct/proxy rocker,
-// masked key input, save, state line). All four mount at the default DIRECT
-// mode; the key/save pair is hidden under PROXY at runtime.
+// DEV-only BRAIN group inner controls (direct/proxy rocker, masked key input,
+// save, state line). All four mount at the default DIRECT mode; the key/save
+// pair is hidden under PROXY at runtime.
 export const SETTINGS_BRAIN_CONTROL_WIRES = [
   "settings.brain.mode",
   "settings.brain.key",
