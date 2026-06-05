@@ -816,7 +816,9 @@ describe("practice booth shell", () => {
       const pulse = root.querySelector<HTMLElement>("#learn-booth-pulse")!;
       expect(booth.dataset.visible).toBe("true");
       expect(pulse.dataset.state).toBe("success");
-      expect(pulse.textContent).toBe("clean pass · 1 move");
+      expect(pulse.textContent).toBe(
+        "clean pass · 1 move · next: start meet your controller",
+      );
       expect(pulse.getAttribute("aria-label")).toBe(
         "clean pass · 1 move. next practice: start meet your controller",
       );
@@ -883,7 +885,9 @@ describe("practice booth shell", () => {
       );
 
       const pulse = root.querySelector<HTMLElement>("#learn-booth-pulse")!;
-      expect(pulse.textContent).toBe("clean pass · screen · 1 move");
+      expect(pulse.textContent).toBe(
+        "clean pass · screen · 1 move · next: start meet your controller",
+      );
       expect(pulse.getAttribute("aria-label")).toBe(
         "clean pass · screen · 1 move. next practice: start meet your controller",
       );
@@ -959,7 +963,7 @@ describe("practice booth shell", () => {
       );
 
       const pulse = root.querySelector<HTMLElement>("#learn-booth-pulse")!;
-      expect(pulse.textContent).toBe("clean pass · hardware · 1 move");
+      expect(pulse.textContent).toContain("clean pass · hardware · 1 move · next:");
       expect(pulse.getAttribute("aria-label")).toContain(
         "clean pass · hardware · 1 move. next practice:",
       );
@@ -1033,7 +1037,7 @@ describe("practice booth shell", () => {
       );
 
       const pulse = root.querySelector<HTMLElement>("#learn-booth-pulse")!;
-      expect(pulse.textContent).toBe("recovered pass · screen · 1 move");
+      expect(pulse.textContent).toContain("recovered pass · screen · 1 move · next:");
       expect(pulse.getAttribute("aria-label")).toContain(
         "recovered pass · screen · 1 move. next practice:",
       );
@@ -1131,7 +1135,9 @@ describe("practice booth shell", () => {
       );
 
       const pulse = root.querySelector<HTMLElement>("#learn-booth-pulse")!;
-      expect(pulse.textContent).toBe("clean pass · hardware + screen · 2 moves");
+      expect(pulse.textContent).toContain(
+        "clean pass · hardware + screen · 2 moves · next:",
+      );
       expect(pulse.getAttribute("aria-label")).toContain(
         "clean pass · hardware + screen · 2 moves. next practice:",
       );
@@ -1390,6 +1396,42 @@ describe("practice booth shell", () => {
     const root = document.getElementById("learn-root") as HTMLElement;
     const { ws } = mountLearnWindow(root);
     try {
+      window.dispatchEvent(
+        new CustomEvent("ipc.learn.progress_state", {
+          detail: {
+            action: "snapshot",
+            progress: {
+              schema_version: 2,
+              courses: {},
+              lessons: {},
+              course_2_unlocked: false,
+              course_3_unlocked: false,
+              next_practice_mission: {
+                lesson_id: "L1.01",
+                course_id: "course_1_anatomy",
+                course_label: "Course 1 · Anatomy",
+                skill_id: "deck_control",
+                skill_label: "deck control",
+                title: "opening dialog",
+                mode: "start",
+                command: "Practice opening dialog; start the booth.",
+                payoff: "You get the first rep moving.",
+                proof: "screen deck is enough.",
+                why: "This is the first unlocked move.",
+                estimated_minutes: 4,
+                focus: "first_rep",
+                focus_label: "first rep",
+                challenge: "Do one move.",
+                meter_label: "first rep",
+                meter_value: 0,
+                meter_max: 1,
+                meter_state: "armed",
+                meter_caption: "touch the control to begin",
+              },
+            },
+          },
+        }),
+      );
       window.dispatchEvent(
         new CustomEvent("ipc.learn.lesson_loaded", {
           detail: {

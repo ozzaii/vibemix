@@ -1209,16 +1209,21 @@ function mountLearnWindow(root: HTMLElement): {
     // should not offer the just-finished lesson while waiting for it.
     if (payload.lesson_id && payload.reason === "completed") {
       progressList.setStatus(payload.lesson_id, "completed");
-      latestProgress = {
+      const lessonRows = latestProgress?.lessons ?? {};
+      const nextProgress: LearnProgressProjection = {
         ...(latestProgress ?? {}),
         lessons: {
-          ...(latestProgress?.lessons ?? {}),
+          ...lessonRows,
           [payload.lesson_id]: {
-            ...(latestProgress?.lessons?.[payload.lesson_id] ?? {}),
+            ...(lessonRows[payload.lesson_id] ?? {}),
             completed: true,
           },
         },
       };
+      if (nextProgress.next_practice_mission?.lesson_id === payload.lesson_id) {
+        delete nextProgress.next_practice_mission;
+      }
+      latestProgress = nextProgress;
       renderLessonChooser();
     }
     // Return to the simple booth surface; the full map stays opt-in.
@@ -1231,7 +1236,11 @@ function mountLearnWindow(root: HTMLElement): {
     );
     setBoothPulse(
       payload.reason === "completed" ? "success" : "idle",
-      completionText,
+      completionPulseDisplay(
+        payload.reason,
+        completionText,
+        startRecommendedButton.textContent,
+      ),
       completionPulseA11y(
         payload.reason,
         completionText,
@@ -1756,6 +1765,18 @@ function completionPulseLabel(
   return source !== null
     ? `${passLabel} · ${source} · ${moves}`
     : `${passLabel} · ${moves}`;
+}
+
+function completionPulseDisplay(
+  reason: CompleteLessonPayload["reason"],
+  completionText: string,
+  nextAction: string | null,
+): string {
+  const cleanNextAction = (nextAction ?? "").trim();
+  if (reason !== "completed" || !cleanNextAction) {
+    return completionText;
+  }
+  return `${completionText} · next: ${cleanNextAction}`;
 }
 
 function completionPulseA11y(
