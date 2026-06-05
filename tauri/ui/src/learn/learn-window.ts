@@ -1362,6 +1362,25 @@ function mountLearnWindow(root: HTMLElement): {
     emitLearnAction(ackControlId, "click", next, prev, direction);
   };
 
+  const triggerKeyboardJog = (
+    controlId: string,
+    ev: KeyboardEvent,
+  ): void => {
+    const prev = lastPositions[controlId] ?? 64;
+    const delta = ev.code === "ArrowLeft" ? -16 : 16;
+    const next = Math.max(0, Math.min(127, prev + delta));
+    if (next === prev) return;
+    lastPositions[controlId] = next;
+    stage.applyPositionFrame({ [visualControlIdFor(controlId)]: next });
+    emitLearnAction(
+      controlId,
+      "click",
+      next,
+      prev,
+      next > prev ? "down" : "up",
+    );
+  };
+
   const initialAnalogValue = (controlId: string): number => {
     const head = controlId.split(":")[0] ?? controlId;
     if (head === "vol") return 127;
@@ -1426,6 +1445,19 @@ function mountLearnWindow(root: HTMLElement): {
   stageEl.addEventListener("keydown", (ev: KeyboardEvent) => {
     if (ev.key !== "Enter" && ev.key !== " ") return;
     handleStageControlActivation(ev);
+  });
+  addWindowListener("keydown", (ev: Event) => {
+    if (!(ev instanceof KeyboardEvent)) return;
+    if (shouldIgnoreDeckKeyboard(ev)) return;
+    const controlId = keyboardControlIdForEvent(ev);
+    if (controlId === null) return;
+    ev.preventDefault();
+    if (controlId.startsWith("jog:")) {
+      triggerKeyboardJog(controlId, ev);
+      return;
+    }
+    if (ev.repeat) return;
+    triggerScreenControl(controlId);
   });
 
   // Second midi_position listener — emits ipc.learn.ack whenever a
@@ -1732,6 +1764,45 @@ function freePracticeControlLabel(controlId: string): string {
     rawHead === "jog_touch" || rawHead === "jog_touched" ? "jog" : rawHead;
   const label = controlLabel(head ?? controlId);
   return deck ? `deck ${deck} ${label}` : label;
+}
+
+function shouldIgnoreDeckKeyboard(ev: KeyboardEvent): boolean {
+  const target = ev.target;
+  if (
+    target instanceof Element &&
+    target.closest("input, textarea, select, [contenteditable='true']")
+  ) {
+    return true;
+  }
+  const active = document.activeElement;
+  return active instanceof HTMLButtonElement ||
+    active instanceof HTMLInputElement ||
+    active instanceof HTMLTextAreaElement ||
+    active instanceof HTMLSelectElement;
+}
+
+function keyboardControlIdForEvent(ev: KeyboardEvent): string | null {
+  switch (ev.code) {
+    case "Space":
+      return "play:A";
+    case "KeyK":
+      return "play:B";
+    case "KeyQ":
+      return "cue:A";
+    case "KeyO":
+      return "cue:B";
+    case "KeyS":
+      return "sync:B";
+    case "Digit1":
+      return "hotcue:A";
+    case "Digit2":
+      return "hotcue:B";
+    case "ArrowLeft":
+    case "ArrowRight":
+      return ev.shiftKey ? "jog:B" : "jog:A";
+    default:
+      return null;
+  }
 }
 
 interface LessonSourceCounts {

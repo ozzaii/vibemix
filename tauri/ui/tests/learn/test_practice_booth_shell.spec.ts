@@ -214,6 +214,80 @@ describe("practice booth shell", () => {
     }
   });
 
+  it("keyboard deck shortcuts drive free practice through the same ack path", () => {
+    const root = document.getElementById("learn-root") as HTMLElement;
+    const { ws } = mountLearnWindow(root);
+    try {
+      const pulse = root.querySelector<HTMLElement>("#learn-booth-pulse")!;
+
+      mocks.emitIpc.mockClear();
+      window.dispatchEvent(
+        new KeyboardEvent("keydown", {
+          code: "Space",
+          key: " ",
+          bubbles: true,
+          cancelable: true,
+        }),
+      );
+
+      expect(mocks.emitIpc).toHaveBeenCalledWith("ipc.learn.ack", {
+        control_id: "play:A",
+        source: "click",
+        value: 127,
+        prev_value: 0,
+        direction: "down",
+      });
+      expect(pulse.textContent).toBe("screen: deck A play");
+
+      mocks.emitIpc.mockClear();
+      window.dispatchEvent(
+        new KeyboardEvent("keydown", {
+          code: "ArrowRight",
+          key: "ArrowRight",
+          bubbles: true,
+          cancelable: true,
+        }),
+      );
+
+      expect(mocks.emitIpc).toHaveBeenCalledWith("ipc.learn.ack", {
+        control_id: "jog:A",
+        source: "click",
+        value: 80,
+        prev_value: 64,
+        direction: "down",
+      });
+      expect(pulse.textContent).toBe("screen: deck A jog wheel");
+    } finally {
+      ws.close();
+    }
+  });
+
+  it("keyboard deck shortcuts do not hijack focused buttons", () => {
+    const root = document.getElementById("learn-root") as HTMLElement;
+    const { ws } = mountLearnWindow(root);
+    try {
+      const start = root.querySelector<HTMLButtonElement>("#learn-start-recommended")!;
+      start.focus();
+
+      mocks.emitIpc.mockClear();
+      window.dispatchEvent(
+        new KeyboardEvent("keydown", {
+          code: "Space",
+          key: " ",
+          bubbles: true,
+          cancelable: true,
+        }),
+      );
+
+      expect(mocks.emitIpc).not.toHaveBeenCalledWith(
+        "ipc.learn.ack",
+        expect.anything(),
+      );
+    } finally {
+      ws.close();
+    }
+  });
+
   it("mounts the live grade meter and updates it from the learn bus", async () => {
     const root = document.getElementById("learn-root") as HTMLElement;
     const { ws } = mountLearnWindow(root);
