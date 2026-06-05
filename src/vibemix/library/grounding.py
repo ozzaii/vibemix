@@ -15,9 +15,10 @@ RESEARCH Open Q1). Embed calls fire only on event emission, not every
 3-excerpts/min path at ~€1500/month.
 
 Decision thresholds (Open Q3):
-    cosine >= 0.7  → cited        (inject [track:<id>])
-    cosine >= 0.6  → uncertain    (no citation; emit telemetry)
-    cosine <  0.6  → below_threshold (no citation; emit telemetry)
+    cosine >= 0.7 + library resolves id → cited        (inject [track:<id>])
+    cosine >= 0.7 + library rejects id  → unregistered_track (no citation)
+    cosine >= 0.6                       → uncertain    (no citation)
+    cosine <  0.6                       → below_threshold (no citation)
 """
 
 from __future__ import annotations
@@ -82,6 +83,7 @@ def identify_playing(
     store: LibraryStore,
     audio_bytes: bytes | None,
     *,
+    library=None,
     event_type: str = "MANUAL",
     event_id: str | None = None,
     mime_type: str = "audio/wav",
@@ -97,6 +99,8 @@ def identify_playing(
 
     The ``audio_bytes`` arg may be ``None`` when no audio is available —
     in that case we skip embed + return ``Citation(decision="below_threshold")``.
+    When ``library`` is provided, the top-1 store id must still resolve in the
+    current library cache before it may become a ``[track:<id>]`` citation.
     """
     if event_type not in TRACK_AWARE_EVENTS and event_type != "MANUAL":
         return None
@@ -142,6 +146,13 @@ def identify_playing(
         )
     tid, sim = topk[0]
     decision = _decide(float(sim))
+    if decision == "cited" and library is not None:
+        try:
+            resolved = library.lookup_by_id(str(tid))
+        except Exception:
+            resolved = None
+        if resolved is None:
+            decision = "unregistered_track"
     return Citation(
         event_id=eid,
         decision=decision,
@@ -164,9 +175,12 @@ class Grounding:
         self,
         embedder: AudioBytesEmbedder,
         store: LibraryStore,
+        *,
+        library=None,
     ) -> None:
         self._embedder = embedder
         self._store = store
+        self._library = library
         self._lock = threading.Lock()
         self._latest: Citation | None = None
         # Phase 77 review CR-01 — per-dispatch generation token, mirroring
@@ -214,6 +228,7 @@ class Grounding:
             self._embedder,
             self._store,
             audio_bytes,
+            library=self._library,
             event_type=event_type,
             event_id=event_id,
             mime_type=mime_type,

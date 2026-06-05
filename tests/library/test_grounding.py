@@ -37,6 +37,14 @@ def fake_store() -> MagicMock:
     return s
 
 
+class _FakeLibrary:
+    def __init__(self, track_ids: set[str] | None = None) -> None:
+        self._track_ids = track_ids or set()
+
+    def lookup_by_id(self, track_id: str):
+        return object() if track_id in self._track_ids else None
+
+
 def test_thresholds_locked() -> None:
     assert CITATION_THRESHOLD == 0.7
     assert UNCERTAIN_THRESHOLD == 0.6
@@ -54,6 +62,39 @@ def test_cited_decision_above_threshold(fake_embedder, fake_store) -> None:
     assert c.decision == "cited"
     assert c.track_id == "t000"
     assert c.is_cited is True
+
+
+def test_cited_decision_requires_library_self_match(fake_embedder, fake_store) -> None:
+    fake_store.search.return_value = [("stale-track", 0.95)]
+
+    c = identify_playing(
+        fake_embedder,
+        fake_store,
+        b"audio",
+        event_type="TRACK_CHANGE",
+        library=_FakeLibrary({"fresh-track"}),
+    )
+
+    assert c is not None
+    assert c.decision == "unregistered_track"
+    assert c.track_id is None
+    assert c.is_cited is False
+
+
+def test_library_self_match_allows_registered_track(fake_embedder, fake_store) -> None:
+    fake_store.search.return_value = [("t000", 0.85)]
+
+    c = identify_playing(
+        fake_embedder,
+        fake_store,
+        b"audio",
+        event_type="TRACK_CHANGE",
+        library=_FakeLibrary({"t000"}),
+    )
+
+    assert c is not None
+    assert c.decision == "cited"
+    assert c.track_id == "t000"
 
 
 def test_uncertain_decision(fake_embedder, fake_store) -> None:
@@ -113,7 +154,7 @@ def test_empty_store_returns_below_threshold(fake_embedder) -> None:
 
 
 def test_grounding_class_holds_latest_citation(fake_embedder, fake_store) -> None:
-    g = Grounding(fake_embedder, fake_store)
+    g = Grounding(fake_embedder, fake_store, library=_FakeLibrary({"t000"}))
     assert g.get_latest_citation() is None
 
     fake_store.search.return_value = [("t000", 0.85)]
@@ -121,6 +162,17 @@ def test_grounding_class_holds_latest_citation(fake_embedder, fake_store) -> Non
     latest = g.get_latest_citation()
     assert latest is not None
     assert latest.track_id == "t000"
+
+
+def test_grounding_class_doesnt_store_unregistered_track(fake_embedder, fake_store) -> None:
+    g = Grounding(fake_embedder, fake_store, library=_FakeLibrary({"other"}))
+    fake_store.search.return_value = [("t000", 0.85)]
+
+    citation = g.on_event("TRACK_CHANGE", b"audio")
+
+    assert citation is not None
+    assert citation.decision == "unregistered_track"
+    assert g.get_latest_citation() is None
 
 
 def test_grounding_class_doesnt_store_below_threshold(

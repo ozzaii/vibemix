@@ -1698,6 +1698,7 @@ async def main() -> None:
         input_audio_processor = None
         midi_stop: threading.Event | None = None
         midi_watcher_stop: asyncio.Event | None = None
+        grounding_store = None
         cleanup_tasks: list[asyncio.Task] = []
         try:
             _ensure_live_llm_tts_deps()
@@ -1771,6 +1772,41 @@ async def main() -> None:
             )
             stripped_rate_tracker = StrippedRateTracker() if anti_slop_enabled else None
 
+            library_cache = Path.home() / ".cache" / "vibemix" / "library.pkl"
+            deck_library = None
+            grounding = None
+            if library_cache.exists():
+                try:
+                    deck_library = RekordboxLibrary()
+                    if deck_library.try_load_cache():
+                        registered = evidence_registry.register_library(deck_library)
+                        print(f"-> library: {registered} tracks registered for [track:<id>] citations")
+                    else:
+                        deck_library = None
+                except Exception as exc:
+                    deck_library = None
+                    print(f"-> library registration skipped: {exc!r}", file=sys.stderr)
+            if deck_library is not None:
+                try:
+                    from vibemix.library import Grounding, build_embedder, open_store
+
+                    grounding_store = open_store()
+                    grounding = Grounding(
+                        build_embedder(),
+                        grounding_store,
+                        library=deck_library,
+                    )
+                    print("-> grounding: CLAP self-match armed")
+                except Exception as exc:
+                    grounding = None
+                    if grounding_store is not None:
+                        try:
+                            grounding_store.close()
+                        except Exception:
+                            pass
+                        grounding_store = None
+                    print(f"-> grounding skipped: {exc!r}", file=sys.stderr)
+
             def _citation_telemetry() -> dict[str, Any]:
                 slop_ratio = stripped_rate_tracker.slop_ratio() if stripped_rate_tracker is not None else 0.0
                 rate = stripped_rate_tracker.rate() if stripped_rate_tracker is not None else 0.0
@@ -1808,6 +1844,7 @@ async def main() -> None:
                 transcript_sink=transcript_buf,
                 recall=None,
                 recall_enabled=False,
+                grounding=grounding,
                 secondary_ear=os.environ.get("VIBEMIX_GROUND_SECONDARY_EAR", "0").strip().lower()
                 not in ("0", "off", "false", "no", ""),
                 audio_capture_context=audio_capture_context,
@@ -1867,20 +1904,6 @@ async def main() -> None:
                     mic_stream = None
             else:
                 print("-> mic disabled: set VIBEMIX_ENABLE_MIC=1 to enable mic capture")
-
-            library_cache = Path.home() / ".cache" / "vibemix" / "library.pkl"
-            deck_library = None
-            if library_cache.exists():
-                try:
-                    deck_library = RekordboxLibrary()
-                    if deck_library.try_load_cache():
-                        registered = evidence_registry.register_library(deck_library)
-                        print(f"-> library: {registered} tracks registered for citations")
-                    else:
-                        deck_library = None
-                except Exception as exc:
-                    deck_library = None
-                    print(f"-> library registration skipped: {exc!r}", file=sys.stderr)
 
             midi_stop = threading.Event()
             midi_macos.start_listener_thread(midi_stop)
@@ -2075,6 +2098,11 @@ async def main() -> None:
                     await _close_tts_chain(tts_inst)
                 except Exception as exc:
                     print(f"[close tts err] {exc}", file=sys.stderr)
+            if grounding_store is not None:
+                try:
+                    grounding_store.close()
+                except Exception as exc:
+                    print(f"[close grounding store err] {exc}", file=sys.stderr)
             for stream in (voice_stream, pass_stream, input_stream):
                 if stream is None:
                     continue

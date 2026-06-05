@@ -16,7 +16,6 @@ from __future__ import annotations
 from unittest.mock import MagicMock
 
 import numpy as np
-import pytest
 
 
 def _make_track_entry(tid: str):
@@ -66,7 +65,7 @@ def test_drag_drop_xml_then_live_track_citation_validates(
     fake_store = MagicMock()
     fake_store.search.return_value = [("t000", 0.85)]
 
-    grounding = Grounding(fake_embedder, fake_store)
+    grounding = Grounding(fake_embedder, fake_store, library=fake_lib)
     citation = grounding.on_event("TRACK_CHANGE", b"audio_buffer_bytes")
     assert citation is not None
     assert citation.is_cited, (
