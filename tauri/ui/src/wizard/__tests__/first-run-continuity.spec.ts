@@ -54,6 +54,7 @@ import {
   renderCurrentStep,
   type WizardStep,
 } from "../router.js";
+import { sendIpcRequest } from "../../ipc/client.js";
 
 // Mirrors router.ts STEP_ORDER (the numbered chain after the intro hero).
 // Kept local so the test reads the chain it is asserting; if router's
@@ -247,5 +248,25 @@ describe("first-run continuity smoke (POLISH-03)", () => {
     armStep("permissions");
     renderCurrentStep();
     expect(hasEnabledForwardControl(primary())).toBe(true);
+  });
+
+  it("audio step does not probe DJ application windows", () => {
+    const sendIpcRequestMock = vi.mocked(sendIpcRequest);
+    sendIpcRequestMock.mockClear();
+
+    getDevSurface().setState({
+      currentStep: "audio",
+      step2: {
+        ...getDevSurface().getState().step2,
+        selectedDeviceId: "",
+      },
+    });
+    renderCurrentStep();
+
+    expect(sendIpcRequestMock).not.toHaveBeenCalledWith(
+      "ipc.calibration.list_windows",
+      {},
+      "ipc.calibration.window_list",
+    );
   });
 });

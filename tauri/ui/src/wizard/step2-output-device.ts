@@ -41,7 +41,6 @@ export interface Step2State {
   blackHoleBannerPostClick: boolean;
   devices: DropdownDeviceItem[];
   selectedDeviceId: string;
-  detectedDjApp?: { appName: string; windowTitle: string };
   /** Phase 97 / ONBOARD-04 — headphone device pick for tutor exemplar
    *  playback. `null` means system default (the user has not chosen);
    *  otherwise the integer index from the `devices` array maps to a

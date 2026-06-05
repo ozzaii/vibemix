@@ -12,7 +12,7 @@
  *   - Wizard step0 intro CTA — armed Let's-go button.
  *   - Wizard step1 Continue + Back CTAs + Grant + DENIED · open
  *     Settings affordance (the permissions-card role="button" chip).
- *   - Wizard step2 device dropdown + test-tone button + window picker.
+ *   - Wizard step2 output-device picker + Continue CTA.
  *   - Wizard step3 controller-probe Listen Again + Skip.
  *   - Wizard profile-consent + telemetry-consent toggle rows + CTAs.
  *   - Settings drawer __close + __btn + interactive-union safety net.
@@ -109,12 +109,12 @@ test.describe("VIS-02 hover-glow — wizard step2 output-device (Plan 43-03)", (
     await page.locator(".wizard-step--output-device").waitFor();
   });
 
-  test("test-tone button carries --glow-faint on hover", async ({ page }) => {
-    const tone = page
+  test("Continue CTA carries --glow-faint on hover", async ({ page }) => {
+    const cta = page
       .locator(".wizard-step--output-device .cmp-btn")
-      .first();
-    await tone.hover();
-    const shadow = await tone.evaluate(
+      .last();
+    await cta.hover();
+    const shadow = await cta.evaluate(
       (el) => getComputedStyle(el).boxShadow,
     );
     expect(shadow).toMatch(GLOW_FAINT_BOX_SHADOW);

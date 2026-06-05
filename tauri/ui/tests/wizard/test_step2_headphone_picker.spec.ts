@@ -25,7 +25,6 @@ function makeState(over: Partial<Step2State> = {}): Step2State {
       { id: "2", name: "BlackHole 2ch" },
     ],
     selectedDeviceId: "0",
-    detectedDjApp: undefined,
     selectedHeadphoneDeviceIndex: null,
     ...over,
   };

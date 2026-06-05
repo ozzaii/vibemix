@@ -10,8 +10,6 @@
  *   - Step 1 [ Grant ] buttons invoke Tauri commands open_*_settings /
  *     request_microphone_permission.
  *   - Step 2 mount -> ipc.calibration.list_devices.
- *   - Step 2 mount -> ipc.calibration.list_windows for a DJ-app hint
- *     (Warning #4: WS-only window enumeration, no Tauri-side command).
  *   - Step 3 mount → ipc.calibration.start_midi_listen (timeout 10s).
  *   - Smoke-test mount → ipc.calibration.smoke_test (timeout 30s).
  *   - Wizard done → emitIpc ipc.wizard.done + invoke write_first_run_state.
@@ -89,7 +87,6 @@ const DEFAULT_STATE: WizardState = {
     blackHoleBannerPostClick: false,
     devices: [],
     selectedDeviceId: "",
-    detectedDjApp: undefined,
     // Phase 97 / ONBOARD-04 — headphone picker default = system default
     // (null on the wire). The user can flip this to any real device
     // index via the Step 2 picker.
@@ -647,9 +644,9 @@ function startStep1PermissionPoll(): void {
   step1PollTimer = window.setInterval(() => void poll(), 1000);
 }
 
-/** Step 2 bootstrap — request device list + window list in parallel. */
+/** Step 2 bootstrap — request the output-device list. */
 async function boostrapStep2(): Promise<void> {
-  await Promise.allSettled([refreshDeviceList(), refreshWindowList()]);
+  await refreshDeviceList();
 }
 
 async function refreshDeviceList(): Promise<void> {
@@ -684,49 +681,6 @@ async function refreshDeviceList(): Promise<void> {
     });
   } catch (err) {
     console.warn("[step2] list_devices failed:", err);
-  }
-}
-
-async function refreshWindowList(): Promise<void> {
-  // Warning #4: WS-only window enumeration, no Tauri window-enum command.
-  try {
-    const resp = await sendIpcRequest(
-      "ipc.calibration.list_windows",
-      {},
-      "ipc.calibration.window_list",
-    );
-    const payload = (resp as { payload: { windows: Array<{ id: string; app_name: string; title: string; dj_app_hint: string | null }> } }).payload;
-    if (payload.windows.length === 0) {
-      setState({
-        step2: {
-          ...wizardState.step2,
-          detectedDjApp: undefined,
-        },
-      });
-      return;
-    }
-    // Auto-select the first DJ-app match using the Python hint-table order.
-    const djWindow = payload.windows.find((w) => w.dj_app_hint !== null);
-    if (djWindow) {
-      setState({
-        step2: {
-          ...wizardState.step2,
-          detectedDjApp: {
-            appName: djWindow.app_name,
-            windowTitle: djWindow.title,
-          },
-        },
-      });
-    } else {
-      setState({
-        step2: {
-          ...wizardState.step2,
-          detectedDjApp: undefined,
-        },
-      });
-    }
-  } catch (err) {
-    console.warn("[step2] list_windows failed:", err);
   }
 }
 
@@ -825,7 +779,7 @@ async function completeWizard(): Promise<void> {
         calibrated_at: new Date().toISOString(),
         output_device_id: payload.output_device_id,
         controller_profile: payload.controller_profile,
-        target_dj_app_hint: wizardState.step2.detectedDjApp?.appName ?? null,
+        target_dj_app_hint: null,
         target_window_id: payload.target_window_id,
         blackhole_install_seen: wizardState.step2.blackHoleBannerPostClick,
       },

@@ -98,7 +98,7 @@ describe("staleness-banner — dismiss hides + emits action", () => {
 });
 
 describe("staleness-banner — refresh action", () => {
-  it("shows Refresh library for a refreshable source and calls onRefresh", async () => {
+  it("hides the re-index action for a retired XML source", async () => {
     const onRefresh = vi.fn(async (_path: string, _kind: string) => undefined);
     const handle = renderStalenessBanner({ onRefresh });
     document.body.append(handle.element);
@@ -120,15 +120,19 @@ describe("staleness-banner — refresh action", () => {
     const refreshBtn = handle.element.querySelector(
       ".vmx-staleness-refresh",
     ) as HTMLButtonElement;
-    expect(refreshBtn.classList.contains("hidden")).toBe(false);
+    expect(refreshBtn.classList.contains("hidden")).toBe(true);
+    expect(refreshBtn.disabled).toBe(true);
+    expect(handle.element.textContent).toContain(
+      "Choose a music folder below so Viber can listen locally.",
+    );
     refreshBtn.click();
     await _flushMicrotasks();
 
-    expect(onRefresh).toHaveBeenCalledWith("/Music/collection.xml", "xml");
-    expect(handle.element.classList.contains("hidden")).toBe(true);
+    expect(onRefresh).not.toHaveBeenCalled();
+    expect(handle.element.classList.contains("hidden")).toBe(false);
   });
 
-  it("labels a detected-but-unindexed source as an import action", async () => {
+  it("labels a detected-but-unindexed folder as an index action", async () => {
     const onRefresh = vi.fn(async (_path: string, _kind: string) => undefined);
     const handle = renderStalenessBanner({ onRefresh });
     document.body.append(handle.element);
@@ -141,7 +145,8 @@ describe("staleness-banner — refresh action", () => {
       payload: {
         age_days: 0,
         snoozed_until_ts: null,
-        source_path: "/Music/rekordbox/collection.xml",
+        source_path: "/Music/rekordbox",
+        source_kind: "folder",
         reason: "source_detected_not_indexed",
         schema_version: "1",
       },
@@ -151,12 +156,12 @@ describe("staleness-banner — refresh action", () => {
       ".vmx-staleness-refresh",
     ) as HTMLButtonElement;
     expect(handle.element.textContent).toContain("source found");
-    expect(handle.element.textContent).toContain("Import it so Viber can use your tracks.");
-    expect(refreshBtn.textContent).toBe("Import library");
+    expect(handle.element.textContent).toContain("Index it so Viber can use your tracks.");
+    expect(refreshBtn.textContent).toBe("Index folder");
     refreshBtn.click();
     await _flushMicrotasks();
 
-    expect(onRefresh).toHaveBeenCalledWith("/Music/rekordbox/collection.xml", "xml");
+    expect(onRefresh).toHaveBeenCalledWith("/Music/rekordbox", "folder");
   });
 
   it("routes folder sources to the re-index action", async () => {
@@ -240,9 +245,7 @@ describe("staleness-banner — refresh action", () => {
     ) as HTMLButtonElement;
     expect(refreshBtn.classList.contains("hidden")).toBe(true);
     expect(refreshBtn.disabled).toBe(true);
-    expect(handle.element.textContent).toContain(
-      "Drop the Rekordbox XML or import a folder below.",
-    );
+    expect(handle.element.textContent).toContain("Drop a music folder below.");
   });
 });
 
