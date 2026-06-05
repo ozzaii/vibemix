@@ -188,7 +188,7 @@ describe("Phase 12 — session + drawer integration", () => {
     expect(getSessionState().settings.learn_headphone_device_index).toBe(4);
   });
 
-  it("voice picker lists real MOSS voices and emits the selected voice", async () => {
+  it("voice picker lists local voice presets and emits the selected voice", async () => {
     mountSettingsDrawer(document.body);
     applySettingsState({
       voice: "Adam",
@@ -230,6 +230,7 @@ describe("Phase 12 — session + drawer integration", () => {
     ]);
     expect(optionIds).not.toContain("kore");
     expect(optionIds).not.toContain("puck");
+    expect(picker!.textContent).not.toContain("MOSS");
 
     const bella = Array.from(
       picker!.querySelectorAll<HTMLElement>(".vmx-picker__opt"),

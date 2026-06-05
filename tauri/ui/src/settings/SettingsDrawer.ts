@@ -937,7 +937,7 @@ function renderDrawerBody(body: HTMLElement, modalSlot: HTMLElement): void {
       label: "VOICE",
       value: settings.voice,
       avatar: true,
-      options: VOICE_OPTIONS.map((v) => ({ id: v, label: v, sub: "MOSS" })),
+      options: VOICE_OPTIONS.map((v) => ({ id: v, label: v })),
       onChange: (id) => {
         void sendSettingsField("voice", id);
       },
