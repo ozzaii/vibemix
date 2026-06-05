@@ -357,6 +357,7 @@ describe("layout projection", () => {
     // lens "hype" wins over the legacy mode "coach": the deck reflects the
     // persona the live brain runs (lens), not the writer-less mode field.
     expect(layout.persona.interaction).toBe("HYPE");
+    expect(layout.persona.mood).toBe("HYPE");
     expect(layout.output.profile).toBe("SPK");
   });
 });

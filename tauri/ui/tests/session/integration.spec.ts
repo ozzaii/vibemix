@@ -7,7 +7,7 @@
  *   4. Simulate a settings boot payload (write into SessionState via
  *      `applySettingsState`) — drawer must read these values when opened.
  *   5. Open the drawer (programmatically via openSettings).
- *   6. Click a rocker option (interaction mode "coach") — assert that
+ *   6. Click a rocker option (persona mode "coach") — assert that
  *      `forward_ipc_to_sidecar` was invoked with `ipc.settings.set`.
  *   7. Close the drawer — assert state preserved (settings unchanged).
  */
@@ -27,7 +27,10 @@ import { listen as listenMock_ } from "@tauri-apps/api/event";
 const invokeMock = invokeMock_ as unknown as ReturnType<typeof vi.fn>;
 const listenMock = listenMock_ as unknown as ReturnType<typeof vi.fn>;
 
-import { mountSessionLayout } from "../../src/session/SessionLayout.js";
+import {
+  mountSessionLayout,
+  renderSessionFrame,
+} from "../../src/session/SessionLayout.js";
 import {
   _resetDrawerForTests,
   closeSettings,
@@ -42,6 +45,7 @@ import {
   _resetSessionStateForTests,
   getSessionState,
 } from "../../src/session/state.js";
+import { _internals as renderLoopInternals } from "../../src/session/render-loop.js";
 import {
   applySettingsState,
   SETTINGS_FIELDS,
@@ -270,6 +274,18 @@ describe("Phase 12 — session + drawer integration", () => {
     openSettings();
     invokeMock.mockClear();
 
+    expect(
+      document.querySelector('[data-wire="settings.persona.mode"]'),
+    ).toBeNull();
+    const lens = document.querySelector<HTMLElement>(
+      '[data-wire="settings.persona.lens"]',
+    );
+    expect(lens?.textContent).toContain("MODE");
+    expect(
+      Array.from(lens?.querySelectorAll<HTMLElement>(".vmx-rocker__seg") ?? [])
+        .map((el) => el.textContent),
+    ).toEqual(["Hype", "Coach", "Teach"]);
+
     const critiqueBtn = Array.from(
       document.querySelectorAll<HTMLElement>(
         '.vmx-settings-drawer .vmx-rocker__seg',
@@ -297,7 +313,7 @@ describe("Phase 12 — session + drawer integration", () => {
     expect(payload).toEqual({ field: "lens", value: "critique" });
   });
 
-  it("boots session → opens drawer → emits ipc.settings.set on rocker change → close preserves state", async () => {
+  it("boots session → opens drawer → emits ipc.settings.set on persona mode change → close preserves state", async () => {
     // 1. Mount the session layout.
     const host = document.createElement("div");
     document.body.append(host);
@@ -317,6 +333,7 @@ describe("Phase 12 — session + drawer integration", () => {
       retention_days: 14,
       push_to_mute_hotkey: "cmd+shift+m",
       muted: false,
+      lens: "hype",
     });
 
     expect(getSessionState().settings.voice).toBe("Bella");
@@ -327,22 +344,20 @@ describe("Phase 12 — session + drawer integration", () => {
     openSettings();
     expect(getSettingsUIState().open).toBe(true);
 
-    // 5. Click the COACH rocker option (interaction mode).
-    const coachBtn = Array.from(
-      document.querySelectorAll<HTMLElement>(
-        '.vmx-settings-drawer .vmx-rocker__seg',
-      ),
-    ).find((el) => el.dataset.id === "coach");
-    expect(coachBtn).toBeTruthy();
-    coachBtn?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    // 5. Click TEACH on the one persona-mode rocker.
+    const teachBtn = document.querySelector<HTMLElement>(
+      '[data-wire="settings.persona.lens"] .vmx-rocker__seg[data-id="tutor"]',
+    );
+    expect(teachBtn).toBeTruthy();
+    teachBtn?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
 
     // Allow microtasks to flush — sendSettings is async (emitIpc → invoke).
     await Promise.resolve();
     await Promise.resolve();
 
     // 6. Assert forward_ipc_to_sidecar was invoked at least once with
-    //    a message carrying ipc.settings.set and payload field=mode,
-    //    value=coach.
+    //    a message carrying ipc.settings.set and payload field=lens,
+    //    value=tutor.
     expect(invokeMock).toHaveBeenCalled();
     const settingsSetCall = invokeMock.mock.calls.find((c) => {
       const args = c[1] as { message?: { type?: string; payload?: unknown } };
@@ -354,8 +369,8 @@ describe("Phase 12 — session + drawer integration", () => {
         message: { payload: { field: string; value: unknown } };
       }
     ).message.payload;
-    expect(payload.field).toBe("mode");
-    expect(payload.value).toBe("coach");
+    expect(payload.field).toBe("lens");
+    expect(payload.value).toBe("tutor");
 
     // 7. Close the drawer — UI state flips; SessionState.settings is
     //    unaffected by the close (the rocker click queued an ipc.settings.set;
@@ -366,6 +381,46 @@ describe("Phase 12 — session + drawer integration", () => {
     // The SessionState reflects whatever we last hydrated — the optimistic
     // local write happens via the sidecar round-trip, not the drawer.
     expect(getSessionState().settings.voice).toBe("Bella");
+  });
+
+  it("deck persona button writes lens, not the overridden mood field", async () => {
+    const host = document.createElement("div");
+    document.body.append(host);
+    const mounted = mountSessionLayout(host);
+
+    applySettingsState({
+      voice: "Bella",
+      mode: "coach",
+      genre: "techno",
+      output_device_id: null,
+      output_profile: "hp",
+      retention_days: 14,
+      push_to_mute_hotkey: "cmd+shift+m",
+      muted: false,
+      lens: "hype",
+      mood: "teacher",
+    });
+    renderSessionFrame(
+      mounted,
+      renderLoopInternals.projectToLayoutState(getSessionState()),
+    );
+    invokeMock.mockClear();
+
+    document.querySelector<HTMLButtonElement>(".vmx-persona")?.click();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    const settingsSetCall = invokeMock.mock.calls.find((c) => {
+      const args = c[1] as { message?: { type?: string; payload?: unknown } };
+      return args?.message?.type === "ipc.settings.set";
+    });
+    expect(settingsSetCall).toBeDefined();
+    const payload = (
+      settingsSetCall![1] as {
+        message: { payload: { field: string; value: unknown } };
+      }
+    ).message.payload;
+    expect(payload).toEqual({ field: "lens", value: "critique" });
   });
 
   it("retention slider click emits ipc.settings.set with retention_days", async () => {

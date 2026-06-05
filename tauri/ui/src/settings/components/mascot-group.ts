@@ -12,7 +12,7 @@
  *     overlay window passes pointer events through to the app beneath
  *     (Plan 13-02 wires the actual `set_mascot_click_through` Tauri
  *     command). Default OFF — the window stays draggable.
- *   - MOOD: 3 segmented pills (HYPE-MAN / TEACHER / COACH). The active
+ *   - MOOD: 3 segmented pills (HYPE / COACH / TEACH). The active
  *     pill paints amber-backlit per the v5 .mood-btn.on anatomy (mock-
  *     verbatim gradient + inset glow), matching the existing interaction
  *     rocker (no flat fills).
@@ -61,9 +61,9 @@ interface MoodOption {
 }
 
 const MOOD_OPTIONS: readonly MoodOption[] = [
-  { id: "hype-man", label: "HYPE-MAN" },
-  { id: "teacher", label: "TEACHER" },
+  { id: "hype-man", label: "HYPE" },
   { id: "coach", label: "COACH" },
+  { id: "teacher", label: "TEACH" },
 ];
 
 const CSS = `

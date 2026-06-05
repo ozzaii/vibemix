@@ -129,11 +129,12 @@ export interface SessionState {
     skill: "BEG" | "INT" | "PRO";
     /** Legacy 2-state — retained for back-compat with existing tests / wires. */
     interaction: "HYPE" | "COACH";
+    /** Persona display value. Kept as `mood` for layout compatibility. */
     mood: "HYPE" | "TEACH" | "COACH";
     voice: string;
     genre: string;
-    /** Tap-to-cycle mood (HYPE → TEACH → COACH) — render-loop wires it to
-     *  ipc.settings.set mood. Omitted (dev mock) → tap is a no-op. */
+    /** Tap-to-cycle persona mode. Render-loop wires it to ipc.settings.set lens.
+     *  Omitted (dev mock) means tap is a no-op. */
     onCycleMood?: () => void;
   };
   output: {
@@ -321,7 +322,7 @@ const LAYOUT_CSS = `
   }
   .vmx-persona:focus-visible { outline: 2px solid var(--amber); outline-offset: 3px; border-radius: var(--rad-sm); }
   /* The "PERSONA" key micro-label was redundant chrome — the lit mood word plus
-   * the button's full aria-label ("co-host mood: hype. tap to cycle…") already
+   * the button's full aria-label ("co-host persona: hype. tap to cycle...") already
    * name the control. Cut so the rose mood word reads in one beat, no key/value
    * spec-sheet tic (impeccable layout pass, 2026-06-03). */
   .vmx-persona__v {
@@ -942,7 +943,7 @@ export function mountSessionLayout(
   persona.type = "button";
   persona.className = "vmx-persona";
   // Mood value only — the "persona" key label was redundant with the aria-label
-  // ("co-host mood: …. tap to cycle …") set on every mood change below.
+  // ("co-host persona: ... tap to cycle ...") set on every persona change below.
   const personaValue = document.createElement("span");
   personaValue.className = "vmx-persona__v";
   persona.append(personaValue);
@@ -1219,7 +1220,7 @@ function applyState(mounted: Mounted, next: SessionState, isMount: boolean): voi
     mounted.persona.dataset.mood = next.persona.mood;
     mounted.persona.setAttribute(
       "aria-label",
-      `co-host mood: ${next.persona.mood.toLowerCase()}. tap to cycle hype, coach, teach.`,
+      `co-host persona: ${next.persona.mood.toLowerCase()}. tap to cycle hype, coach, teach.`,
     );
   }
 

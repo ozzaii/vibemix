@@ -99,7 +99,7 @@ describe("MascotGroup rendering", () => {
     const pills = group.querySelectorAll(".vmx-mascot-pill");
     expect(pills.length).toBe(3);
     const labels = Array.from(pills).map((p) => p.textContent);
-    expect(labels).toEqual(["HYPE-MAN", "TEACHER", "COACH"]);
+    expect(labels).toEqual(["HYPE", "COACH", "TEACH"]);
   });
 
   it("MascotGroup public alias matches renderMascotGroup output shape", () => {
@@ -143,7 +143,7 @@ describe("MascotGroup rendering", () => {
     expect(offSeg?.dataset.active).toBe("false");
   });
 
-  it("default state: click_through=false → click-through OFF segment active, mood=hype-man → HYPE-MAN pill active", () => {
+  it("default state: click_through=false → click-through OFF segment active, mood=hype-man → HYPE pill active", () => {
     const group = renderMascotGroup();
     document.body.append(group);
     const ctRocker = group.querySelector<HTMLElement>(

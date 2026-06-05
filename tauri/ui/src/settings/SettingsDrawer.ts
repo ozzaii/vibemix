@@ -780,15 +780,10 @@ const SETTINGS_LENSES: readonly SharedLens[] = ["hype", "critique", "tutor"];
 const SETTINGS_OUTPUT_PROFILES: readonly SettingsView["output_profile"][] = ["hp", "spk"];
 const SETTINGS_MOODS: readonly MascotMood[] = ["hype-man", "teacher", "coach"];
 
-const MODE_LABELS: Record<SettingsView["mode"], string> = {
-  hype: "Hype",
-  coach: "Coach",
-};
-
 const LENS_LABELS: Record<SharedLens, string> = {
   hype: "Hype",
-  critique: "Critique",
-  tutor: "Tutor",
+  critique: "Coach",
+  tutor: "Teach",
 };
 
 const SKILL_LABELS: Record<SkillLevel, string> = {
@@ -950,31 +945,16 @@ function renderDrawerBody(body: HTMLElement, modalSlot: HTMLElement): void {
   );
   personaBody.append(withWire(voicePicker, "settings.persona.voice"));
 
-  // Mode rocker
-  const modeRocker = renderRocker({
-    ariaLabel: "interaction mode",
-    options: [
-      { id: "hype", label: MODE_LABELS.hype },
-      { id: "coach", label: MODE_LABELS.coach },
-    ],
-    active: settings.mode,
-    variant: "interaction",
-    onChange: (id) => {
-      void sendSettingsField("mode", id);
-    },
-  });
-  personaBody.append(withWire(modeRocker, "settings.persona.mode"));
-
   const lensWrap = document.createElement("div");
   lensWrap.style.cssText = "display:flex; flex-direction:column; gap: var(--sp-2);";
   lensWrap.dataset.wire = "settings.persona.lens";
   const lensLabel = document.createElement("div");
   lensLabel.className = "vmx-settings-drawer__label";
-  lensLabel.textContent = "LENS";
+  lensLabel.textContent = "MODE";
   lensWrap.append(lensLabel);
   lensWrap.append(
     renderRocker({
-      ariaLabel: "shared persona lens",
+      ariaLabel: "persona mode",
       options: [
         { id: "hype", label: LENS_LABELS.hype },
         { id: "critique", label: LENS_LABELS.critique },

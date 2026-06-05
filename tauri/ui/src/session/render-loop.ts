@@ -121,22 +121,20 @@ function openModeSurface(mode: "cohost" | "learn" | "build" | "debrief"): Promis
   return Promise.resolve();
 }
 
-/** 2026-05-26 /impeccable critique P1 — in-deck mood cycle. Advances the
- *  co-host mood HYPE → TEACH → COACH → HYPE and writes it through the same
- *  real, already-wired knob the settings drawer uses
- *  (emitIpc "ipc.settings.set"). Reads the live mood from state at click
+/** Deck persona cycle. Advances the Sven mode HYPE -> COACH -> TEACH -> HYPE
+ *  through the `lens` field the live brain reads. Reads live state at click
  *  time (not a captured value), so repeated taps walk the cycle correctly.
  *  Fire-and-forget; the readout reflects the echoed ipc.settings.state on
- *  the next frame, matching the settings drawer's mascot-group pattern. */
-const MOOD_CYCLE = ["hype-man", "teacher", "coach"] as const;
-function cohostMoodCycleHandler(): void {
-  const cur = getSessionState().settings.mood;
-  const idx = MOOD_CYCLE.indexOf(cur as (typeof MOOD_CYCLE)[number]);
-  const next = MOOD_CYCLE[(idx + 1) % MOOD_CYCLE.length];
-  void emitIpc("ipc.settings.set", { field: "mood", value: next }).catch(
+ *  the next frame, matching the settings drawer's optimistic pattern. */
+const LENS_CYCLE = ["hype", "critique", "tutor"] as const;
+function cohostLensCycleHandler(): void {
+  const cur = getSessionState().settings.lens;
+  const idx = LENS_CYCLE.indexOf(cur as (typeof LENS_CYCLE)[number]);
+  const next = LENS_CYCLE[(idx + 1) % LENS_CYCLE.length];
+  void emitIpc("ipc.settings.set", { field: "lens", value: next }).catch(
     (err: unknown) => {
       // eslint-disable-next-line no-console
-      console.warn("[render-loop] mood cycle emitIpc failed:", err);
+      console.warn("[render-loop] lens cycle emitIpc failed:", err);
     },
   );
 }
@@ -413,11 +411,10 @@ function projectToLayoutState(s: BridgeSessionState): LayoutSessionState {
       // deck readout from lens, not the now writer-less `mode`, so the deck
       // never shows a persona the co-host is not running.
       interaction: s.settings.lens === "hype" ? "HYPE" : "COACH",
-      mood: moodFromSettings(s.settings.mood),
+      mood: lensFromSettings(s.settings.lens),
       voice: s.settings.voice,
       genre: s.settings.genre,
-      // 2026-05-26 /impeccable critique P1 — in-deck mood cycle handler.
-      onCycleMood: cohostMoodCycleHandler,
+      onCycleMood: cohostLensCycleHandler,
     },
     output: {
       device: s.settings.output_device_id ?? "AUTO",
@@ -483,15 +480,15 @@ function skillFromSettings(
   }
 }
 
-function moodFromSettings(
-  mood: BridgeSessionState["settings"]["mood"],
+function lensFromSettings(
+  lens: BridgeSessionState["settings"]["lens"],
 ): "HYPE" | "TEACH" | "COACH" {
-  switch (mood) {
-    case "teacher":
+  switch (lens) {
+    case "tutor":
       return "TEACH";
-    case "coach":
+    case "critique":
       return "COACH";
-    case "hype-man":
+    case "hype":
     default:
       return "HYPE";
   }

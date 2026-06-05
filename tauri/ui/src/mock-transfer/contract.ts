@@ -332,7 +332,6 @@ export const SETTINGS_GROUP_WIRES = [
 
 export const SETTINGS_PERSONA_CONTROL_WIRES = [
   "settings.persona.voice",
-  "settings.persona.mode",
   "settings.persona.lens",
   "settings.persona.genre",
   "settings.persona.skill",
