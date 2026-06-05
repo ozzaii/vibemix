@@ -118,9 +118,9 @@ function armStep(step: WizardStep): void {
       });
       break;
     case "audio":
-      // A window is picked → Continue arms (step2 armed = windowSelected).
+      // Output selection lands -> Continue arms.
       dev.setState({
-        step2: { ...dev.getState().step2, windowSelected: true },
+        step2: { ...dev.getState().step2, selectedDeviceId: "built-in" },
       });
       break;
     case "controller":

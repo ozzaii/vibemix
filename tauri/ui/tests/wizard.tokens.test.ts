@@ -4,7 +4,7 @@
  * primitives. The spec stays green for the rest of the phase.
  *
  * Renders the heaviest-token-reference wizard components (primary-panel,
- * window-picker, controller-probe, dropdown-device) and asserts the
+ * controller-probe, dropdown-device) and asserts the
  * rendered HTML + registered stylesheet text is free of legacy shim
  * tokens.
  *
@@ -61,18 +61,6 @@ describe("wizard surface tokens (wave 1)", () => {
     expect(rendered.dataset.tile).toBeUndefined();
   });
 
-  it("WindowPicker renders without legacy token refs", async () => {
-    const { WindowPicker } = await import("../src/wizard/components/window-picker.js");
-    const rendered = WindowPicker({
-      mode: "hint",
-      detectedHint: { appName: "djay Pro", windowTitle: "main" },
-      onSelect: () => {},
-      onPickDifferent: () => {},
-    });
-    document.body.append(rendered);
-    expect(containsLegacyToken(renderedHtmlPlusStyles(rendered))).toBe(false);
-  });
-
   it("ControllerProbe renders without legacy token refs", async () => {
     const { ControllerProbe } = await import("../src/wizard/components/controller-probe.js");
     const rendered = ControllerProbe({
@@ -95,7 +83,7 @@ describe("wizard surface tokens (wave 1)", () => {
     });
     document.body.append(rendered);
     expect(rendered.textContent).toContain("DDJ-FLX4 over USB");
-    expect(rendered.textContent).toContain("Enable MIDI output in Rekordbox");
+    expect(rendered.textContent).toContain("Enable MIDI output in your DJ app");
     expect(rendered.textContent).toContain("move a fader, knob, pad, cue, or play");
   });
 

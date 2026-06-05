@@ -9,11 +9,9 @@
  *   - Step 1 permission cards poll ipc.permission.check @1Hz.
  *   - Step 1 [ Grant ] buttons invoke Tauri commands open_*_settings /
  *     request_microphone_permission.
- *   - Step 2 mount → ipc.calibration.list_devices.
- *   - Step 2 [ PLAY 1 kHz TEST ] → ipc.calibration.probe_audio (parallel
- *     to user heard-tone Yes/Retry → emitIpc user_heard_tone).
- *   - Step 2 window picker → ipc.calibration.list_windows (Warning #4 —
- *     WS-only window picker; no Tauri-side window-enum command).
+ *   - Step 2 mount -> ipc.calibration.list_devices.
+ *   - Step 2 mount -> ipc.calibration.list_windows for a DJ-app hint
+ *     (Warning #4: WS-only window enumeration, no Tauri-side command).
  *   - Step 3 mount → ipc.calibration.start_midi_listen (timeout 10s).
  *   - Smoke-test mount → ipc.calibration.smoke_test (timeout 30s).
  *   - Wizard done → emitIpc ipc.wizard.done + invoke write_first_run_state.
@@ -91,12 +89,7 @@ const DEFAULT_STATE: WizardState = {
     blackHoleBannerPostClick: false,
     devices: [],
     selectedDeviceId: "",
-    audioTestState: "idle",
-    audioPassed: false,
-    actualRate: 0,
     detectedDjApp: undefined,
-    windowPickerMode: "hint",
-    windowSelected: false,
     // Phase 97 / ONBOARD-04 — headphone picker default = system default
     // (null on the wire). The user can flip this to any real device
     // index via the Step 2 picker.
@@ -393,41 +386,6 @@ export function renderCurrentStep(): void {
         onBack: () => back(),
         onSelectDevice: (id) =>
           setState({ step2: { ...wizardState.step2, selectedDeviceId: id } }),
-        onPlayTest: () => {
-          setState({
-            step2: { ...wizardState.step2, audioTestState: "playing" },
-          });
-          void runProbeAudio();
-        },
-        onAudioYes: () => {
-          // Forward the user's Yes — the sidecar correlates this
-          // with the in-flight probe_audio handler (if still waiting).
-          void emitIpc("ipc.calibration.user_heard_tone", { heard: true });
-          // If the probe already resolved as "failed" (timeout or
-          // programmatic mismatch) before the user clicked Yes, the
-          // sidecar's user_heard_tone event has already fired and the
-          // emit above is a no-op. Honor the user's override locally so
-          // Continue arms — they're the ground truth on whether they
-          // heard the tone.
-          if (
-            wizardState.step2.audioTestState === "failed" ||
-            wizardState.step2.audioTestState === "programmatic-failed"
-          ) {
-            setState({
-              step2: {
-                ...wizardState.step2,
-                audioTestState: "passed",
-                audioPassed: true,
-              },
-            });
-          }
-        },
-        onAudioRetry: () => {
-          void emitIpc("ipc.calibration.user_heard_tone", { heard: false });
-          setState({
-            step2: { ...wizardState.step2, audioTestState: "idle" },
-          });
-        },
         onOpenInstall: () => {
           // Capability allowlist (11-03) permits this single URL.
           void invoke("plugin:shell|open", {
@@ -439,14 +397,6 @@ export function renderCurrentStep(): void {
         },
         onRecheckBlackHole: () => {
           void recheckBlackHole();
-        },
-        onSelectWindow: () =>
-          setState({ step2: { ...wizardState.step2, windowSelected: true } }),
-        onPickDifferent: () => {
-          setState({
-            step2: { ...wizardState.step2, windowPickerMode: "enum" },
-          });
-          void refreshWindowList();
         },
         // Phase 97 / ONBOARD-04 — headphone picker callback. Updates the
         // local Step 2 state AND fires ipc.settings.set so the sidecar
@@ -738,7 +688,7 @@ async function refreshDeviceList(): Promise<void> {
 }
 
 async function refreshWindowList(): Promise<void> {
-  // Warning #4 — WS-only window picker; no Tauri window-enum command.
+  // Warning #4: WS-only window enumeration, no Tauri window-enum command.
   try {
     const resp = await sendIpcRequest(
       "ipc.calibration.list_windows",
@@ -747,19 +697,15 @@ async function refreshWindowList(): Promise<void> {
     );
     const payload = (resp as { payload: { windows: Array<{ id: string; app_name: string; title: string; dj_app_hint: string | null }> } }).payload;
     if (payload.windows.length === 0) {
-      // Empty enumeration — surface "no windowed apps detected" via enum
-      // mode with an empty list (the picker shows the recheck CTA).
       setState({
         step2: {
           ...wizardState.step2,
           detectedDjApp: undefined,
-          windowPickerMode: "enum",
         },
       });
       return;
     }
-    // Auto-select the first DJ-app match (preferring djay > rekordbox >
-    // serato > traktor > virtualdj per the Python hint table).
+    // Auto-select the first DJ-app match using the Python hint-table order.
     const djWindow = payload.windows.find((w) => w.dj_app_hint !== null);
     if (djWindow) {
       setState({
@@ -769,7 +715,6 @@ async function refreshWindowList(): Promise<void> {
             appName: djWindow.app_name,
             windowTitle: djWindow.title,
           },
-          windowPickerMode: "hint",
         },
       });
     } else {
@@ -777,7 +722,6 @@ async function refreshWindowList(): Promise<void> {
         step2: {
           ...wizardState.step2,
           detectedDjApp: undefined,
-          windowPickerMode: "enum",
         },
       });
     }
@@ -791,47 +735,6 @@ async function recheckBlackHole(): Promise<void> {
     step2: { ...wizardState.step2, blackHoleBannerPostClick: false },
   });
   await refreshDeviceList();
-}
-
-async function runProbeAudio(): Promise<void> {
-  if (!wizardState.step2.selectedDeviceId) {
-    console.warn("[step2] no device selected");
-    return;
-  }
-  try {
-    const resp = await sendIpcRequest(
-      "ipc.calibration.probe_audio",
-      {
-        output_device_id: wizardState.step2.selectedDeviceId,
-        expected_rate: 48000,
-      },
-      "ipc.calibration.audio_result",
-      35_000, // longer than default — 30s user-confirm window + 5s buffer
-    );
-    const payload = (resp as {
-      payload: {
-        playback_ok: boolean;
-        audible_confirmed: boolean;
-        programmatic_pass: boolean;
-        actual_rate: number | null;
-        error: string | null;
-      };
-    }).payload;
-    const passed = payload.audible_confirmed && payload.programmatic_pass;
-    setState({
-      step2: {
-        ...wizardState.step2,
-        audioTestState: passed ? "passed" : "failed",
-        audioPassed: passed,
-        actualRate: payload.actual_rate ?? 0,
-      },
-    });
-  } catch (err) {
-    console.warn("[step2] probe_audio failed:", err);
-    setState({
-      step2: { ...wizardState.step2, audioTestState: "failed", audioPassed: false },
-    });
-  }
 }
 
 async function runMidiListen(): Promise<void> {

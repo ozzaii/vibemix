@@ -2,8 +2,8 @@
 //
 // Phase 97 / ONBOARD-04 — Headphone device picker on wizard step 2.
 //
-// Pins the new picker surface: an additional DropdownDevice below the
-// AudioTestButton block. Users pick where tutor exemplar playback should
+// Pins the picker surface: an additional DropdownDevice below the
+// master-output picker. Users pick where tutor exemplar playback should
 // route (default = system output). The wire shape is the EXISTING
 // ipc.settings.set { field: 'learn.headphone_device_index' } envelope
 // landed in P93 — this plan adds the picker UI, not the wire field.
@@ -25,12 +25,7 @@ function makeState(over: Partial<Step2State> = {}): Step2State {
       { id: "2", name: "BlackHole 2ch" },
     ],
     selectedDeviceId: "0",
-    audioTestState: "idle",
-    audioPassed: false,
-    actualRate: 48000,
     detectedDjApp: undefined,
-    windowPickerMode: "hint",
-    windowSelected: false,
     selectedHeadphoneDeviceIndex: null,
     ...over,
   };
@@ -41,13 +36,8 @@ function makeCallbacks(over: Partial<Step2Callbacks> = {}): Step2Callbacks {
     platform: "darwin",
     onContinue: vi.fn(),
     onSelectDevice: vi.fn(),
-    onPlayTest: vi.fn(),
-    onAudioYes: vi.fn(),
-    onAudioRetry: vi.fn(),
     onOpenInstall: vi.fn(),
     onRecheckBlackHole: vi.fn(),
-    onSelectWindow: vi.fn(),
-    onPickDifferent: vi.fn(),
     onBack: vi.fn(),
     onSelectHeadphoneDevice: vi.fn(),
     ...over,
@@ -91,8 +81,20 @@ describe("wizard step 2 — headphone picker (ONBOARD-04)", () => {
     );
     expect(heading?.textContent).toBe("tutor exemplar playback (headphones)");
     expect(helper?.textContent).toBe(
-      "beginner lessons play short audio examples — pick where they should come out.",
+      "beginner lessons play short audio examples; pick where they should come out.",
     );
+  });
+
+  it("does not render the retired tone or fake window controls", () => {
+    const rendered = renderStep2(makeState(), makeCallbacks());
+    document.body.append(rendered);
+
+    expect(rendered.querySelector(".cmp-audio-test")).toBeNull();
+    expect(rendered.querySelector(".cmp-window-picker")).toBeNull();
+    expect(rendered.textContent).not.toContain("1 kHz");
+    expect(rendered.textContent).not.toContain("clean tone");
+    expect(rendered.textContent).not.toContain("Pick a different window");
+    expect(rendered.textContent).not.toContain("Chrome");
   });
 
   it("the default selection is the '[ system default ]' pseudo-option", () => {
@@ -192,12 +194,11 @@ describe("wizard step 2 — headphone picker (ONBOARD-04)", () => {
     expect(headName?.textContent).toBe("AirPods Pro");
   });
 
-  it("does NOT block the wizard Continue button — picker is optional", () => {
-    // Continue arms on windowSelected (existing contract). The picker is
-    // a side-affordance, not a gate. Verify by rendering with continue-
-    // armed criteria met but headphone picker untouched.
+  it("does NOT block the wizard Continue button when the output is selected", () => {
+    // Continue arms on the real output-device selection. The picker is a
+    // side-affordance, not a gate.
     const rendered = renderStep2(
-      makeState({ windowSelected: true, audioPassed: true }),
+      makeState({ selectedDeviceId: "0" }),
       makeCallbacks(),
     );
     document.body.append(rendered);
@@ -211,5 +212,21 @@ describe("wizard step 2 — headphone picker (ONBOARD-04)", () => {
     expect(continueBtn).not.toBeUndefined();
     // The button should be armed (not disabled).
     expect(continueBtn!.disabled).toBe(false);
+  });
+
+  it("keeps Continue disabled until an output device is selected", () => {
+    const rendered = renderStep2(
+      makeState({ selectedDeviceId: "" }),
+      makeCallbacks(),
+    );
+    document.body.append(rendered);
+    const buttons = Array.from(
+      rendered.querySelectorAll<HTMLButtonElement>("button"),
+    );
+    const continueBtn = buttons.find((b) =>
+      b.textContent?.includes("Continue"),
+    );
+    expect(continueBtn).not.toBeUndefined();
+    expect(continueBtn!.disabled).toBe(true);
   });
 });

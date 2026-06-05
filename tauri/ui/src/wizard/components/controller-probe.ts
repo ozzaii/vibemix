@@ -307,7 +307,7 @@ export function ControllerProbe(props: ControllerProbeProps): HTMLElement {
   const hint = document.createElement("div");
   hint.className = "cmp-ctrl-probe__hint";
   hint.textContent =
-    "DDJ-FLX4 over USB. Enable MIDI output in Rekordbox, then move a fader, knob, pad, cue, or play.";
+    "DDJ-FLX4 over USB. Enable MIDI output in your DJ app, then move a fader, knob, pad, cue, or play.";
 
   if (props.state === "caught") {
     lcd.textContent = "✓";

@@ -1,27 +1,23 @@
 /* step2-output-device.ts — Step 2 surface (UI-SPEC §Step 2).
  *
- * Header → conditional BlackHole banner (macOS + missing) → DeviceDropdown
- * → AudioTestButton → WindowPicker → Continue CTA (armed only when
- * audio passed + window selected).
+ * Header -> conditional BlackHole banner (macOS + missing) -> DeviceDropdown
+ * -> optional lesson-output picker -> Continue CTA (armed once an output
+ * device is selected).
  *
  * Copy strings VERBATIM from UI-SPEC §Step 2. */
 
 import { PrimaryPanel } from "./components/primary-panel.js";
 import { BlackHoleBanner } from "./components/blackhole-banner.js";
 import { DropdownDevice, type DropdownDevice as DropdownDeviceItem } from "./components/dropdown-device.js";
-import { AudioTestButton, type AudioTestState } from "./components/audio-test-button.js";
-import { WindowPicker, type WindowPickerMode } from "./components/window-picker.js";
 import { Button } from "./components/button.js";
 import { withStepLeadGlyph } from "./step1-permissions.js";
 import { registerStyle } from "./components/_style-registry.js";
 
 /* Phase 43 / Plan 43-03 — VIS-02 hover-glow sweep for the output-device
- * step. Step 2 owns the device dropdown + 1kHz test tone + window picker
- * — every one of those is interactive. The scoped block here lifts the
- * existing .wizard-step__cta-row glow rule (registered by
- * step1-permissions.ts) onto the deeper device-picker / test-tone /
- * window-picker subtrees so the entire calibration surface is uniform
- * under cursor. */
+ * step. Step 2 owns the master-output picker plus optional lesson-output
+ * picker. The scoped block here lifts the existing .wizard-step__cta-row
+ * glow rule (registered by step1-permissions.ts) onto those interactive
+ * subtrees so the calibration surface is uniform under cursor. */
 const CSS = `
   .wizard-step--output-device button:not([disabled]),
   .wizard-step--output-device [role="button"]:not([aria-disabled="true"]),
@@ -45,12 +41,7 @@ export interface Step2State {
   blackHoleBannerPostClick: boolean;
   devices: DropdownDeviceItem[];
   selectedDeviceId: string;
-  audioTestState: AudioTestState;
-  audioPassed: boolean;
-  actualRate: number;
   detectedDjApp?: { appName: string; windowTitle: string };
-  windowPickerMode: WindowPickerMode;
-  windowSelected: boolean;
   /** Phase 97 / ONBOARD-04 — headphone device pick for tutor exemplar
    *  playback. `null` means system default (the user has not chosen);
    *  otherwise the integer index from the `devices` array maps to a
@@ -63,13 +54,8 @@ export interface Step2Callbacks {
   platform: "darwin" | "win32" | "linux";
   onContinue: () => void;
   onSelectDevice: (id: string) => void;
-  onPlayTest: () => void;
-  onAudioYes: () => void;
-  onAudioRetry: () => void;
   onOpenInstall: () => void;
   onRecheckBlackHole: () => void;
-  onSelectWindow: () => void;
-  onPickDifferent: () => void;
   /** Impeccable Wave 5.A — walks the wizard one step backward. Optional
    *  for back-compat with existing tests; the router always wires it. */
   onBack?: () => void;
@@ -95,7 +81,7 @@ export function renderStep2(state: Step2State, cb: Step2Callbacks): HTMLElement 
   const subtitle = document.createElement("p");
   subtitle.className = "wizard-step__subtitle";
   // UI-SPEC §Step 2 Subtitle — VERBATIM
-  subtitle.textContent = "picking your headphones and proving the audio chain works.";
+  subtitle.textContent = "choose where setup and lesson audio should play.";
 
   body.append(heading, subtitle);
 
@@ -124,46 +110,14 @@ export function renderStep2(state: Step2State, cb: Step2Callbacks): HTMLElement 
     })
   );
 
-  // Audio test
-  body.append(
-    AudioTestButton({
-      state: state.audioTestState,
-      actualRate: state.actualRate,
-      onPlay: cb.onPlayTest,
-      onYes: cb.onAudioYes,
-      onRetry: cb.onAudioRetry,
-    })
-  );
-
   // Phase 97 / ONBOARD-04 — headphone device picker row. Beginner lessons
   // play short tutor exemplars; the user picks where they should come out
-  // (default = system output). The picker is OPTIONAL — the wizard's
-  // continue gate (audioPassed + windowSelected) does NOT depend on it,
-  // so a user who skips this step still reaches the smoke-test.
+  // (default = system output). The picker is OPTIONAL, so a user who skips
+  // it still reaches the smoke-test.
   // Advanced BlackHole + Multi-Output Device routing recipes are documented
   // in docs/audio-routing.md (§LEARN-AUDIO-ROUTING-WIZARD-DISCHARGE).
   if (cb.onSelectHeadphoneDevice) {
     body.append(renderHeadphonePickerSection(state, cb));
-  }
-
-  // Window picker
-  if (state.detectedDjApp || state.windowPickerMode === "enum") {
-    body.append(
-      WindowPicker({
-        mode: state.windowPickerMode,
-        detectedHint: state.detectedDjApp ? {
-          appName: state.detectedDjApp.appName,
-          windowTitle: state.detectedDjApp.windowTitle,
-        } : undefined,
-        allWindows: state.windowPickerMode === "enum" ? [
-          { id: "djay", name: "djay Pro AI" },
-          { id: "rekordbox", name: "Rekordbox" },
-          { id: "chrome", name: "Chrome · gmail" },
-        ] : undefined,
-        onSelect: () => cb.onSelectWindow(),
-        onPickDifferent: cb.onPickDifferent,
-      })
-    );
   }
 
   const panel = PrimaryPanel({ children: body });
@@ -183,15 +137,10 @@ export function renderStep2(state: Step2State, cb: Step2Callbacks): HTMLElement 
       }),
     );
   }
-  // Continue is armed once the window has been picked. We previously
-  // required state.audioPassed too, but the 1kHz tone test can fail in
-  // ways that don't reflect the user's actual rig (sample rate
-  // mismatch flagged as failure even though the user heard it; user
-  // clicked Retry once and is now on a stale failed state with the
-  // Yes button stranded behind the disabled-on-failed branch). The
-  // tone test stays informational — user judgment over a fragile
-  // probe heuristic.
-  const armed = state.windowSelected;
+  // Continue is armed by the real output-device selection. DJ-window
+  // detection is only a background hint for first-run state because the
+  // wizard does not persist a selected target window id.
+  const armed = Boolean(state.selectedDeviceId);
   ctaRow.append(
     Button({
       variant: "primary",
@@ -212,10 +161,10 @@ export function renderStep2(state: Step2State, cb: Step2Callbacks): HTMLElement 
 /* ---------------------------------------------------------------------------
  * Phase 97 / ONBOARD-04 — Headphone device picker section.
  *
- * Renders a labelled DropdownDevice below the audio-test block:
+ * Renders a labelled DropdownDevice below the master-output picker:
  *
  *   ╭ Tutor exemplar playback (headphones) ──────────────────────╮
- *   │ Beginner lessons play short audio examples — pick where    │
+ *   │ Beginner lessons play short audio examples; pick where     │
  *   │ they should come out.                                      │
  *   │ ┌──────────────────────────────────────────────────────┐   │
  *   │ │  🎧  [ system default ]                          ▾  │   │
@@ -226,7 +175,7 @@ export function renderStep2(state: Step2State, cb: Step2Callbacks): HTMLElement 
  * wire. Real device indices are 0..N-1 from the same `devices` array the
  * master output picker uses (the wizard already roundtripped
  * ipc.calibration.list_devices). Persists via the parent's
- * onSelectHeadphoneDevice callback → ipc.settings.set.
+ * onSelectHeadphoneDevice callback -> ipc.settings.set.
  *
  * Tone discipline: lowercase subheading + helper text; consistent with
  * the rest of the wizard's copy register.
@@ -282,7 +231,7 @@ function renderHeadphonePickerSection(
   const helper = document.createElement("p");
   helper.className = "wizard-step__headphone-picker__helper";
   helper.textContent =
-    "beginner lessons play short audio examples — pick where they should come out.";
+    "beginner lessons play short audio examples; pick where they should come out.";
   section.append(helper);
 
   // Prepend the "[ system default ]" pseudo-option. The DropdownDevice
