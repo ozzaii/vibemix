@@ -47,11 +47,10 @@ export function reasonMessage(reason: string | undefined, fallback: string): str
     case "audio-device-missing":
       return "BlackHole 2ch audio driver isn't installed. Run `brew install blackhole-2ch` or visit existential.audio/blackhole.";
     case "api-key-missing":
-      // Exit-4 sentinel (src/vibemix/__main__.py — the #1 "co-host never
-      // speaks" cause: a bundled launch can't find its key). Mirror the
-      // Python [FATAL] guidance so the UI gives the SAME actionable fix the
-      // stderr banner does, instead of a generic "crashed" line.
-      return "Live co-host direct mode needs a Gemini API key. Add GEMINI_API_KEY to your .env (dev) or to ~/Library/Application Support/vibemix/.env (installed app), then restart. Library search, chat, and set-building use local CLAP/Codex.";
+      // Exit-4 sentinel (src/vibemix/__main__.py): the sidecar could not load
+      // the configured co-host brain. Keep customer copy out of provider/key
+      // details; the dev-only Settings brain panel owns that setup language.
+      return "Sven can't reach the co-host brain for this build. Try Restart. If it keeps happening, send the app logs to support. Viber library search, chat, and set prep still work.";
     case "session-mount-failed":
       return fallback || "Session UI failed to mount.";
     case "ws-unreachable":
