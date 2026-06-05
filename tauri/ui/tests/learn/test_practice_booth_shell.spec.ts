@@ -153,6 +153,10 @@ describe("practice booth shell", () => {
       const eq = await waitForMountedControl(root, "eq_hi:A");
       const booth = root.querySelector<HTMLElement>("#learn-booth-panel")!;
       const pulse = root.querySelector<HTMLElement>("#learn-booth-pulse")!;
+      const reward = root.querySelector<HTMLElement>("#learn-booth-reward")!;
+      const rewardFill = root.querySelector<HTMLElement>(
+        "#learn-booth-reward-fill",
+      )!;
       const title = root.querySelector<HTMLElement>("#learn-booth-title")!;
       const start = root.querySelector<HTMLButtonElement>(
         "#learn-start-recommended",
@@ -175,6 +179,12 @@ describe("practice booth shell", () => {
       );
       expect(title.textContent).toBe("channel strip");
       expect(start.textContent).toBe("start channel strip");
+      expect(reward.dataset.visible).toBe("true");
+      expect(reward.textContent).toContain("warmup 1/3");
+      expect(rewardFill.style.width).toBe("33%");
+      expect(reward.getAttribute("aria-label")).toContain(
+        "no lesson credit awarded",
+      );
 
       mocks.emitIpc.mockClear();
       start.click();
@@ -232,6 +242,7 @@ describe("practice booth shell", () => {
     const { ws } = mountLearnWindow(root);
     try {
       const pulse = root.querySelector<HTMLElement>("#learn-booth-pulse")!;
+      const reward = root.querySelector<HTMLElement>("#learn-booth-reward")!;
 
       mocks.emitIpc.mockClear();
       window.dispatchEvent(
@@ -273,6 +284,7 @@ describe("practice booth shell", () => {
       expect(
         root.querySelector<HTMLElement>("#learn-booth-title")?.textContent,
       ).toBe("jog wheel");
+      expect(reward.textContent).toContain("warmup 2/3");
 
       mocks.emitIpc.mockClear();
       root.querySelector<HTMLButtonElement>("#learn-start-recommended")?.click();

@@ -497,6 +497,7 @@ function mountLearnWindow(root: HTMLElement): {
   let lastHighlightPayload: HighlightPayload | null = null;
   let lastPositions: Record<string, number> = {};
   let lastActionSource: "click" | "midi" | null = null;
+  let freePracticeRepCount = 0;
   let lessonActionCount = 0;
   let lessonMatchedSourceCounts = freshLessonSourceCounts();
   let lessonUsedHint = false;
@@ -635,6 +636,7 @@ function mountLearnWindow(root: HTMLElement): {
   };
   const pickLesson = (lesson_id: string, level: "fresh" | "replay") => {
     practiceIntentLessonId = null;
+    freePracticeRepCount = 0;
     closeLessonMap(false);
     boothPanel.dataset.visible = "false";
     setBoothPulse("listening", "hands on deck");
@@ -759,7 +761,11 @@ function mountLearnWindow(root: HTMLElement): {
       cleanMissionText(mission?.command) ??
       practiceCommandLine(recommended, readiness, controllerDisplayName);
     renderBoothChain(mission);
-    renderBoothReward(mission);
+    if (mission) {
+      renderBoothReward(mission);
+    } else {
+      renderFreePracticeReward();
+    }
     const cue = mission
       ? missionBoothCue(mission, recommended, readiness, controllerDisplayName)
       : recommendationBoothCue(recommended, readiness, controllerDisplayName);
@@ -787,6 +793,25 @@ function mountLearnWindow(root: HTMLElement): {
     boothReward.setAttribute(
       "aria-label",
       `${label} ${value} of ${max}. ${caption}`,
+    );
+  };
+  const renderFreePracticeReward = (): void => {
+    if (freePracticeRepCount <= 0) {
+      boothReward.dataset.visible = "false";
+      boothRewardFill.style.width = "0%";
+      boothReward.removeAttribute("aria-label");
+      return;
+    }
+    const capped = Math.min(3, freePracticeRepCount);
+    const caption = capped >= 3 ? "drill primed" : "build a clean warmup";
+    boothReward.dataset.visible = "true";
+    boothReward.dataset.state = capped >= 3 ? "proof" : "armed";
+    boothRewardLabel.textContent = `warmup ${capped}/3`;
+    boothRewardCaption.textContent = caption;
+    boothRewardFill.style.width = `${Math.round((capped / 3) * 100)}%`;
+    boothReward.setAttribute(
+      "aria-label",
+      `free practice warmup ${capped} of 3. ${caption}. no lesson credit awarded.`,
     );
   };
   const renderBoothChain = (mission?: LearnPracticeMission): void => {
@@ -920,6 +945,7 @@ function mountLearnWindow(root: HTMLElement): {
     }
     closeLessonMap(false);
     practiceIntentLessonId = null;
+    freePracticeRepCount = 0;
     boothPanel.dataset.visible = "false";
     setBoothPulse("listening", "hands on deck");
     void emitLearnIpc("ipc.learn.start_course", payload).catch(
@@ -1090,6 +1116,7 @@ function mountLearnWindow(root: HTMLElement): {
     screenAction.hidden = true;
     lastPositions = {};
     lastActionSource = null;
+    freePracticeRepCount = 0;
     lessonActionCount = 0;
     lessonMatchedSourceCounts = freshLessonSourceCounts();
     lessonUsedHint = false;
@@ -1232,6 +1259,7 @@ function mountLearnWindow(root: HTMLElement): {
     clearHighlight(stageEl);
     lastPositions = {};
     lastActionSource = null;
+    freePracticeRepCount = 0;
     // If we have a completed lesson_id, flip its dot to "completed"
     // locally and refresh the booth recommendation. The next
     // progress_state(snapshot) re-confirms from disk, but the frontstage
@@ -1359,10 +1387,13 @@ function mountLearnWindow(root: HTMLElement): {
   ): void => {
     if (currentLessonId !== null) return;
     const line = freePracticeFeedbackLine(controlId, source);
+    freePracticeRepCount += 1;
     const lessonId = practiceLessonIdForControl(controlId);
     if (lessonId && lessonId !== practiceIntentLessonId) {
       practiceIntentLessonId = lessonId;
       renderLessonChooser();
+    } else {
+      renderFreePracticeReward();
     }
     status.setPracticeFeedback(line.text, {
       ariaLabel: line.ariaLabel,
