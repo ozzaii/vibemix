@@ -283,30 +283,54 @@ def _build_learn_tutor_speak_audio(
     voice_tts: Any,
     playback: PlaybackQueue,
     muted: Callable[[], bool],
+    event_logger: Callable[[str, dict[str, Any]], None] | None = None,
 ) -> Callable[[str, str], None]:
     """Build a mute-aware Learn tutor voice sink using the product voice."""
 
+    def _log(kind: str, **fields: Any) -> None:
+        if event_logger is None:
+            return
+        try:
+            event_logger(kind, fields)
+        except Exception:
+            pass
+
     def speak(text: str, tts_marker: str) -> None:
         if muted():
+            _log("learn_tutor_voice_skipped", reason="muted", tts_marker=tts_marker)
             return
+        _log("learn_tutor_voice_queued", tts_marker=tts_marker, chars=len(text))
 
         def _run() -> None:
+            pushed_bytes = 0
             try:
                 source_sr = int(getattr(voice_tts, "sample_rate", OUTPUT_SR) or OUTPUT_SR)
 
                 def _on_pcm(pcm: bytes) -> None:
+                    nonlocal pushed_bytes
                     if muted():
                         return
-                    playback.push(
-                        _resample_pcm16_mono_bytes(
-                            pcm,
-                            source_sr=source_sr,
-                            target_sr=OUTPUT_SR,
-                        )
+                    out = _resample_pcm16_mono_bytes(
+                        pcm,
+                        source_sr=source_sr,
+                        target_sr=OUTPUT_SR,
                     )
+                    if out:
+                        playback.push(out)
+                        pushed_bytes += len(out)
 
                 voice_tts.synthesize_pcm(text, _on_pcm)
+                _log(
+                    "learn_tutor_voice_complete",
+                    tts_marker=tts_marker,
+                    bytes=pushed_bytes,
+                )
             except Exception as exc:  # pragma: no cover - defensive boot/runtime path
+                _log(
+                    "learn_tutor_voice_error",
+                    tts_marker=tts_marker,
+                    error=type(exc).__name__,
+                )
                 print(
                     f"[learn boot] tutor voice synthesis failed for {tts_marker}: {exc!r}",
                     file=sys.stderr,
@@ -2359,6 +2383,7 @@ async def main() -> None:
             voice_tts=live_voice_tts,
             playback=playback,
             muted=lambda: bool(_session_ipc is not None and _session_ipc.muted),
+            event_logger=_learn_session_event,
         )
         if live_voice_tts is not None
         else None
