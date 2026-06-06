@@ -9,10 +9,10 @@
  * Seven modes (mode switch in the left console):
  *   - search   text query → librarySearch → results + scope
  *   - similar  seed (drop a file or keep the current) → librarySimilar → results + scope
- *   - ingest   folder + strategy → libraryEmbedFolder → progress bar + live log + running €
+ *   - ingest   folder/catalog → ipc.library.import → progress bar + live log
  *   - curate   theme → libraryCurate → numbered set + notes
- *   - build    brief + curve → libraryBuildSet → AutoCrate set + Rekordbox export
- *   - cue      folder + format → libraryCueFolder → portable cue export receipt
+ *   - build    brief + curve → libraryBuildSet → AutoCrate set + Rekordbox export,
+ *              plus folded hot-cue folder export via libraryCueFolder
  *   - chat     message + history → libraryChat → reply, live proof, artifacts
  *
  * Wire-vs-dev: every api.ts call falls back to the real 2026-05-25 subset-run
@@ -25,10 +25,13 @@
 import {
   DEV_FALLBACK,
   libraryBuildSet,
+  libraryCancelImport,
   libraryChat,
   libraryCueFolder,
   libraryCurate,
   libraryEmbedFolder,
+  libraryImport,
+  libraryImportFromAction,
   libraryModels,
   libraryRevealExport,
   librarySearch,
@@ -37,6 +40,7 @@ import {
   normalizeLiveContextPayload,
   onEmbedDone,
   onEmbedProgress,
+  onLibraryImportProgress,
   onLiveDeckContext,
   onLiveMoveContext,
   onModelProgress,
@@ -58,6 +62,7 @@ import {
   type LibraryLiveEvidence,
   type LibraryLiveMidiEvidence,
   type LibraryLiveVerification,
+  type LibraryImportProgress,
   type LibraryModelInstallTarget,
   type LibraryModelProgress,
   type LibraryViberToolEvent,
@@ -904,14 +909,12 @@ function renderCueLoading(folder: string): void {
 /** Idle state for agent-backed modes. Search/similar can refresh on tab switch;
  *  Codex-backed curate/build should wait for an explicit run or preset chip so
  *  merely opening the mode does not start a slow tool loop. */
-function renderAgentIdle(mode: "curate" | "build" | "cue"): void {
+function renderAgentIdle(mode: "curate" | "build"): void {
   clearRationale();
   $("vmx-lib-rationale-body").textContent =
     mode === "build"
       ? "No set built yet."
-      : mode === "cue"
-        ? "No cue export yet."
-        : "No playlist curated yet.";
+      : "No playlist curated yet.";
   $("vmx-lib-rationale-meta").textContent = "idle";
   $("vmx-lib-results").innerHTML = "";
   $("vmx-lib-rcount").textContent = "ready";
@@ -1040,6 +1043,47 @@ function setupEmbedProgressNote(p: EmbedProgress): string {
 function setupEmbedDoneNote(d: EmbedDone): string {
   const note = embedDoneNote(d);
   return d.failed > 0 ? `index partial · ${note}` : `indexed · ${note}`;
+}
+
+function importProgressTotal(p: LibraryImportProgress): string {
+  if (p.total > 0) return `${Math.min(p.done, p.total)}/${p.total}`;
+  return p.done > 0 ? String(p.done) : "indexing";
+}
+
+function importProgressNote(p: LibraryImportProgress): string {
+  if (p.cancelled) return "index cancelled";
+  const total = importProgressTotal(p);
+  const name = p.current_track_name.trim();
+  if (name) return `${total} ${name}`;
+  if (p.cache_hits > 0) return `${total} · ${p.cache_hits} cached`;
+  return p.total > 0 ? `${total} indexed` : "indexing library";
+}
+
+function isImportProgressTerminal(p: LibraryImportProgress): boolean {
+  if (p.cancelled) return true;
+  if (p.total <= 0) return false;
+  return p.done >= p.total || p.current_track_name.trim() === "";
+}
+
+function importDoneNote(p: LibraryImportProgress): string {
+  if (p.cancelled) return "cancelled";
+  const processed = p.total > 0 ? p.total : p.done;
+  const parts: string[] = [];
+  if (processed > 0) parts.push(`${processed} processed`);
+  if (p.cache_hits > 0) parts.push(`${p.cache_hits} cached`);
+  if (parts.length > 0) return parts.join(" · ");
+  return p.total > 0 ? `${p.total} scanned` : "no audio indexed";
+}
+
+function renderImportDone(p: LibraryImportProgress): void {
+  const total = p.total > 0 ? p.total : p.done;
+  const note = importDoneNote(p);
+  setProgress(total, total, 0, note);
+  clearIngestError();
+  $("vmx-lib-rcount").textContent =
+    p.cancelled ? "cancelled" : total > 0 ? `${total} processed` : "indexed";
+  $("vmx-lib-scope-state").textContent =
+    p.cancelled ? "index cancelled" : "library indexed";
 }
 
 function embeddingLabel(stats: LibraryStats): string {
@@ -1895,8 +1939,10 @@ function librarySetupCandidateLabel(kind: string): string {
 function bestLibrarySetupCandidate(
   stats: LibraryStats | null,
 ): LibrarySetupCandidate | null {
+  const candidates = stats?.library_setup_candidates ?? [];
   return (
-    stats?.library_setup_candidates?.find((candidate) => candidate.kind === "music_folder") ??
+    candidates.find((candidate) => candidate.import_action?.type === "ipc.library.import") ??
+    candidates[0] ??
     null
   );
 }
@@ -1933,7 +1979,8 @@ function chatLibrarySetupCard(stats: LibraryStats | null): HTMLElement | null {
   const button = document.createElement("button");
   button.type = "button";
   button.className = "vmx-lib-chat-action";
-  button.textContent = "Index folder";
+  button.textContent =
+    candidate.kind === "music_folder" ? "Index folder" : "Index catalog";
   button.addEventListener("click", () => {
     void runLibrarySetupImport(candidate, {
       button,
@@ -1963,31 +2010,50 @@ async function runLibrarySetupImport(
   els.status.textContent = "indexing queued";
   $("vmx-lib-scope-state").textContent = "indexing library";
   try {
-    unlisteners.push(
-      await onEmbedProgress((p: EmbedProgress) => {
-        if (finished) return;
-        els.status.textContent = setupEmbedProgressNote(p);
-      }),
-    );
-    unlisteners.push(
-      await onEmbedDone((d: EmbedDone) => {
-        finish(
-          setupEmbedDoneNote(d),
-          d.failed > 0 ? "index partial" : "library indexed",
-        );
-      }),
-    );
-    const accepted = await libraryEmbedFolder(candidate.path, "mean_excerpt");
+    if (candidate.import_action) {
+      unlisteners.push(
+        await onLibraryImportProgress((p: LibraryImportProgress) => {
+          if (finished) return;
+          els.status.textContent = importProgressNote(p);
+          if (isImportProgressTerminal(p)) {
+            finish(
+              p.cancelled ? "index cancelled" : `indexed · ${importDoneNote(p)}`,
+              p.cancelled ? "index cancelled" : "library indexed",
+            );
+          }
+        }),
+      );
+    } else {
+      unlisteners.push(
+        await onEmbedProgress((p: EmbedProgress) => {
+          if (finished) return;
+          els.status.textContent = setupEmbedProgressNote(p);
+        }),
+      );
+      unlisteners.push(
+        await onEmbedDone((d: EmbedDone) => {
+          finish(
+            setupEmbedDoneNote(d),
+            d.failed > 0 ? "index partial" : "library indexed",
+          );
+        }),
+      );
+    }
+    const accepted = candidate.import_action
+      ? await libraryImportFromAction(candidate.import_action, candidate.path)
+      : await libraryEmbedFolder(candidate.path, "mean_excerpt");
     if (!accepted) {
       finish("setup action unavailable", "setup unavailable");
       return;
     }
-    await Promise.resolve();
-    finish("index command finished", "library indexed");
+    if (!candidate.import_action) {
+      await Promise.resolve();
+      finish("index command finished", "library indexed");
+    }
   } catch (err) {
     finish("setup action unavailable", "setup unavailable");
     // eslint-disable-next-line no-console
-    console.warn("[library] setup folder embed failed", err);
+    console.warn("[library] setup import failed", err);
   }
 }
 
@@ -2168,6 +2234,7 @@ export function mountLibrary(root: ParentNode = document): void {
   const briefInput = $("vmx-lib-brief") as HTMLTextAreaElement;
   const chatInput = $("vmx-lib-chat") as HTMLTextAreaElement;
   const runBtn = $("vmx-lib-runbtn") as HTMLButtonElement;
+  const cueRunBtn = $maybe("vmx-lib-cue-run") as HTMLButtonElement | null;
   const installModelsBtn = $("vmx-lib-install-models") as HTMLButtonElement;
   const buildTagsToggle = $maybe("vmx-lib-build-tags") as HTMLButtonElement | null;
   const exportOpenBtn = $maybe("vmx-lib-export-open") as HTMLButtonElement | null;
@@ -2205,8 +2272,6 @@ export function mountLibrary(root: ParentNode = document): void {
         ? "Viber"
         : state.mode === "build"
           ? "Built"
-          : state.mode === "cue"
-            ? "Cued"
           : state.mode === "curate"
             ? "Curated"
             : state.mode === "ingest"
@@ -2254,6 +2319,7 @@ export function mountLibrary(root: ParentNode = document): void {
     runSeq += 1;
     busy = false;
     runBtn.disabled = false;
+    setCueActionState(false);
     const cancel = cancelActiveRun;
     cancelActiveRun = null;
     cancel?.();
@@ -2264,7 +2330,6 @@ export function mountLibrary(root: ParentNode = document): void {
       case "search":
       case "similar":
       case "ingest":
-      case "cue":
       case "curate":
       case "build":
       case "chat":
@@ -2281,12 +2346,9 @@ export function mountLibrary(root: ParentNode = document): void {
     applyModeVisibility();
     // The set-notes block is shared by curate + build; only clear it when
     // leaving BOTH so a fresh build/curate keeps its own working state.
-    if (mode !== "curate" && mode !== "build" && mode !== "cue")
+    if (mode !== "curate" && mode !== "build")
       clearRationale();
-    if (
-      (mode === "curate" || mode === "build" || mode === "cue") &&
-      previousMode !== mode
-    ) {
+    if ((mode === "curate" || mode === "build") && previousMode !== mode) {
       renderAgentIdle(mode);
     }
     if (mode === "build") {
@@ -2379,7 +2441,10 @@ export function mountLibrary(root: ParentNode = document): void {
     renderBuildSet(result);
   }
 
-  async function runCueExport(runId: number): Promise<void> {
+  async function runCueExport(
+    runId: number,
+    modeAtStart: LibraryMode,
+  ): Promise<void> {
     state = setCueFolder(
       state,
       cueFolderInput.value.trim() || state.cueFolder,
@@ -2387,8 +2452,40 @@ export function mountLibrary(root: ParentNode = document): void {
     echoEl.textContent = state.cueFolder;
     renderCueLoading(state.cueFolder);
     const result = await libraryCueFolder(state.cueFolder, state.cueExport);
-    if (!isCurrentRun(runId, "cue")) return;
+    if (!isCurrentRun(runId, modeAtStart)) return;
     renderCueExport(result);
+  }
+
+  function setCueActionState(disabled: boolean, text = "Export hot cues"): void {
+    if (!cueRunBtn) return;
+    cueRunBtn.disabled = disabled;
+    cueRunBtn.textContent = text;
+  }
+
+  async function runBuildCueExport(): Promise<void> {
+    if (busy || state.mode !== "build") return;
+    busy = true;
+    runBtn.disabled = true;
+    setCueActionState(true, "Exporting");
+    const runId = ++runSeq;
+    const modeAtStart = state.mode;
+    cancelActiveRun = null;
+    try {
+      await runCueExport(runId, modeAtStart);
+    } catch (err) {
+      if (!isCurrentRun(runId, modeAtStart)) return;
+      // eslint-disable-next-line no-console
+      console.error("[vmx-lib] cue export failed:", err);
+      renderError(err);
+    } finally {
+      if (isCurrentRun(runId, modeAtStart)) {
+        busy = false;
+        runBtn.disabled = false;
+        runBtn.textContent = runLabel(state.mode);
+        cancelActiveRun = null;
+        setCueActionState(false);
+      }
+    }
   }
 
   async function runChat(runId: number): Promise<void> {
@@ -2469,14 +2566,26 @@ export function mountLibrary(root: ParentNode = document): void {
   }
 
   /** Drive the ingest progress bar + log. If the bridge accepts the job, the
-   *  Tauri `library://embed-*` events drive the UI. Otherwise (no bridge) we
-   *  replay the real subset-run log so the surface is demoable. */
+   *  `ipc.library.import_progress` frames drive the UI. Otherwise (no bridge)
+   *  we replay the real subset-run log so the surface is demoable. */
   async function runIngest(runId: number): Promise<void> {
     state = setFolder(state, folderInput.value.trim() || state.folder);
     clearIngestError();
     setProgress(0, 0, 0, "");
+    cancelActiveRun = () => {
+      runBtn.disabled = true;
+      runBtn.textContent = "Cancelling";
+      setProgress(0, 0, 0, "cancelling import");
+      void libraryCancelImport().catch((err) => {
+        renderIngestError(err);
+        busy = false;
+        runBtn.disabled = false;
+        runBtn.textContent = runLabel(state.mode);
+        cancelActiveRun = null;
+      });
+    };
 
-    const accepted = await libraryEmbedFolder(state.folder, state.strategy);
+    const accepted = await libraryImport(state.folder);
     if (!isCurrentRun(runId, "ingest")) return;
     if (accepted) return; // bridge live — events take over via the listeners below
 
@@ -2490,6 +2599,8 @@ export function mountLibrary(root: ParentNode = document): void {
         void refreshStats();
         busy = false;
         runBtn.disabled = false;
+        runBtn.textContent = runLabel(state.mode);
+        cancelActiveRun = null;
         return;
       }
       const entry = log[i];
@@ -2510,6 +2621,12 @@ export function mountLibrary(root: ParentNode = document): void {
     const runId = ++runSeq;
     const modeAtStart = state.mode;
     cancelActiveRun = null;
+    if (modeAtStart === "ingest") {
+      runBtn.disabled = false;
+      runBtn.textContent = "Cancel import";
+    } else if (modeAtStart === "build") {
+      setCueActionState(true, "Set building");
+    }
     // Reset transient Viber status/proof chrome so each run starts clean.
     if (
       modeAtStart === "chat" ||
@@ -2526,7 +2643,6 @@ export function mountLibrary(root: ParentNode = document): void {
       else if (modeAtStart === "similar") await runSimilar(runId);
       else if (modeAtStart === "curate") await runCurate(runId);
       else if (modeAtStart === "build") await runBuildSet(runId);
-      else if (modeAtStart === "cue") await runCueExport(runId);
       else if (modeAtStart === "chat") await runChat(runId);
       else {
         await runIngest(runId);
@@ -2548,11 +2664,14 @@ export function mountLibrary(root: ParentNode = document): void {
       if (modeAtStart === "ingest") {
         busy = false;
         runBtn.disabled = false;
+        runBtn.textContent = runLabel(state.mode);
+        cancelActiveRun = null;
       }
     } finally {
       if (isCurrentRun(runId, modeAtStart) && modeAtStart !== "ingest") {
         busy = false;
         runBtn.disabled = false;
+        if (modeAtStart === "build") setCueActionState(false);
         cancelActiveRun = null;
         if (modeAtStart === "chat" && chatHistory.length === 0) {
           renderChatIdleSide();
@@ -2563,7 +2682,14 @@ export function mountLibrary(root: ParentNode = document): void {
 
   // ── event wiring ───────────────────────────────────────────────────────────
 
-  runBtn.addEventListener("click", () => void run());
+  runBtn.addEventListener("click", () => {
+    if (busy && state.mode === "ingest" && cancelActiveRun) {
+      cancelActiveRun();
+      return;
+    }
+    void run();
+  });
+  cueRunBtn?.addEventListener("click", () => void runBuildCueExport());
   exportOpenBtn?.addEventListener("click", () => void revealExportFromButton(exportOpenBtn));
   installModelsBtn.addEventListener("click", () => void installLocalModels());
   buildTagsToggle?.addEventListener("click", () => {
@@ -2581,7 +2707,10 @@ export function mountLibrary(root: ParentNode = document): void {
     if (e.key === "Enter" && state.mode === "ingest") void run();
   });
   cueFolderInput.addEventListener("keydown", (e) => {
-    if (e.key === "Enter" && state.mode === "cue") void run();
+    if (e.key === "Enter" && state.mode === "build") {
+      e.preventDefault();
+      void runBuildCueExport();
+    }
   });
   themeInput.addEventListener("keydown", (e) => {
     if (e.key === "Enter" && state.mode === "curate") void run();
@@ -2738,6 +2867,25 @@ export function mountLibrary(root: ParentNode = document): void {
     renderIngestDone(d);
     busy = false;
     runBtn.disabled = false;
+    runBtn.textContent = runLabel(state.mode);
+    cancelActiveRun = null;
+    void refreshStats();
+  });
+  void onLibraryImportProgress((p: LibraryImportProgress) => {
+    if (!busy || state.mode !== "ingest") return;
+    clearIngestError();
+    setProgress(
+      p.total > 0 ? Math.min(p.done, p.total) : p.done,
+      p.total,
+      0,
+      importProgressNote(p),
+    );
+    if (!isImportProgressTerminal(p)) return;
+    renderImportDone(p);
+    busy = false;
+    runBtn.disabled = false;
+    runBtn.textContent = runLabel(state.mode);
+    cancelActiveRun = null;
     void refreshStats();
   });
 

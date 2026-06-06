@@ -346,8 +346,12 @@ function doMockApi(): void {
     libraryStats: () => statsMock(),
     libraryModels: (install?: LibraryModelInstallTarget) => modelsMock(install),
     libraryEmbedFolder: vi.fn(async () => false),
+    libraryImport: vi.fn(async () => false),
+    libraryImportFromAction: vi.fn(async () => false),
+    libraryCancelImport: vi.fn(async () => undefined),
     onEmbedProgress: vi.fn(async () => () => {}),
     onEmbedDone: vi.fn(async () => () => {}),
+    onLibraryImportProgress: vi.fn(async () => () => {}),
     onModelProgress: vi.fn(async () => () => {}),
     onLiveDeckContext: vi.fn(async () => () => {}),
     onLiveMoveContext: vi.fn(async () => () => {}),
@@ -365,7 +369,6 @@ function mountSkeleton(): void {
       <button data-mode="similar" aria-selected="false">Similar</button>
       <button data-mode="curate" aria-selected="false">Curate</button>
       <button data-mode="build" aria-selected="false">Build</button>
-      <button data-mode="cue" aria-selected="false">Cue</button>
       <button data-mode="chat" aria-selected="true">Viber</button>
       <button data-mode="ingest" aria-selected="false">Ingest</button>
     </div>
@@ -386,6 +389,7 @@ function mountSkeleton(): void {
     <button data-cue-export="rekordbox" aria-pressed="true">Rekordbox XML</button>
     <button data-cue-export="m3u8" aria-pressed="false">M3U8</button>
     <button data-cue-export="both" aria-pressed="false">Both</button>
+    <button id="vmx-lib-cue-run">Export hot cues</button>
     <span id="vmx-lib-seed-name"></span>
     <button id="vmx-lib-runbtn"></button>
     <span id="vmx-lib-center-label"></span>
@@ -461,14 +465,14 @@ async function runRealCue(
   mountLibrary();
   await Promise.resolve();
   await Promise.resolve();
-  document.querySelector<HTMLElement>('button[data-mode="cue"]')?.click();
+  document.querySelector<HTMLElement>('button[data-mode="build"]')?.click();
   for (let i = 0; i < 6; i++) await Promise.resolve();
   if (clickFormat) {
     document
       .querySelector<HTMLElement>(`[data-cue-export="${clickFormat}"]`)
       ?.click();
   }
-  (document.getElementById("vmx-lib-runbtn") as HTMLButtonElement).click();
+  (document.getElementById("vmx-lib-cue-run") as HTMLButtonElement).click();
   for (let i = 0; i < 6; i++) await Promise.resolve();
 }
 
@@ -842,7 +846,7 @@ describe("build — real renderBuildSet path (jsdom, via mountLibrary)", () => {
     );
   });
 
-  it("renders cue export receipts without claiming Serato tag writes", async () => {
+  it("renders cue export receipts from the folded Build hot-cue instrument", async () => {
     await runRealCue({
       ok: true,
       mode: "export",
@@ -855,6 +859,7 @@ describe("build — real renderBuildSet path (jsdom, via mountLibrary)", () => {
       },
     });
 
+    expect(document.querySelector('[data-mode="cue"]')).toBeNull();
     expect(cueMock).toHaveBeenCalledWith("~/Music", "rekordbox");
     expect(document.getElementById("vmx-lib-rationale-body")?.textContent).toContain(
       "Cued 3 tracks with 18 hot cues.",
@@ -887,5 +892,8 @@ describe("build — real renderBuildSet path (jsdom, via mountLibrary)", () => {
     expect(pressed).toHaveLength(1);
     expect(pressed[0]?.dataset.cueExport).toBe("both");
     expect(cueMock).toHaveBeenLastCalledWith("~/Music", "both");
+    expect(document.getElementById("vmx-lib-cue-run")?.textContent).toBe(
+      "Export hot cues",
+    );
   });
 });

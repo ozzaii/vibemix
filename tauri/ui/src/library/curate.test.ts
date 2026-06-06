@@ -115,8 +115,12 @@ function doMockApi(): void {
       all_ready: true,
     })),
     libraryEmbedFolder: vi.fn(async () => false),
+    libraryImport: vi.fn(async () => false),
+    libraryImportFromAction: vi.fn(async () => false),
+    libraryCancelImport: vi.fn(async () => undefined),
     onEmbedProgress: vi.fn(async () => () => {}),
     onEmbedDone: vi.fn(async () => () => {}),
+    onLibraryImportProgress: vi.fn(async () => () => {}),
     onModelProgress: vi.fn(async () => () => {}),
     onLiveDeckContext: vi.fn(async () => () => {}),
     onLiveMoveContext: vi.fn(async () => () => {}),
@@ -136,7 +140,6 @@ function mountSkeleton(): void {
       <button data-mode="similar" aria-selected="false">Similar</button>
       <button data-mode="curate" aria-selected="false">Curate</button>
       <button data-mode="build" aria-selected="false">Build</button>
-      <button data-mode="cue" aria-selected="false">Cue</button>
       <button data-mode="chat" aria-selected="true">Viber</button>
       <button data-mode="ingest" aria-selected="false">Ingest</button>
     </div>
@@ -156,6 +159,7 @@ function mountSkeleton(): void {
     <button data-cue-export="rekordbox" aria-pressed="true">Rekordbox XML</button>
     <button data-cue-export="m3u8" aria-pressed="false">M3U8</button>
     <button data-cue-export="both" aria-pressed="false">Both</button>
+    <button id="vmx-lib-cue-run">Export hot cues</button>
     <span id="vmx-lib-seed-name"></span>
     <button id="vmx-lib-runbtn"></button>
     <span id="vmx-lib-center-label"></span>

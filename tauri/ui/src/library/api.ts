@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 /* Vibe Engine — typed invoke()/event client for the library surface.
  *
- * The Rust bridge agent owns the matching `#[tauri::command]` handlers and the
- * `library://embed-*` event emitters (tauri/src-tauri/**). This module is the
- * webview-side typed gateway against that exact contract:
+ * The Rust bridge agent owns the matching `#[tauri::command]` handlers, legacy
+ * `library://embed-*` event emitters, and the schema-gated `ipc.library.*`
+ * import path. This module is the webview-side typed gateway against those
+ * exact contracts:
  *
  *   invoke("library_search",  { query, k })       -> SearchResult
  *   invoke("library_similar", { seed,  k })       -> SearchResult   (same shape)
@@ -17,10 +18,12 @@
  *        -> kicks off a folder embed; progress arrives as Tauri events:
  *           listen("library://embed-progress")  EmbedProgress
  *           listen("library://embed-done")      EmbedDone
+ *   emitIpc("ipc.library.import", { path, schema_version })
+ *        -> imports folders or DJ catalog files; progress arrives as:
+ *           subscribeIpc("ipc.library.import_progress") LibraryImportProgress
  *
- * Unlike the wizard's schema-gated WS path (ipc/client.ts), the Vibe Engine
- * commands are direct Tauri commands. Rust owns the one-shot CLI subprocess
- * bridge + event stream, so there is no JSON-schema validator on this seam.
+ * The older Vibe Engine commands are direct Tauri commands. The richer library
+ * import path rides the same schema-gated WS seam as the session/wizard IPC.
  *
  * DEV FALLBACK: when `invoke()` is genuinely UNAVAILABLE (plain `vite` dev,
  * jsdom tests — `getInvoke()` returns null), every call resolves with the real
@@ -37,6 +40,9 @@
  */
 
 import { listen as tauriListen, type UnlistenFn } from "@tauri-apps/api/event";
+
+import { emitIpc, subscribeIpc } from "../ipc/client.js";
+import type { LibraryImportProgress as LibraryImportProgressMessage } from "../ipc/messages.js";
 
 // ── Wire types (the bridge contract) ───────────────────────────────────────
 
@@ -103,6 +109,15 @@ export interface LibrarySetupCandidate {
   reason?: string;
   command?: string;
   audio_files_seen?: number;
+  import_action?: LibrarySetupImportAction;
+}
+
+export interface LibrarySetupImportAction {
+  type: "ipc.library.import" | string;
+  payload?: {
+    path?: string;
+    schema_version?: "1" | string;
+  };
 }
 
 export type LibraryModelInstallTarget =
@@ -449,6 +464,14 @@ export interface EmbedDone {
   failed: number;
   total: number;
   cost_eur: number;
+}
+
+export interface LibraryImportProgress {
+  total: number;
+  done: number;
+  current_track_name: string;
+  cache_hits: number;
+  cancelled: boolean;
 }
 
 // ── Runtime response guards ────────────────────────────────────────────────
@@ -2082,7 +2105,7 @@ function normalizeLibrarySetupCandidate(
   label: string,
 ): LibrarySetupCandidate {
   const row = asRecord(value, label);
-  return {
+  const candidate: LibrarySetupCandidate = {
     kind: asString(row.kind, `${label}.kind`),
     path: asString(row.path, `${label}.path`),
     confidence: optionalString(row, "confidence"),
@@ -2090,6 +2113,13 @@ function normalizeLibrarySetupCandidate(
     command: optionalString(row, "command"),
     audio_files_seen: optionalNumber(row, "audio_files_seen"),
   };
+  if (row.import_action !== undefined && row.import_action !== null) {
+    candidate.import_action = normalizeLibrarySetupImportAction(
+      row.import_action,
+      `${label}.import_action`,
+    );
+  }
+  return candidate;
 }
 
 function normalizeLibrarySetupCandidates(
@@ -2100,6 +2130,26 @@ function normalizeLibrarySetupCandidates(
   return asArray(value, label).map((item, index) =>
     normalizeLibrarySetupCandidate(item, `${label}[${index}]`),
   );
+}
+
+function normalizeLibrarySetupImportAction(
+  value: unknown,
+  label: string,
+): LibrarySetupImportAction {
+  const row = asRecord(value, label);
+  const payload =
+    row.payload === undefined || row.payload === null
+      ? undefined
+      : asRecord(row.payload, `${label}.payload`);
+  return {
+    type: asString(row.type, `${label}.type`),
+    payload: payload
+      ? {
+          path: optionalString(payload, "path"),
+          schema_version: optionalString(payload, "schema_version"),
+        }
+      : undefined,
+  };
 }
 
 export function normalizeStats(value: unknown): LibraryStats {
@@ -2286,6 +2336,28 @@ export function normalizeEmbedDone(value: unknown): EmbedDone {
     failed: asFiniteNumber(root.failed, "library://embed-done.failed"),
     total: asFiniteNumber(root.total, "library://embed-done.total"),
     cost_eur: asFiniteNumber(root.cost_eur, "library://embed-done.cost_eur"),
+  };
+}
+
+export function normalizeLibraryImportProgress(
+  value: unknown,
+): LibraryImportProgress {
+  const root = asRecord(value, "ipc.library.import_progress");
+  return {
+    total: asFiniteNumber(root.total, "ipc.library.import_progress.total"),
+    done: asFiniteNumber(root.done, "ipc.library.import_progress.done"),
+    current_track_name: asString(
+      root.current_track_name,
+      "ipc.library.import_progress.current_track_name",
+    ),
+    cache_hits: asFiniteNumber(
+      root.cache_hits,
+      "ipc.library.import_progress.cache_hits",
+    ),
+    cancelled: asBoolean(
+      root.cancelled,
+      "ipc.library.import_progress.cancelled",
+    ),
   };
 }
 
@@ -2841,6 +2913,37 @@ export async function libraryEmbedFolder(
   return true;
 }
 
+/** Start the rich sidecar import path. Accepts folders and DJ catalog files, and
+ * progress arrives as schema-gated `ipc.library.import_progress` frames. */
+export async function libraryImport(path: string): Promise<boolean> {
+  const invoke = await getInvoke();
+  if (!invoke) return false;
+  const cleanPath = path.trim();
+  if (!cleanPath) throw new Error("library import needs a source path");
+  await emitIpc("ipc.library.import", {
+    path: cleanPath,
+    schema_version: "1",
+  });
+  return true;
+}
+
+export async function libraryImportFromAction(
+  action: LibrarySetupImportAction | undefined,
+  fallbackPath: string,
+): Promise<boolean> {
+  const actionType = action?.type ?? "ipc.library.import";
+  if (actionType !== "ipc.library.import") {
+    throw new Error(`unsupported library setup action: ${actionType}`);
+  }
+  return await libraryImport(action?.payload?.path ?? fallbackPath);
+}
+
+export async function libraryCancelImport(): Promise<void> {
+  const invoke = await getInvoke();
+  if (!invoke) return;
+  await emitIpc("ipc.library.import_cancel", { schema_version: "1" });
+}
+
 // ── Event subscriptions ─────────────────────────────────────────────────────
 
 const NO_UNLISTEN: UnlistenFn = () => {};
@@ -2902,6 +3005,26 @@ export async function onEmbedDone(
         console.warn("[vmx-lib] dropped malformed embed-done:", err);
       }
     });
+  } catch {
+    return NO_UNLISTEN;
+  }
+}
+
+/** Subscribe to the rich library-import progress stream. No-op outside Tauri. */
+export async function onLibraryImportProgress(
+  cb: (p: LibraryImportProgress) => void,
+): Promise<UnlistenFn> {
+  try {
+    return await subscribeIpc<LibraryImportProgressMessage>(
+      "ipc.library.import_progress",
+      (msg) => {
+        try {
+          cb(normalizeLibraryImportProgress(msg.payload));
+        } catch (err) {
+          console.warn("[vmx-lib] dropped malformed import-progress:", err);
+        }
+      },
+    );
   } catch {
     return NO_UNLISTEN;
   }

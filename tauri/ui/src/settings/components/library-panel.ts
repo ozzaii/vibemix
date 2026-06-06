@@ -4,9 +4,9 @@
  * SettingsDrawer alongside the Plan 28-07 staleness banner.
  *
  * Bridge contract:
- *   invoke: library_embed_folder { path, strategy }
- *   inbound: library://embed-progress { n, total, status, filename, cost_eur }
- *   inbound: library://embed-done { embedded, skipped, failed, total, cost_eur }
+ *   outbound: ipc.library.import { path, schema_version }
+ *   outbound: ipc.library.import_cancel { schema_version }
+ *   inbound: ipc.library.import_progress { total, done, current_track_name, cache_hits, cancelled }
  *
  * Drag-drop dedupe (Tauri Issue #14134): the same physical drop fires the
  * onDragDropEvent listener TWICE — once from the OS and once from the
@@ -15,11 +15,10 @@
 
 import { emitIpc } from "../../ipc/client.js";
 import {
-  libraryEmbedFolder,
-  onEmbedDone,
-  onEmbedProgress,
-  type EmbedDone,
-  type EmbedProgress,
+  libraryCancelImport,
+  libraryImport,
+  onLibraryImportProgress,
+  type LibraryImportProgress,
 } from "../../library/api.js";
 
 export interface LibraryPanelHandle {
@@ -44,15 +43,17 @@ export async function renderLibraryPanel(
   root.className = "vmx-library-panel";
   root.innerHTML = `
     <div class="vmx-library-droptarget" role="region"
-         aria-label="Drop a music folder here">
-      Drop a music folder here,
-      or click <button type="button" class="vmx-library-pick-folder-btn">Choose folder</button>
+         aria-label="Drop a music folder or DJ catalog here">
+      Drop music folder or DJ catalog,
+      then <button type="button" class="vmx-library-pick-folder-btn">Choose folder</button>
+      or <button type="button" class="vmx-library-pick-catalog-btn">Choose catalog</button>
     </div>
     <div class="vmx-library-progress hidden">
       <div class="vmx-library-progress-track" aria-hidden="true">
         <div class="vmx-library-progress-fill"></div>
       </div>
       <div class="vmx-library-progress-label">· / ·</div>
+      <button type="button" class="vmx-library-cancel-btn" hidden>Cancel</button>
     </div>
     <div class="vmx-library-filelog" aria-live="polite"></div>
     <div class="vmx-library-status" aria-live="polite"></div>
@@ -62,6 +63,9 @@ export async function renderLibraryPanel(
   const pickFolderBtn = root.querySelector(
     ".vmx-library-pick-folder-btn",
   ) as HTMLButtonElement;
+  const pickCatalogBtn = root.querySelector(
+    ".vmx-library-pick-catalog-btn",
+  ) as HTMLButtonElement;
   const progress = root.querySelector(".vmx-library-progress") as HTMLElement;
   const fill = root.querySelector(
     ".vmx-library-progress-fill",
@@ -69,6 +73,7 @@ export async function renderLibraryPanel(
   const label = root.querySelector(
     ".vmx-library-progress-label",
   ) as HTMLElement;
+  const cancelBtn = root.querySelector(".vmx-library-cancel-btn") as HTMLButtonElement;
   const fileLog = root.querySelector(".vmx-library-filelog") as HTMLElement;
   const status = root.querySelector(".vmx-library-status") as HTMLElement;
 
@@ -89,17 +94,20 @@ export async function renderLibraryPanel(
     return true;
   }
   let unsubProgress: (() => void) | null = null;
-  let unsubDone: (() => void) | null = null;
   let unlistenDrop: (() => void) | null = null;
 
   function showProgress(): void {
     if (disposed) return;
     progress.classList.remove("hidden");
+    cancelBtn.hidden = false;
+    cancelBtn.disabled = false;
     status.textContent = "";
   }
   function hideProgress(): void {
     if (disposed) return;
     progress.classList.add("hidden");
+    cancelBtn.hidden = true;
+    cancelBtn.disabled = false;
   }
   function setStatus(text: string): void {
     if (disposed) return;
@@ -115,34 +123,48 @@ export async function renderLibraryPanel(
       fileLog.lastElementChild?.remove();
     }
   }
-  function showEmbedProgress(p: EmbedProgress): void {
-    if (!activeJob || disposed) return;
-    const pct = p.total > 0 ? (p.n / p.total) * 100 : 0;
-    fill.style.width = `${pct.toFixed(1)}%`;
-    label.textContent = `${p.n} / ${p.total} · €${p.cost_eur.toFixed(4)}`;
-    const mark = p.status === "err" ? "error" : p.status === "skip" ? "cached" : "indexed";
-    appendFileLog(`${mark}: ${p.filename}`);
-    setStatus(p.filename);
+  function sourceProgressDone(p: LibraryImportProgress): boolean {
+    if (p.cancelled) return true;
+    if (p.total <= 0) return false;
+    return p.done >= p.total || p.current_track_name.trim() === "";
   }
-  function showEmbedDone(d: EmbedDone): void {
+  function sourceProgressNote(p: LibraryImportProgress): string {
+    if (p.cancelled) return "import cancelled";
+    const count = p.total > 0 ? `${Math.min(p.done, p.total)} / ${p.total}` : String(p.done);
+    const cache = p.cache_hits > 0 ? ` · ${p.cache_hits} cached` : "";
+    const name = p.current_track_name.trim();
+    return name ? `${count} · ${name}${cache}` : `${count}${cache}`;
+  }
+  function sourceDoneNote(p: LibraryImportProgress): string {
+    if (p.cancelled) return "Import cancelled";
+    const processed = p.total > 0 ? p.total : p.done;
+    const parts: string[] = [];
+    if (processed > 0) parts.push(`${processed} processed`);
+    if (p.cache_hits > 0) parts.push(`${p.cache_hits} cached`);
+    return parts.length > 0 ? parts.join(", ") : "Import finished";
+  }
+  function showImportProgress(p: LibraryImportProgress): void {
     if (!activeJob || disposed) return;
+    const pct = p.total > 0 ? (Math.min(p.done, p.total) / p.total) * 100 : 0;
+    fill.style.width = `${pct.toFixed(1)}%`;
+    label.textContent = sourceProgressNote(p);
+    if (p.current_track_name.trim()) appendFileLog(`indexed: ${p.current_track_name}`);
+    setStatus(sourceProgressNote(p));
+    if (!sourceProgressDone(p)) return;
     activeJob = false;
-    fill.style.width = "100%";
-    label.textContent = `${d.total} / ${d.total} · €${d.cost_eur.toFixed(4)}`;
+    fill.style.width = p.cancelled ? fill.style.width : "100%";
     hideProgress();
-    setStatus(
-      `${d.embedded} embedded, ${d.skipped} cached, ${d.failed} failed`,
-    );
+    setStatus(sourceDoneNote(p));
     opts.onImportComplete?.({
-      total: d.total,
-      done: d.total,
-      cache_hits: d.skipped,
+      total: p.total,
+      done: p.done,
+      cache_hits: p.cache_hits,
     });
   }
 
   async function ensureProgressSubscription(): Promise<void> {
     if (!unsubProgress) {
-      const unsub = await onEmbedProgress(showEmbedProgress);
+      const unsub = await onLibraryImportProgress(showImportProgress);
       const disposeProgress = unsub as unknown as () => void;
       if (disposed) {
         try {
@@ -152,19 +174,6 @@ export async function renderLibraryPanel(
         }
       } else {
         unsubProgress = disposeProgress;
-      }
-    }
-    if (!unsubDone) {
-      const unsub = await onEmbedDone(showEmbedDone);
-      const disposeDone = unsub as unknown as () => void;
-      if (disposed) {
-        try {
-          disposeDone();
-        } catch {
-          /* ignore */
-        }
-      } else {
-        unsubDone = disposeDone;
       }
     }
   }
@@ -190,20 +199,24 @@ export async function renderLibraryPanel(
   }
 
   async function beginImport(path: string): Promise<void> {
-    if (looksLikeFilePath(path)) {
-      setStatus("Choose a music folder, not a database file.");
+    if (looksLikeAudioFilePath(path)) {
+      setStatus("Drop a music folder or DJ catalog, not a single audio file.");
+      return;
+    }
+    if (looksLikeUnsupportedFilePath(path)) {
+      setStatus("Choose a folder, Rekordbox XML, Traktor NML, VirtualDJ XML, or Engine DB.");
       return;
     }
     await beginLibraryJob(
       async () => {
-        const accepted = await libraryEmbedFolder(path, "mean_excerpt");
+        const accepted = await libraryImport(path);
         if (!accepted) {
           activeJob = false;
           hideProgress();
-          setStatus("Folder indexing needs the desktop bridge.");
+          setStatus("Library import needs the desktop bridge.");
         }
       },
-      "Folder indexing failed",
+      "Library import failed",
     );
   }
 
@@ -218,9 +231,24 @@ export async function renderLibraryPanel(
     );
   }
 
-  function looksLikeFilePath(path: string): boolean {
+  function looksLikeAudioFilePath(path: string): boolean {
+    return /\.(mp3|m4a|wav|flac|aac|aiff?)$/i.test(path);
+  }
+
+  function looksLikeSupportedCatalogPath(path: string): boolean {
     const leaf = path.split(/[\\/]/).pop() ?? "";
-    return /\.[^./\\]+$/.test(leaf);
+    const lower = leaf.toLowerCase();
+    return (
+      lower === "database v2" ||
+      lower === "database.xml" ||
+      lower === "m.db" ||
+      /\.(xml|nml|db)$/i.test(leaf)
+    );
+  }
+
+  function looksLikeUnsupportedFilePath(path: string): boolean {
+    const leaf = path.split(/[\\/]/).pop() ?? "";
+    return /\.[^./\\]+$/.test(leaf) && !looksLikeSupportedCatalogPath(path);
   }
 
   function firstDialogPath(selection: unknown): string | null {
@@ -255,8 +283,48 @@ export async function renderLibraryPanel(
     }
   }
 
+  async function chooseLibraryCatalog(): Promise<void> {
+    if (disposed) return;
+    try {
+      const { open } = await import("@tauri-apps/plugin-dialog");
+      const selection = await open({
+        title: "Choose DJ library catalog",
+        directory: false,
+        multiple: false,
+        filters: [
+          {
+            name: "DJ library catalogs",
+            extensions: ["xml", "nml", "db"],
+          },
+        ],
+      });
+      const sourcePath = firstDialogPath(selection);
+      if (!sourcePath) {
+        setStatus("No DJ library catalog selected.");
+        return;
+      }
+      await beginImport(sourcePath);
+    } catch (e) {
+      const message = (e as Error).message ?? String(e);
+      setStatus(`File picker unavailable: ${message}`);
+    }
+  }
+
   pickFolderBtn.addEventListener("click", () => {
     void chooseLibrarySource();
+  });
+  pickCatalogBtn.addEventListener("click", () => {
+    void chooseLibraryCatalog();
+  });
+  cancelBtn.addEventListener("click", () => {
+    if (!activeJob) return;
+    cancelBtn.disabled = true;
+    setStatus("Cancelling import…");
+    void libraryCancelImport().catch((e) => {
+      cancelBtn.disabled = false;
+      const message = (e as Error).message ?? String(e);
+      setStatus(`Cancel failed: ${message}`);
+    });
   });
 
   // Drag-drop wiring — Tauri webview API. The dedupe via seenEventIds is
@@ -286,11 +354,15 @@ export async function renderLibraryPanel(
             return;
           }
         }
-        const librarySource = payload.paths.find((p) => !looksLikeFilePath(p));
+        const librarySource = payload.paths.find(
+          (p) =>
+            !looksLikeAudioFilePath(p) &&
+            !looksLikeUnsupportedFilePath(p),
+        );
         if (librarySource) {
           void beginImport(librarySource);
         } else {
-          setStatus("Drop a music folder, not a single audio file.");
+          setStatus("Drop a music folder or DJ catalog, not a single audio file.");
         }
       }
     });
@@ -321,11 +393,6 @@ export async function renderLibraryPanel(
       }
       try {
         unsubProgress?.();
-      } catch {
-        /* ignore */
-      }
-      try {
-        unsubDone?.();
       } catch {
         /* ignore */
       }

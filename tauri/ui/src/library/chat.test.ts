@@ -14,6 +14,7 @@ import type {
   EmbedDone,
   EmbedProgress,
   LibraryChatResult,
+  LibraryImportProgress,
   LibraryLiveContext,
   LibraryModelInstallTarget,
   LibraryModelsResult,
@@ -32,6 +33,9 @@ let liveContextCallback: ((context: LibraryLiveContext) => void) | null = null;
 let liveMoveCallback: ((moves: string[]) => void) | null = null;
 let embedProgressCallback: ((progress: EmbedProgress) => void) | null = null;
 let embedDoneCallback: ((done: EmbedDone) => void) | null = null;
+let importProgressCallback:
+  | ((progress: LibraryImportProgress) => void)
+  | null = null;
 let viberToolCallback:
   | ((event: { tool: string; ok: boolean; summary: string }) => void)
   | null = null;
@@ -78,6 +82,8 @@ const emitIpcMock =
   vi.fn<(type: string, payload: Record<string, unknown>) => Promise<void>>();
 const embedFolderMock =
   vi.fn<(path: string, strategy: "mean_excerpt" | "cue_anchored") => Promise<boolean>>();
+const importMock = vi.fn<(path: string) => Promise<boolean>>();
+const cancelImportMock = vi.fn<() => Promise<void>>();
 
 const STATS_READY: LibraryStats = {
   indexed: 12,
@@ -140,6 +146,10 @@ function statsWithSetupCandidate(): LibraryStats {
         confidence: "high",
         reason: "bounded scan saw 42 supported audio files",
         audio_files_seen: 42,
+        import_action: {
+          type: "ipc.library.import",
+          payload: { path: "/Users/ozai/Music/PSYMIND", schema_version: "1" },
+        },
       },
     ],
   };
@@ -160,6 +170,10 @@ function statsWithEngineSetupCandidate(): LibraryStats {
         path,
         confidence: "high",
         reason: "standard Engine DJ Database2/m.db path exists",
+        import_action: {
+          type: "ipc.library.import",
+          payload: { path, schema_version: "1" },
+        },
       },
     ],
   };
@@ -373,6 +387,7 @@ function doMockApi(): void {
   liveMoveCallback = null;
   embedProgressCallback = null;
   embedDoneCallback = null;
+  importProgressCallback = null;
   viberToolCallback = null;
   vi.doMock("../ipc/client.js", () => ({
     emitIpc: emitIpcMock,
@@ -414,6 +429,12 @@ function doMockApi(): void {
       libraryModels: (install?: LibraryModelInstallTarget) =>
         modelsMock(install),
       libraryEmbedFolder: embedFolderMock,
+      libraryImport: importMock,
+      libraryImportFromAction: (
+        action: { payload?: { path?: string } } | undefined,
+        fallbackPath: string,
+      ) => importMock(action?.payload?.path ?? fallbackPath),
+      libraryCancelImport: cancelImportMock,
       onEmbedProgress: vi.fn(async (cb: (progress: EmbedProgress) => void) => {
         embedProgressCallback = cb;
         return () => {};
@@ -422,6 +443,12 @@ function doMockApi(): void {
         embedDoneCallback = cb;
         return () => {};
       }),
+      onLibraryImportProgress: vi.fn(
+        async (cb: (progress: LibraryImportProgress) => void) => {
+          importProgressCallback = cb;
+          return () => {};
+        },
+      ),
       onModelProgress: vi.fn(async () => () => {}),
       onLiveDeckContext: vi.fn(
         async (cb: (context: LibraryLiveContext) => void) => {
@@ -454,7 +481,6 @@ function mountSkeleton(): void {
       <button data-mode="similar" aria-selected="false">Similar</button>
       <button data-mode="curate" aria-selected="false">Curate</button>
       <button data-mode="build" aria-selected="false">Build</button>
-      <button data-mode="cue" aria-selected="false">Cue</button>
       <button data-mode="chat" aria-selected="true">Viber</button>
       <button data-mode="ingest" aria-selected="false">Music</button>
     </div>
@@ -474,6 +500,7 @@ function mountSkeleton(): void {
     <button data-cue-export="rekordbox" aria-pressed="true">Rekordbox XML</button>
     <button data-cue-export="m3u8" aria-pressed="false">M3U8</button>
     <button data-cue-export="both" aria-pressed="false">Both</button>
+    <button id="vmx-lib-cue-run">Export hot cues</button>
     <span id="vmx-lib-seed-name"></span>
     <button id="vmx-lib-runbtn"></button>
     <span id="vmx-lib-center-label"></span>
@@ -552,6 +579,10 @@ describe("chat - real runChat path", () => {
     emitIpcMock.mockResolvedValue(undefined);
     embedFolderMock.mockReset();
     embedFolderMock.mockResolvedValue(true);
+    importMock.mockReset();
+    importMock.mockResolvedValue(true);
+    cancelImportMock.mockReset();
+    cancelImportMock.mockResolvedValue(undefined);
     vi.resetModules();
     document.body.innerHTML = "";
   });
@@ -670,14 +701,15 @@ describe("chat - real runChat path", () => {
       "▸ Index folder",
     );
     expect(embedFolderMock).not.toHaveBeenCalled();
+    expect(importMock).not.toHaveBeenCalled();
     expect(document.activeElement).toBe(document.getElementById("vmx-lib-folder"));
   });
 
   it("surfaces folder indexing failures inside the visible ingest panel", async () => {
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-    embedFolderMock.mockRejectedValueOnce(
+    importMock.mockRejectedValueOnce(
       new Error(
-        "embed-folder exited 1: [FATAL] embed-folder: '/missing' is not a directory.",
+        "library.import failed: FileNotFoundError: '/missing' is not a directory.",
       ),
     );
     await mountChat();
@@ -689,10 +721,11 @@ describe("chat - real runChat path", () => {
 
     const error = document.getElementById("vmx-lib-ingest-error") as HTMLElement;
     const runButton = document.getElementById("vmx-lib-runbtn") as HTMLButtonElement;
-    expect(embedFolderMock).toHaveBeenCalledWith("~/Music", "cue_anchored");
+    expect(importMock).toHaveBeenCalledWith("~/Music");
+    expect(embedFolderMock).not.toHaveBeenCalled();
     expect(error.hidden).toBe(false);
     expect(error.textContent).toContain("index failed");
-    expect(error.textContent).toContain("embed-folder exited 1");
+    expect(error.textContent).toContain("library.import failed");
     expect(error.textContent).toContain("Pick an existing music folder");
     expect(document.getElementById("vmx-lib-prog-n")?.textContent).toBe("index failed");
     expect(document.getElementById("vmx-lib-scope-state")?.textContent).toBe(
@@ -707,9 +740,9 @@ describe("chat - real runChat path", () => {
 
   it("turns code-only folder indexing exits into a setup hint", async () => {
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-    embedFolderMock.mockRejectedValueOnce(
+    importMock.mockRejectedValueOnce(
       new Error(
-        "embed-folder exited 1 before reporting diagnostics. Check the selected folder and local CLAP setup, then index again.",
+        "library.import failed: VIBEMIX_CLAP_ONNX_DIR is not configured.",
       ),
     );
     await mountChat();
@@ -721,7 +754,7 @@ describe("chat - real runChat path", () => {
 
     const error = document.getElementById("vmx-lib-ingest-error") as HTMLElement;
     expect(error.hidden).toBe(false);
-    expect(error.textContent).toContain("embed-folder exited 1");
+    expect(error.textContent).toContain("library.import failed");
     expect(error.textContent).toContain("Install local model setup");
     expect(errorSpy).toHaveBeenCalledWith(
       "[vmx-lib] run failed:",
@@ -729,8 +762,8 @@ describe("chat - real runChat path", () => {
     );
   });
 
-  it("surfaces a cached folder-index receipt instead of a vague done state", async () => {
-    embedFolderMock.mockResolvedValueOnce(true);
+  it("surfaces a cached import receipt instead of a vague done state", async () => {
+    importMock.mockResolvedValueOnce(true);
     await mountChat();
 
     document.querySelector<HTMLButtonElement>('[data-mode-jump="ingest"]')?.click();
@@ -738,19 +771,19 @@ describe("chat - real runChat path", () => {
     (document.getElementById("vmx-lib-runbtn") as HTMLButtonElement).click();
     for (let i = 0; i < 4; i++) await Promise.resolve();
 
-    expect(embedDoneCallback).not.toBeNull();
-    embedDoneCallback?.({
-      embedded: 0,
-      skipped: 49,
-      failed: 0,
+    expect(importProgressCallback).not.toBeNull();
+    importProgressCallback?.({
       total: 49,
-      cost_eur: 0,
+      done: 49,
+      current_track_name: "",
+      cache_hits: 49,
+      cancelled: false,
     });
 
     expect(document.getElementById("vmx-lib-prog-n")?.textContent).toContain(
-      "49 cached",
+      "49 processed · 49 cached",
     );
-    expect(document.getElementById("vmx-lib-rcount")?.textContent).toBe("49 cached");
+    expect(document.getElementById("vmx-lib-rcount")?.textContent).toBe("49 processed");
     expect(document.getElementById("vmx-lib-scope-state")?.textContent).toBe(
       "library indexed",
     );
@@ -762,8 +795,8 @@ describe("chat - real runChat path", () => {
     );
   });
 
-  it("keeps partial folder-index failures visible without hiding usable tracks", async () => {
-    embedFolderMock.mockResolvedValueOnce(true);
+  it("sends a real import cancel and keeps the cancelled receipt visible", async () => {
+    importMock.mockResolvedValueOnce(true);
     await mountChat();
 
     document.querySelector<HTMLButtonElement>('[data-mode-jump="ingest"]')?.click();
@@ -771,32 +804,33 @@ describe("chat - real runChat path", () => {
     (document.getElementById("vmx-lib-runbtn") as HTMLButtonElement).click();
     for (let i = 0; i < 4; i++) await Promise.resolve();
 
-    embedDoneCallback?.({
-      embedded: 3,
-      skipped: 1,
-      failed: 2,
+    const runButton = document.getElementById("vmx-lib-runbtn") as HTMLButtonElement;
+    expect(runButton.textContent).toBe("Cancel import");
+    runButton.click();
+    expect(cancelImportMock).toHaveBeenCalledTimes(1);
+
+    importProgressCallback?.({
       total: 6,
-      cost_eur: 0.12,
+      done: 3,
+      current_track_name: "",
+      cache_hits: 1,
+      cancelled: true,
     });
 
     const error = document.getElementById("vmx-lib-ingest-error") as HTMLElement;
     expect(document.getElementById("vmx-lib-prog-n")?.textContent).toContain(
-      "3 embedded · 1 cached · 2 failed",
+      "cancelled",
     );
-    expect(error.hidden).toBe(false);
-    expect(error.textContent).toContain("index completed with errors");
-    expect(error.textContent).toContain("3 embedded · 1 cached · 2 failed");
-    expect(error.textContent).toContain("Viber can use the indexed tracks now");
-    expect(document.getElementById("vmx-lib-rcount")?.textContent).toBe("2 failed");
+    expect(error.hidden).toBe(true);
+    expect(document.getElementById("vmx-lib-rcount")?.textContent).toBe("cancelled");
     expect(document.getElementById("vmx-lib-scope-state")?.textContent).toBe(
-      "index partial",
+      "index cancelled",
     );
-    expect((document.getElementById("vmx-lib-runbtn") as HTMLButtonElement).disabled).toBe(
-      false,
-    );
+    expect(runButton.disabled).toBe(false);
+    expect(runButton.textContent).toBe("▸ Index folder");
   });
 
-  it("does not surface catalog-database setup candidates as actionable", async () => {
+  it("surfaces catalog-database setup candidates as actionable imports", async () => {
     statsMock.mockResolvedValueOnce(statsWithEngineSetupCandidate());
 
     await mountChat();
@@ -804,15 +838,27 @@ describe("chat - real runChat path", () => {
     const setupCard = document.querySelector<HTMLElement>(
       '[data-wire="library.setup-candidate"]',
     );
-    expect(setupCard).toBeNull();
+    expect(setupCard).not.toBeNull();
+    expect(setupCard?.textContent).toContain("Viber found a likely Engine DJ database.");
+    expect(setupCard?.textContent).toContain(
+      "/Users/ozai/Music/Engine Library/Database2/m.db",
+    );
+    expect(setupCard?.textContent).toContain("Index catalog");
+    setupCard?.querySelector<HTMLButtonElement>(".vmx-lib-chat-action")?.click();
+    for (let i = 0; i < 4; i++) await Promise.resolve();
+
+    expect(importMock).toHaveBeenCalledWith(
+      "/Users/ozai/Music/Engine Library/Database2/m.db",
+    );
+    expect(embedFolderMock).not.toHaveBeenCalled();
   });
 
-  it("starts the folder embed only after the user clicks it", async () => {
-    const embedControl: { resolve?: (accepted: boolean) => void } = {};
-    embedFolderMock.mockImplementationOnce(
+  it("starts the setup import only after the user clicks it", async () => {
+    const importControl: { resolve?: (accepted: boolean) => void } = {};
+    importMock.mockImplementationOnce(
       () =>
         new Promise<boolean>((resolve) => {
-          embedControl.resolve = resolve;
+          importControl.resolve = resolve;
         }),
     );
     statsMock.mockResolvedValueOnce(statsWithSetupCandidate());
@@ -826,31 +872,36 @@ describe("chat - real runChat path", () => {
     button?.click();
     for (let i = 0; i < 4; i++) await Promise.resolve();
 
-    expect(embedFolderMock).toHaveBeenCalledTimes(1);
-    expect(embedFolderMock).toHaveBeenCalledWith(
-      "/Users/ozai/Music/PSYMIND",
-      "mean_excerpt",
-    );
+    expect(importMock).toHaveBeenCalledTimes(1);
+    expect(importMock).toHaveBeenCalledWith("/Users/ozai/Music/PSYMIND");
+    expect(embedFolderMock).not.toHaveBeenCalled();
     expect(emitIpcMock).not.toHaveBeenCalled();
     expect(button?.disabled).toBe(true);
-    embedControl.resolve?.(true);
+    importControl.resolve?.(true);
+    importProgressCallback?.({
+      total: 42,
+      done: 42,
+      current_track_name: "",
+      cache_hits: 0,
+      cancelled: false,
+    });
     for (let i = 0; i < 4; i++) await Promise.resolve();
 
     expect(button?.disabled).toBe(false);
     expect(
       document.querySelector('[data-wire="library.setup-candidate"]')?.textContent,
-    ).toContain("index command finished");
+    ).toContain("indexed · 42 processed");
     expect(document.getElementById("vmx-lib-scope-state")?.textContent).toBe(
       "library indexed",
     );
   });
 
   it("surfaces setup-card folder index receipts while staying in chat mode", async () => {
-    const embedControl: { resolve?: (accepted: boolean) => void } = {};
-    embedFolderMock.mockImplementationOnce(
+    const importControl: { resolve?: (accepted: boolean) => void } = {};
+    importMock.mockImplementationOnce(
       () =>
         new Promise<boolean>((resolve) => {
-          embedControl.resolve = resolve;
+          importControl.resolve = resolve;
         }),
     );
     statsMock.mockResolvedValueOnce(statsWithSetupCandidate());
@@ -866,32 +917,32 @@ describe("chat - real runChat path", () => {
     for (let i = 0; i < 8; i++) await Promise.resolve();
 
     expect(document.body.dataset.mode).toBe("chat");
-    expect(embedProgressCallback).not.toBeNull();
-    expect(embedDoneCallback).not.toBeNull();
-    embedProgressCallback?.({
-      n: 12,
+    expect(importProgressCallback).not.toBeNull();
+    expect(embedFolderMock).not.toHaveBeenCalled();
+    importProgressCallback?.({
       total: 49,
-      status: "ok",
-      filename: "Track 12.wav",
-      cost_eur: 0.05,
+      done: 12,
+      current_track_name: "Track 12",
+      cache_hits: 0,
+      cancelled: false,
     });
     expect(status?.textContent).toContain("12/49 Track 12");
 
-    embedDoneCallback?.({
-      embedded: 0,
-      skipped: 49,
-      failed: 0,
+    importProgressCallback?.({
       total: 49,
-      cost_eur: 0,
+      done: 49,
+      current_track_name: "",
+      cache_hits: 49,
+      cancelled: false,
     });
     for (let i = 0; i < 4; i++) await Promise.resolve();
 
-    expect(status?.textContent).toContain("indexed · 49 cached");
+    expect(status?.textContent).toContain("indexed · 49 processed · 49 cached");
     expect(button?.disabled).toBe(false);
     expect(document.getElementById("vmx-lib-scope-state")?.textContent).toBe(
       "library indexed",
     );
-    embedControl.resolve?.(true);
+    importControl.resolve?.(true);
   });
 
   it("passes Deck A/B audio-window part labels into Viber chat", async () => {

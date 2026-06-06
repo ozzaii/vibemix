@@ -1,6 +1,6 @@
 /* Phase 28 Plan 06 — library-panel vitest specs (jsdom).
  *
- * Mocks @tauri-apps/api/webview onDragDropEvent + the library embed bridge
+ * Mocks @tauri-apps/api/webview onDragDropEvent + the library import bridge
  * to drive the panel's drag-drop dedupe + progress flow.
  */
 
@@ -9,28 +9,20 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const dragHandlers: Array<(event: { id: number; payload: unknown }) => void> = [];
 const emitted: { type: string; payload: Record<string, unknown> }[] = [];
 type ProgressFrame = {
-  n: number;
   total: number;
-  status: "ok" | "skip" | "err";
-  filename: string;
-  cost_eur: number;
-};
-type DoneFrame = {
-  embedded: number;
-  skipped: number;
-  failed: number;
-  total: number;
-  cost_eur: number;
+  done: number;
+  current_track_name: string;
+  cache_hits: number;
+  cancelled: boolean;
 };
 const dialogMocks = vi.hoisted(() => ({
   open: vi.fn(),
 }));
 const libraryApiMocks = vi.hoisted(() => ({
-  libraryEmbedFolder: vi.fn(),
-  onEmbedProgress: vi.fn(),
-  onEmbedDone: vi.fn(),
+  libraryCancelImport: vi.fn(),
+  libraryImport: vi.fn(),
+  onLibraryImportProgress: vi.fn(),
   progressHandlers: new Set<(p: ProgressFrame) => void>(),
-  doneHandlers: new Set<(d: DoneFrame) => void>(),
 }));
 
 vi.mock("../../src/ipc/client.js", () => ({
@@ -41,9 +33,9 @@ vi.mock("../../src/ipc/client.js", () => ({
 }));
 
 vi.mock("../../src/library/api.js", () => ({
-  libraryEmbedFolder: libraryApiMocks.libraryEmbedFolder,
-  onEmbedProgress: libraryApiMocks.onEmbedProgress,
-  onEmbedDone: libraryApiMocks.onEmbedDone,
+  libraryCancelImport: libraryApiMocks.libraryCancelImport,
+  libraryImport: libraryApiMocks.libraryImport,
+  onLibraryImportProgress: libraryApiMocks.onLibraryImportProgress,
 }));
 
 vi.mock("@tauri-apps/api/webview", () => ({
@@ -72,18 +64,14 @@ beforeEach(() => {
   dialogMocks.open.mockReset();
   dialogMocks.open.mockResolvedValue(null);
   libraryApiMocks.progressHandlers.clear();
-  libraryApiMocks.doneHandlers.clear();
-  libraryApiMocks.libraryEmbedFolder.mockReset();
-  libraryApiMocks.libraryEmbedFolder.mockResolvedValue(true);
-  libraryApiMocks.onEmbedProgress.mockReset();
-  libraryApiMocks.onEmbedProgress.mockImplementation(async (cb) => {
+  libraryApiMocks.libraryCancelImport.mockReset();
+  libraryApiMocks.libraryCancelImport.mockResolvedValue(undefined);
+  libraryApiMocks.libraryImport.mockReset();
+  libraryApiMocks.libraryImport.mockResolvedValue(true);
+  libraryApiMocks.onLibraryImportProgress.mockReset();
+  libraryApiMocks.onLibraryImportProgress.mockImplementation(async (cb) => {
     libraryApiMocks.progressHandlers.add(cb);
     return () => libraryApiMocks.progressHandlers.delete(cb);
-  });
-  libraryApiMocks.onEmbedDone.mockReset();
-  libraryApiMocks.onEmbedDone.mockImplementation(async (cb) => {
-    libraryApiMocks.doneHandlers.add(cb);
-    return () => libraryApiMocks.doneHandlers.delete(cb);
   });
   document.body.replaceChildren();
 });
@@ -106,12 +94,8 @@ function emitProgress(frame: ProgressFrame): void {
   for (const cb of libraryApiMocks.progressHandlers) cb(frame);
 }
 
-function emitDone(frame: DoneFrame): void {
-  for (const cb of libraryApiMocks.doneHandlers) cb(frame);
-}
-
 describe("library-panel — drag-drop dedupe (Tauri Issue #14134)", () => {
-  it("dedupes by event.id — same id starts one folder embed", async () => {
+  it("dedupes by event.id — same id starts one library import", async () => {
     const handle = await renderLibraryPanel();
     document.body.append(handle.element);
 
@@ -119,14 +103,13 @@ describe("library-panel — drag-drop dedupe (Tauri Issue #14134)", () => {
     dispatchDrop(1, ["/Users/kaan/Music/PSYMIND"]);
     await _flush();
 
-    expect(libraryApiMocks.libraryEmbedFolder).toHaveBeenCalledTimes(1);
-    expect(libraryApiMocks.libraryEmbedFolder).toHaveBeenCalledWith(
+    expect(libraryApiMocks.libraryImport).toHaveBeenCalledTimes(1);
+    expect(libraryApiMocks.libraryImport).toHaveBeenCalledWith(
       "/Users/kaan/Music/PSYMIND",
-      "mean_excerpt",
     );
   });
 
-  it("new event.id starts a new embed — dedupe is per-event-id, not per-path", async () => {
+  it("new event.id starts a new import — dedupe is per-event-id, not per-path", async () => {
     const handle = await renderLibraryPanel();
     document.body.append(handle.element);
 
@@ -135,21 +118,32 @@ describe("library-panel — drag-drop dedupe (Tauri Issue #14134)", () => {
     dispatchDrop(11, ["/Users/kaan/Music/PSYMIND"]);
     await _flush();
 
-    expect(libraryApiMocks.libraryEmbedFolder).toHaveBeenCalledTimes(2);
+    expect(libraryApiMocks.libraryImport).toHaveBeenCalledTimes(2);
   });
 });
 
 describe("library-panel — source drop routing", () => {
-  it("accepts a music folder path as a folder embed source", async () => {
+  it("accepts a music folder path as an import source", async () => {
     const handle = await renderLibraryPanel();
     document.body.append(handle.element);
 
     dispatchDrop(19, ["/Users/kaan/Music/PSYMIND"]);
     await _flush();
 
-    expect(libraryApiMocks.libraryEmbedFolder).toHaveBeenCalledWith(
+    expect(libraryApiMocks.libraryImport).toHaveBeenCalledWith(
       "/Users/kaan/Music/PSYMIND",
-      "mean_excerpt",
+    );
+  });
+
+  it("accepts a DJ catalog file as an import source", async () => {
+    const handle = await renderLibraryPanel();
+    document.body.append(handle.element);
+
+    dispatchDrop(21, ["/Users/kaan/Music/rekordbox/collection.xml"]);
+    await _flush();
+
+    expect(libraryApiMocks.libraryImport).toHaveBeenCalledWith(
+      "/Users/kaan/Music/rekordbox/collection.xml",
     );
   });
 
@@ -161,22 +155,24 @@ describe("library-panel — source drop routing", () => {
     await _flush();
 
     const status = handle.element.querySelector(".vmx-library-status");
-    expect(status?.textContent).toContain("Drop a music folder");
+    expect(status?.textContent).toContain("Drop a music folder or DJ catalog");
   });
 
-  it("copy advertises folder setup only", async () => {
+  it("copy advertises folder and DJ catalog setup", async () => {
     const handle = await renderLibraryPanel();
     document.body.append(handle.element);
 
     const drop = handle.element.querySelector(".vmx-library-droptarget");
-    expect(drop?.getAttribute("aria-label")).toBe("Drop a music folder here");
-    expect(drop?.textContent).toContain("Drop a music folder here");
-    expect(drop?.textContent).not.toContain("Rekordbox XML");
+    expect(drop?.getAttribute("aria-label")).toBe(
+      "Drop a music folder or DJ catalog here",
+    );
+    expect(drop?.textContent).toContain("Drop music folder or DJ catalog");
+    expect(drop?.textContent).toContain("Choose catalog");
   });
 });
 
 describe("library-panel — native picker", () => {
-  it("Choose folder opens the native folder picker and embeds the selected path", async () => {
+  it("Choose folder opens the native folder picker and imports the selected path", async () => {
     dialogMocks.open.mockResolvedValue("/Users/kaan/Music/PSYMIND");
     const handle = await renderLibraryPanel();
     document.body.append(handle.element);
@@ -193,13 +189,40 @@ describe("library-panel — native picker", () => {
       directory: true,
       multiple: false,
     });
-    expect(libraryApiMocks.libraryEmbedFolder).toHaveBeenCalledWith(
+    expect(libraryApiMocks.libraryImport).toHaveBeenCalledWith(
       "/Users/kaan/Music/PSYMIND",
-      "mean_excerpt",
     );
   });
 
-  it("cancelling the native picker leaves embed untouched and reports no selection", async () => {
+  it("Choose catalog opens the native file picker and imports the selected catalog", async () => {
+    dialogMocks.open.mockResolvedValue("/Users/kaan/rekordbox/collection.xml");
+    const handle = await renderLibraryPanel();
+    document.body.append(handle.element);
+
+    const pickCatalogBtn = handle.element.querySelector(
+      ".vmx-library-pick-catalog-btn",
+    ) as HTMLButtonElement;
+    pickCatalogBtn.click();
+    await _flush();
+    await _flush();
+
+    expect(dialogMocks.open).toHaveBeenCalledWith({
+      title: "Choose DJ library catalog",
+      directory: false,
+      multiple: false,
+      filters: [
+        {
+          name: "DJ library catalogs",
+          extensions: ["xml", "nml", "db"],
+        },
+      ],
+    });
+    expect(libraryApiMocks.libraryImport).toHaveBeenCalledWith(
+      "/Users/kaan/rekordbox/collection.xml",
+    );
+  });
+
+  it("cancelling the native picker leaves import untouched and reports no selection", async () => {
     dialogMocks.open.mockResolvedValue(null);
     const handle = await renderLibraryPanel();
     document.body.append(handle.element);
@@ -211,7 +234,7 @@ describe("library-panel — native picker", () => {
     await _flush();
     await _flush();
 
-    expect(libraryApiMocks.libraryEmbedFolder).not.toHaveBeenCalled();
+    expect(libraryApiMocks.libraryImport).not.toHaveBeenCalled();
     expect(handle.element.querySelector(".vmx-library-status")?.textContent).toBe(
       "No music folder selected.",
     );
@@ -227,13 +250,13 @@ describe("library-panel — progress updates fill width", () => {
     dispatchDrop(30, ["/Music/PSYMIND"]);
     await _flush();
 
-    expect(libraryApiMocks.onEmbedProgress).toHaveBeenCalled();
+    expect(libraryApiMocks.onLibraryImportProgress).toHaveBeenCalled();
     emitProgress({
-      n: 50,
       total: 100,
-      status: "ok",
-      filename: "X - Y.wav",
-      cost_eur: 0.0025,
+      done: 50,
+      current_track_name: "X - Y.wav",
+      cache_hits: 0,
+      cancelled: false,
     });
 
     const fill = handle.element.querySelector(
@@ -242,32 +265,47 @@ describe("library-panel — progress updates fill width", () => {
     // jsdom drops trailing zero (50.0% → 50%); accept either form.
     expect(["50%", "50.0%"]).toContain(fill.style.width);
   });
+
+  it("Cancel sends a real library import cancel", async () => {
+    const handle = await renderLibraryPanel();
+    document.body.append(handle.element);
+
+    dispatchDrop(31, ["/Music/PSYMIND"]);
+    await _flush();
+
+    const cancel = handle.element.querySelector(
+      ".vmx-library-cancel-btn",
+    ) as HTMLButtonElement;
+    expect(cancel.hidden).toBe(false);
+    cancel.click();
+
+    expect(libraryApiMocks.libraryCancelImport).toHaveBeenCalledTimes(1);
+    expect(cancel.disabled).toBe(true);
+  });
 });
 
 describe("library-panel — programmatic refresh", () => {
-  it("beginImport embeds folders for stale-source refreshes", async () => {
+  it("beginImport imports folders for stale-source refreshes", async () => {
     const handle = await renderLibraryPanel();
     document.body.append(handle.element);
 
     await handle.beginImport("/path/to/folder");
     await _flush();
 
-    expect(libraryApiMocks.libraryEmbedFolder).toHaveBeenCalledWith(
+    expect(libraryApiMocks.libraryImport).toHaveBeenCalledWith(
       "/path/to/folder",
-      "mean_excerpt",
     );
   });
 
-  it("beginImport rejects catalog-file paths instead of firing dead IPC", async () => {
+  it("beginImport routes catalog-file paths through the rich import path", async () => {
     const handle = await renderLibraryPanel();
     document.body.append(handle.element);
 
     await handle.beginImport("/path/to/collection.xml");
     await _flush();
 
-    expect(libraryApiMocks.libraryEmbedFolder).not.toHaveBeenCalled();
-    expect(handle.element.querySelector(".vmx-library-status")?.textContent).toBe(
-      "Choose a music folder, not a database file.",
+    expect(libraryApiMocks.libraryImport).toHaveBeenCalledWith(
+      "/path/to/collection.xml",
     );
   });
 
@@ -282,29 +320,29 @@ describe("library-panel — programmatic refresh", () => {
       type: "ipc.library.staleness_action",
       payload: { action: "reindex_folder", schema_version: "1" },
     });
-    expect(libraryApiMocks.onEmbedProgress).toHaveBeenCalled();
+    expect(libraryApiMocks.onLibraryImportProgress).toHaveBeenCalled();
   });
 });
 
 describe("library-panel — completion hides progress", () => {
-  it("embed-done hides progress and shows the embed receipt", async () => {
+  it("import-progress terminal frame hides progress and shows the receipt", async () => {
     const handle = await renderLibraryPanel();
     document.body.append(handle.element);
 
     dispatchDrop(50, ["/Music/PSYMIND"]);
     await _flush();
-    emitDone({
-      embedded: 38,
-      skipped: 12,
-      failed: 0,
+    emitProgress({
       total: 50,
-      cost_eur: 0.02,
+      done: 50,
+      current_track_name: "",
+      cache_hits: 12,
+      cancelled: false,
     });
 
     const progress = handle.element.querySelector(".vmx-library-progress");
     expect(progress?.classList.contains("hidden")).toBe(true);
     const status = handle.element.querySelector(".vmx-library-status");
-    expect(status?.textContent).toContain("38 embedded");
+    expect(status?.textContent).toContain("50 processed");
     expect(status?.textContent).toContain("12 cached");
   });
 });
@@ -318,7 +356,7 @@ describe("library-panel — dispose unsubscribes", () => {
     dispatchDrop(60, ["/Music/PSYMIND"]);
     await _flush();
 
-    expect(libraryApiMocks.libraryEmbedFolder).not.toHaveBeenCalled();
+    expect(libraryApiMocks.libraryImport).not.toHaveBeenCalled();
   });
 
   it("immediately unsubs when progress subscribe resolves after dispose", async () => {
@@ -332,7 +370,7 @@ describe("library-panel — dispose unsubscribes", () => {
     let sawResolveSubscribe = false;
     let unlistenCalls = 0;
     const onImportComplete = vi.fn();
-    libraryApiMocks.onEmbedProgress.mockImplementationOnce(async (cb) => {
+    libraryApiMocks.onLibraryImportProgress.mockImplementationOnce(async (cb) => {
       progressCb = cb;
       return await new Promise<() => void>((resolve) => {
         resolveSubscribe = resolve;
@@ -349,11 +387,11 @@ describe("library-panel — dispose unsubscribes", () => {
     handle.dispose();
     expect(sawProgressCb).toBe(true);
     progressCb({
-      n: 10,
       total: 10,
-      status: "ok",
-      filename: "Late Track.wav",
-      cost_eur: 0.004,
+      done: 10,
+      current_track_name: "Late Track.wav",
+      cache_hits: 0,
+      cancelled: false,
     });
     expect(sawResolveSubscribe).toBe(true);
     resolveSubscribe(() => {
@@ -364,7 +402,7 @@ describe("library-panel — dispose unsubscribes", () => {
     expect(unlistenCalls).toBe(1);
     expect(onImportComplete).not.toHaveBeenCalled();
     expect(handle.element.querySelector(".vmx-library-status")?.textContent).not.toContain(
-      "embedded",
+      "processed",
     );
   });
 });

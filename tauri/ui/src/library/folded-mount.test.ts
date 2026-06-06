@@ -45,6 +45,9 @@ function mockApi(): void {
       tracks: [],
     })),
     libraryEmbedFolder: vi.fn(async () => false),
+    libraryImport: vi.fn(async () => false),
+    libraryImportFromAction: vi.fn(async () => false),
+    libraryCancelImport: vi.fn(async () => undefined),
     libraryModels: vi.fn(async () => ({
       install: null,
       models: [],
@@ -79,6 +82,7 @@ function mockApi(): void {
     normalizeLiveContextPayload: vi.fn((payload) => payload),
     onEmbedDone: vi.fn(async () => () => {}),
     onEmbedProgress: vi.fn(async () => () => {}),
+    onLibraryImportProgress: vi.fn(async () => () => {}),
     onLiveDeckContext: vi.fn(async () => () => {}),
     onLiveMoveContext: vi.fn(async () => () => {}),
     onModelProgress: vi.fn(async () => () => {}),
