@@ -140,7 +140,7 @@ export function mountDrillsPanel(
       button.dataset.lessonId = referral.lesson_id;
       button.disabled = true;
       button.setAttribute("aria-disabled", "true");
-      button.textContent = "Learn coming soon";
+      button.textContent = "Lessons land after launch";
       button.title = "Learning engine is parked for launch.";
 
       const meta = document.createElement("span");

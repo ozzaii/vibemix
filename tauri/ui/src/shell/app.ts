@@ -101,7 +101,7 @@ function mountLearnTease(mount: HTMLElement): void {
   const title = document.createElement("h2");
   title.id = "learn-tease-title";
   title.className = "learn-tease__title";
-  title.textContent = "Learning engine coming soon";
+  title.textContent = "Teaching that earns its place.";
 
   const body = document.createElement("p");
   body.className = "learn-tease__body";

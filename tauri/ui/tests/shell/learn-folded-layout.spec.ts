@@ -21,7 +21,7 @@ describe("folded Learn shell layout", () => {
   it("mounts the coming-soon tease without booting the lesson runner", () => {
     const app = readUi("src/shell/app.ts");
     expect(app).toContain("mountLearnTease(mount)");
-    expect(app).toContain("Learning engine coming soon");
+    expect(app).toContain("Teaching that earns its place.");
     expect(app).not.toContain("mountLearnWindow");
     expect(app).not.toContain("mountSkillWall");
     expect(app).not.toContain("../learn/learn-window.js");

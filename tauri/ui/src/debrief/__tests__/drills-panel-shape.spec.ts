@@ -79,7 +79,7 @@ describe("drills-panel", () => {
     ]);
 
     const button = div.querySelector<HTMLButtonElement>(".vmx-drill-learn");
-    expect(button?.textContent).toBe("Learn coming soon");
+    expect(button?.textContent).toBe("Lessons land after launch");
     expect(button?.dataset.lessonId).toBe("L2.01");
     expect(button?.disabled).toBe(true);
     expect(div.querySelector(".vmx-drill-learn-meta")?.textContent).toContain(

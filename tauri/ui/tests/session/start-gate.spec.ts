@@ -68,7 +68,7 @@ describe("SHIP-WIRE START-gate", () => {
     expect(root.querySelector('[data-action="start"]')).toBeTruthy();
     expect(
       root.querySelector<HTMLElement>('[data-action="start"]')?.textContent,
-    ).toBe("start");
+    ).toBe("Go live");
   });
 
   it("boots armed as a composed premium deck face with grounded context", () => {

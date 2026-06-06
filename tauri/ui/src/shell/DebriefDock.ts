@@ -56,7 +56,6 @@ const CSS = `
     pointer-events: none;
     border-radius: var(--rad-sm);
     background:
-      repeating-linear-gradient(90deg, transparent 0 80px, rgba(255, 222, 242, 0.020) 80px 81px),
       linear-gradient(90deg, transparent 0 34%, var(--brand-04) 34.2%, transparent 34.6% 100%),
       linear-gradient(180deg, rgba(255, 222, 242, 0.026), transparent 18%);
     box-shadow:

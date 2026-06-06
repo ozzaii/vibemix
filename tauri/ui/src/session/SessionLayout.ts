@@ -479,8 +479,7 @@ const LAYOUT_CSS = `
     background:
       radial-gradient(135% 92% at 50% 116%, var(--brand-16), var(--brand-04) 38%, transparent 66%),
       linear-gradient(112deg, transparent 0%, var(--brand-04) 30%, transparent 56%),
-      radial-gradient(80% 60% at 82% 8%, rgba(255, 222, 242, 0.03), transparent 58%),
-      repeating-linear-gradient(90deg, transparent 0 78px, rgba(255, 222, 242, 0.022) 78px 79px);
+      radial-gradient(80% 60% at 82% 8%, rgba(255, 222, 242, 0.03), transparent 58%);
     filter: blur(0.2px);
     opacity: 0.86;
     transform: translate3d(0, 0, 0);
@@ -510,7 +509,7 @@ const LAYOUT_CSS = `
     max-width: 11ch;
     font-family: var(--type-serif);
     font-weight: 400;
-    font-size: 72px;
+    font-size: clamp(64px, 7vw, 96px);
     line-height: 0.96;
     letter-spacing: 0;
     color: var(--text-primary);
@@ -524,7 +523,7 @@ const LAYOUT_CSS = `
     margin: 0;
     margin-inline: auto;
     font-family: var(--type-body);
-    font-size: 15px;
+    font-size: 17px;
     line-height: 1.55;
     color: var(--text-muted);
   }
@@ -560,21 +559,15 @@ const LAYOUT_CSS = `
     letter-spacing: 0;
     color: var(--text-secondary);
   }
+  /* F9 polish: the Start CTA reads WITH the copy column, not as a separate
+   * raised dashboard tile. Keep the element (start-gate.spec.ts:92) and its
+   * kicker/button/note stack; drop the pad-box, radius, fill, and bevel. */
   .vmx-armed__module {
     position: relative;
     display: grid;
     gap: var(--sp-4);
     align-self: center;
     justify-self: center;
-    padding: 24px;
-    border-radius: var(--rad-md);
-    background:
-      linear-gradient(180deg, rgba(255, 251, 244, 0.040), rgba(0, 0, 0, 0.26)),
-      rgba(34, 29, 32, 0.74);
-    box-shadow:
-      var(--bevel-raised),
-      var(--shadow-raised),
-      0 0 66px -28px var(--brand-22);
   }
   .vmx-armed__kicker {
     color: var(--silk-40);
@@ -690,16 +683,14 @@ const LAYOUT_CSS = `
     overflow: hidden;
   }
   /* The engraved inner faceplate (2026-05-30 level-up): an inset machined frame
-   * + a milled vertical grid + a top sheen, lifted from near-invisible (0.010-
-   * 0.035 alpha) to read as a real precision deck face — so the slab's open area
-   * is hardware character, not dead empty box. The frame catches a 0.5px lip. */
+   * + a top sheen, lifted from near-invisible (0.010-0.035 alpha) to read as
+   * a real precision deck face. The frame catches a 0.5px lip. */
   .vmx-voice::before {
     content: "";
     position: absolute;
     inset: 12px;
     border-radius: calc(var(--rad-md) - 4px);
     background:
-      repeating-linear-gradient(90deg, transparent 0 46px, rgba(255, 222, 242, 0.028) 46px 47px),
       linear-gradient(180deg, rgba(255, 251, 244, 0.030) 0%, transparent 18%, transparent 100%);
     box-shadow:
       inset 0 1px 0 rgba(255, 210, 240, 0.055),
@@ -1261,13 +1252,13 @@ export function mountSessionLayout(
   armedModule.className = "vmx-armed__module";
   const armedKicker = document.createElement("span");
   armedKicker.className = "vmx-armed__kicker";
-  armedKicker.textContent = "co-host ready";
+  armedKicker.textContent = "ready to listen";
   const startBtn = document.createElement("button");
   startBtn.type = "button";
   startBtn.dataset.action = "start";
   startBtn.className = "vmx-armed__start";
-  startBtn.textContent = "start";
-  startBtn.setAttribute("aria-label", "start co-host");
+  startBtn.textContent = "Go live";
+  startBtn.setAttribute("aria-label", "go live, start the co-host");
   // Optimistic repaint (CLAUDE.md rule): flip the deck to running locally so
   // the live surface appears instantly; onStart fires ipc.session.start +
   // setSessionState, and the next render frame confirms the run-state.
@@ -1277,7 +1268,7 @@ export function mountSessionLayout(
   });
   const armedNote = document.createElement("span");
   armedNote.className = "vmx-armed__note";
-  armedNote.textContent = "press start to go live";
+  armedNote.textContent = "Stands by until you go live.";
   armedModule.append(armedKicker, startBtn, armedNote);
   armed.append(armedField, armedCopy, armedModule);
 

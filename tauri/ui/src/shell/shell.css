@@ -738,8 +738,7 @@ html[data-runtime="tauri"] .shell-main {
   box-shadow: 0 0 18px var(--brand-40);
 }
 
-.learn-tease__kicker,
-.learn-tease__note {
+.learn-tease__kicker {
   position: relative;
   margin: 0;
   font-family: var(--type-mono);
@@ -814,7 +813,13 @@ html[data-runtime="tauri"] .shell-main {
 
 .learn-tease__note {
   max-width: 58ch;
-  margin-top: var(--sp-5);
+  position: relative;
+  margin: var(--sp-5) 0 0;
+  font-family: var(--type-body);
+  font-size: 13px;
+  line-height: 1.5;
+  letter-spacing: normal;
+  text-transform: none;
   color: var(--text-muted);
 }
 
