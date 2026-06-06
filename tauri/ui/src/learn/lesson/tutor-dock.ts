@@ -40,6 +40,12 @@ export interface TutorSpeakPayload {
   data_state: "active" | "hint";
 }
 
+export type TutorVoiceStatus = "ok" | "muted" | "unknown";
+
+export interface TutorSpeakOptions {
+  voiceStatus?: TutorVoiceStatus;
+}
+
 export interface TutorAdvanceFeedback {
   label: string;
   count: number;
@@ -48,7 +54,7 @@ export interface TutorAdvanceFeedback {
 
 export interface TutorSpeakHandle extends HTMLDivElement {
   /** Apply a new tutor_speak envelope. Handles the active/hint fork. */
-  show(payload: TutorSpeakPayload): void;
+  show(payload: TutorSpeakPayload, options?: TutorSpeakOptions): void;
   /** Cycle current → g1 (called on ipc.learn.advance — no new line yet). */
   advance(feedback?: TutorAdvanceFeedback): void;
   /** Collapse dock + clear all text (called on idle / complete). */
@@ -135,7 +141,7 @@ export function TutorSpeakDock(): TutorSpeakHandle {
 
   const sr = ensureSrRegion();
 
-  root.show = (payload: TutorSpeakPayload) => {
+  root.show = (payload: TutorSpeakPayload, options: TutorSpeakOptions = {}) => {
     if (payload.data_state === "hint") {
       // HINT path — APPEND italic below .now; do NOT shuffle ghosts.
       root.setAttribute("data-state", "hint");
@@ -143,8 +149,7 @@ export function TutorSpeakDock(): TutorSpeakHandle {
       line.className = "hint-line";
       line.textContent = payload.text;
       hintLines.appendChild(line);
-      voiceState.textContent = "speaking";
-      voiceState.setAttribute("data-active", "hint");
+      syncVoiceReceipt(voiceState, "hint", options.voiceStatus);
       renderCitation(payload.citations, cite);
       sr.setAttribute("aria-live", "assertive");
       sr.textContent = payload.text;
@@ -158,8 +163,7 @@ export function TutorSpeakDock(): TutorSpeakHandle {
     now.textContent = payload.text;
     // Clear prior hint lines — each new active beat starts hint-free.
     hintLines.textContent = "";
-    voiceState.textContent = "speaking";
-    voiceState.setAttribute("data-active", "true");
+    syncVoiceReceipt(voiceState, "true", options.voiceStatus);
     takePulse.removeAttribute("data-active");
     takePulse.textContent = "";
     // Re-trigger the rise animation by removing+re-adding the class so
@@ -227,6 +231,16 @@ export function TutorSpeakDock(): TutorSpeakHandle {
   };
 
   return root;
+}
+
+function syncVoiceReceipt(
+  el: HTMLElement,
+  active: "true" | "hint",
+  status: TutorVoiceStatus | undefined,
+): void {
+  el.textContent = status === "muted" ? "subtitles" : "speaking";
+  el.dataset.voiceStatus = status ?? "unknown";
+  el.setAttribute("data-active", active);
 }
 
 function renderCitation(

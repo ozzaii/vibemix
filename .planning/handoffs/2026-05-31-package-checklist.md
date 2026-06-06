@@ -13244,3 +13244,36 @@ Proof before staging:
 - `npm --prefix tauri/ui run build`
 - `git diff --check -- tauri/ui/src/learn/lesson/progress-list.ts tauri/ui/tests/learn/test_progress_list.spec.ts .planning/handoffs/2026-05-31-package-checklist.md`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+
+## Package 157 - Learn Tutor Subtitle Voice Receipt
+
+Suggested commit: `fix(learn-ui): label muted tutor lines as subtitles`
+
+Include:
+
+- `tauri/ui/src/learn/lesson/tutor-dock.ts`
+- `tauri/ui/src/learn/learn-window.ts`
+- `tauri/ui/tests/learn/test_tutor_speak_sr_announcement.spec.ts`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- TTS backend changes, shell footer redesign, Learn copy rewrites,
+  beginner-path suites, and co-host/Sven prompt work. This package only makes
+  the tutor receipt match the already-reported local voice state.
+
+Reason:
+
+- The Learn tutor dock printed `speaking` for every authored tutor line even
+  when `ipc.status.tick` reported `voice: muted`. That made subtitle-only
+  lessons look like broken voice playback during fresh user tests. Pass the
+  latest Learn voice status into `TutorSpeakDock.show()` so muted tutor lines
+  are labeled as subtitles while normal/unknown voice states keep the existing
+  speaking receipt.
+
+Proof before staging:
+
+- `npm --prefix tauri/ui test -- tests/learn/test_tutor_speak_sr_announcement.spec.ts`
+- `npm --prefix tauri/ui run build`
+- `git diff --check -- tauri/ui/src/learn/lesson/tutor-dock.ts tauri/ui/src/learn/learn-window.ts tauri/ui/tests/learn/test_tutor_speak_sr_announcement.spec.ts .planning/handoffs/2026-05-31-package-checklist.md`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`

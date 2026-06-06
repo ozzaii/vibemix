@@ -104,6 +104,37 @@ describe("test_tutor_speak_sr_announcement.spec.ts (LESSON-05 a11y)", () => {
     }
   });
 
+  it("labels tutor lines as subtitles when local voice is muted", async () => {
+    const root = document.getElementById("learn-root") as HTMLElement;
+    const { ws } = mountLearnWindow(root);
+    try {
+      dispatchLessonLoaded();
+      window.dispatchEvent(
+        new CustomEvent("ipc.status.tick", {
+          detail: { payload: { voice: "muted" } },
+        }),
+      );
+      window.dispatchEvent(
+        new CustomEvent("ipc.learn.tutor_speak", {
+          detail: {
+            text: "shift it about a quarter of the throw",
+            tts_marker: "L1.05.beat0",
+            citations: [],
+            data_state: "active",
+          },
+        }),
+      );
+      await Promise.resolve();
+
+      const voice = root.querySelector<HTMLElement>(".tutor-dock .voice-state");
+      expect(voice?.textContent).toBe("subtitles");
+      expect(voice?.dataset.voiceStatus).toBe("muted");
+      expect(voice?.getAttribute("data-active")).toBe("true");
+    } finally {
+      ws.close();
+    }
+  });
+
   it("data-state='hint' raises aria-live to assertive", async () => {
     const root = document.getElementById("learn-root") as HTMLElement;
     const { ws } = mountLearnWindow(root);

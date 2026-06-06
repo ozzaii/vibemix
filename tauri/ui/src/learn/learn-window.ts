@@ -1408,7 +1408,7 @@ function mountLearnWindow(root: HTMLElement): {
     const payload = (ev as CustomEvent<TutorSpeakWirePayload>).detail;
     if (!payload) return;
     if (currentLessonId && payload.data_state === "hint") lessonUsedHint = true;
-    ensureTutorDock().show(payload);
+    ensureTutorDock().show(payload, { voiceStatus: latestVoiceStatus });
     // Secondary a11y channel — when the dock enters hint state, the
     // currently-lit highlight intensifies (UI-SPEC §Motion line 306).
     setHighlightHintIntensity(stageEl, payload.data_state === "hint");
