@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Plan 29-03 Task 1 — Roundtrip tests for the 6 new debrief wrappers.
+"""Plan 29-03 Task 1 — Roundtrip tests for additive debrief wrappers.
 
 Mirrors the Phase 25 ``test_debrief_schemas.py`` style. Each wrapper:
 - has ``frozen=True, slots=True``
@@ -21,6 +21,7 @@ from vibemix.ui_bus import (
     DebriefCitationTooltipReq,
     DebriefDrills,
     DebriefError,
+    DebriefNearMiss,
     DebriefTldrAudio,
     DrillPayload,
     LearnReferralPayload,
@@ -80,6 +81,41 @@ def test_debrief_chapter_list_rejects_invalid_kind():
     )
     with pytest.raises(jsonschema.ValidationError):
         msg.to_json()
+
+
+# ---------------------------------------------------------------------------
+# DebriefNearMiss
+# ---------------------------------------------------------------------------
+
+
+def test_debrief_near_miss_roundtrip_with_replay_window():
+    msg = DebriefNearMiss.make(
+        input_wav_relative_path="input.wav",
+        t_center=42.0,
+        window=(36.0, 46.0),
+        receipt_text="the mix recovered by ear [mix:near_miss@42.000]",
+        friend_line_text="I heard the mix pull back in [mix:near_miss@42.000]",
+        duration_s=600.0,
+    )
+    parsed = json.loads(msg.to_json())
+    assert parsed["type"] == "ipc.debrief.near-miss"
+    assert parsed["payload"]["window"] == [36.0, 46.0]
+    jsonschema.validate(parsed, _SCHEMA)
+
+
+def test_debrief_near_miss_roundtrip_quiet_state():
+    msg = DebriefNearMiss.make(
+        input_wav_relative_path="input.wav",
+        t_center=None,
+        window=None,
+        receipt_text="",
+        friend_line_text="",
+        duration_s=600.0,
+    )
+    parsed = json.loads(msg.to_json())
+    assert parsed["payload"]["t_center"] is None
+    assert parsed["payload"]["window"] is None
+    jsonschema.validate(parsed, _SCHEMA)
 
 
 # ---------------------------------------------------------------------------

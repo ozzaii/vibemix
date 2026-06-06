@@ -11323,3 +11323,48 @@ Proof before staging:
 - `uv run python -m compileall -q src/vibemix/debrief/friend_line.py tests/debrief/test_friend_line.py`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
 - `git diff --check -- src/vibemix/debrief/friend_line.py tests/debrief/test_friend_line.py .planning/handoffs/2026-05-31-package-checklist.md`
+
+## Package 107 - Debrief Near-Miss Frame Sender
+
+Suggested commit: `feat(debrief): emit last-night near-miss payload`
+
+Include:
+
+- `src/vibemix/debrief/main.py`
+- `src/vibemix/debrief/ws_server.py`
+- `src/vibemix/debrief/session_loader.py`
+- `src/vibemix/ui_bus/messages.py`
+- `src/vibemix/ui_bus/schemas/debrief.py`
+- `src/vibemix/ui_bus/__init__.py`
+- `tauri/ui/src/ipc/messages.schema.json`
+- `tauri/ui/src/ipc/messages.ts`
+- `tauri/ui/src/ipc/validator.generated.mjs`
+- `scripts/check_ipc_schema.py`
+- `tests/ui_bus/test_debrief_new_wrappers_roundtrip.py`
+- `tests/debrief/test_ws_server_progressive_emit.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- The visual debrief card, waveform rendering, audio playback controls, and
+  Learn routing. This package only produces and validates the backend frame UX
+  will consume.
+
+Reason:
+
+- A2/A1 can now produce a grounded line, but UX needs a real IPC contract
+  instead of inferred field names. Emit a compact `ipc.debrief.near-miss` frame
+  with `{input_wav_relative_path, t_center, window, receipt_text,
+  friend_line_text, duration_s}`, allow null replay fields for honest quiet
+  states, and fix the session-loaded duration axis to use real session duration
+  instead of `voice.wav`.
+
+Proof before staging:
+
+- `uv run python scripts/check_ipc_schema.py`
+- `npm --prefix tauri/ui run check:ipc`
+- `uv run pytest -q tests/ui_bus/test_debrief_new_wrappers_roundtrip.py tests/ui_bus/test_debrief_schema_additive_only.py tests/debrief/test_ws_server_progressive_emit.py tests/debrief/test_friend_line.py tests/debrief/test_near_miss_detector.py`
+- `uv run ruff check src/vibemix/debrief/main.py src/vibemix/debrief/ws_server.py src/vibemix/debrief/session_loader.py src/vibemix/ui_bus/messages.py src/vibemix/ui_bus/schemas/debrief.py src/vibemix/ui_bus/__init__.py scripts/check_ipc_schema.py tests/ui_bus/test_debrief_new_wrappers_roundtrip.py tests/debrief/test_ws_server_progressive_emit.py`
+- `uv run python -m compileall -q src/vibemix/debrief/main.py src/vibemix/debrief/ws_server.py src/vibemix/debrief/session_loader.py src/vibemix/ui_bus/messages.py src/vibemix/ui_bus/schemas/debrief.py src/vibemix/ui_bus/__init__.py scripts/check_ipc_schema.py tests/ui_bus/test_debrief_new_wrappers_roundtrip.py tests/debrief/test_ws_server_progressive_emit.py`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+- `git diff --check -- src/vibemix/debrief/main.py src/vibemix/debrief/ws_server.py src/vibemix/debrief/session_loader.py src/vibemix/ui_bus/messages.py src/vibemix/ui_bus/schemas/debrief.py src/vibemix/ui_bus/__init__.py scripts/check_ipc_schema.py tests/ui_bus/test_debrief_new_wrappers_roundtrip.py tests/debrief/test_ws_server_progressive_emit.py tauri/ui/src/ipc/messages.schema.json tauri/ui/src/ipc/messages.ts tauri/ui/src/ipc/validator.generated.mjs .planning/handoffs/2026-05-31-package-checklist.md`

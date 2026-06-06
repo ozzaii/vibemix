@@ -62,7 +62,8 @@ class InvalidSessionDir(Exception):
 class VoiceWavMeta:
     """Metadata about the session's voice.wav (Gemini reply audio).
 
-    Renderer uses ``duration_s`` to size the WaveSurfer.js timeline.
+    Renderer uses this only for AI-reply audio; master replay duration comes
+    from session events / input.wav.
     """
 
     path: Path

@@ -140,6 +140,9 @@
       "$ref": "#/definitions/DebriefChapterList"
     },
     {
+      "$ref": "#/definitions/DebriefNearMiss"
+    },
+    {
       "$ref": "#/definitions/DebriefTldrAudio"
     },
     {
@@ -2431,6 +2434,51 @@
               }
             },
             "derived_at": { "type": "string", "format": "date-time" }
+          }
+        }
+      }
+    },
+    "DebriefNearMiss": {
+      "$comment": "Learn Revolution A5 \u2014 DEBRIEF Last Night, Heard. Sidecar \u2192 shell. Carries a resolver-backed near-miss/gap/quiet payload and points the renderer at input.wav via the existing recordings asset scope.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "ts", "payload"],
+      "properties": {
+        "type": { "const": "ipc.debrief.near-miss" },
+        "ts": { "type": "string", "format": "date-time" },
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "input_wav_relative_path",
+            "t_center",
+            "window",
+            "receipt_text",
+            "friend_line_text",
+            "duration_s"
+          ],
+          "properties": {
+            "input_wav_relative_path": { "type": "string", "minLength": 1 },
+            "t_center": {
+              "anyOf": [
+                { "type": "number", "minimum": 0 },
+                { "type": "null" }
+              ]
+            },
+            "window": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "minItems": 2,
+                  "maxItems": 2,
+                  "items": { "type": "number", "minimum": 0 }
+                },
+                { "type": "null" }
+              ]
+            },
+            "receipt_text": { "type": "string" },
+            "friend_line_text": { "type": "string" },
+            "duration_s": { "type": "number", "minimum": 0 }
           }
         }
       }

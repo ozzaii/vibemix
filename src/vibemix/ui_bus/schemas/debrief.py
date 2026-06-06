@@ -81,6 +81,30 @@ class DebriefChapterListPayload:
 
 
 @dataclass(frozen=True, slots=True)
+class DebriefNearMissPayload:
+    """One "Last Night, Heard" master-replay payload.
+
+    Fields:
+        input_wav_relative_path: filename relative to session_dir. The renderer
+            resolves it through the existing recordings asset scope.
+        t_center: near-miss center in session seconds. ``None`` means honest
+            quiet/gap state, so there is no replay seek target.
+        window: ``(start, end)`` session-second span for the audible recovery.
+            ``None`` means no confident near-miss window.
+        receipt_text: resolver-backed proof text for the card.
+        friend_line_text: one human line that may be spoken/rendered.
+        duration_s: real set duration from events/input, not ``voice.wav``.
+    """
+
+    input_wav_relative_path: str
+    t_center: float | None
+    window: tuple[float, float] | None
+    receipt_text: str
+    friend_line_text: str
+    duration_s: float
+
+
+@dataclass(frozen=True, slots=True)
 class DebriefTldrAudioPayload:
     """TLDR MP3 metadata frame — emitted once the audio is on disk.
 

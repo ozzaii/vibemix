@@ -49,6 +49,7 @@ export type VibemixIPCMessages =
   | SessionCohostReaction
   | DebriefSessionLoaded
   | DebriefChapterList
+  | DebriefNearMiss
   | DebriefTldrAudio
   | DebriefDrills
   | DebriefCitationTooltipReq
@@ -564,6 +565,18 @@ export interface DebriefChapterList {
       citation_event_id: string;
     }[];
     derived_at: string;
+  };
+}
+export interface DebriefNearMiss {
+  type: "ipc.debrief.near-miss";
+  ts: string;
+  payload: {
+    input_wav_relative_path: string;
+    t_center: number | null;
+    window: [number, number] | null;
+    receipt_text: string;
+    friend_line_text: string;
+    duration_s: number;
   };
 }
 export interface DebriefTldrAudio {

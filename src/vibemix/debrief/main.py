@@ -203,6 +203,54 @@ def _build_cited_critique(events: list[dict], chapters: list[ChapterRegion]) -> 
     return " ".join(out)
 
 
+def _session_duration_s(events: list[dict]) -> float:
+    ts = [float(e.get("t")) for e in events if isinstance(e.get("t"), (int, float))]
+    if not ts:
+        return 0.0
+    return max(ts) - min(ts)
+
+
+def _build_debrief_near_miss_payload(
+    session_dir: Path,
+    *,
+    events: list[dict],
+    evidence_snapshot: dict[str, dict[str, list[float]]],
+    duration_s: float,
+):
+    input_wav = session_dir / "input.wav"
+    if not input_wav.exists() or input_wav.stat().st_size == 0:
+        return None
+    try:
+        from vibemix.debrief.friend_line import build_morning_friend_lines
+        from vibemix.debrief.near_miss_detector import detect_near_miss
+        from vibemix.ui_bus import DebriefNearMissPayload
+
+        near_miss = detect_near_miss(session_dir)
+        lines = build_morning_friend_lines(
+            near_miss=near_miss,
+            events=events,
+            evidence_snapshot=evidence_snapshot,
+        )
+    except Exception as exc:  # pragma: no cover - defensive debrief add-on
+        logger.warning("[debrief] near-miss payload skipped: %s", exc)
+        return None
+
+    chosen = lines.near_miss or lines.gap
+    has_replay_window = near_miss is not None and lines.near_miss is not None
+    return DebriefNearMissPayload(
+        input_wav_relative_path="input.wav",
+        t_center=near_miss.t_center_s if has_replay_window else None,
+        window=(
+            (near_miss.window_start_s, near_miss.window_end_s)
+            if has_replay_window
+            else None
+        ),
+        receipt_text=chosen.receipt_text if chosen else "",
+        friend_line_text=chosen.text if chosen else "",
+        duration_s=max(duration_s, 0.0),
+    )
+
+
 def _learn_action_critique_line(event: dict) -> str:
     observed = str(event.get("observed_control_id") or "").strip()
     if not observed:
@@ -351,6 +399,13 @@ def run(
                 _emit_error_and_exit(port, e.reason, str(e))
                 return {}
             raise
+        duration_s = _session_duration_s(events)
+        near_miss_payload = _build_debrief_near_miss_payload(
+            validated_session_dir,
+            events=events,
+            evidence_snapshot=evidence_snapshot,
+            duration_s=duration_s,
+        )
         _write_back_profile_best_effort(events, evidence_snapshot)
         state = {
             "session_dir": validated_session_dir,
@@ -359,6 +414,8 @@ def run(
             "debrief": cached,
             "evidence_snapshot": evidence_snapshot,
             "voice_meta": voice_meta,
+            "duration_s": duration_s,
+            "near_miss_payload": near_miss_payload,
             "tldr_mp3_path": validated_session_dir / TLDR_MP3_FILENAME,
             "cache_hit": True,
         }
@@ -375,6 +432,13 @@ def run(
             _emit_error_and_exit(port, e.reason, str(e))
             return {}
         raise
+    duration_s = _session_duration_s(events)
+    near_miss_payload = _build_debrief_near_miss_payload(
+        validated_session_dir,
+        events=events,
+        evidence_snapshot=evidence_snapshot,
+        duration_s=duration_s,
+    )
 
     chapters = derive_chapters(validated_session_dir / "events.jsonl")
     chapter_summaries = _chapter_summaries(chapters)
@@ -466,6 +530,8 @@ def run(
         "debrief": debrief_dict,
         "evidence_snapshot": evidence_snapshot,
         "voice_meta": voice_meta,
+        "duration_s": duration_s,
+        "near_miss_payload": near_miss_payload,
         "tldr_mp3_path": validated_session_dir / TLDR_MP3_FILENAME,
         "cache_hit": False,
     }

@@ -17,6 +17,7 @@ import pytest
 from vibemix.debrief.chapters import ChapterRegion
 from vibemix.debrief.drills import Drill, Drills
 from vibemix.debrief.ws_server import DebriefWsServer
+from vibemix.ui_bus import DebriefNearMissPayload
 
 websockets = pytest.importorskip("websockets")
 
@@ -72,6 +73,7 @@ def _fixture_state(tmp_path: Path) -> dict:
         "debrief": debrief,
         "evidence_snapshot": evidence_snapshot,
         "voice_meta": None,
+        "duration_s": 600.0,
         "tldr_mp3_path": sess / "debrief_tldr.mp3",
         "cache_hit": False,
     }
@@ -117,6 +119,49 @@ async def test_progressive_emit_order(tmp_path: Path):
                 "ipc.debrief.drills",
                 "ipc.debrief.tldr-audio",
             ]
+    finally:
+        server_handle.cancel()
+        try:
+            await server_handle
+        except asyncio.CancelledError:
+            pass
+
+
+@pytest.mark.anyio("asyncio")
+async def test_progressive_emit_includes_near_miss_frame_when_present(tmp_path: Path):
+    state = _fixture_state(tmp_path)
+    state["near_miss_payload"] = DebriefNearMissPayload(
+        input_wav_relative_path="input.wav",
+        t_center=42.0,
+        window=(36.0, 46.0),
+        receipt_text="the mix recovered by ear [mix:near_miss@42.000]",
+        friend_line_text="I heard the mix pull back in [mix:near_miss@42.000]",
+        duration_s=600.0,
+    )
+    port = _free_port()
+    server = DebriefWsServer(port=port, state=state)
+    server.enqueue_initial_frames()
+
+    async def server_task():
+        async with websockets.serve(server._handler, "127.0.0.1", port):
+            await asyncio.sleep(2.0)
+
+    server_handle = asyncio.create_task(server_task())
+    await asyncio.sleep(0.1)
+
+    try:
+        async with websockets.connect(f"ws://127.0.0.1:{port}") as ws:
+            frames = [
+                json.loads(await asyncio.wait_for(ws.recv(), timeout=2.0))
+                for _ in range(5)
+            ]
+            assert [frame["type"] for frame in frames[:2]] == [
+                "ipc.debrief.session-loaded",
+                "ipc.debrief.near-miss",
+            ]
+            assert frames[0]["payload"]["duration_s"] == 600.0
+            assert frames[1]["payload"]["input_wav_relative_path"] == "input.wav"
+            assert frames[1]["payload"]["window"] == [36.0, 46.0]
     finally:
         server_handle.cancel()
         try:

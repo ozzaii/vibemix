@@ -41,6 +41,7 @@ from vibemix.ui_bus.schemas.debrief import (
     DebriefCitationTooltipReqPayload,
     DebriefDrillsPayload,
     DebriefErrorPayload,
+    DebriefNearMissPayload,
     DebriefSessionLoadedPayload,
     DebriefTldrAudioPayload,
     DrillPayload,
@@ -1749,6 +1750,40 @@ class DebriefChapterList:
             payload=DebriefChapterListPayload(
                 chapters=tuple(chapters),
                 derived_at=derived_at,
+            ),
+        )
+
+    def to_json(self) -> str:
+        return _serialize(self)
+
+
+@dataclass(frozen=True, slots=True)
+class DebriefNearMiss:
+    type: Literal["ipc.debrief.near-miss"]
+    ts: str
+    payload: DebriefNearMissPayload
+
+    @classmethod
+    def make(
+        cls,
+        *,
+        input_wav_relative_path: str,
+        t_center: float | None,
+        window: tuple[float, float] | None,
+        receipt_text: str,
+        friend_line_text: str,
+        duration_s: float,
+    ) -> DebriefNearMiss:
+        return cls(
+            type="ipc.debrief.near-miss",
+            ts=_now_iso(),
+            payload=DebriefNearMissPayload(
+                input_wav_relative_path=input_wav_relative_path,
+                t_center=t_center,
+                window=window,
+                receipt_text=receipt_text,
+                friend_line_text=friend_line_text,
+                duration_s=duration_s,
             ),
         )
 

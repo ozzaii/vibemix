@@ -75,6 +75,7 @@ class DebriefWsServer:
         from vibemix.ui_bus import (
             DebriefChapterList,
             DebriefDrills,
+            DebriefNearMiss,
             DebriefSessionLoaded,
             DebriefTldrAudio,
         )
@@ -82,7 +83,9 @@ class DebriefWsServer:
         session_dir = self.state.get("session_dir")
         session_id = session_dir.name if session_dir else "unknown"
         voice_meta = self.state.get("voice_meta")
-        duration_s = voice_meta.duration_s if voice_meta else 0.0
+        duration_s = float(self.state.get("duration_s") or 0.0)
+        if duration_s <= 0.0 and voice_meta:
+            duration_s = voice_meta.duration_s
 
         # 1. session-loaded
         self._enqueue(
@@ -92,6 +95,19 @@ class DebriefWsServer:
                 duration_s=max(duration_s, 1.0),  # schema requires ≥ 0
             )
         )
+
+        near_miss_payload = self.state.get("near_miss_payload")
+        if near_miss_payload is not None:
+            self._enqueue(
+                DebriefNearMiss.make(
+                    input_wav_relative_path=near_miss_payload.input_wav_relative_path,
+                    t_center=near_miss_payload.t_center,
+                    window=near_miss_payload.window,
+                    receipt_text=near_miss_payload.receipt_text,
+                    friend_line_text=near_miss_payload.friend_line_text,
+                    duration_s=near_miss_payload.duration_s,
+                )
+            )
 
         # 2. chapter-list
         chapters = self.state.get("chapters") or []

@@ -50,6 +50,7 @@ from vibemix.ui_bus import (
     DebriefCitationTooltipReq,
     DebriefDrills,
     DebriefError,
+    DebriefNearMiss,
     DebriefSessionLoaded,
     DebriefTldrAudio,
     DeviceInfo,
@@ -356,6 +357,17 @@ def _minimal_examples() -> list[tuple[str, object]]:
                     ),
                 ),
                 derived_at="2026-05-15T11:21:39.656+00:00",
+            ),
+        ),
+        (
+            "DebriefNearMiss",
+            DebriefNearMiss.make(
+                input_wav_relative_path="input.wav",
+                t_center=42.0,
+                window=(36.0, 46.0),
+                receipt_text="the mix recovered by ear [mix:near_miss@42.000]",
+                friend_line_text="I heard the mix pull back in [mix:near_miss@42.000]",
+                duration_s=600.0,
             ),
         ),
         (
