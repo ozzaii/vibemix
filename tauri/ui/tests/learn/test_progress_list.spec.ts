@@ -396,6 +396,46 @@ describe("progress-list — pick + level", () => {
       "fix tempo is off. start the recovery drill.",
     );
   });
+
+  it("surfaces completed recovery recommendations as fixes", () => {
+    const onPick = vi.fn();
+    const root = renderProgressList({
+      lessons: [
+        mkLesson({
+          lesson_id: "L1.03",
+          title: "channel strip",
+          status: "completed",
+          is_recommended: true,
+          practice_feedback: {
+            kind: "control",
+            label: "recital miss",
+            message: "repeat this move",
+          },
+        }),
+      ],
+      onPickLesson: onPick,
+    });
+    document.body.append(root);
+
+    const btn = root.querySelector<HTMLButtonElement>(
+      "[data-lesson-id='L1.03']",
+    );
+    const tag = btn?.querySelector<HTMLElement>(".vmx-progress-list__tag");
+
+    expect(btn?.dataset.practiceFeedback).toBe("true");
+    expect(btn?.dataset.practiceFeedbackKind).toBe("control");
+    expect(tag?.textContent).toBe("fix");
+    expect(tag?.dataset.kind).toBe("fix");
+    expect(btn?.getAttribute("aria-label")).toBe(
+      "channel strip, completed, fix recital miss, next, press to replay",
+    );
+    expect(btn?.getAttribute("title")).toBe(
+      "fix repeat this move. start the recovery drill.",
+    );
+
+    btn!.click();
+    expect(onPick).toHaveBeenCalledWith("L1.03", "replay");
+  });
 });
 
 describe("progress-list — empty state", () => {
@@ -676,5 +716,36 @@ describe("progress-list — setStatus", () => {
         "[data-course='course_1_anatomy'] .vmx-progress-list__group-summary",
       )?.textContent,
     ).toBe("1/2 done, fix queued");
+  });
+
+  it("course summaries show queued fixes even when the course is complete", () => {
+    const root = renderProgressList({
+      lessons: [
+        mkLesson({
+          lesson_id: "L1.01",
+          title: "opening dialog",
+          status: "completed",
+        }),
+        mkLesson({
+          lesson_id: "L1.03",
+          title: "channel strip",
+          status: "completed",
+          is_recommended: true,
+          practice_feedback: {
+            kind: "control",
+            label: "recital miss",
+            message: "repeat this move",
+          },
+        }),
+      ],
+      onPickLesson: () => {},
+    });
+    document.body.append(root);
+
+    expect(
+      root.querySelector<HTMLElement>(
+        "[data-course='course_1_anatomy'] .vmx-progress-list__group-summary",
+      )?.textContent,
+    ).toBe("2/2 done, fix queued");
   });
 });

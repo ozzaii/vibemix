@@ -13212,3 +13212,35 @@ Proof before staging:
 - `uv run python -m compileall -q src/vibemix/learn/runtime.py tests/learn/test_ipc_handlers_dispatch.py`
 - `git diff --check -- src/vibemix/learn/runtime.py tests/learn/test_ipc_handlers_dispatch.py .planning/handoffs/2026-05-31-package-checklist.md`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+
+## Package 156 - Learn Completed Recovery Fix Badges
+
+Suggested commit: `fix(learn-ui): surface completed recovery fixes`
+
+Include:
+
+- `tauri/ui/src/learn/lesson/progress-list.ts`
+- `tauri/ui/tests/learn/test_progress_list.spec.ts`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Backend mission ranking, recital scoring, broader Learn window layout,
+  beginner-path suites, and visual redesign. This package only makes the
+  progress list honor the backend's completed-lesson recovery mission.
+
+Reason:
+
+- Backend recovery can now reopen a previously completed lesson when a fresh
+  measured miss lands there, but the progress list dropped all feedback for
+  completed rows. That made the row and course summary look fully complete
+  while the booth button was correctly saying "fix". Let a recommended
+  completed row with valid measured feedback render as a fix, while ordinary
+  completed rows stay plain replay.
+
+Proof before staging:
+
+- `npm --prefix tauri/ui test -- tests/learn/test_progress_list.spec.ts`
+- `npm --prefix tauri/ui run build`
+- `git diff --check -- tauri/ui/src/learn/lesson/progress-list.ts tauri/ui/tests/learn/test_progress_list.spec.ts .planning/handoffs/2026-05-31-package-checklist.md`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`

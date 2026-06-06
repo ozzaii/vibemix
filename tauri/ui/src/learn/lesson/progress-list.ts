@@ -295,8 +295,8 @@ function groupSummary(lessons: ReadonlyArray<ProgressListEntry>): string {
   const inProgress = lessons.some((lesson) => lesson.status === "in-progress");
   const allLocked = lessons.every((lesson) => lesson.locked && lesson.status !== "completed");
   if (allLocked) return `${total} locked`;
-  if (completed === total) return `${total}/${total} complete`;
   if (hasFix) return `${completed}/${total} done, fix queued`;
+  if (completed === total) return `${total}/${total} complete`;
   if (hasBanked) return `${completed}/${total} done, banked`;
   if (inProgress) return `${completed}/${total} done, in progress`;
   return `${completed}/${total} done`;
@@ -409,7 +409,8 @@ function effectivePracticeBankCount(lesson: ProgressListEntry): number {
 function effectivePracticeFeedback(
   lesson: ProgressListEntry,
 ): ProgressListEntry["practice_feedback"] | null {
-  if (lesson.locked || lesson.status === "completed") return null;
+  if (lesson.locked) return null;
+  if (lesson.status === "completed" && !lesson.is_recommended) return null;
   const feedback = lesson.practice_feedback;
   if (!feedback) return null;
   const label = feedback.label.trim();
