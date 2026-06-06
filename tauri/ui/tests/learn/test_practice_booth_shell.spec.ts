@@ -146,6 +146,53 @@ describe("practice booth shell", () => {
     }
   });
 
+  it("surfaces tutor voice status without waiting for a MIDI status change", () => {
+    const root = document.getElementById("learn-root") as HTMLElement;
+    const { ws } = mountLearnWindow(root);
+    try {
+      const voice = root.querySelector<HTMLElement>(".learn-status-voice")!;
+      const controller = root.querySelector<HTMLElement>(
+        ".learn-status-controller",
+      )!;
+      expect(voice.textContent).toBe("voice pending");
+      expect(voice.dataset.voiceStatus).toBe("pending");
+
+      window.dispatchEvent(
+        new CustomEvent("ipc.status.tick", {
+          detail: {
+            payload: {
+              midi: 0,
+              voice: "muted",
+            },
+          },
+        }),
+      );
+      expect(controller.textContent).toBe("on-screen deck");
+      expect(voice.textContent).toBe("subtitles only");
+      expect(voice.dataset.voiceStatus).toBe("muted");
+      expect(voice.getAttribute("aria-label")).toBe(
+        "tutor voice is muted or unavailable; lesson subtitles stay visible",
+      );
+
+      window.dispatchEvent(
+        new CustomEvent("ipc.status.tick", {
+          detail: {
+            payload: {
+              midi: 0,
+              voice: "ok",
+            },
+          },
+        }),
+      );
+      expect(controller.textContent).toBe("on-screen deck");
+      expect(voice.textContent).toBe("voice ready");
+      expect(voice.dataset.voiceStatus).toBe("ok");
+      expect(voice.getAttribute("aria-label")).toBe("local tutor voice is ready");
+    } finally {
+      ws.close();
+    }
+  });
+
   it("free-practice screen deck emits an ack before a lesson starts", async () => {
     const root = document.getElementById("learn-root") as HTMLElement;
     const { ws } = mountLearnWindow(root);

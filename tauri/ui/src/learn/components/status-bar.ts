@@ -18,6 +18,7 @@ import {
 } from "../lesson/operator-action.js";
 
 type MirrorStatus = "waiting" | "screen" | "midi" | "live" | "unplugged";
+type VoiceStatus = "ok" | "muted" | "pending" | "unknown";
 
 type Course3LensStatus = {
   session_active: boolean;
@@ -45,6 +46,7 @@ export class StatusBar {
   private el: HTMLElement;
   private controllerEl: HTMLSpanElement;
   private hintEl: HTMLSpanElement;
+  private voiceEl: HTMLSpanElement;
   private readonly defaultHint: string;
   private course3LessonActive = false;
 
@@ -56,12 +58,17 @@ export class StatusBar {
       <span class="learn-status-segment learn-status-controller">waiting for midi</span>
       <span class="learn-status-divider" aria-hidden="true">|</span>
       <span class="learn-status-segment learn-status-hint">${this.defaultHint}</span>
+      <span class="learn-status-divider" aria-hidden="true">|</span>
+      <span class="learn-status-segment learn-status-voice" data-voice-status="pending">voice pending</span>
     `;
     this.controllerEl = this.el.querySelector(
       ".learn-status-controller",
     ) as HTMLSpanElement;
     this.hintEl = this.el.querySelector(
       ".learn-status-hint",
+    ) as HTMLSpanElement;
+    this.voiceEl = this.el.querySelector(
+      ".learn-status-voice",
     ) as HTMLSpanElement;
   }
 
@@ -198,6 +205,43 @@ export class StatusBar {
   clearPracticeFeedback(): void {
     this.hintEl.removeAttribute("data-practice-feedback");
     this.restoreDefaultHint();
+  }
+
+  setVoiceStatus(status: VoiceStatus): void {
+    switch (status) {
+      case "ok":
+        this.voiceEl.textContent = "voice ready";
+        this.voiceEl.dataset.voiceStatus = "ok";
+        this.voiceEl.setAttribute("aria-label", "local tutor voice is ready");
+        this.voiceEl.removeAttribute("title");
+        break;
+      case "muted":
+        this.voiceEl.textContent = "subtitles only";
+        this.voiceEl.dataset.voiceStatus = "muted";
+        this.voiceEl.setAttribute(
+          "aria-label",
+          "tutor voice is muted or unavailable; lesson subtitles stay visible",
+        );
+        this.voiceEl.setAttribute(
+          "title",
+          "Tutor voice is muted or unavailable; lesson subtitles stay visible.",
+        );
+        break;
+      case "unknown":
+        this.voiceEl.textContent = "voice unknown";
+        this.voiceEl.dataset.voiceStatus = "unknown";
+        this.voiceEl.setAttribute(
+          "aria-label",
+          "tutor voice status is not reported yet",
+        );
+        this.voiceEl.removeAttribute("title");
+        break;
+      default:
+        this.voiceEl.textContent = "voice pending";
+        this.voiceEl.dataset.voiceStatus = "pending";
+        this.voiceEl.setAttribute("aria-label", "checking local tutor voice");
+        this.voiceEl.removeAttribute("title");
+    }
   }
 
   setCourse3LessonActive(active: boolean): void {

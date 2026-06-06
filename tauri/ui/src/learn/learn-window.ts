@@ -131,8 +131,12 @@ interface FreePracticeMove {
 
 interface StatusTickPayload {
   midi?: number;
+  muted?: boolean | null;
+  voice?: string | null;
   payload?: {
     midi?: number;
+    muted?: boolean | null;
+    voice?: string | null;
   };
 }
 
@@ -151,6 +155,16 @@ interface Course3LensPayload {
 
 function statusTickMidiCount(detail: StatusTickPayload | undefined): number {
   return Number(detail?.midi ?? detail?.payload?.midi ?? 0);
+}
+
+function statusTickVoiceState(
+  detail: StatusTickPayload | undefined,
+): "ok" | "muted" | "unknown" {
+  const voice = detail?.voice ?? detail?.payload?.voice ?? null;
+  const muted = detail?.muted ?? detail?.payload?.muted ?? null;
+  if (voice === "ok" || voice === "muted") return voice;
+  if (muted === true) return "muted";
+  return "unknown";
 }
 
 /* ===================================================================
@@ -1092,12 +1106,14 @@ function mountLearnWindow(root: HTMLElement): {
   addWindowListener("ipc.status.tick", (ev: Event) => {
     const detail = (ev as CustomEvent<StatusTickPayload>).detail;
     const nextMidiSeen = statusTickMidiCount(detail) > 0;
-    if (midiSeenOnStatusTick === nextMidiSeen) return;
-    midiSeenOnStatusTick = nextMidiSeen;
-    if (!controllerDetected) {
-      status.setMirrorStatus(nextMidiSeen ? "midi" : "screen");
+    status.setVoiceStatus(statusTickVoiceState(detail));
+    if (midiSeenOnStatusTick !== nextMidiSeen) {
+      midiSeenOnStatusTick = nextMidiSeen;
+      if (!controllerDetected) {
+        status.setMirrorStatus(nextMidiSeen ? "midi" : "screen");
+      }
+      renderLessonChooser();
     }
-    renderLessonChooser();
   });
 
   // learn.course3_lens: quiet Course 3 live-evidence indicator. This is
