@@ -25,10 +25,10 @@ This is the grounded shortlist path for the Pill Advancer:
   deck track may extend the slate only when it resolves through the library and
   stored vector cache; live deck reality is context, not a license to invent.
 * **Harmonic / BPM refine is Phase 2** — a POST-filter on the embedding
-  shortlist (embedding similarity stays the primary ranker). Candidates lacking
-  key/BPM degrade gracefully (kept, never dropped for missing metadata). When
-  no key/BPM is available at all (folder-only library) it is embedding-only and
-  ``why = "similar vibe"``.
+  shortlist plus a bounded continuous rerank (embedding similarity stays the
+  largest component). Candidates lacking key/BPM degrade gracefully (kept, never
+  dropped for missing metadata). When no key/BPM is available at all
+  (folder-only library) it is embedding-only and ``why = "similar vibe"``.
 * Rekordbox cue hints are surfaced only when already present on the resolved
   library entry. We never run cue detection inside the realtime pill path.
 """
@@ -45,10 +45,14 @@ from vibemix.library._cosine import l2_normalize
 from vibemix.library.rekordbox import RekordboxLibrary, TrackEntry
 from vibemix.library.section_vectors import resolve_section_vector
 from vibemix.library.store import LibraryStore
+from vibemix.library.track_relation import compute_relation
 from vibemix.state import harmonics
 
 SECTION_POSITION_CONFIDENCE_FLOOR = 0.50
 TRANSITION_ALTERNATIVE_LIMIT = 3
+TRACK_LEVEL_SIMILARITY_WEIGHT = 0.75
+TRACK_LEVEL_HARMONIC_WEIGHT = 0.15
+TRACK_LEVEL_TEMPO_WEIGHT = 0.10
 
 
 @dataclass(frozen=True, slots=True)
@@ -77,6 +81,7 @@ class _SuggestionOption:
     camelot: str | None
     bpm: float | None
     why: str
+    rank_score: float | None = None
     source: str = "search"
 
 
@@ -126,8 +131,9 @@ def next_suggestion(
     fabricated track.
 
     Phase 2 (``seed_camelot``/``seed_bpm`` provided) post-filters the embedding
-    shortlist by Camelot compatibility + a BPM window; candidates missing
-    key/BPM PASS the filter (degrade gracefully).
+    shortlist by Camelot compatibility + a BPM window, then gives compatible
+    key/tempo matches a bounded lift inside the same grounded shortlist;
+    candidates missing key/BPM PASS the filter (degrade gracefully).
     """
     # Match similar_to's query path: normalize the seed before the centered
     # search (search_centered centers + renorms; the input must be L2-normed
@@ -175,6 +181,15 @@ def next_suggestion(
                 camelot=cand_camelot,
                 bpm=cand_bpm,
                 why=_why_for_entry(entry, prefix="similar vibe"),
+                rank_score=_track_level_rank_score(
+                    track_id=tid,
+                    similarity=float(sim),
+                    seed_track_id=seed_track_id,
+                    seed_camelot=seed_camelot,
+                    seed_bpm=seed_bpm,
+                    cand_camelot=cand_camelot,
+                    cand_bpm=cand_bpm,
+                ),
             )
         )
 
@@ -250,14 +265,22 @@ def _select_set_aware_option(
     The embedding shortlist still defines the candidate universe. Within that
     universe, a section-level transition slate can promote a lower-ranked track
     only when the scorer returns a live-safe cue recommendation. If no option
-    has grounded transition evidence, the original top embedding survivor wins.
+    has grounded transition evidence, the best track-level relation inside the
+    original embedding shortlist wins.
     """
     if seed_track_id is None:
-        first_search_option = next(
-            (option for option in options if not _requires_transition(option.source)),
-            None,
+        search_options = [
+            (order, option)
+            for order, option in enumerate(options)
+            if not _requires_transition(option.source)
+        ]
+        if not search_options:
+            return None
+        _, first_search_option = max(
+            search_options,
+            key=lambda item: (_track_level_score(item[1]), -float(item[0])),
         )
-        return (first_search_option, None, ()) if first_search_option is not None else None
+        return (first_search_option, None, ())
 
     destination_vectors = _vectors_for_track_ids(store, [option.track_id for option in options])
     ranked: list[tuple[tuple[float, float, float, float], _SuggestionOption, dict | None]] = []
@@ -440,7 +463,12 @@ def _selection_key(
     order: int,
 ) -> tuple[float, float, float, float]:
     if transition is None:
-        return (0.0, _similarity_component(option.similarity), -float(order), 0.0)
+        return (
+            0.0,
+            _track_level_score(option),
+            _similarity_component(option.similarity),
+            -float(order),
+        )
     return (
         1.0,
         _selection_score(option, transition),
@@ -621,6 +649,40 @@ def _selection_score_for_similarity(similarity: float | None, transition: dict) 
     confidence = _float01(transition.get("confidence"), 0.0)
     similarity_score = _similarity_component(similarity or 0.0)
     return 0.42 * transition_score + 0.28 * confidence + 0.30 * similarity_score
+
+
+def _track_level_rank_score(
+    *,
+    track_id: str,
+    similarity: float,
+    seed_track_id: str | None,
+    seed_camelot: str | None,
+    seed_bpm: float | None,
+    cand_camelot: str | None,
+    cand_bpm: float | None,
+) -> float | None:
+    if seed_camelot is None and seed_bpm is None:
+        return None
+    relation = compute_relation(
+        src_track_id=seed_track_id or "seed",
+        dst_track_id=track_id,
+        cosine=similarity,
+        src_camelot=seed_camelot,
+        dst_camelot=cand_camelot,
+        src_bpm=seed_bpm,
+        dst_bpm=cand_bpm,
+    )
+    return (
+        TRACK_LEVEL_SIMILARITY_WEIGHT * _similarity_component(similarity)
+        + TRACK_LEVEL_HARMONIC_WEIGHT * _float01(relation.harmonic, 0.0)
+        + TRACK_LEVEL_TEMPO_WEIGHT * _float01(relation.tempo, 0.0)
+    )
+
+
+def _track_level_score(option: _SuggestionOption) -> float:
+    if option.rank_score is not None:
+        return _float01(option.rank_score, _similarity_component(option.similarity))
+    return _similarity_component(option.similarity)
 
 
 def _similarity_component(similarity: float) -> float:
