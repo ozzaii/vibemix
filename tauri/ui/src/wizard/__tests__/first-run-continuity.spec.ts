@@ -291,6 +291,34 @@ describe("first-run continuity smoke (POLISH-03)", () => {
     expect(primary().querySelectorAll(".vmx-skill-level__radio-row")).toHaveLength(3);
   });
 
+  it("launch music-folder candidate shows track count + a Recheck path (F8)", () => {
+    getDevSurface().setState({
+      currentStep: "library-feed",
+      libraryFeed: {
+        status: "ready",
+        indexed: 0,
+        candidates: [
+          {
+            kind: "music_folder",
+            path: "/Users/ozai/Music/crates",
+            confidence: "high",
+            reason: "bounded scan saw 47 supported audio files",
+            audio_files_seen: 47,
+          },
+        ],
+      },
+    });
+    renderCurrentStep();
+
+    const text = primary().textContent ?? "";
+    expect(text).toContain("47 tracks found");
+    expect(text).toContain("/Users/ozai/Music/crates");
+    const recheck = Array.from(primary().querySelectorAll("button")).find((b) =>
+      (b.textContent ?? "").includes("Recheck"),
+    );
+    expect(recheck).toBeDefined();
+  });
+
   it("launch Index this routes the structured import action", async () => {
     const action = {
       type: "ipc.library.import",

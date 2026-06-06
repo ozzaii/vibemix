@@ -212,6 +212,17 @@ const CSS = `
     color: var(--silk);
     overflow-wrap: anywhere;
   }
+  .wizard-feed-candidate__detail {
+    margin-top: var(--sp-1);
+    font-family: var(--type-mono);
+    font-size: 11px;
+    line-height: 1.35;
+    color: var(--silk-65);
+  }
+  .wizard-feed-recheck {
+    margin-top: var(--sp-2);
+    align-self: start;
+  }
   .wizard-feed-candidate .cmp-btn {
     width: 100%;
     min-width: 0;
@@ -411,7 +422,16 @@ function renderLibraryCard(
     const path = document.createElement("div");
     path.className = "wizard-feed-candidate__path";
     path.textContent = candidate.path;
-    copy.append(kind, path);
+    const detail = document.createElement("div");
+    detail.className = "wizard-feed-candidate__detail";
+    const seen = candidate.audio_files_seen;
+    if (typeof seen === "number" && seen > 0) {
+      const conf = candidate.confidence ? ` · ${candidate.confidence} confidence` : "";
+      detail.textContent = `${seen} ${seen === 1 ? "track" : "tracks"} found${conf}`;
+    } else {
+      detail.textContent = candidate.reason ?? "";
+    }
+    copy.append(kind, path, detail);
 
     row.append(badge, copy);
     row.append(
@@ -423,6 +443,15 @@ function renderLibraryCard(
       }),
     );
     card.append(row);
+
+    const recheck = Button({
+      variant: "secondary",
+      state: state.status === "indexing" ? "disabled" : "idle",
+      label: "Recheck",
+      onClick: cb.onRefreshCandidates,
+    });
+    recheck.classList.add("wizard-feed-recheck");
+    card.append(recheck);
   } else {
     card.append(
       Button({
