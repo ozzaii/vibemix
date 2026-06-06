@@ -109,6 +109,7 @@ if TYPE_CHECKING:
 # line while the co-host is already silent.
 CITATION_PUBLISH_INTERVAL_S = 2.0
 CITATION_UNCHANGED_PUBLISH_INTERVAL_S = 30.0
+NEXT_SUGGESTION_VOICE_WAIT_S = 0.75
 _BEATMATCH_GRADED_EVENT = "BEATMATCH_GRADED"
 _BEATMATCH_GRADED_RECEIPT_FRESH_S = 2.0
 
@@ -873,7 +874,12 @@ async def coach_loop(
             try:
                 current_suggestion = None
                 if suggestion_service is not None:
-                    if hasattr(suggestion_service, "current_for_state"):
+                    if hasattr(suggestion_service, "current_for_voice_from_state"):
+                        current_suggestion = await suggestion_service.current_for_voice_from_state(
+                            state,
+                            timeout_s=NEXT_SUGGESTION_VOICE_WAIT_S,
+                        )
+                    elif hasattr(suggestion_service, "current_for_state"):
                         current_suggestion = suggestion_service.current_for_state(state)
                     elif hasattr(suggestion_service, "current"):
                         current_suggestion = suggestion_service.current()

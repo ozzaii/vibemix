@@ -267,6 +267,7 @@ class SuggestionService:
         self._last_compute_seed_track_id: str | None = None
         self._compute_inflight = False
         self._compute_inflight_seed_track_id: str | None = None
+        self._compute_future: asyncio.Future[Any] | None = None
         self._next_compute_allowed_at = 0.0
 
     def current(self) -> dict | None:
@@ -330,6 +331,40 @@ class SuggestionService:
         """
         self.maybe_schedule_compute_from_state(state)
         return self.refresh_from_state(state)
+
+    async def current_for_voice_from_state(
+        self,
+        state: Any,
+        *,
+        timeout_s: float = 0.75,
+    ) -> dict | None:
+        """Return a voice-ready suggestion, briefly waiting for the live seed.
+
+        ``TRACK_CHANGE`` is the only moment Sven gets to speak a grounded
+        forward suggestion for the new track. The regular bus path schedules
+        the shortlist asynchronously and returns immediately; this helper lets
+        the coach wait a small, shielded window for that same compute. Timeout
+        preserves the old honest-null path and leaves the compute running for
+        the pill.
+        """
+        seed = resolve_seed_context(state)
+        if seed is None:
+            return self.current_for_state(state)
+
+        self.maybe_schedule_compute_from_state(state)
+        current = self.refresh_from_state(state, min_interval_s=0.0)
+        if current is not None:
+            return current
+
+        fut = self._compute_future_for_seed(seed.track_id)
+        if fut is not None:
+            try:
+                await asyncio.wait_for(asyncio.shield(fut), timeout=max(0.0, timeout_s))
+            except TimeoutError:
+                pass
+            except Exception as e:
+                logger.warning("[suggestion] voice wait failed: %s", e)
+        return self.refresh_from_state(state, min_interval_s=0.0)
 
     def choose_alternative(
         self,
@@ -916,9 +951,13 @@ class SuggestionService:
                 if self._compute_inflight_seed_track_id == seed.track_id:
                     self._compute_inflight = False
                     self._compute_inflight_seed_track_id = None
+                    self._compute_future = None
             return False
 
         fut = loop.run_in_executor(None, self.compute_for_seed, seed, timing)
+        with self._lock:
+            if self._compute_inflight_seed_track_id == seed.track_id:
+                self._compute_future = fut
         fut.add_done_callback(lambda f: self._finish_scheduled_compute(seed.track_id, f))
         return True
 
@@ -1326,10 +1365,18 @@ class SuggestionService:
             if self._compute_inflight_seed_track_id == seed_track_id:
                 self._compute_inflight = False
                 self._compute_inflight_seed_track_id = None
+                if self._compute_future is fut:
+                    self._compute_future = None
             if result is None:
                 self._next_compute_allowed_at = time.monotonic() + FULL_COMPUTE_RETRY_S
             else:
                 self._next_compute_allowed_at = 0.0
+
+    def _compute_future_for_seed(self, seed_track_id: str) -> asyncio.Future[Any] | None:
+        with self._lock:
+            if self._compute_inflight_seed_track_id != seed_track_id:
+                return None
+            return self._compute_future
 
 
 def _transition_alternative_track_ids(raw: dict | None) -> tuple[str, ...]:
