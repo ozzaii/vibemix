@@ -211,8 +211,20 @@ describe("DesktopShell", () => {
     expect(footer.dataset.conn).toBe("reconnecting");
     expect(label.textContent).toBe("co-host reconnecting");
 
+    shell.store.setActiveSurface("learn");
+    expect(label.textContent).toBe("learn local");
+    expect(footer.getAttribute("title")).toContain("subtitles");
+
     shell.store.setConnection("connected");
     expect(footer.dataset.conn).toBe("connected");
+    expect(label.textContent).toBe("learn local");
+    expect(footer.getAttribute("title")).toContain("Learn status bar");
+
+    shell.store.setActiveSurface("viber");
+    expect(label.textContent).toBe("viber local");
+    expect(footer.getAttribute("title")).toContain("local library");
+
+    shell.store.setActiveSurface("deck");
     expect(label.textContent).toBe("idle");
     expect(footer.getAttribute("title")).toBeNull();
   });

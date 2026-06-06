@@ -13316,3 +13316,35 @@ Proof before staging:
 - `npm --prefix tauri/ui run build`
 - `git diff --check -- src/vibemix/__main__.py tauri/src-tauri/src/library_cmds.rs tauri/ui/src/library/chat.test.ts tests/library/test_folder_ingest_band_shares.py .planning/handoffs/2026-05-31-package-checklist.md`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+
+## Package 159 - Shell Local Surface Footer Labels
+
+Suggested commit: `fix(shell): keep local surfaces out of cohost offline copy`
+
+Include:
+
+- `tauri/ui/src/shell/StatusFooter.ts`
+- `tauri/ui/tests/shell/shell.spec.ts`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Runtime connection semantics, Learn lesson logic, Viber library indexing,
+  footer badge transport, and shell layout changes. This package only changes
+  the always-visible footer label/title for local-first surfaces.
+
+Reason:
+
+- In the folded shell, Learn and Viber can still be useful while Sven's live
+  co-host pipe is disconnected or reconnecting. The footer's Deck-focused
+  `co-host offline` copy made fresh Learn tests look broken even when the Learn
+  status bar was correctly showing local tutor/subtitle readiness. Keep Deck
+  strict about co-host connection, but label Learn and Viber as local surfaces
+  with titles that explain Sven status only matters on Deck.
+
+Proof before staging:
+
+- `npm --prefix tauri/ui test -- tests/shell/shell.spec.ts`
+- `npm --prefix tauri/ui run build`
+- `git diff --check -- tauri/ui/src/shell/StatusFooter.ts tauri/ui/tests/shell/shell.spec.ts .planning/handoffs/2026-05-31-package-checklist.md`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`

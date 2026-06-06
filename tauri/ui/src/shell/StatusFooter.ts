@@ -29,20 +29,31 @@ const CONNECTION_LABEL: Record<ConnectionState, string> = {
   disconnected: "co-host offline",
 };
 
+const LOCAL_SURFACE_LABEL: Partial<Record<SurfaceId, string>> = {
+  learn: "learn local",
+  viber: "viber local",
+};
+
 function footerLabel(
   activation: ActivationState,
   connection: ConnectionState,
   surface: SurfaceId,
 ): string {
-  if (surface === "learn" && connection === "disconnected") return "learn local";
+  const localLabel = LOCAL_SURFACE_LABEL[surface];
+  if (localLabel) return localLabel;
   return CONNECTION_LABEL[connection] || ACTIVATION_LABEL[activation];
 }
 
 function footerTitle(connection: ConnectionState, surface: SurfaceId): string | null {
-  if (connection === "connected") return null;
-  if (surface === "learn" && connection === "disconnected") {
-    return "Sven is offline; Learn still accepts on-screen practice and subtitles.";
+  if (surface === "learn") {
+    return connection === "connected"
+      ? "Learn runs locally; use the Learn status bar for tutor voice and practice input."
+      : "Sven is offline; Learn still accepts on-screen practice and subtitles.";
   }
+  if (surface === "viber") {
+    return "Viber runs local library and set-prep work; Sven status only matters on Deck.";
+  }
+  if (connection === "connected") return null;
   if (connection === "reconnecting") {
     return "The co-host is reconnecting to the audio engine.";
   }
