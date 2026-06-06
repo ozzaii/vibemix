@@ -113,6 +113,26 @@ def _sliding_beatmatch_snapshot() -> BeatmatchPracticeSnapshot:
     )
 
 
+def _library_sliding_beatmatch_snapshot() -> BeatmatchPracticeSnapshot:
+    grid = _beat_grid()
+    return BeatmatchPracticeSnapshot(
+        grid_a=grid,
+        grid_b=grid,
+        deck_state=DeckState(
+            a_frame=0.0,
+            b_frame=grid.beat_len_frames * -0.05,
+            rate_a=1.0,
+            rate_b=1.0,
+            xfader=0.5,
+        ),
+        practice_source="library_save_mode",
+        deck_a_track_id="seed",
+        deck_b_track_id="target",
+        deck_a_title="Seed Track",
+        deck_b_title="Target Track",
+    )
+
+
 def _tempo_off_beatmatch_snapshot() -> BeatmatchPracticeSnapshot:
     grid = _beat_grid()
     return BeatmatchPracticeSnapshot(
@@ -1330,6 +1350,42 @@ def test_live_beatmatch_save_landed_flags_real_recovery_edge(monkeypatch) -> Non
     )
 
 
+def test_save_landed_session_event_carries_own_track_source(monkeypatch) -> None:
+    """Debrief/event replay can say a measured save happened on library tracks."""
+
+    monkeypatch.setattr("vibemix.learn.progress.save_progress", lambda _progress: None)
+    progress = LearnProgress()
+    _make_beatmatching_competent(progress)
+    snapshots = [
+        _library_sliding_beatmatch_snapshot(),
+        _library_locked_beatmatch_snapshot(),
+    ]
+    events: list[tuple[str, dict]] = []
+    runtime = LessonRuntime(
+        learn_state=LearnState(),
+        midi_mirror=MagicMock(name="midi_mirror"),
+        controller_state=MagicMock(name="controller_state"),
+        ipc_router=MagicMock(name="ipc_router"),
+        progress_store=progress,
+        evidence_registry=EvidenceRegistry(),
+        evidence_clock=lambda: 80.0,
+        beatmatch_practice_loader=lambda: snapshots.pop(0) if snapshots else None,
+        session_event_logger=lambda kind, fields: events.append((kind, dict(fields))),
+    )
+
+    runtime._grade_beatmatch_practice_tick()
+    runtime._grade_beatmatch_practice_tick()
+
+    save_event = next(
+        fields for kind, fields in events if kind == "learn_beatmatch_save_landed"
+    )
+    assert save_event["practice_source"] == "library_save_mode"
+    assert save_event["deck_a_track_id"] == "seed"
+    assert save_event["deck_b_track_id"] == "target"
+    assert save_event["deck_a_title"] == "Seed Track"
+    assert save_event["deck_b_title"] == "Target Track"
+
+
 def test_live_beatmatch_save_landed_ignores_tempo_off_interruption(monkeypatch) -> None:
     """A tempo-off tick breaks the recovery edge; the later lock is just a lock."""
 
@@ -1397,6 +1453,42 @@ def test_live_beatmatch_save_floor_expires_before_late_lock(monkeypatch) -> None
     assert grades[1]["save_floor_seconds_remaining"] == pytest.approx(0.0)
     assert grades[2]["save_landed"] is False
     assert grades[2]["save_from_verdict"] is None
+
+
+def test_save_floor_expired_session_event_carries_own_track_source() -> None:
+    """A failed Save-mode window keeps source provenance for honest debriefs."""
+
+    snapshots = [
+        _library_sliding_beatmatch_snapshot(),
+        _library_sliding_beatmatch_snapshot(),
+    ]
+    clock_values = [100.0, 115.0]
+    events: list[tuple[str, dict]] = []
+    runtime = LessonRuntime(
+        learn_state=LearnState(),
+        midi_mirror=MagicMock(name="midi_mirror"),
+        controller_state=MagicMock(name="controller_state"),
+        ipc_router=MagicMock(name="ipc_router"),
+        progress_store=LearnProgress(),
+        evidence_registry=EvidenceRegistry(),
+        evidence_clock=lambda: clock_values.pop(0),
+        beatmatch_practice_loader=lambda: snapshots.pop(0) if snapshots else None,
+        session_event_logger=lambda kind, fields: events.append((kind, dict(fields))),
+    )
+
+    runtime._grade_beatmatch_practice_tick()
+    runtime._grade_beatmatch_practice_tick()
+
+    floor_event = next(
+        fields
+        for kind, fields in events
+        if kind == "learn_beatmatch_save_floor_expired"
+    )
+    assert floor_event["practice_source"] == "library_save_mode"
+    assert floor_event["deck_a_track_id"] == "seed"
+    assert floor_event["deck_b_track_id"] == "target"
+    assert floor_event["deck_a_title"] == "Seed Track"
+    assert floor_event["deck_b_title"] == "Target Track"
 
 
 def test_live_beatmatch_save_landed_escalates_next_floor_window(monkeypatch) -> None:

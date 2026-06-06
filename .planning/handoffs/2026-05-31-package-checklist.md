@@ -12155,3 +12155,36 @@ Proof before staging:
 - `uv run python .claude/skills/ipc-wiring-checker/scripts/check_ipc_wiring.py` (expected current-source fail: existing one-ended calibration/settings/library types; no new `ipc.learn.*` dead type)
 - `git diff --check -- src/vibemix/__main__.py src/vibemix/learn/beatmatch_practice_driver.py src/vibemix/ui_bus/learn_messages.py tauri/ui/src/ipc/messages.schema.json tauri/ui/src/ipc/messages.ts tauri/ui/src/ipc/validator.generated.mjs tauri/ui/src/learn/waveform-display.ts tauri/ui/src/learn/styles/learn.css tauri/ui/tests/learn/test_waveform_hidden_until_ready.spec.ts tests/learn/test_beatmatch_practice_driver.py tests/learn/test_observer_boot_wiring.py tests/ui_bus/test_learn_waveform_ready_message.py .planning/handoffs/2026-05-31-package-checklist.md`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+
+## Package 128 - Learn Save Event Source Provenance
+
+Suggested commit: `feat(learn): log save receipt source context`
+
+Include:
+
+- `src/vibemix/learn/runtime.py`
+- `tests/learn/test_runtime_evidence_grounding.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Schema/UI changes, Save-mode difficulty tuning, own-track loader ranking,
+  debrief rendering, and new lesson copy. Packages 125-127 already expose the
+  source truth live; this package only preserves it in session history.
+
+Reason:
+
+- Current source showed `ipc.learn.live_grade` and `ipc.learn.waveform_ready`
+  now carry Save-mode source metadata, but the durable session events for
+  `learn_beatmatch_save_landed` and `learn_beatmatch_save_floor_expired`
+  remained anonymous. Add the practice source and deck track/title fields to
+  those two event records so debrief/replay/taste accrual can distinguish a
+  save on the user's own tracks from a bundled-loop practice attempt.
+
+Proof before staging:
+
+- `uv run pytest -q tests/learn/test_runtime_evidence_grounding.py`
+- `uv run ruff check src/vibemix/learn/runtime.py tests/learn/test_runtime_evidence_grounding.py`
+- `uv run python -m compileall -q src/vibemix/learn/runtime.py tests/learn/test_runtime_evidence_grounding.py`
+- `git diff --check -- src/vibemix/learn/runtime.py tests/learn/test_runtime_evidence_grounding.py .planning/handoffs/2026-05-31-package-checklist.md`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`

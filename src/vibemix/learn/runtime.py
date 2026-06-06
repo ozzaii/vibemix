@@ -2995,7 +2995,11 @@ class LessonRuntime(StateMachine):
         )
         if not is_creditable_locked_grade(grade):
             self._beatmatch_practice_lock_active = False
-            save_state = self._beatmatch_save_state_for_miss(grade, t_session)
+            save_state = self._beatmatch_save_state_for_miss(
+                grade,
+                t_session,
+                snapshot=snapshot,
+            )
             if save_state["save_floor_expired"]:
                 self._last_beatmatch_save_candidate = None
             else:
@@ -3061,6 +3065,7 @@ class LessonRuntime(StateMachine):
                 from_verdict=str(save_edge["from_verdict"]),
                 from_phase_error_beats=float(save_edge["from_phase_error_beats"]),
                 recovery_delta_beats=float(save_edge["recovery_delta_beats"]),
+                snapshot=snapshot,
             )
             result = replace(
                 result,
@@ -3202,10 +3207,30 @@ class LessonRuntime(StateMachine):
             "save_streak": int(self._beatmatch_save_streak if streak is None else streak),
         }
 
+    def _beatmatch_source_event_fields(
+        self,
+        snapshot: BeatmatchPracticeSnapshot | None,
+    ) -> dict[str, object]:
+        if snapshot is None:
+            return {}
+        fields: dict[str, object] = {}
+        for key, value in (
+            ("practice_source", snapshot.practice_source),
+            ("deck_a_track_id", snapshot.deck_a_track_id),
+            ("deck_b_track_id", snapshot.deck_b_track_id),
+            ("deck_a_title", snapshot.deck_a_title),
+            ("deck_b_title", snapshot.deck_b_title),
+        ):
+            if value:
+                fields[key] = value
+        return fields
+
     def _beatmatch_save_state_for_miss(
         self,
         grade,
         t_session: float,
+        *,
+        snapshot: BeatmatchPracticeSnapshot | None = None,
     ) -> dict[str, object]:
         verdict = getattr(grade, "verdict", "")
         if verdict not in {"drifting", "trainwreck"}:
@@ -3241,6 +3266,7 @@ class LessonRuntime(StateMachine):
             verdict=verdict,
             difficulty_level=level,
             floor_seconds_total=total_s,
+            **self._beatmatch_source_event_fields(snapshot),
         )
         self._reset_beatmatch_save_attempt()
         return self._beatmatch_save_payload(
@@ -3259,6 +3285,7 @@ class LessonRuntime(StateMachine):
         from_verdict: str,
         from_phase_error_beats: float,
         recovery_delta_beats: float,
+        snapshot: BeatmatchPracticeSnapshot | None = None,
     ) -> dict[str, object]:
         level_won = self._beatmatch_save_difficulty_level
         total_s = self._beatmatch_save_attempt_window_s
@@ -3282,6 +3309,7 @@ class LessonRuntime(StateMachine):
             recovery_delta_beats=recovery_delta_beats,
             difficulty_level=level_won,
             streak=next_streak,
+            **self._beatmatch_source_event_fields(snapshot),
         )
         self._reset_beatmatch_save_attempt()
         self._set_beatmatch_save_difficulty(level_won + 1)
