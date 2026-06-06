@@ -115,6 +115,70 @@ def test_learn_tutor_voice_logs_queue_and_completion() -> None:
     assert playback.chunks == [b"\x01\x00" * 32]
 
 
+def test_learn_tutor_voice_loads_provider_lazily() -> None:
+    playback = _FakePlayback()
+    events: list[tuple[str, dict]] = []
+    done = threading.Event()
+    provider_calls = 0
+
+    def provider() -> _FakeTutorTTS:
+        nonlocal provider_calls
+        provider_calls += 1
+        return _FakeTutorTTS()
+
+    def log(kind: str, fields: dict) -> None:
+        events.append((kind, dict(fields)))
+        if kind == "learn_tutor_voice_complete":
+            done.set()
+
+    speak = _build_learn_tutor_speak_audio(
+        voice_tts_provider=provider,
+        playback=playback,
+        muted=lambda: False,
+        event_logger=log,
+    )
+
+    speak("line", "sandbox.grade")
+    _wait_for(done)
+
+    assert provider_calls == 1
+    assert [kind for kind, _fields in events] == [
+        "learn_tutor_voice_queued",
+        "learn_tutor_voice_complete",
+    ]
+    assert playback.chunks == [b"\x01\x00" * 32]
+
+
+def test_learn_tutor_voice_logs_unavailable_provider_skip() -> None:
+    playback = _FakePlayback()
+    events: list[tuple[str, dict]] = []
+    done = threading.Event()
+
+    def log(kind: str, fields: dict) -> None:
+        events.append((kind, dict(fields)))
+        if kind == "learn_tutor_voice_skipped":
+            done.set()
+
+    speak = _build_learn_tutor_speak_audio(
+        voice_tts_provider=lambda: None,
+        playback=playback,
+        muted=lambda: False,
+        event_logger=log,
+    )
+
+    speak("line", "sandbox.grade")
+    _wait_for(done)
+
+    assert events == [
+        ("learn_tutor_voice_queued", {"tts_marker": "sandbox.grade", "chars": 4}),
+        (
+            "learn_tutor_voice_skipped",
+            {"reason": "unavailable", "tts_marker": "sandbox.grade"},
+        ),
+    ]
+    assert playback.chunks == []
+
+
 def test_learn_tutor_voice_logs_muted_skip_without_thread() -> None:
     playback = _FakePlayback()
     events: list[tuple[str, dict]] = []

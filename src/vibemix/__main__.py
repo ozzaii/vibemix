@@ -280,7 +280,8 @@ def _resample_pcm16_mono_bytes(pcm: bytes, *, source_sr: int, target_sr: int) ->
 
 def _build_learn_tutor_speak_audio(
     *,
-    voice_tts: Any,
+    voice_tts: Any | None = None,
+    voice_tts_provider: Callable[[], Any | None] | None = None,
     playback: PlaybackQueue,
     muted: Callable[[], bool],
     event_logger: Callable[[str, dict[str, Any]], None] | None = None,
@@ -304,7 +305,13 @@ def _build_learn_tutor_speak_audio(
         def _run() -> None:
             pushed_bytes = 0
             try:
-                source_sr = int(getattr(voice_tts, "sample_rate", OUTPUT_SR) or OUTPUT_SR)
+                tts = voice_tts
+                if tts is None and voice_tts_provider is not None:
+                    tts = voice_tts_provider()
+                if tts is None:
+                    _log("learn_tutor_voice_skipped", reason="unavailable", tts_marker=tts_marker)
+                    return
+                source_sr = int(getattr(tts, "sample_rate", OUTPUT_SR) or OUTPUT_SR)
 
                 def _on_pcm(pcm: bytes) -> None:
                     nonlocal pushed_bytes
@@ -319,7 +326,7 @@ def _build_learn_tutor_speak_audio(
                         playback.push(out)
                         pushed_bytes += len(out)
 
-                voice_tts.synthesize_pcm(text, _on_pcm)
+                tts.synthesize_pcm(text, _on_pcm)
                 _log(
                     "learn_tutor_voice_complete",
                     tts_marker=tts_marker,
@@ -1619,6 +1626,9 @@ async def main() -> None:
     active_stop_event: asyncio.Event | None = None
     live_session_active = False
     live_voice_muted = True
+    learn_voice_stream: Any | None = None
+    learn_voice_lock = threading.RLock()
+    learn_voice_tts_cache: dict[str, Any | None] = {"tts": None}
     _background_tasks: set[asyncio.Task] = set()
 
     async def _boot_housekeeping() -> None:
@@ -1741,6 +1751,67 @@ async def main() -> None:
     def _is_brain_configured() -> bool:
         return brain_unavailable_reason is None
 
+    def _learn_voice_tts_provider() -> Any | None:
+        """Return a local voice provider for Learn without requiring Start."""
+
+        if live_voice_tts is not None:
+            return live_voice_tts
+        with learn_voice_lock:
+            cached = learn_voice_tts_cache.get("tts")
+            if cached is not None:
+                return cached
+            try:
+                from vibemix.agent.chatterbox_tts import (
+                    ChatterboxLocalTTS,
+                    chatterbox_available,
+                    engine_selected,
+                )
+
+                if not engine_selected() or not chatterbox_available():
+                    return None
+                cached = ChatterboxLocalTTS()
+                learn_voice_tts_cache["tts"] = cached
+                return cached
+            except Exception as exc:
+                print(f"[learn boot] tutor voice unavailable: {exc!r}", file=sys.stderr)
+                return None
+
+    def _ensure_learn_voice_stream() -> bool:
+        """Open the shared voice output stream lazily for Learn tutor speech."""
+
+        nonlocal learn_voice_stream, live_voice_muted
+        if _is_live_session_active() and not live_voice_muted:
+            return True
+        if learn_voice_stream is not None:
+            live_voice_muted = False
+            return True
+        with learn_voice_lock:
+            if learn_voice_stream is not None:
+                live_voice_muted = False
+                return True
+            if _learn_voice_tts_provider() is None:
+                live_voice_muted = True
+                return False
+            try:
+                learn_voice_stream = audio_backend.open_voice_output(
+                    output_idx,
+                    sample_rate=OUTPUT_SR,
+                    block_size=VOICE_BLOCKSIZE,
+                    callback=_voice_callback_factory(playback),
+                )
+                live_voice_muted = False
+                print(f"-> Learn tutor voice -> {output_device_label} @ {OUTPUT_SR}Hz")
+                return True
+            except Exception as exc:
+                live_voice_muted = True
+                print(f"[learn boot] tutor voice stream unavailable: {exc!r}", file=sys.stderr)
+                return False
+
+    def _learn_tutor_voice_provider() -> Any | None:
+        if not _ensure_learn_voice_stream():
+            return None
+        return _learn_voice_tts_provider()
+
     async def _activate_session(
         run_stop_event: asyncio.Event,
         started_event: asyncio.Event,
@@ -1806,11 +1877,18 @@ async def main() -> None:
                     engine_selected,
                 )
 
+                cached_learn_voice_tts = learn_voice_tts_cache.get("tts")
                 live_voice_tts = (
-                    ChatterboxLocalTTS()
-                    if engine_selected() and chatterbox_available()
-                    else None
+                    cached_learn_voice_tts
+                    if cached_learn_voice_tts is not None
+                    else (
+                        ChatterboxLocalTTS()
+                        if engine_selected() and chatterbox_available()
+                        else None
+                    )
                 )
+                if live_voice_tts is not None:
+                    learn_voice_tts_cache["tts"] = live_voice_tts
             except Exception as exc:
                 live_voice_tts = None
                 print(f"-> tts voice hook unavailable on Start: {exc!r}", file=sys.stderr)
@@ -1950,13 +2028,16 @@ async def main() -> None:
                 print("-> AI voice output muted (no local TTS); stream not opened")
             else:
                 session.output.audio = PlaybackQueueAudioOutput(playback, recorder, sample_rate=OUTPUT_SR)
-                voice_stream = audio_backend.open_voice_output(
-                    output_idx,
-                    sample_rate=OUTPUT_SR,
-                    block_size=VOICE_BLOCKSIZE,
-                    callback=_voice_callback_factory(playback),
-                )
-                print(f"-> AI voice -> {output_device_label} @ {OUTPUT_SR}Hz")
+                if learn_voice_stream is not None:
+                    print(f"-> AI voice -> {output_device_label} @ {OUTPUT_SR}Hz (shared Learn stream)")
+                else:
+                    voice_stream = audio_backend.open_voice_output(
+                        output_idx,
+                        sample_rate=OUTPUT_SR,
+                        block_size=VOICE_BLOCKSIZE,
+                        callback=_voice_callback_factory(playback),
+                    )
+                    print(f"-> AI voice -> {output_device_label} @ {OUTPUT_SR}Hz")
 
             await session.start(agent)
             print("-> agent started.")
@@ -2163,7 +2244,7 @@ async def main() -> None:
             raise
         finally:
             live_session_active = False
-            live_voice_muted = True
+            live_voice_muted = learn_voice_stream is None
             if midi_stop is not None:
                 midi_stop.set()
             if midi_watcher_stop is not None:
@@ -2460,15 +2541,11 @@ async def main() -> None:
         )
         cue_placement_practice_driver = None
 
-    learn_tutor_speak_audio = (
-        _build_learn_tutor_speak_audio(
-            voice_tts=live_voice_tts,
-            playback=playback,
-            muted=lambda: bool(_session_ipc is not None and _session_ipc.muted),
-            event_logger=_learn_session_event,
-        )
-        if live_voice_tts is not None
-        else None
+    learn_tutor_speak_audio = _build_learn_tutor_speak_audio(
+        voice_tts_provider=_learn_tutor_voice_provider,
+        playback=playback,
+        muted=lambda: bool(_session_ipc is not None and _session_ipc.muted),
+        event_logger=_learn_session_event,
     )
 
     lesson_runtime = LessonRuntime(
@@ -2765,6 +2842,12 @@ async def main() -> None:
                     await bg_task
                 except (asyncio.CancelledError, Exception):
                     pass
+        if learn_voice_stream is not None:
+            try:
+                learn_voice_stream.stop()
+                learn_voice_stream.close()
+            except Exception as exc:
+                print(f"[close learn voice stream err] {exc}", file=sys.stderr)
         try:
             tracer.close()
         except Exception as exc:

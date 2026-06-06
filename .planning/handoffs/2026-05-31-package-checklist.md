@@ -10945,3 +10945,36 @@ Proof before staging:
 - `uv run ruff check src/vibemix/__main__.py tests/memory/test_ingest_wiring.py`
 - `uv run python -m compileall -q src/vibemix/__main__.py tests/memory/test_ingest_wiring.py`
 - `git diff --check -- src/vibemix/__main__.py tests/memory/test_ingest_wiring.py .planning/handoffs/2026-05-31-package-checklist.md`
+
+## Package 96 - Learn Boot Tutor Voice Stream
+
+Suggested commit: `fix(learn): voice tutor before session start`
+
+Include:
+
+- `src/vibemix/__main__.py`
+- `tests/learn/test_tutor_voice_callback.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Live co-host prompt policy, cloud TTS fallback, packaged model install flow,
+  Learn transcript copy, and frontend lesson layout. This package only makes
+  existing Learn tutor lines audible before `ipc.session.start`.
+
+Reason:
+
+- Learn runtime is created at app boot, but the local voice provider and
+  `open_voice_output()` stream were previously created only inside live session
+  activation. A first-user Learn flow could emit `ipc.learn.tutor_speak` and
+  subtitles while no voice stream existed to consume the playback queue. Lazily
+  open a boot-owned Learn voice stream on first tutor speech, lazily reuse the
+  local Chatterbox provider, and let live session reuse the Learn stream when it
+  is already open.
+
+Proof before staging:
+
+- `uv run pytest -q tests/learn/test_tutor_voice_callback.py tests/learn/test_beatmatch_practice_audio_lifecycle.py`
+- `uv run ruff check src/vibemix/__main__.py tests/learn/test_tutor_voice_callback.py`
+- `uv run python -m compileall -q src/vibemix/__main__.py tests/learn/test_tutor_voice_callback.py`
+- `git diff --check -- src/vibemix/__main__.py tests/learn/test_tutor_voice_callback.py .planning/handoffs/2026-05-31-package-checklist.md`
