@@ -157,6 +157,7 @@ describe("practice booth shell", () => {
       const rewardFill = root.querySelector<HTMLElement>(
         "#learn-booth-reward-fill",
       )!;
+      const chain = root.querySelector<HTMLElement>("#learn-booth-chain")!;
       const title = root.querySelector<HTMLElement>("#learn-booth-title")!;
       const start = root.querySelector<HTMLButtonElement>(
         "#learn-start-recommended",
@@ -184,6 +185,18 @@ describe("practice booth shell", () => {
       expect(rewardFill.style.width).toBe("33%");
       expect(reward.getAttribute("aria-label")).toContain(
         "no lesson credit awarded",
+      );
+      expect(chain.dataset.visible).toBe("true");
+      expect(
+        Array.from(chain.querySelectorAll<HTMLElement>(".learn-booth-chain__label"))
+          .map((el) => el.textContent),
+      ).toEqual(["warmup 1/3", "lock it in", "next route"]);
+      expect(
+        Array.from(chain.querySelectorAll<HTMLElement>(".learn-booth-chain__title"))
+          .map((el) => el.textContent),
+      ).toEqual(["screen: deck A high EQ", "channel strip", "crossfader"]);
+      expect(chain.getAttribute("aria-label")).toContain(
+        "warmup 1/3: screen: deck A high EQ",
       );
 
       mocks.emitIpc.mockClear();

@@ -88,6 +88,7 @@ import {
   CURRICULUM_META,
   firstRecommendedLessonId,
   type LearnProgressProjection,
+  type LearnPracticeChainStep,
   type LearnPracticeMission,
 } from "./lesson/curriculum-meta.js";
 import type { SkillWallRow } from "./SkillWall.js";
@@ -120,6 +121,12 @@ interface MidiPositionPayload {
   positions: Record<string, number>;
   // Optional emit_ts attached by the ws-client for latency measurement
   // (the canonical envelope ts is ISO-8601; we parse it on receive).
+}
+
+interface FreePracticeMove {
+  controlLabel: string;
+  sourceLabel: "hardware" | "screen";
+  lessonId: string | null;
 }
 
 interface StatusTickPayload {
@@ -498,6 +505,7 @@ function mountLearnWindow(root: HTMLElement): {
   let lastPositions: Record<string, number> = {};
   let lastActionSource: "click" | "midi" | null = null;
   let freePracticeRepCount = 0;
+  let lastFreePracticeMove: FreePracticeMove | null = null;
   let lessonActionCount = 0;
   let lessonMatchedSourceCounts = freshLessonSourceCounts();
   let lessonUsedHint = false;
@@ -637,6 +645,7 @@ function mountLearnWindow(root: HTMLElement): {
   const pickLesson = (lesson_id: string, level: "fresh" | "replay") => {
     practiceIntentLessonId = null;
     freePracticeRepCount = 0;
+    lastFreePracticeMove = null;
     closeLessonMap(false);
     boothPanel.dataset.visible = "false";
     setBoothPulse("listening", "hands on deck");
@@ -736,12 +745,13 @@ function mountLearnWindow(root: HTMLElement): {
       },
     });
     progressListBody.replaceChildren(progressList);
-    updateBoothPulseForRecommendation(recommended, activeMission);
+    updateBoothPulseForRecommendation(recommended, activeMission, lessons);
     routePendingReferralLesson(lessons);
   };
   const updateBoothPulseForRecommendation = (
     recommended: ProgressListEntry | undefined,
     mission?: LearnPracticeMission,
+    lessons: ProgressListEntry[] = [],
   ): void => {
     if (boothPanel.dataset.visible !== "true") return;
     const readiness = controllerDetected
@@ -760,7 +770,7 @@ function mountLearnWindow(root: HTMLElement): {
     boothCommandText.textContent =
       cleanMissionText(mission?.command) ??
       practiceCommandLine(recommended, readiness, controllerDisplayName);
-    renderBoothChain(mission);
+    renderBoothChain(mission, recommended, lessons);
     if (mission) {
       renderBoothReward(mission);
     } else {
@@ -814,9 +824,57 @@ function mountLearnWindow(root: HTMLElement): {
       `free practice warmup ${capped} of 3. ${caption}. no lesson credit awarded.`,
     );
   };
-  const renderBoothChain = (mission?: LearnPracticeMission): void => {
+  const freePracticeChain = (
+    recommended: ProgressListEntry | undefined,
+    lessons: ProgressListEntry[],
+  ): LearnPracticeChainStep[] => {
+    if (freePracticeRepCount <= 0 || lastFreePracticeMove === null) return [];
+    const capped = Math.min(3, freePracticeRepCount);
+    const routeLesson = recommended ??
+      lessons.find((lesson) => lesson.lesson_id === lastFreePracticeMove?.lessonId);
+    const steps: LearnPracticeChainStep[] = [
+      {
+        lesson_id: lastFreePracticeMove.lessonId ?? routeLesson?.lesson_id ?? "booth",
+        course_id: routeLesson?.course_id ?? "booth",
+        course_label: "Booth warmup",
+        title: `${lastFreePracticeMove.sourceLabel}: ${lastFreePracticeMove.controlLabel}`,
+        state: "now",
+        mode: "start",
+        label: `warmup ${capped}/3`,
+      },
+    ];
+    if (routeLesson) {
+      steps.push({
+        lesson_id: routeLesson.lesson_id,
+        course_id: routeLesson.course_id,
+        course_label: routeLesson.course_label,
+        title: routeLesson.title,
+        state: "next",
+        mode: routeLessonMode(routeLesson),
+        label: routeLesson.status === "completed" ? "replay" : "lock it in",
+      });
+      const nextLesson = nextUnlockedRouteLesson(lessons, routeLesson.lesson_id);
+      if (nextLesson) {
+        steps.push({
+          lesson_id: nextLesson.lesson_id,
+          course_id: nextLesson.course_id,
+          course_label: nextLesson.course_label,
+          title: nextLesson.title,
+          state: "next",
+          mode: routeLessonMode(nextLesson),
+          label: "next route",
+        });
+      }
+    }
+    return steps.slice(0, 3);
+  };
+  const renderBoothChain = (
+    mission: LearnPracticeMission | undefined,
+    recommended: ProgressListEntry | undefined,
+    lessons: ProgressListEntry[],
+  ): void => {
     boothChain.textContent = "";
-    const steps = mission?.chain;
+    const steps = mission?.chain ?? freePracticeChain(recommended, lessons);
     if (!Array.isArray(steps) || steps.length === 0) {
       boothChain.dataset.visible = "false";
       boothChain.removeAttribute("aria-label");
@@ -946,6 +1004,7 @@ function mountLearnWindow(root: HTMLElement): {
     closeLessonMap(false);
     practiceIntentLessonId = null;
     freePracticeRepCount = 0;
+    lastFreePracticeMove = null;
     boothPanel.dataset.visible = "false";
     setBoothPulse("listening", "hands on deck");
     void emitLearnIpc("ipc.learn.start_course", payload).catch(
@@ -1117,6 +1176,7 @@ function mountLearnWindow(root: HTMLElement): {
     lastPositions = {};
     lastActionSource = null;
     freePracticeRepCount = 0;
+    lastFreePracticeMove = null;
     lessonActionCount = 0;
     lessonMatchedSourceCounts = freshLessonSourceCounts();
     lessonUsedHint = false;
@@ -1260,6 +1320,7 @@ function mountLearnWindow(root: HTMLElement): {
     lastPositions = {};
     lastActionSource = null;
     freePracticeRepCount = 0;
+    lastFreePracticeMove = null;
     // If we have a completed lesson_id, flip its dot to "completed"
     // locally and refresh the booth recommendation. The next
     // progress_state(snapshot) re-confirms from disk, but the frontstage
@@ -1389,6 +1450,11 @@ function mountLearnWindow(root: HTMLElement): {
     const line = freePracticeFeedbackLine(controlId, source);
     freePracticeRepCount += 1;
     const lessonId = practiceLessonIdForControl(controlId);
+    lastFreePracticeMove = {
+      controlLabel: freePracticeControlLabel(controlId),
+      sourceLabel: source === "midi" ? "hardware" : "screen",
+      lessonId,
+    };
     if (lessonId && lessonId !== practiceIntentLessonId) {
       practiceIntentLessonId = lessonId;
       renderLessonChooser();
@@ -2157,6 +2223,21 @@ function practiceTargetLine(recommended: ProgressListEntry | undefined): string 
   if (recommended.status === "completed") return `replay ${title}`;
   if (recommended.status === "in-progress") return `finish ${title}`;
   return title;
+}
+
+function routeLessonMode(lesson: ProgressListEntry): LearnPracticeChainStep["mode"] {
+  if (lesson.status === "completed") return "replay";
+  if (lesson.status === "in-progress") return "finish";
+  return "start";
+}
+
+function nextUnlockedRouteLesson(
+  lessons: ProgressListEntry[],
+  lessonId: string,
+): ProgressListEntry | undefined {
+  const index = lessons.findIndex((lesson) => lesson.lesson_id === lessonId);
+  if (index < 0) return undefined;
+  return lessons.slice(index + 1).find((lesson) => !lesson.locked);
 }
 
 function practiceCommandLine(
