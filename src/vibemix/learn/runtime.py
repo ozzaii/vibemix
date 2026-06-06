@@ -3014,13 +3014,9 @@ class LessonRuntime(StateMachine):
             return
 
         verdict = result.grade.verdict
-        text_by_verdict = {
-            "locked": "tempo and phase are matched.",
-            "drifting": "close, you're sliding behind — nudge the jog.",
-            "tempo_off": "tempos are off — ease the pitch back.",
-            "trainwreck": "that's drifted off — pull it back and re-find the 1.",
-        }
-        text = self._recovery_drill_grade_text(verdict) or text_by_verdict.get(verdict)
+        text = self._recovery_drill_grade_text(verdict) or self._beatmatch_grade_text(
+            result
+        )
         if text is None:
             return
 
@@ -3073,6 +3069,48 @@ class LessonRuntime(StateMachine):
                 f"[learn.runtime] beatmatch live grade emit failed: {exc!r}",
                 file=sys.stderr,
             )
+
+    def _beatmatch_grade_text(self, result: BeatmatchPracticeResult) -> str | None:
+        """Return authored beatmatch feedback grounded in the measured grade."""
+        grade = result.grade
+        verdict = grade.verdict
+        if verdict == "locked":
+            if result.event is not None:
+                return "that's the pocket - tempo and phase are sitting together."
+            return "pocket is centered - keep it there until proof lands."
+        if verdict == "drifting":
+            try:
+                phase_error = float(grade.phase_error_beats)
+            except (TypeError, ValueError):
+                phase_error = 0.0
+            if not math.isfinite(phase_error):
+                phase_error = 0.0
+            if abs(phase_error) < 0.08:
+                if phase_error > 0:
+                    return "deck B is just late - nudge forward without touching tempo."
+                if phase_error < 0:
+                    return "deck B is just early - drag it back without touching tempo."
+                return "phase is close - listen for the kicks to sit together."
+            if phase_error > 0:
+                return "deck B is dragging - jog it forward until the kicks meet."
+            return "deck B is rushing - drag it back until the kicks meet."
+        if verdict == "tempo_off":
+            try:
+                tempo_error = float(grade.tempo_error)
+            except (TypeError, ValueError):
+                tempo_error = 0.0
+            if math.isfinite(tempo_error) and tempo_error >= 0.08:
+                return "tempo is far out - fix pitch before chasing phase."
+            return "tempo is close but off - ease the pitch until drift stops."
+        if verdict == "trainwreck":
+            try:
+                phase_error = float(grade.phase_error_beats)
+            except (TypeError, ValueError):
+                phase_error = 0.0
+            if math.isfinite(phase_error) and phase_error < 0:
+                return "deck B jumped early - pull back and re-find the 1."
+            return "deck B missed the 1 late - reset on the next downbeat."
+        return None
 
     def _recovery_drill_grade_text(self, verdict: str) -> str | None:
         """Return drill-specific feedback for authored recovery misses."""

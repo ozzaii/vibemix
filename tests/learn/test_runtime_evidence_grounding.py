@@ -180,6 +180,7 @@ def test_runtime_grade_feedback_avoids_empty_compliments() -> None:
 
     source = (
         inspect.getsource(LessonRuntime._emit_live_beatmatch_grade)
+        + inspect.getsource(LessonRuntime._beatmatch_grade_text)
         + inspect.getsource(LessonRuntime._emit_live_cue_placement_grade)
         + inspect.getsource(LessonRuntime._recovery_drill_success_text)
     ).lower()
@@ -729,7 +730,7 @@ def test_live_beatmatch_grade_voices_locked_with_resolving_citation(monkeypatch)
 
     payload = _tutor_speak_payloads(ipc)[-1]
     live_grade = _live_grade_payloads(ipc)[-1]
-    assert payload["text"] == "tempo and phase are matched."
+    assert payload["text"] == "that's the pocket - tempo and phase are sitting together."
     assert payload["tts_marker"] == "L2.01.grade"
     assert payload["data_state"] == "hint"
     assert payload["citations"] == ["[ev:BEATMATCH_GRADED@42.400]"]
@@ -814,7 +815,9 @@ def test_beatmatch_mastered_flip_speaks_factual_proof_once(monkeypatch) -> None:
         for payload in _tutor_speak_payloads(ipc)
         if payload["tts_marker"] == "L2.01.grade"
     ][-1]
-    assert grade_payload["text"] == "tempo and phase are matched."
+    assert (
+        grade_payload["text"] == "that's the pocket - tempo and phase are sitting together."
+    )
     assert CitationLinter().check(
         " ".join(mastered_payloads[0]["citations"]),
         registry.snapshot(),
@@ -916,7 +919,7 @@ def test_live_beatmatch_grade_cites_locked_event_before_mastery_credit() -> None
 
     payload = _tutor_speak_payloads(ipc)[-1]
     live_grade = _live_grade_payloads(ipc)[-1]
-    assert payload["text"] == "tempo and phase are matched."
+    assert payload["text"] == "that's the pocket - tempo and phase are sitting together."
     assert payload["citations"] == ["[ev:BEATMATCH_GRADED@43.200]"]
     assert live_grade["citation"] == "[ev:BEATMATCH_GRADED@43.200]"
     assert registry.has("ev", "BEATMATCH_GRADED", 43.2, tol=1.0)
@@ -1114,7 +1117,7 @@ def test_live_beatmatch_grade_voices_drift_without_fabricated_citation() -> None
 
     payload = _tutor_speak_payloads(ipc)[-1]
     live_grade = _live_grade_payloads(ipc)[-1]
-    assert payload["text"] == "close, you're sliding behind — nudge the jog."
+    assert payload["text"] == "deck B is just late - nudge forward without touching tempo."
     assert payload["citations"] == []
     assert live_grade["verdict"] == "drifting"
     assert live_grade["citation"] is None
@@ -1310,7 +1313,10 @@ def test_matched_beatmatch_action_records_and_grades_immediately(monkeypatch) ->
     assert progress in saved
     assert any(kind == "learn_beatmatch_practice_graded" for kind, _fields in events)
     tutor_payload = _tutor_speak_payloads(runtime._ipc)[-1]
-    assert tutor_payload["text"] == "tempo and phase are matched."
+    assert (
+        tutor_payload["text"]
+        == "that's the pocket - tempo and phase are sitting together."
+    )
     assert tutor_payload["citations"] == ["[ev:BEATMATCH_GRADED@91.200]"]
 
 
@@ -1375,7 +1381,10 @@ def test_uncredited_beatmatch_practice_ack_stays_active_for_recovery() -> None:
     ]
     assert _live_grade_payloads(runtime._ipc)[-1]["verdict"] == "drifting"
     tutor_payload = _tutor_speak_payloads(runtime._ipc)[-1]
-    assert tutor_payload["text"] == "close, you're sliding behind — nudge the jog."
+    assert (
+        tutor_payload["text"]
+        == "deck B is just late - nudge forward without touching tempo."
+    )
     assert tutor_payload["citations"] == []
     assert not registry.has("ev", "BEATMATCH_GRADED", 92.4, tol=1.0)
     assert progress.lessons["L2.01"]["completed"] is False

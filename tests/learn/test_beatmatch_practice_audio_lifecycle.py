@@ -369,7 +369,7 @@ def test_free_practice_ack_emits_non_credit_live_grade(monkeypatch) -> None:
     assert live_grade["verdict"] == "drifting"
     assert live_grade["citation"] is None
     tutor = _tutor_speak_payloads(ipc)[-1]
-    assert tutor["text"].startswith("close, you're sliding behind")
+    assert tutor["text"].startswith("deck B is just late")
     assert tutor["citations"] == []
     assert "ev" not in registry.snapshot()
     assert progress.skills.get("beatmatching", {}).get("live_proof_count", 0) == 0

@@ -11227,3 +11227,35 @@ Proof before staging:
 - `npm --prefix tauri/ui test -- tests/learn/live-meter.spec.ts`
 - `npm --prefix tauri/ui run build`
 - `git diff --check -- tauri/ui/src/learn/live-meter.ts tauri/ui/src/learn/styles/learn.css tauri/ui/tests/learn/live-meter.spec.ts .planning/handoffs/2026-05-31-package-checklist.md`
+
+## Package 104 - Learn Measured Beatmatch Voice Bank
+
+Suggested commit: `feat(learn): vary measured beatmatch feedback`
+
+Include:
+
+- `src/vibemix/learn/runtime.py`
+- `tests/learn/test_runtime_evidence_grounding.py`
+- `tests/learn/test_beatmatch_practice_audio_lifecycle.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Randomized/generated tutor copy, live-grade IPC changes, lock-meter UI, and
+  owned-track audio. This package only replaces the old four-line beatmatch
+  text map with deterministic authored text chosen from measured grade fields.
+
+Reason:
+
+- Beatmatch feedback was grounded but robotic: every locked/drift/tempo/trainwreck
+  state used one generic line. Use the existing deterministic grade fields to
+  say whether deck B is late or early, whether tempo is far out or close, and
+  whether a locked result has proof. Keep the current verdict de-dupe cadence so
+  voice fires on meaningful changes instead of every meter tick.
+
+Proof before staging:
+
+- `uv run pytest -q tests/learn/test_runtime_evidence_grounding.py tests/learn/test_beatmatch_practice_audio_lifecycle.py tests/learn/test_scripts_are_fixtures.py`
+- `uv run ruff check src/vibemix/learn/runtime.py tests/learn/test_runtime_evidence_grounding.py tests/learn/test_beatmatch_practice_audio_lifecycle.py`
+- `uv run python -m compileall -q src/vibemix/learn/runtime.py tests/learn/test_runtime_evidence_grounding.py tests/learn/test_beatmatch_practice_audio_lifecycle.py`
+- `git diff --check -- src/vibemix/learn/runtime.py tests/learn/test_runtime_evidence_grounding.py tests/learn/test_beatmatch_practice_audio_lifecycle.py .planning/handoffs/2026-05-31-package-checklist.md`
