@@ -478,6 +478,19 @@ def test_five_of_five_unlocks_course_2_and_saves() -> None:
     progress = LearnProgress()
     emitted: list[dict] = []
     save_fn = MagicMock(name="save_fn")
+    sampled = random.Random(42).sample(_RECITAL_POOL, k=_RECITAL_SUBSET_SIZE)
+    recovery_lesson = str(sampled[0]["from_lesson"])
+    progress.mark_practice_feedback(
+        "course_1_anatomy",
+        recovery_lesson,
+        kind="control",
+        label="recital miss",
+        message=(
+            "The mixed check stopped here; repeat this move before "
+            "replaying the recital."
+        ),
+        detail=str(sampled[0]["prompt"]),
+    )
     rt = RecitalRuntime(
         ipc_emit=emitted.append,
         progress=progress,
@@ -498,6 +511,10 @@ def test_five_of_five_unlocks_course_2_and_saves() -> None:
     # save_fn was called with the LearnProgress instance (verifying the
     # right object survives — not a copy or a dict-shaped surrogate).
     save_fn.assert_called_with(progress)
+    assert "practice_feedback" not in progress.lessons[recovery_lesson], (
+        "passing the sampled recital prompt should clear its stale recovery target"
+    )
+    assert "last_feedback_seq" not in progress.lessons[recovery_lesson]
 
 
 # ---------------------------------------------------------------------------

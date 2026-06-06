@@ -128,6 +128,11 @@ _COURSE_2_DISTINCT_TYPES_REQUIRED: int = 3
 # CC delta floor — mirrors runtime.py and exemplar_lesson.py.
 _CC_DEFAULT_MIN_DELTA: int = 38
 
+_RECITAL_RECOVERY_LABEL = "recital miss"
+_RECITAL_RECOVERY_MESSAGE = (
+    "The mixed check stopped here; repeat this move before replaying the recital."
+)
+
 
 # ---------------------------------------------------------------------------
 # MIDI matcher — local copy of the runtime's action_matches predicate.
@@ -500,6 +505,7 @@ class RecitalRuntime:
             # field (course_2_unlocked or course_3_unlocked) +
             # persist atomically.
             setattr(self._progress, unlock_field, True)
+            self._clear_sampled_recital_recovery_targets()
             try:
                 self._save(self._progress)
             except Exception as exc:  # pragma: no cover — defensive
@@ -574,11 +580,8 @@ class RecitalRuntime:
             meta.course_id,
             from_lesson,
             kind="control",
-            label="recital miss",
-            message=(
-                "The mixed check stopped here; repeat this move before "
-                "replaying the recital."
-            ),
+            label=_RECITAL_RECOVERY_LABEL,
+            message=_RECITAL_RECOVERY_MESSAGE,
             detail=prompt or None,
         )
         if not changed:
@@ -602,6 +605,27 @@ class RecitalRuntime:
             index = min(index, len(self._sampled) - 1)
         entry = self._sampled[index]
         return entry if isinstance(entry, dict) else None
+
+    def _clear_sampled_recital_recovery_targets(self) -> None:
+        """Clear stale recital-miss targets for prompts the user just passed."""
+        for entry in self._sampled:
+            if not isinstance(entry, dict):
+                continue
+            from_lesson = str(entry.get("from_lesson") or "").strip()
+            if not from_lesson:
+                continue
+            row = self._progress.lessons.get(from_lesson)
+            if not isinstance(row, dict):
+                continue
+            feedback = row.get("practice_feedback")
+            if not isinstance(feedback, dict):
+                continue
+            if (
+                feedback.get("kind") == "control"
+                and feedback.get("label") == _RECITAL_RECOVERY_LABEL
+                and feedback.get("message") == _RECITAL_RECOVERY_MESSAGE
+            ):
+                self._progress.clear_practice_feedback(from_lesson)
 
     def _emit_progress_state_snapshot(self) -> None:
         """Emit a progress snapshot after progress persistence changes."""

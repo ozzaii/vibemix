@@ -13144,3 +13144,37 @@ Proof before staging:
 - `uv run python -m compileall -q src/vibemix/learn/recital.py src/vibemix/learn/practice_mission.py tests/learn/test_recital.py tests/learn/test_course_2_recital.py tests/learn/test_practice_mission.py`
 - `git diff --check -- src/vibemix/learn/recital.py src/vibemix/learn/practice_mission.py tests/learn/test_recital.py tests/learn/test_course_2_recital.py tests/learn/test_practice_mission.py .planning/handoffs/2026-05-31-package-checklist.md`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+
+## Package 154 - Learn Recital Recovery Clearance
+
+Suggested commit: `fix(learn): clear recital recovery targets on pass`
+
+Include:
+
+- `src/vibemix/learn/recital.py`
+- `tests/learn/test_recital.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Practice mission ranking changes, new recital scoring rules, UI layout work,
+  beginner-path suites, spoken tutor rewrites, and broader progress schema
+  changes. This package only clears stale recital-created recovery targets when
+  the sampled recital prompts are later passed.
+
+Reason:
+
+- A failed recital now feeds the first missed source prompt into recovery
+  practice. Once the user later passes that sampled recital prompt, keeping the
+  old `recital miss` target would make Learn keep nudging a move the user just
+  proved. Clear only recital-authored targets with the exact label/message on
+  the sampled prompts, and persist the cleanup together with the existing unlock
+  save.
+
+Proof before staging:
+
+- `uv run pytest -q tests/learn/test_recital.py tests/learn/test_course_2_recital.py tests/learn/test_practice_mission.py tests/learn/test_progress_persistence.py`
+- `uv run ruff check src/vibemix/learn/recital.py tests/learn/test_recital.py`
+- `uv run python -m compileall -q src/vibemix/learn/recital.py tests/learn/test_recital.py`
+- `git diff --check -- src/vibemix/learn/recital.py tests/learn/test_recital.py .planning/handoffs/2026-05-31-package-checklist.md`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
