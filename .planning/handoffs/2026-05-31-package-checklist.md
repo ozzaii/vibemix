@@ -12188,3 +12188,37 @@ Proof before staging:
 - `uv run python -m compileall -q src/vibemix/learn/runtime.py tests/learn/test_runtime_evidence_grounding.py`
 - `git diff --check -- src/vibemix/learn/runtime.py tests/learn/test_runtime_evidence_grounding.py .planning/handoffs/2026-05-31-package-checklist.md`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+
+## Package 129 - Debrief Near-Miss Ear-Test Clip
+
+Suggested commit: `feat(debrief): export near-miss ear-test clip`
+
+Include:
+
+- `src/vibemix/__main__.py`
+- `src/vibemix/debrief/__init__.py`
+- `src/vibemix/debrief/ear_test.py`
+- `tests/debrief/test_near_miss_detector.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Detector threshold tuning, Morning Mirror UI changes, friend-line/TTS copy,
+  real-session verdict claims, and debrief websocket rendering. This package
+  only turns an already-detected near-miss window into a playable proof file.
+
+Reason:
+
+- The detector could name a timestamp, but the useful shipping gate is by ear:
+  can the DJ play the exact master-audio window and hear the gallop snap back?
+  Add `vibemix debrief near-miss --write-clip` so the headless tool writes a
+  bounded `input.wav` slice that preserves the recorded channel count, sample
+  width, and sample rate.
+
+Proof before staging:
+
+- `uv run pytest -q tests/debrief/test_near_miss_detector.py tests/debrief/test_friend_line.py`
+- `uv run ruff check src/vibemix/__main__.py src/vibemix/debrief/__init__.py src/vibemix/debrief/ear_test.py tests/debrief/test_near_miss_detector.py`
+- `uv run python -m compileall -q src/vibemix/__main__.py src/vibemix/debrief/__init__.py src/vibemix/debrief/ear_test.py tests/debrief/test_near_miss_detector.py`
+- `git diff --check -- src/vibemix/__main__.py src/vibemix/debrief/__init__.py src/vibemix/debrief/ear_test.py tests/debrief/test_near_miss_detector.py .planning/handoffs/2026-05-31-package-checklist.md`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`

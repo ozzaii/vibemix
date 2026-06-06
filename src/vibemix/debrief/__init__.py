@@ -23,6 +23,7 @@ Plans:
 from __future__ import annotations
 
 from vibemix.debrief.chapters import ChapterRegion, derive_chapters
+from vibemix.debrief.ear_test import DEFAULT_NEAR_MISS_CLIP, write_near_miss_clip
 from vibemix.debrief.main import (
     resolve_recordings_root,
     run,
@@ -42,6 +43,7 @@ from vibemix.debrief.stripper import (
 )
 
 __all__ = [
+    "DEFAULT_NEAR_MISS_CLIP",
     "ChapterRegion",
     "EventsMissing",
     "InvalidSessionDir",
@@ -56,4 +58,5 @@ __all__ = [
     "strip_uncited_sentences",
     "validate_session_dir_under_root",
     "write_debrief",
+    "write_near_miss_clip",
 ]

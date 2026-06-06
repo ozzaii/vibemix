@@ -731,6 +731,23 @@ def _run_debrief_cli(argv: list[str]) -> int:
         default=0.38,
         help="Minimum detector confidence before reporting a near miss",
     )
+    sp_near_miss.add_argument(
+        "--write-clip",
+        nargs="?",
+        const="near_miss_ear_test.wav",
+        default=None,
+        metavar="PATH",
+        help=(
+            "Write a playable WAV clip around the detected window; optional PATH is "
+            "relative to the session dir unless absolute"
+        ),
+    )
+    sp_near_miss.add_argument(
+        "--clip-pad-s",
+        type=float,
+        default=2.0,
+        help="Seconds of input.wav padding on each side of a written near-miss clip",
+    )
     sp_near_miss.add_argument("--json", action="store_true", help="Print machine-readable JSON")
     sp_near_miss.set_defaults(func=_cmd_debrief_near_miss)
 
@@ -739,6 +756,9 @@ def _run_debrief_cli(argv: list[str]) -> int:
 
 
 def _cmd_debrief_near_miss(args: argparse.Namespace) -> int:
+    import wave
+
+    from vibemix.debrief.ear_test import write_near_miss_clip
     from vibemix.debrief.main import resolve_recordings_root, validate_session_dir_under_root
     from vibemix.debrief.near_miss_detector import detect_near_miss
     from vibemix.debrief.session_loader import InvalidSessionDir
@@ -755,7 +775,27 @@ def _cmd_debrief_near_miss(args: argparse.Namespace) -> int:
         return 2
 
     result = detect_near_miss(session_dir, min_confidence=float(args.min_confidence))
-    payload = {"near_miss": result.to_dict() if result is not None else None}
+    clip_path: Path | None = None
+    if result is not None and args.write_clip is not None:
+        try:
+            clip_path = write_near_miss_clip(
+                session_dir,
+                result,
+                output_path=args.write_clip,
+                pad_s=float(args.clip_pad_s),
+            )
+        except (EOFError, OSError, ValueError, wave.Error) as exc:
+            print(
+                f"vibemix debrief near-miss: failed to write clip: {exc}",
+                file=sys.stderr,
+                flush=True,
+            )
+            return 1
+
+    payload = {
+        "near_miss": result.to_dict() if result is not None else None,
+        "clip_path": str(clip_path) if clip_path is not None else None,
+    }
     if args.json:
         print(json.dumps(payload, indent=2, sort_keys=True), file=sys.stdout, flush=True)
         return 0
@@ -771,6 +811,8 @@ def _cmd_debrief_near_miss(args: argparse.Namespace) -> int:
         file=sys.stdout,
         flush=True,
     )
+    if clip_path is not None:
+        print(f"Ear-test clip: {clip_path}", file=sys.stdout, flush=True)
     return 0
 
 

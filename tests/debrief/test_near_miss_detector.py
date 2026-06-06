@@ -9,6 +9,7 @@ import numpy as np
 import pytest
 
 from vibemix.__main__ import _run_debrief_cli, cli_entry
+from vibemix.debrief import DEFAULT_NEAR_MISS_CLIP, write_near_miss_clip
 from vibemix.debrief.main import _build_debrief_waveform_peaks
 from vibemix.debrief.near_miss_detector import detect_near_miss_from_samples
 
@@ -106,6 +107,53 @@ def test_debrief_near_miss_cli_validates_root_and_emits_json(
     payload = json.loads(capsys.readouterr().out)
     assert payload["near_miss"]["event_type"] == "MIX_MOVE"
     assert payload["near_miss"]["citation"].startswith("[mix:near_miss@")
+    assert payload["clip_path"] is None
+
+
+def test_write_near_miss_clip_copies_master_audio_window(tmp_path: Path) -> None:
+    session = _write_session(tmp_path, _kick_loop(36.0, shifted=True))
+    result = detect_near_miss_from_samples(
+        _kick_loop(36.0, shifted=True),
+        _SR,
+        _events(),
+    )
+
+    assert result is not None
+    path = write_near_miss_clip(session, result, pad_s=1.0)
+
+    assert path == session / DEFAULT_NEAR_MISS_CLIP
+    with wave.open(str(path), "rb") as wf:
+        assert wf.getnchannels() == 1
+        assert wf.getsampwidth() == 2
+        assert wf.getframerate() == _SR
+        duration_s = wf.getnframes() / float(wf.getframerate())
+    assert 0.0 < duration_s < 36.0
+
+
+def test_debrief_near_miss_cli_writes_ear_test_clip(
+    tmp_path: Path,
+    capsys,
+) -> None:
+    recordings = tmp_path / "recordings"
+    recordings.mkdir()
+    session = _write_session(recordings, _kick_loop(36.0, shifted=True))
+
+    exit_code = _run_debrief_cli(
+        [
+            "near-miss",
+            "20260606-121212",
+            "--recordings-root",
+            str(recordings),
+            "--json",
+            "--write-clip",
+        ]
+    )
+
+    assert exit_code == 0
+    payload = json.loads(capsys.readouterr().out)
+    clip_path = Path(payload["clip_path"])
+    assert clip_path == session / DEFAULT_NEAR_MISS_CLIP
+    assert clip_path.exists()
 
 
 def test_debrief_waveform_peaks_are_read_from_input_wav(tmp_path: Path) -> None:
