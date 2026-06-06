@@ -17,13 +17,23 @@ function readUi(path: string): string {
 }
 
 describe("main window chrome", () => {
-  it("uses native decorations with the macOS overlay titlebar", () => {
+  it("uses native decorations with the overlay titlebar + native window material", () => {
     const conf = readUi("../src-tauri/tauri.conf.json5");
     expect(conf).toContain('"label": "main"');
     expect(conf).toContain('"decorations": true');
     expect(conf).toContain('"hiddenTitle": true');
     expect(conf).toContain('"titleBarStyle": "Overlay"');
-    expect(conf).toContain('"transparent": false');
+    // Transparent webview so the native window material (macOS NSVisualEffectView
+    // "Sidebar" vibrancy / Windows Mica, applied in main.rs) shows through the
+    // chrome + sidebar glass; the opaque .shell-main content stage hides it.
+    expect(conf).toContain('"transparent": true');
+    const main = readUi("../src-tauri/src/main.rs");
+    expect(main).toContain("apply_main_native_material");
+    expect(main).toContain("NSVisualEffectMaterial::Sidebar");
+    // The vibrancy transparency is scoped to the live Tauri runtime so plain
+    // Vite/browser dev keeps its opaque scene (no white bleed through the glass).
+    const shell = readUi("src/shell/shell.css");
+    expect(shell).toContain('html[data-runtime="tauri"]');
   });
 
   it("reserves the native traffic-light gutter in shell chrome", () => {

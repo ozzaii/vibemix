@@ -46,7 +46,12 @@
         "minHeight": 760,
         "resizable": true,
         "decorations": true,
-        "transparent": false,
+        // Transparent webview so the macOS NSVisualEffectView "Sidebar" vibrancy
+        // (applied in main.rs setup) shows through the chrome + sidebar glass;
+        // the opaque .shell-main content stage hides it. The shell body is only
+        // transparent under #shell-root, so the wizard + other windows stay
+        // solid. Windows uses Mica. See apply_main_native_material.
+        "transparent": true,
         "fullscreen": false,
         "hiddenTitle": true,
         "titleBarStyle": "Overlay",

@@ -50,6 +50,29 @@
   color: var(--text-primary);
   font-family: var(--type-body);
 }
+
+/* === Native window vibrancy (Tauri only) ================================
+ * In the real Tauri app the main window is transparent + an NSVisualEffectView
+ * ("Sidebar" vibrancy) / Windows Mica sits behind it (see main.rs
+ * apply_main_native_material). To reveal that material through the slim chrome
+ * + the sidebar glass, the shell body + root go transparent and the lit scene
+ * moves down to the opaque .shell-main content stage (--scene-lit ends on a
+ * solid gradient, so content never bleeds). Scoped to html[data-runtime="tauri"]
+ * (set in main.ts boot) so plain Vite/Playwright dev keeps the opaque scene
+ * above and never bleeds white through the glass, and so other windows (debrief,
+ * wizard) are untouched. */
+html[data-runtime="tauri"] body:has(#shell-root),
+html[data-runtime="tauri"] #shell-root {
+  background: transparent;
+}
+html[data-runtime="tauri"] .shell-main {
+  background:
+    linear-gradient(112deg, rgba(255, 165, 223, 0.055) 0%, transparent 28%),
+    radial-gradient(115% 82% at 74% 10%, rgba(255, 222, 242, 0.050) 0%, transparent 46%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.018) 0%, transparent 20%),
+    var(--scene-lit);
+  background-attachment: fixed;
+}
 #shell-root[data-collapsed="true"] { --sidebar-w: var(--sidebar-collapsed); }
 #shell-root[data-panel="open"]     { --panel-cur: var(--panel-w); }
 

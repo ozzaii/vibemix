@@ -45,6 +45,40 @@ use crate::sidecar::SidecarHandle;
 use crate::tray::{QuitPending, TrayHandle};
 use crate::ws_client::WsClientHandle;
 
+/// Apply the native window material to the main window: macOS NSVisualEffectView
+/// "Sidebar" vibrancy, Windows Mica. The slim chrome + the sidebar glass reveal
+/// it; the opaque content stage (`.shell-main`) hides it, so the result is the
+/// native "vibrant sidebar, solid content" look (Finder / Mail / Music), not a
+/// washed-out content area. The webview is `transparent: true` (tauri.conf) and
+/// the shell body is transparent only under `#shell-root` (so other windows and
+/// the wizard keep their opaque floor). macOS is the verified path; Windows Mica
+/// needs a box check before release.
+#[cfg(target_os = "macos")]
+fn apply_main_native_material(window: &tauri::WebviewWindow) {
+    use window_vibrancy::{apply_vibrancy, NSVisualEffectMaterial, NSVisualEffectState};
+
+    if let Err(e) = apply_vibrancy(
+        window,
+        NSVisualEffectMaterial::Sidebar,
+        Some(NSVisualEffectState::Active),
+        None,
+    ) {
+        tracing::warn!("main window vibrancy failed: {e}");
+    }
+}
+
+#[cfg(target_os = "windows")]
+fn apply_main_native_material(window: &tauri::WebviewWindow) {
+    if let Err(e) = window_vibrancy::apply_mica(window, None) {
+        tracing::warn!("main window mica failed: {e}");
+    }
+}
+
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
+fn apply_main_native_material(window: &tauri::WebviewWindow) {
+    let _ = window;
+}
+
 fn main() {
     let builder = tauri::Builder::default()
         // Plugins — every one is gated by the capability allowlist.
@@ -141,6 +175,9 @@ fn main() {
             let wizard_mode = config::is_first_run(&app_handle);
             let primary_surface = config::load_primary_surface(&app_handle).unwrap_or_default();
             if let Some(window) = app_handle.get_webview_window("main") {
+                // Native window material (macOS vibrancy / Windows Mica) before
+                // first paint, so the chrome + sidebar come up already vibrant.
+                apply_main_native_material(&window);
                 if let Err(e) = window.show() {
                     tracing::warn!("main window show failed: {e}");
                 }

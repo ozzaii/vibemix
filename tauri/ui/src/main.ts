@@ -129,6 +129,18 @@ async function boot(): Promise<void> {
   consumeUrlParam();
   initCrashBanner();
 
+  // Tag the document with the runtime so CSS can scope native-only effects.
+  // Window vibrancy (main.rs apply_main_native_material) needs a transparent
+  // shell body to reveal the NSVisualEffectView; in plain Vite/browser dev
+  // there is no vibrancy behind it, so that transparency would bleed white
+  // through the chrome + sidebar glass. shell.css gates the transparency on
+  // html[data-runtime="tauri"], set here from the live Tauri internals probe.
+  document.documentElement.dataset.runtime =
+    typeof (window as Window & { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__ ===
+    "object"
+      ? "tauri"
+      : "web";
+
   // The session bridge applies the persisted lighter-blur preference from
   // ipc.settings.state once the sidecar is connected. Keeping this boot path
   // non-blocking avoids a false timeout during sidecar startup.
