@@ -73,6 +73,16 @@ def test_debrief_critique_includes_learn_grade_receipts() -> None:
     critique = _build_cited_critique(
         [
             {
+                "kind": "learn_control_practice_graded",
+                "lesson_id": "L1.03",
+                "step_id": "eq",
+                "evidence_time": 12.5,
+                "control": "eq_hi",
+                "deck": "A",
+                "skill_id": "eq_mixing",
+                "credited": ["eq_mixing"],
+            },
+            {
                 "kind": "learn_beatmatch_practice_graded",
                 "lesson_id": "L2.01",
                 "step_id": "lock",
@@ -88,14 +98,28 @@ def test_debrief_critique_includes_learn_grade_receipts() -> None:
                 "verdict": "drop_locked",
                 "credited": ["phrasing_performance"],
             },
+            {
+                "kind": "learn_harmonic_practice_graded",
+                "lesson_id": "L2.11",
+                "step_id": "pair",
+                "evidence_time": 91.25,
+                "source_track_id": "track:source",
+                "target_track_id": "track:target",
+                "relation": "compatible neighbors",
+                "credited": ["harmonic_mixing"],
+            },
         ],
         [],
     )
 
+    assert "control practice graded eq_hi:A for eq_mixing" in critique
+    assert "[ev:CONTROL_PRACTICE_GRADED@12.500]" in critique
     assert "beatmatch practice graded locked" in critique
     assert "[ev:BEATMATCH_GRADED@42.400]" in critique
     assert "cue placement practice graded drop_locked" in critique
     assert "[ev:CUE_PLACEMENT_GRADED@64.000]" in critique
+    assert "harmonic practice graded compatible neighbors" in critique
+    assert "[ev:HARMONIC_PRACTICE_GRADED@91.250]" in critique
     assert_all_cited(critique)
 
 

@@ -12337,3 +12337,34 @@ Proof before staging:
 - `uv run python -m compileall -q src/vibemix/learn/runtime.py src/vibemix/learn/practice_mission.py tests/learn/test_practice_mission.py tests/learn/test_ipc_handlers_dispatch.py tests/learn/test_beatmatch_practice_audio_lifecycle.py`
 - `git diff --check -- src/vibemix/learn/runtime.py src/vibemix/learn/practice_mission.py tests/learn/test_practice_mission.py tests/learn/test_ipc_handlers_dispatch.py tests/learn/test_beatmatch_practice_audio_lifecycle.py .planning/handoffs/2026-05-31-package-checklist.md`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+
+## Package 133 - Debrief All Learn Practice Receipts
+
+Suggested commit: `feat(debrief): include all learn practice receipts`
+
+Include:
+
+- `src/vibemix/debrief/main.py`
+- `tests/debrief/test_transition_judged_critique.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Debrief schema changes, new UI frames, TLDR prompt rewrites, and Learn
+  runtime logging changes. This package only lets already-logged Learn
+  evidence receipts enter the cited critique stream.
+
+Reason:
+
+- Learn already logs control, beatmatch, cue-placement, and harmonic practice
+  receipts. Debrief remembered beatmatch/cue but dropped control/harmonic,
+  which broke the "what I practiced shows up tomorrow" utility loop. Surface
+  all four receipt kinds through resolver-shaped `[ev:*@t]` atoms.
+
+Proof before staging:
+
+- `uv run pytest -q tests/debrief/test_transition_judged_critique.py`
+- `uv run ruff check src/vibemix/debrief/main.py tests/debrief/test_transition_judged_critique.py`
+- `uv run python -m compileall -q src/vibemix/debrief/main.py tests/debrief/test_transition_judged_critique.py`
+- `git diff --check -- src/vibemix/debrief/main.py tests/debrief/test_transition_judged_critique.py .planning/handoffs/2026-05-31-package-checklist.md`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`

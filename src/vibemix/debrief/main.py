@@ -199,7 +199,9 @@ def _build_cited_critique(events: list[dict], chapters: list[ChapterRegion]) -> 
                 out.append(text)
         elif kind in {
             "learn_beatmatch_practice_graded",
+            "learn_control_practice_graded",
             "learn_cue_placement_practice_graded",
+            "learn_harmonic_practice_graded",
         }:
             text = _learn_grade_critique_line(e)
             if text:
@@ -404,16 +406,25 @@ def _learn_grade_critique_line(event: dict) -> str:
     if kind == "learn_beatmatch_practice_graded":
         label = "beatmatch practice"
         evidence_key = "BEATMATCH_GRADED"
+        verdict = str(event.get("verdict") or "").strip()
+    elif kind == "learn_control_practice_graded":
+        label = "control practice"
+        evidence_key = "CONTROL_PRACTICE_GRADED"
+        verdict = _learn_control_grade_detail(event)
     elif kind == "learn_cue_placement_practice_graded":
         label = "cue placement practice"
         evidence_key = "CUE_PLACEMENT_GRADED"
+        verdict = str(event.get("verdict") or "").strip()
+    elif kind == "learn_harmonic_practice_graded":
+        label = "harmonic practice"
+        evidence_key = "HARMONIC_PRACTICE_GRADED"
+        verdict = _learn_harmonic_grade_detail(event)
     else:
         return ""
 
     citation_time = _learn_event_time_or_none(event)
     if citation_time is None:
         return ""
-    verdict = str(event.get("verdict") or "").strip()
     if not verdict:
         return ""
 
@@ -428,6 +439,27 @@ def _learn_grade_critique_line(event: dict) -> str:
         f"Learn {lesson_id}{step}: {label} graded {verdict}"
         f"{credited_clause} {citation}."
     )
+
+
+def _learn_control_grade_detail(event: dict) -> str:
+    control = str(event.get("control") or "").strip()
+    deck = str(event.get("deck") or "").strip()
+    skill_id = str(event.get("skill_id") or "").strip()
+    control_id = f"{control}:{deck}" if control and deck else control
+    if control_id and skill_id:
+        return f"{control_id} for {skill_id}"
+    return control_id or skill_id
+
+
+def _learn_harmonic_grade_detail(event: dict) -> str:
+    relation = str(event.get("relation") or "").strip()
+    source = str(event.get("source_track_id") or "").strip()
+    target = str(event.get("target_track_id") or "").strip()
+    if relation:
+        return relation
+    if source and target:
+        return f"{source} into {target}"
+    return "compatible pair"
 
 
 def _transition_judged_critique_line(event: dict) -> str:
