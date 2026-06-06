@@ -20,6 +20,8 @@ from types import SimpleNamespace
 from typing import Any
 
 AI_MESSAGE_SCHEMA_VERSION = 1
+LIVE_RESPAN_SPAN_SCHEMA_VERSION = 1
+LIVE_RESPAN_SPAN_CATEGORY = "sven-live-session"
 _ENV_ENABLED = "VIBEMIX_AI_OBSERVABILITY"
 _LOG_LOCK = threading.Lock()
 _SLUG_RE = re.compile(r"[^A-Za-z0-9_.-]+")
@@ -59,6 +61,16 @@ def _bounded_text(value: object, *, limit: int = 4000) -> str | None:
     if value is None:
         return None
     text = str(value)
+    if len(text) <= limit:
+        return text
+    return text[: limit - 16] + "...<truncated>"
+
+
+def _bounded_json(value: object, *, limit: int = 1200) -> str:
+    try:
+        text = json.dumps(value, ensure_ascii=False, sort_keys=True)
+    except Exception:
+        text = str(value)
     if len(text) <= limit:
         return text
     return text[: limit - 16] + "...<truncated>"
@@ -282,6 +294,162 @@ def build_ai_message_record(
     return rec
 
 
+def build_live_respan_span(record: dict[str, Any]) -> dict[str, Any]:
+    """Return a privacy-safe Respan span for one live Sven decision.
+
+    The span contains only text metadata already present in the AI-message row:
+    evidence digest, emitted/suppressed line, citation decision, and local
+    artifact paths. It intentionally omits raw audio bytes, screen frames, and
+    the full prompt body.
+    """
+
+    response_id = str(record.get("response_id") or "")
+    event = record.get("event")
+    message = str(record.get("message") or "")
+    citation = record.get("citation") if isinstance(record.get("citation"), dict) else {}
+    citation_action = str(citation.get("action") or "")
+    suppression = record.get("suppression")
+    stop_reason = record.get("stop_reason")
+    live_decision = "spoke" if citation_action == "emit" and message.strip() else "silent"
+    silence_reason = None if live_decision == "spoke" else (suppression or stop_reason or citation_action)
+    moves = record.get("moves") if isinstance(record.get("moves"), dict) else {}
+    evidence_digest = _live_span_evidence_digest(
+        response_id=response_id,
+        event=event,
+        live_decision=live_decision,
+        silence_reason=silence_reason,
+        citation=citation,
+        moves=moves,
+        extra=record.get("extra"),
+    )
+    metadata = {
+        "schema": "vibemix_live_sven_respan_span_v1",
+        "schema_version": LIVE_RESPAN_SPAN_SCHEMA_VERSION,
+        "surface": record.get("surface"),
+        "engine": record.get("engine"),
+        "direction": record.get("direction"),
+        "response_id": response_id,
+        "event": event,
+        "live_decision": live_decision,
+        "silence_reason": silence_reason,
+        "stop_reason": stop_reason,
+        "suppression": suppression,
+        "citation": citation,
+        "grounded": bool(citation_action == "emit" and citation.get("valid") is not False),
+        "should_evaluate_five_dim": bool(live_decision == "spoke" and message.strip()),
+        "moves": moves,
+        "artifacts": dict(record.get("artifacts") or {}),
+        "privacy": {
+            "contains_audio_bytes": False,
+            "contains_screen_frames": False,
+            "contains_full_prompt": False,
+            "source": "ai_message_text_digest",
+        },
+    }
+    return {
+        "schema": "vibemix_live_sven_respan_span_v1",
+        "schema_version": LIVE_RESPAN_SPAN_SCHEMA_VERSION,
+        "model": record.get("model") or "unknown",
+        "log_type": "chat",
+        "input": [{"role": "user", "content": evidence_digest}],
+        "output": {"role": "assistant", "content": message},
+        # Legacy chat fields are still accepted by Respan and keep the local file
+        # easy to use with older upload helpers.
+        "prompt_messages": [{"role": "user", "content": evidence_digest}],
+        "completion_message": {"role": "assistant", "content": message},
+        "status": "success",
+        "status_code": 200,
+        "category": LIVE_RESPAN_SPAN_CATEGORY,
+        "custom_identifier": response_id,
+        "metadata": metadata,
+    }
+
+
+def _live_span_evidence_digest(
+    *,
+    response_id: str,
+    event: object,
+    live_decision: str,
+    silence_reason: object,
+    citation: dict[str, Any],
+    moves: dict[str, Any],
+    extra: object,
+) -> str:
+    lines = [
+        "SVEN LIVE DECISION EVIDENCE",
+        f"response_id={response_id or 'unknown'}",
+        f"event={event or 'unknown'}",
+        f"decision={live_decision}",
+    ]
+    if silence_reason:
+        lines.append(f"silence_reason={silence_reason}")
+    lines.append(f"citation={_bounded_json(citation, limit=900)}")
+    for key in (
+        "event_moves",
+        "recent_moves",
+        "audio_delta",
+        "audible_deck",
+        "audible_track",
+        "phase",
+        "set_seconds",
+        "vocal_active",
+        "onset_density",
+        "deck_mixer",
+    ):
+        if key in moves:
+            lines.append(f"{key}={_bounded_json(moves.get(key), limit=900)}")
+    if isinstance(extra, dict):
+        compact_extra = {
+            key: extra.get(key)
+            for key in (
+                "head_yielded",
+                "diet",
+                "cache_state",
+                "audio_tokens_est",
+                "avoided_audio_tokens_est",
+                "deck_audio_parts",
+                "live_claim_defer_stream",
+                "pre_llm_short_circuit",
+                "raw_response_chars",
+                "spoken_response_chars",
+            )
+            if key in extra
+        }
+        if compact_extra:
+            lines.append(f"turn={_bounded_json(compact_extra, limit=900)}")
+    return "\n".join(lines)
+
+
+def _append_session_respan_span(
+    recorder: object,
+    rec: dict[str, Any],
+) -> dict[str, Any] | None:
+    session_dir = getattr(recorder, "session_dir", None)
+    if session_dir is None:
+        return None
+    try:
+        root = Path(session_dir)
+        span = build_live_respan_span(rec)
+        span_path = root / "respan_spans.jsonl"
+        line = json.dumps(span, ensure_ascii=False)
+        lock = getattr(recorder, "_lock", None)
+        if lock is not None:
+            with lock:
+                with span_path.open("a", encoding="utf-8") as fh:
+                    fh.write(line)
+                    fh.write("\n")
+        else:
+            with span_path.open("a", encoding="utf-8") as fh:
+                fh.write(line)
+                fh.write("\n")
+        artifacts = dict(rec.get("artifacts") or {})
+        artifacts["session_respan_spans_path"] = str(span_path)
+        rec["artifacts"] = artifacts
+        return span
+    except Exception:
+        return None
+
+
 def record_session_ai_message(recorder: object | None, **kwargs: Any) -> dict[str, Any]:
     """Append an ``ai_message`` row to the active session's ``events.jsonl``."""
     prompt = kwargs.pop("prompt", None)
@@ -303,7 +471,23 @@ def record_session_ai_message(recorder: object | None, **kwargs: Any) -> dict[st
         return rec
     try:
         _write_session_ai_artifacts(recorder, rec, prompt=prompt, response=response)
+        span = _append_session_respan_span(recorder, rec)
         recorder.log_event("ai_message", **rec)
+        if span is not None:
+            metadata = span.get("metadata") if isinstance(span.get("metadata"), dict) else {}
+            recorder.log_event(
+                "respan_span",
+                schema=span.get("schema"),
+                response_id=span.get("custom_identifier"),
+                event=metadata.get("event"),
+                live_decision=metadata.get("live_decision"),
+                silence_reason=metadata.get("silence_reason"),
+                citation_action=(metadata.get("citation") or {}).get("action")
+                if isinstance(metadata.get("citation"), dict)
+                else None,
+                should_evaluate_five_dim=metadata.get("should_evaluate_five_dim"),
+                path=str(Path(recorder.session_dir) / "respan_spans.jsonl"),
+            )
     except Exception:
         pass
     return rec
@@ -431,8 +615,10 @@ def compact_prompt_preview(prompt: object, *, limit: int = 4000) -> str | None:
 
 __all__ = [
     "AI_MESSAGE_SCHEMA_VERSION",
+    "LIVE_RESPAN_SPAN_SCHEMA_VERSION",
     "append_global_ai_message",
     "build_ai_message_record",
+    "build_live_respan_span",
     "compact_prompt_preview",
     "move_context",
     "normalize_recent_moves",
