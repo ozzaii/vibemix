@@ -418,11 +418,25 @@ def _serialize_deck_controls(raw: Any) -> dict[str, Any]:
     }
 
 
-def _serialize_deck_mixer(state: MusicState) -> dict[str, Any]:
+def _serialize_deck_mixer(
+    state: MusicState,
+    controller_state: Any | None = None,
+) -> dict[str, Any]:
     """Read-only serialize per-deck mixer posture for live deck reasoning."""
+    midi_activity = _status_midi_activity(state, controller_state) or "unknown"
+    connected = bool(getattr(state, "controller_connected", False))
+    if midi_activity == "disconnected":
+        connected = False
+    elif midi_activity in {
+        "connected_no_midi_traffic",
+        "midi_traffic_unmapped",
+        "midi_events_no_moves",
+        "active",
+    }:
+        connected = True
     return {
-        "connected": bool(getattr(state, "controller_connected", False)),
-        "midi_activity": str(getattr(state, "controller_midi_activity", "unknown") or "unknown"),
+        "connected": connected,
+        "midi_activity": midi_activity,
         "midi_messages_seen": max(0, int(getattr(state, "controller_midi_messages_seen", 0) or 0)),
         "midi_events_seen": max(0, int(getattr(state, "controller_midi_events_seen", 0) or 0)),
         "midi_moves_seen": max(0, int(getattr(state, "controller_midi_moves_seen", 0) or 0)),
@@ -1281,7 +1295,7 @@ async def ws_broadcast(
                         # distinguish "deck A low was cut" from "a musical
                         # transition happened": deck faders/EQ/filter/play,
                         # crossfader, and attribution confidence.
-                        "deck_mixer": _serialize_deck_mixer(state),
+                        "deck_mixer": _serialize_deck_mixer(state, controller_state),
                         "deck_audio_separation_context": deck_audio_separation_context,
                         "audio_part_context": audio_part_context,
                         # Bounded DSP deltas from the existing perceive snapshot.

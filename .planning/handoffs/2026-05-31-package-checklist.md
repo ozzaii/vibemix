@@ -13576,3 +13576,35 @@ Proof before staging:
 - `npm --prefix tauri/ui run build`
 - `git diff --check -- tauri/ui/src/session/components/status-bar.ts tauri/ui/src/session/SessionLayout.ts tauri/ui/tests/session/components.spec.ts .planning/handoffs/2026-05-31-package-checklist.md`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+
+## Package 166 - Deck Mixer Controller Activity Truth
+
+Suggested commit: `fix(grounding): align deck mixer controller status`
+
+Include:
+
+- `src/vibemix/runtime/ws_bus.py`
+- `tests/runtime/test_ws_bus_deck_state.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- MIDI hotplug/listener lifecycle, controller mapping, IPC schema changes,
+  Course 3 prompt wording, UI status copy, and deck-state attribution rules.
+  This package only makes the rich live-context frame use the same bounded
+  controller activity truth as `ipc.status.tick`.
+
+Reason:
+
+- After a manual trigger with no controller attached, `ipc.status.tick` reported
+  `midi_activity:"disconnected"` but the rich live context still serialized
+  `deck_mixer.midi_activity:"unknown"`. Sven and Viber read the rich context,
+  so the grounding packet must not disagree with the status footer.
+
+Proof before staging:
+
+- `uv run pytest -q tests/runtime/test_ws_bus_deck_state.py tests/runtime/test_ws_bus_status_tick.py`
+- `uv run ruff check src/vibemix/runtime/ws_bus.py tests/runtime/test_ws_bus_deck_state.py tests/runtime/test_ws_bus_status_tick.py`
+- `uv run python -m compileall -q src/vibemix/runtime/ws_bus.py tests/runtime/test_ws_bus_deck_state.py tests/runtime/test_ws_bus_status_tick.py`
+- `git diff --check -- src/vibemix/runtime/ws_bus.py tests/runtime/test_ws_bus_deck_state.py .planning/handoffs/2026-05-31-package-checklist.md`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`

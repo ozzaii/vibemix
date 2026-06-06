@@ -49,7 +49,11 @@ def _build_mock_server() -> MagicMock:
 
 
 def _capture_payload(
-    state: MusicState, mocker, *, audio_capture_context: dict | None = None
+    state: MusicState,
+    mocker,
+    *,
+    audio_capture_context: dict | None = None,
+    controller_state: object | None = None,
 ) -> dict:
     """Drive ws_broadcast through one tick + capture the first outbound mascot
     payload as a parsed dict. Same approach as test_ws_bus_genre_fields."""
@@ -99,6 +103,7 @@ def _capture_payload(
                 state,
                 manual_trigger,
                 stop_event,
+                controller_state=controller_state,
                 audio_capture_context=audio_capture_context,
             )
         )
@@ -234,6 +239,26 @@ def test_payload_includes_bounded_deck_mixer_posture(mocker):
             "play": False,
         },
     }
+
+
+def test_deck_mixer_uses_controller_snapshot_for_disconnected_activity(mocker):
+    state = MusicState()
+    state.controller_connected = False
+    state.controller_midi_activity = "unknown"
+    controller_state = MagicMock(
+        activity_snapshot=lambda: {
+            "connected": False,
+            "port_name": None,
+            "messages_seen_total": 0,
+            "events_seen_total": 0,
+            "moves_seen_total": 0,
+        }
+    )
+
+    payload = _capture_payload(state, mocker, controller_state=controller_state)
+
+    assert payload["deck_mixer"]["connected"] is False
+    assert payload["deck_mixer"]["midi_activity"] == "disconnected"
 
 
 def test_payload_includes_bounded_deck_context_maps(mocker):
