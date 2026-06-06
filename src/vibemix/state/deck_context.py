@@ -222,6 +222,16 @@ _LIVE_AUDIO_SOURCE_DETAIL_TAIL_RE = re.compile(
     r")\b[^\[.?!;]*",
     re.IGNORECASE,
 )
+_LIVE_AUDIO_SOURCE_DETAIL_ADVICE_RE = re.compile(
+    r"(?:\s*[,;]\s*)?(?:\b(?:now|then|so)\b\s+)?\b"
+    r"(?:bring|add|layer|drop|pull|mix|blend|cue)\b"
+    r"[^.?!]{0,44}\b(?P<noun>"
+    r"vocal|vocals|voice|lyric|lyrics|kick|kickdrum|kick drum|snare|clap|"
+    r"hi[- ]?hat|hat|hats|drum|drums|bassline|lead|synth|pad|stem|stems|"
+    r"acapella|instrumental"
+    r")\b",
+    re.IGNORECASE,
+)
 _LIVE_AUDIO_KICK_EVENT_TYPES: frozenset[str] = frozenset(
     {
         "KICK_SWAP",
@@ -3011,6 +3021,10 @@ def should_defer_live_claim_text(
         or _has_uncited_track_identity_claim(text, state)
         or _has_unsupported_mixer_low_kill_claim(text, state)
         or (not moves and _has_unsupported_no_move_control_claim(text))
+        or (
+            _unsupported_audio_source_detail_reason(text, state, event_type=event_type)
+            is not None
+        )
         or (not moves and event == "PHASE" and _has_unsupported_no_move_coaching_advice(text))
         or (
             policy in {"blocked", "watch_not_claim", "candidate_not_verdict", "requires_more_evidence"}
@@ -3535,7 +3549,8 @@ def _unsupported_audio_source_detail_reason(
         and _LIVE_AUDIO_SOURCE_DETAIL_CLAIM_RE.search(text)
     )
     has_source_tail = bool(_LIVE_AUDIO_SOURCE_DETAIL_TAIL_RE.search(text))
-    if not (has_source_claim or has_source_tail):
+    has_source_advice = bool(_LIVE_AUDIO_SOURCE_DETAIL_ADVICE_RE.search(text))
+    if not (has_source_claim or has_source_tail or has_source_advice):
         return None
 
     unsupported = [
@@ -3619,7 +3634,14 @@ def _strip_unsupported_audio_source_detail_phrase(
             return match.group(0)
         return ""
 
+    def _replace_advice(match: re.Match[str]) -> str:
+        noun = str(match.group("noun") or "")
+        if _source_detail_noun_supported(noun, state, event_type=event_type):
+            return match.group(0)
+        return ""
+
     cleaned = _LIVE_AUDIO_SOURCE_DETAIL_TAIL_RE.sub(_replace, str(text or ""))
+    cleaned = _LIVE_AUDIO_SOURCE_DETAIL_ADVICE_RE.sub(_replace_advice, cleaned)
     return re.sub(r"\s+", " ", cleaned).strip(" ,;:")
 
 
