@@ -12862,3 +12862,37 @@ Proof before staging:
 - `uv run python -m compileall -q src/vibemix/learn/runtime.py tests/learn/test_beatmatch_practice_audio_lifecycle.py`
 - `git diff --check -- src/vibemix/learn/runtime.py tests/learn/test_beatmatch_practice_audio_lifecycle.py .planning/handoffs/2026-05-31-package-checklist.md`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+
+## Package 147 - Library Index Receipts Stay Actionable
+
+Suggested commit: `fix(library-ui): surface folder index receipts`
+
+Include:
+
+- `tauri/ui/src/library/index.ts`
+- `tauri/ui/src/library/chat.test.ts`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Python ingest behavior, Tauri command spawning, model installation, Viber
+  chat tooling, Learn lesson runtime, shell footer status, and fresh-user state
+  resets. This package only changes the terminal folder-index receipt rendered
+  by the library window when the existing bridge emits `library://embed-done`.
+
+Reason:
+
+- Fresh-user library setup should not end on a vague `done` or hide partial
+  ingest failures. Current-source CLI proof on `/Users/ozai/Music/bois` shows
+  the backend can legitimately finish as `0 embedded / 49 cached / 0 failed`;
+  the UI should say that plainly. When failed files exist, keep the usable
+  indexed tracks available while showing an actionable partial-failure receipt
+  instead of looking clean or wedged.
+
+Proof before staging:
+
+- `uv run python -m vibemix library embed-folder /Users/ozai/Music/bois --strategy mean_excerpt --no-key --no-bpm --json`
+- `npm --prefix tauri/ui test -- src/library/chat.test.ts`
+- `npm --prefix tauri/ui run build`
+- `git diff --check -- tauri/ui/src/library/index.ts tauri/ui/src/library/chat.test.ts .planning/handoffs/2026-05-31-package-checklist.md`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`

@@ -978,6 +978,44 @@ function renderIngestError(err: unknown): void {
   $("vmx-lib-scope-state").textContent = "index failed";
 }
 
+function embedDoneNote(d: EmbedDone): string {
+  const parts: string[] = [];
+  if (d.embedded > 0) parts.push(`${d.embedded} embedded`);
+  if (d.skipped > 0) parts.push(`${d.skipped} cached`);
+  if (d.failed > 0) parts.push(`${d.failed} failed`);
+  if (parts.length > 0) return parts.join(" · ");
+  return d.total > 0 ? `${d.total} scanned` : "no audio indexed";
+}
+
+function renderIngestDone(d: EmbedDone): void {
+  const note = embedDoneNote(d);
+  setProgress(d.total, d.total, d.cost_eur, note);
+  if (d.failed > 0) {
+    const el = $maybe("vmx-lib-ingest-error");
+    if (el) {
+      const title = document.createElement("div");
+      title.className = "title";
+      title.textContent = "index completed with errors";
+      const body = document.createElement("div");
+      body.className = "msg";
+      body.textContent = note;
+      const hint = document.createElement("div");
+      hint.className = "hint";
+      hint.textContent = "Viber can use the indexed tracks now; retry later for the failed files.";
+      el.replaceChildren(title, body, hint);
+      el.hidden = false;
+      el.title = note;
+    }
+    $("vmx-lib-rcount").textContent = `${d.failed} failed`;
+    $("vmx-lib-scope-state").textContent = "index partial";
+    return;
+  }
+  clearIngestError();
+  $("vmx-lib-rcount").textContent =
+    d.embedded > 0 ? `${d.embedded} indexed` : `${d.skipped} cached`;
+  $("vmx-lib-scope-state").textContent = "library indexed";
+}
+
 function embeddingLabel(stats: LibraryStats): string {
   const backend = (stats.embedding_backend ?? "clap").toLowerCase();
   const model =
@@ -2635,8 +2673,7 @@ export function mountLibrary(root: ParentNode = document): void {
   });
   void onEmbedDone((d: EmbedDone) => {
     if (!busy || state.mode !== "ingest") return;
-    clearIngestError();
-    setProgress(d.total, d.total, d.cost_eur, "done");
+    renderIngestDone(d);
     busy = false;
     runBtn.disabled = false;
     void refreshStats();

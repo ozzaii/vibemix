@@ -11,6 +11,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type {
+  EmbedDone,
   LibraryChatResult,
   LibraryLiveContext,
   LibraryModelInstallTarget,
@@ -28,6 +29,7 @@ const chatMock =
   >();
 let liveContextCallback: ((context: LibraryLiveContext) => void) | null = null;
 let liveMoveCallback: ((moves: string[]) => void) | null = null;
+let embedDoneCallback: ((done: EmbedDone) => void) | null = null;
 let viberToolCallback:
   | ((event: { tool: string; ok: boolean; summary: string }) => void)
   | null = null;
@@ -367,6 +369,7 @@ function readyIdentifiedDeckPairLiveContext(): LibraryLiveContext {
 function doMockApi(): void {
   liveContextCallback = null;
   liveMoveCallback = null;
+  embedDoneCallback = null;
   viberToolCallback = null;
   vi.doMock("../ipc/client.js", () => ({
     emitIpc: emitIpcMock,
@@ -409,7 +412,10 @@ function doMockApi(): void {
         modelsMock(install),
       libraryEmbedFolder: embedFolderMock,
       onEmbedProgress: vi.fn(async () => () => {}),
-      onEmbedDone: vi.fn(async () => () => {}),
+      onEmbedDone: vi.fn(async (cb: (done: EmbedDone) => void) => {
+        embedDoneCallback = cb;
+        return () => {};
+      }),
       onModelProgress: vi.fn(async () => () => {}),
       onLiveDeckContext: vi.fn(
         async (cb: (context: LibraryLiveContext) => void) => {
@@ -690,6 +696,73 @@ describe("chat - real runChat path", () => {
     expect(errorSpy).toHaveBeenCalledWith(
       "[vmx-lib] run failed:",
       expect.any(Error),
+    );
+  });
+
+  it("surfaces a cached folder-index receipt instead of a vague done state", async () => {
+    embedFolderMock.mockResolvedValueOnce(true);
+    await mountChat();
+
+    document.querySelector<HTMLButtonElement>('[data-mode-jump="ingest"]')?.click();
+    for (let i = 0; i < 4; i++) await Promise.resolve();
+    (document.getElementById("vmx-lib-runbtn") as HTMLButtonElement).click();
+    for (let i = 0; i < 4; i++) await Promise.resolve();
+
+    expect(embedDoneCallback).not.toBeNull();
+    embedDoneCallback?.({
+      embedded: 0,
+      skipped: 49,
+      failed: 0,
+      total: 49,
+      cost_eur: 0,
+    });
+
+    expect(document.getElementById("vmx-lib-prog-n")?.textContent).toContain(
+      "49 cached",
+    );
+    expect(document.getElementById("vmx-lib-rcount")?.textContent).toBe("49 cached");
+    expect(document.getElementById("vmx-lib-scope-state")?.textContent).toBe(
+      "library indexed",
+    );
+    expect((document.getElementById("vmx-lib-ingest-error") as HTMLElement).hidden).toBe(
+      true,
+    );
+    expect((document.getElementById("vmx-lib-runbtn") as HTMLButtonElement).disabled).toBe(
+      false,
+    );
+  });
+
+  it("keeps partial folder-index failures visible without hiding usable tracks", async () => {
+    embedFolderMock.mockResolvedValueOnce(true);
+    await mountChat();
+
+    document.querySelector<HTMLButtonElement>('[data-mode-jump="ingest"]')?.click();
+    for (let i = 0; i < 4; i++) await Promise.resolve();
+    (document.getElementById("vmx-lib-runbtn") as HTMLButtonElement).click();
+    for (let i = 0; i < 4; i++) await Promise.resolve();
+
+    embedDoneCallback?.({
+      embedded: 3,
+      skipped: 1,
+      failed: 2,
+      total: 6,
+      cost_eur: 0.12,
+    });
+
+    const error = document.getElementById("vmx-lib-ingest-error") as HTMLElement;
+    expect(document.getElementById("vmx-lib-prog-n")?.textContent).toContain(
+      "3 embedded · 1 cached · 2 failed",
+    );
+    expect(error.hidden).toBe(false);
+    expect(error.textContent).toContain("index completed with errors");
+    expect(error.textContent).toContain("3 embedded · 1 cached · 2 failed");
+    expect(error.textContent).toContain("Viber can use the indexed tracks now");
+    expect(document.getElementById("vmx-lib-rcount")?.textContent).toBe("2 failed");
+    expect(document.getElementById("vmx-lib-scope-state")?.textContent).toBe(
+      "index partial",
+    );
+    expect((document.getElementById("vmx-lib-runbtn") as HTMLButtonElement).disabled).toBe(
+      false,
     );
   });
 
