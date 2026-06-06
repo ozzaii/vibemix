@@ -601,9 +601,7 @@
  * empty strip, so collapse the whole titlebar in that case. The `.learn-titlebar-*`
  * classes are unique to the learn interior, so scoping to `.surface--mounted` can
  * never touch the Viber stub. */
-.surface--mounted .learn-titlebar-wordmark,
-.surface--mounted .learn-titlebar-clock { display: none; }
-.surface--mounted .learn-titlebar:has(.learn-titlebar-controller[data-empty="true"]) { display: none; }
+.surface--mounted .learn-titlebar { display: none; }
 
 /* A stub surface's interior fills its region (overriding the centered stub). */
 .surface--stub.surface--mounted { align-items: stretch; justify-content: stretch; padding: 0; }
@@ -633,6 +631,45 @@
 .surface[data-surface="learn"].surface--mounted .learn-lesson-host #learn-root {
   height: 100%;
   min-height: 0;
+  box-sizing: border-box;
+  padding-bottom: calc(var(--sp-5) + 24px);
+  grid-template-rows: minmax(0, 1fr) auto auto;
+}
+
+.surface[data-surface="learn"].surface--mounted .learn-lesson-host #learn-stage {
+  grid-row: 1;
+}
+
+.surface[data-surface="learn"].surface--mounted .learn-lesson-host #learn-waveform-host {
+  grid-row: 2;
+}
+
+.surface[data-surface="learn"].surface--mounted .learn-lesson-host .tutor-dock {
+  grid-row: 3;
+}
+
+.surface[data-surface="learn"].surface--mounted .learn-lesson-host #learn-status-bar {
+  display: none;
+}
+
+.surface[data-surface="learn"].surface--mounted .learn-lesson-host #learn-root.lesson-mode {
+  grid-template-rows: 56px minmax(0, 1fr) auto minmax(112px, auto);
+}
+
+.surface[data-surface="learn"].surface--mounted .learn-lesson-host #learn-root.lesson-mode .learn-hud {
+  grid-row: 1;
+}
+
+.surface[data-surface="learn"].surface--mounted .learn-lesson-host #learn-root.lesson-mode #learn-stage {
+  grid-row: 2;
+}
+
+.surface[data-surface="learn"].surface--mounted .learn-lesson-host #learn-root.lesson-mode #learn-waveform-host {
+  grid-row: 3;
+}
+
+.surface[data-surface="learn"].surface--mounted .learn-lesson-host #learn-root.lesson-mode .tutor-dock {
+  grid-row: 4;
 }
 
 .surface[data-surface="learn"].surface--mounted .learn-lesson-host .learn-footer {
@@ -1013,6 +1050,15 @@
 .shell-footer[data-conn="disconnected"] .conn-dot {
   background: var(--led-fault);
   opacity: 1;
+}
+
+#shell-root[data-surface="learn"] .shell-footer[data-conn="disconnected"] {
+  color: var(--text-tertiary);
+}
+
+#shell-root[data-surface="learn"] .shell-footer[data-conn="disconnected"] .conn-dot {
+  background: var(--brand);
+  box-shadow: 0 0 6px var(--brand-22);
 }
 
 /* ── Command palette ─────────────────────────────────────────────────────── */

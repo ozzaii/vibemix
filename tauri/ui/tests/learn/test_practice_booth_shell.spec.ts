@@ -169,6 +169,15 @@ describe("practice booth shell", () => {
       expect(root.querySelector(".learn-booth-command")).toBeTruthy();
       expect(root.textContent).toContain("your move");
       expect(root.textContent).toContain("use the on-screen controls");
+      expect(root.querySelector<HTMLElement>("#learn-booth-input")?.textContent).toBe(
+        "screen deck",
+      );
+      expect(root.querySelector<HTMLElement>("#learn-booth-credit")?.textContent).toBe(
+        "screen rep",
+      );
+      expect(root.querySelector<HTMLElement>("#learn-booth-voice")?.textContent).toBe(
+        "voice pending",
+      );
     } finally {
       ws.close();
     }
@@ -243,6 +252,9 @@ describe("practice booth shell", () => {
       expect(controller.textContent).toBe("on-screen deck");
       expect(voice.textContent).toBe("subtitles only");
       expect(voice.dataset.voiceStatus).toBe("muted");
+      expect(root.querySelector<HTMLElement>("#learn-booth-voice")?.textContent).toBe(
+        "subtitles live",
+      );
       expect(voice.getAttribute("aria-label")).toBe(
         "tutor voice is muted or unavailable; lesson subtitles stay visible",
       );
@@ -260,6 +272,9 @@ describe("practice booth shell", () => {
       expect(controller.textContent).toBe("on-screen deck");
       expect(voice.textContent).toBe("voice ready");
       expect(voice.dataset.voiceStatus).toBe("ok");
+      expect(root.querySelector<HTMLElement>("#learn-booth-voice")?.textContent).toBe(
+        "voice ready",
+      );
       expect(voice.getAttribute("aria-label")).toBe("local tutor voice is ready");
     } finally {
       ws.close();

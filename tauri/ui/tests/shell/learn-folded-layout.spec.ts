@@ -56,6 +56,12 @@ describe("folded Learn shell layout", () => {
       '.surface[data-surface="learn"].surface--mounted .learn-lesson-host #learn-root',
     );
     expect(css).toContain("height: 100%");
+    expect(css).toContain("padding-bottom: calc(var(--sp-5) + 24px)");
+    expect(css).toContain("#learn-root.lesson-mode");
+    expect(css).toContain("grid-template-rows: 56px minmax(0, 1fr) auto minmax(112px, auto)");
+    expect(css).toContain(".surface--mounted .learn-titlebar { display: none; }");
+    expect(css).toContain(".learn-lesson-host #learn-status-bar");
+    expect(css).toContain("display: none");
     expect(css).toContain(".learn-lesson-host .learn-booth-panel");
     expect(css).toContain(".learn-booth-brief");
     expect(css).toContain("position: absolute");

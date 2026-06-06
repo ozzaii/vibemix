@@ -199,6 +199,14 @@ describe("DesktopShell", () => {
     expect(label.textContent).toBe("co-host offline");
     expect(footer.getAttribute("title")).toContain("co-host cannot speak");
 
+    shell.store.setActiveSurface("learn");
+    expect(label.textContent).toBe("learn local");
+    expect(footer.dataset.surface).toBe("learn");
+    expect(footer.getAttribute("title")).toContain("on-screen practice");
+
+    shell.store.setActiveSurface("deck");
+    expect(label.textContent).toBe("co-host offline");
+
     shell.store.setConnection("reconnecting");
     expect(footer.dataset.conn).toBe("reconnecting");
     expect(label.textContent).toBe("co-host reconnecting");

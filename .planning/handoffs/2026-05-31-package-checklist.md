@@ -12411,3 +12411,40 @@ Proof before staging:
 - `uv run python -m compileall -q src/vibemix/learn/progress.py src/vibemix/learn/practice_mission.py src/vibemix/learn/runtime.py tests/learn/test_ipc_handlers_dispatch.py tests/learn/test_runtime_evidence_grounding.py tests/learn/test_harmonic_practice_runtime.py`
 - `git diff --check -- src/vibemix/learn/progress.py src/vibemix/learn/practice_mission.py src/vibemix/learn/runtime.py tauri/ui/src/ipc/messages.schema.json tauri/ui/src/ipc/messages.ts tauri/ui/src/ipc/validator.generated.mjs tauri/ui/src/learn/lesson/curriculum-meta.ts tauri/ui/src/learn/lesson/progress-list.ts tests/learn/test_ipc_handlers_dispatch.py tests/learn/test_runtime_evidence_grounding.py tests/learn/test_harmonic_practice_runtime.py .planning/handoffs/2026-05-31-package-checklist.md`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+
+## Package 135 - Folded Learn Local Practice Readiness
+
+Suggested commit: `fix(learn-ui): make folded practice read alive offline`
+
+Include:
+
+- `tauri/ui/src/learn/learn-window.ts`
+- `tauri/ui/src/learn/styles/learn.css`
+- `tauri/ui/src/shell/StatusFooter.ts`
+- `tauri/ui/src/shell/shell.css`
+- `tauri/ui/tests/learn/test_practice_booth_shell.spec.ts`
+- `tauri/ui/tests/shell/shell.spec.ts`
+- `tauri/ui/tests/shell/learn-folded-layout.spec.ts`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Lesson content rewrites, new backend packets, co-host/Sven prompt rewrites,
+  and library ingest behavior. This package only fixes how the existing Learn
+  practice surface reads inside the folded shell.
+
+Reason:
+
+- In the folded shell, Learn still spent standalone-window rows on hidden chrome
+  and its own status bar while the shell footer overlaid the bottom edge. That
+  made the tutor line clip and the screen read as dead when Sven was offline,
+  even though the on-screen deck and subtitles-only tutor path were still
+  usable. Reclaim the duplicate chrome space, reserve a real tutor row, and
+  surface local input/credit/voice readiness in the booth panel.
+
+Proof before staging:
+
+- `npm --prefix tauri/ui test -- tests/learn/test_practice_booth_shell.spec.ts tests/shell/shell.spec.ts tests/shell/learn-folded-layout.spec.ts`
+- `npm --prefix tauri/ui run build`
+- `git diff --check -- tauri/ui/src/learn/learn-window.ts tauri/ui/src/learn/styles/learn.css tauri/ui/src/shell/StatusFooter.ts tauri/ui/src/shell/shell.css tauri/ui/tests/learn/test_practice_booth_shell.spec.ts tauri/ui/tests/shell/shell.spec.ts tauri/ui/tests/shell/learn-folded-layout.spec.ts .planning/handoffs/2026-05-31-package-checklist.md`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`

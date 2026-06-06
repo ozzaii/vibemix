@@ -8,7 +8,12 @@
 // Activation is read-only here. The live session bridge owns activation and
 // connection; the footer must never simulate a live state.
 
-import type { ActivationState, ConnectionState, ShellStore } from "./shell-store.js";
+import type {
+  ActivationState,
+  ConnectionState,
+  ShellStore,
+  SurfaceId,
+} from "./shell-store.js";
 
 // Terse instrument-readout states. Kept distinct from the deck hero copy
 // ("listening for the mix…") so the footer reads as a status line, not an echo.
@@ -27,8 +32,21 @@ const CONNECTION_LABEL: Record<ConnectionState, string> = {
 function footerLabel(
   activation: ActivationState,
   connection: ConnectionState,
+  surface: SurfaceId,
 ): string {
+  if (surface === "learn" && connection === "disconnected") return "learn local";
   return CONNECTION_LABEL[connection] || ACTIVATION_LABEL[activation];
+}
+
+function footerTitle(connection: ConnectionState, surface: SurfaceId): string | null {
+  if (connection === "connected") return null;
+  if (surface === "learn" && connection === "disconnected") {
+    return "Sven is offline; Learn still accepts on-screen practice and subtitles.";
+  }
+  if (connection === "reconnecting") {
+    return "The co-host is reconnecting to the audio engine.";
+  }
+  return "The co-host cannot speak until the connection comes back.";
 }
 
 export function createStatusFooter(store: ShellStore): HTMLElement {
@@ -52,19 +70,20 @@ export function createStatusFooter(store: ShellStore): HTMLElement {
 
   const render = (): void => {
     const model = store.getState();
-    const nextLabel = footerLabel(model.activation, model.connection);
+    const nextLabel = footerLabel(
+      model.activation,
+      model.connection,
+      model.activeSurface,
+    );
+    const nextTitle = footerTitle(model.connection, model.activeSurface);
     label.textContent = nextLabel;
     footer.dataset.conn = model.connection;
+    footer.dataset.surface = model.activeSurface;
     footer.setAttribute("aria-label", `Session status: ${nextLabel}`);
-    if (model.connection === "connected") {
+    if (nextTitle === null) {
       footer.removeAttribute("title");
     } else {
-      footer.setAttribute(
-        "title",
-        model.connection === "reconnecting"
-          ? "The co-host is reconnecting to the audio engine."
-          : "The co-host cannot speak until the connection comes back.",
-      );
+      footer.setAttribute("title", nextTitle);
     }
   };
   store.subscribe(render);

@@ -240,7 +240,7 @@ interface ProgressStatePayload {
       practice_sources?: { hardware?: number; screen?: number };
       last_practice_source?: "hardware" | "screen" | null;
       practice_feedback?: {
-        kind: "beatmatch" | "cue_placement";
+        kind: "beatmatch" | "cue_placement" | "control";
         label: string;
         message: string;
         detail?: string;
@@ -416,6 +416,20 @@ function mountLearnWindow(root: HTMLElement): {
           do one clean move and I'll confirm it.
         </strong>
       </div>
+      <dl id="learn-booth-brief" class="learn-booth-brief" aria-label="practice readiness">
+        <div>
+          <dt>input</dt>
+          <dd id="learn-booth-input">screen deck</dd>
+        </div>
+        <div>
+          <dt>credit</dt>
+          <dd id="learn-booth-credit">screen rep</dd>
+        </div>
+        <div>
+          <dt>tutor</dt>
+          <dd id="learn-booth-voice">voice pending</dd>
+        </div>
+      </dl>
       <div id="learn-booth-chain" class="learn-booth-chain" data-visible="false" aria-label="practice run"></div>
       <div id="learn-booth-pulse" class="learn-booth-pulse" data-state="ready" aria-live="polite">practice deck ready</div>
       <button id="learn-start-recommended" class="learn-booth-primary" type="button">start practice</button>
@@ -495,6 +509,9 @@ function mountLearnWindow(root: HTMLElement): {
   const boothRewardFill = root.querySelector("#learn-booth-reward-fill") as HTMLElement;
   const boothRewardCaption = root.querySelector("#learn-booth-reward-caption") as HTMLElement;
   const boothCommandText = root.querySelector("#learn-booth-command-text") as HTMLElement;
+  const boothInput = root.querySelector("#learn-booth-input") as HTMLElement;
+  const boothCredit = root.querySelector("#learn-booth-credit") as HTMLElement;
+  const boothVoice = root.querySelector("#learn-booth-voice") as HTMLElement;
   const boothChain = root.querySelector("#learn-booth-chain") as HTMLElement;
   const boothPulse = root.querySelector("#learn-booth-pulse") as HTMLElement;
   const screenAction = root.querySelector("#learn-screen-action") as HTMLButtonElement;
@@ -524,6 +541,7 @@ function mountLearnWindow(root: HTMLElement): {
   let controllerDetected = false; // flipped by controller_detected handler
   let midiSeenOnStatusTick = false;
   let controllerDisplayName: string | null = null;
+  let latestVoiceStatus: "ok" | "muted" | "unknown" = "unknown";
   let currentLessonId: string | null = null;
   let pendingReferralLessonId =
     typeof window !== "undefined"
@@ -799,6 +817,9 @@ function mountLearnWindow(root: HTMLElement): {
     boothCommandText.textContent =
       cleanMissionText(mission?.command) ??
       practiceCommandLine(recommended, readiness, controllerDisplayName);
+    boothInput.textContent = readinessInputLine(readiness, controllerDisplayName);
+    boothCredit.textContent = readinessCreditLine(readiness);
+    boothVoice.textContent = voiceReadinessLine(latestVoiceStatus);
     renderBoothChain(mission, recommended, lessons);
     if (mission) {
       renderBoothReward(mission);
@@ -1121,14 +1142,15 @@ function mountLearnWindow(root: HTMLElement): {
   addWindowListener("ipc.status.tick", (ev: Event) => {
     const detail = (ev as CustomEvent<StatusTickPayload>).detail;
     const nextMidiSeen = statusTickMidiCount(detail) > 0;
-    status.setVoiceStatus(statusTickVoiceState(detail));
+    latestVoiceStatus = statusTickVoiceState(detail);
+    status.setVoiceStatus(latestVoiceStatus);
     if (midiSeenOnStatusTick !== nextMidiSeen) {
       midiSeenOnStatusTick = nextMidiSeen;
       if (!controllerDetected) {
         status.setMirrorStatus(nextMidiSeen ? "midi" : "screen");
       }
-      renderLessonChooser();
     }
+    renderLessonChooser();
   });
 
   // learn.course3_lens: quiet Course 3 live-evidence indicator. This is
@@ -2286,6 +2308,29 @@ function readinessProofLine(
   }
   if (readiness === "midi") return "controller detected";
   return "screen deck available";
+}
+
+function readinessInputLine(
+  readiness: "hardware" | "midi" | "screen",
+  controllerName: string | null,
+): string {
+  if (readiness === "hardware") {
+    return compactControllerName(controllerName) ?? "hardware";
+  }
+  if (readiness === "midi") return "midi seen";
+  return "screen deck";
+}
+
+function readinessCreditLine(readiness: "hardware" | "midi" | "screen"): string {
+  if (readiness === "hardware") return "hardware proof";
+  if (readiness === "midi") return "midi proof";
+  return "screen rep";
+}
+
+function voiceReadinessLine(status: "ok" | "muted" | "unknown"): string {
+  if (status === "ok") return "voice ready";
+  if (status === "muted") return "subtitles live";
+  return "voice pending";
 }
 
 function practiceTargetLine(recommended: ProgressListEntry | undefined): string {
