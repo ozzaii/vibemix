@@ -12675,3 +12675,35 @@ Reason:
   booth package stages only its source, test, style, and checklist paths. The
   packet and handbook directories are broad tokens by design: they are planning
   artifacts, not source files for the Learn booth package.
+
+## Package 142 - Folded Learn Mission Layout
+
+Suggested commit: `fix(learn-ui): fit mission stakes in folded shell`
+
+Include:
+
+- `tauri/ui/src/shell/shell.css`
+- `tauri/ui/tests/shell/learn-folded-layout.spec.ts`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Learn mission backend ranking, shell routing, sidebar/footer activation, Skill
+  Wall rendering, and standalone Learn booth behavior. This package only keeps
+  the folded shell layout aligned with the existing Learn booth mission rows.
+
+Reason:
+
+- The real app folds Learn into the desktop shell, whose CSS overrides the
+  booth grid. After Package 141 added reward/mission/chain rows, the shell
+  override still only named kicker/next/command/brief/pulse, so the new mission
+  stakes could auto-place awkwardly in the user-tested app even though the
+  standalone Learn window was green. Add folded grid areas and width caps for
+  the same mission rows.
+
+Proof before staging:
+
+- `npm --prefix tauri/ui test -- tests/shell/learn-folded-layout.spec.ts tests/learn/test_practice_booth_shell.spec.ts`
+- `npm --prefix tauri/ui run build`
+- `git diff --check -- tauri/ui/src/shell/shell.css tauri/ui/tests/shell/learn-folded-layout.spec.ts .planning/handoffs/2026-05-31-package-checklist.md`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`

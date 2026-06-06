@@ -692,8 +692,11 @@
   grid-template-areas:
     "kicker primary secondary"
     "next primary secondary"
+    "reward primary secondary"
     "command primary secondary"
+    "mission primary secondary"
     "brief primary secondary"
+    "chain primary secondary"
     "pulse primary secondary";
   justify-content: stretch;
   justify-items: start;
@@ -737,7 +740,10 @@
   max-width: none;
 }
 
-.surface[data-surface="learn"].surface--mounted .learn-booth-command {
+.surface[data-surface="learn"].surface--mounted .learn-booth-command,
+.surface[data-surface="learn"].surface--mounted .learn-booth-reward,
+.surface[data-surface="learn"].surface--mounted .learn-booth-mission,
+.surface[data-surface="learn"].surface--mounted .learn-booth-chain {
   width: 100%;
   max-width: 70ch;
 }

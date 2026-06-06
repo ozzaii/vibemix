@@ -74,9 +74,14 @@ describe("folded Learn shell layout", () => {
     expect(css).toContain("--panel-w: 228px");
     expect(css).toContain("grid-template-areas:");
     expect(css).toContain('"kicker primary secondary"');
+    expect(css).toContain('"reward primary secondary"');
+    expect(css).toContain('"mission primary secondary"');
+    expect(css).toContain('"chain primary secondary"');
     expect(css).toContain('"brief primary secondary"');
     expect(css).toContain('"pulse primary secondary"');
     expect(css).toContain("justify-content: stretch");
+    expect(css).toContain(".learn-booth-mission");
+    expect(css).toContain(".learn-booth-chain");
   });
 
   it("keeps Earned as compact context in the folded surface", () => {
