@@ -28,7 +28,7 @@ DEFAULT_CATEGORY = "sven-bench-offline"
 DEFAULT_SUITE_NAME = "sven_offline_bench"
 DEFAULT_MAX_INPUT_CHARS = 5000
 
-RESPAN_REQUEST_LOG_TARGET = "POST /api/request-logs/create"
+RESPAN_REQUEST_LOG_TARGET = "POST /api/request-logs/"
 RESPAN_DATASET_TARGET = "DatasetAPI.create + add_logs_to_dataset"
 RESPAN_EVALUATOR_TARGET = "EvaluatorAPI.create"
 RESPAN_EXPERIMENT_TARGET = "DatasetAPI.run_dataset_evaluation"
@@ -289,8 +289,15 @@ def build_request_log_payload(
     return {
         "schema": REQUEST_LOG_SCHEMA,
         "model": respan_model,
+        "log_type": "chat",
+        "input": [{"role": "user", "content": input_text}],
+        "output": {"role": "assistant", "content": output},
         "prompt_messages": [{"role": "user", "content": input_text}],
         "completion_message": {"role": "assistant", "content": output},
+        "usage": _respan_usage(result.get("usage")),
+        "status": "success" if error is None else "error",
+        "status_code": 200 if error is None else 599,
+        "error_message": str(error) if error is not None else None,
         "category": category,
         "custom_identifier": custom_id,
         "metadata": metadata,
@@ -302,13 +309,17 @@ def build_dataset_row(log: dict[str, Any]) -> dict[str, Any]:
 
     metadata = dict(log.get("metadata") or {})
     metadata["schema"] = DATASET_ROW_SCHEMA
-    prompt_messages = log.get("prompt_messages") or []
-    completion = log.get("completion_message") or {}
+    input_value = log.get("input")
+    output_value = log.get("output")
+    if not input_value:
+        input_value = log.get("prompt_messages") or []
+    if not output_value:
+        output_value = log.get("completion_message") or {}
     return {
         "schema": DATASET_ROW_SCHEMA,
         "id": log.get("custom_identifier"),
-        "input": prompt_messages[0].get("content") if prompt_messages else "",
-        "output": completion.get("content") or "",
+        "input": _message_content(input_value),
+        "output": _message_content(output_value),
         "metadata": metadata,
     }
 
@@ -596,6 +607,47 @@ def _dsp_snapshot_summary(snapshot: Any) -> dict[str, Any]:
         keys = sorted(str(key) for key in atoms)
         sources[str(source)] = {"atom_count": len(keys), "atoms": keys[:24]}
     return {"source_count": len(sources), "sources": sources}
+
+
+def _respan_usage(usage: Any) -> dict[str, Any]:
+    if not isinstance(usage, dict):
+        return {}
+    prompt_tokens = _nonnegative_int(usage.get("prompt_token_count"))
+    completion_tokens = _nonnegative_int(usage.get("candidates_token_count"))
+    total_tokens = _nonnegative_int(usage.get("total_token_count"))
+    if total_tokens == 0 and (prompt_tokens or completion_tokens):
+        total_tokens = prompt_tokens + completion_tokens
+    out: dict[str, Any] = {}
+    if prompt_tokens:
+        out["prompt_tokens"] = prompt_tokens
+    if completion_tokens:
+        out["completion_tokens"] = completion_tokens
+    if total_tokens:
+        out["total_tokens"] = total_tokens
+    cached = _nonnegative_int(usage.get("cached_content_token_count"))
+    if cached:
+        out["prompt_tokens_details"] = {"cached_tokens": cached}
+    return out
+
+
+def _nonnegative_int(value: Any) -> int:
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        return 0
+    return max(0, parsed)
+
+
+def _message_content(value: Any) -> str:
+    if isinstance(value, str):
+        return value
+    if isinstance(value, dict):
+        return str(value.get("content") or "")
+    if isinstance(value, list) and value:
+        first = value[0]
+        if isinstance(first, dict):
+            return str(first.get("content") or "")
+    return ""
 
 
 def _custom_id(cell: dict[str, Any], index: int) -> str:
