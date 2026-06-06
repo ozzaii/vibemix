@@ -1083,6 +1083,11 @@ html[data-runtime="tauri"] .shell-main {
  * trigger; the sidebar (with Cmd+1..5 + palette) reaches every surface. Mirrors the
  * .vmx-titlebar suppression above — additive CSS, no edit to the session module. */
 .surface--deck .vmx-modebar { display: none; }
+/* The folded session's own audio/AI/voice/screen/MIDI status row is shell
+ * chrome's job, not the deck's. The floating footer badge and deck idle line
+ * already own status; left visible, the row un-hides on status alerts and lands
+ * at the deck foot under the shell footer. Suppress it only in the folded deck. */
+.surface--deck .vmx-statusrow { display: none; }
 
 /* ── Grounding panel — contextual right drawer. ──────────────────────────── */
 .shell-panel {
