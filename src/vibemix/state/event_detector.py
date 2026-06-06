@@ -204,6 +204,28 @@ class EventDetector:
             return False
         return True
 
+    def _track_change_presence_ok(self, state: MusicState, now: float) -> bool:
+        """Allow only track-change edges when deck+track proof is already citable.
+
+        BPM autocorr can fail on sparse intros or replay proof clips even while the
+        runtime has stronger evidence than BPM: sustained audience audio, one
+        physical deck, and a library-backed title above the cite floor. This does
+        not unlock phase/heartbeat/texture chatter; it only lets a citable title
+        edge reach the TRACK_CHANGE branch instead of being flattened into
+        silence by a missing BPM lock.
+        """
+        if not state.audible:
+            return False
+        if self._audible_since is None or (now - self._audible_since) < MUSIC_PRESENCE_MIN_SECONDS:
+            return False
+        if not state.audible_track:
+            return False
+        if state.audible_track_confidence < TRACK_CHANGE_MIN_CONFIDENCE:
+            return False
+        if str(state.audible_deck or "").upper() not in {"A", "B"}:
+            return False
+        return state.deck_confidence >= DECK_CITE_MIN_CONF
+
     def _melodic_overlap_gate(self, state: MusicState) -> bool:
         """True iff BOTH decks are plausibly contributing simultaneous MELODIC
         content — the precondition for ANY clash note (HARMONIC-02).
@@ -282,7 +304,11 @@ class EventDetector:
         # title is hanging around from another app, or while BPM autocorr
         # is locking onto noise. The AI stays quiet until Kaan actually
         # mixes something.
-        if not self._music_truly_playing(state, now):
+        music_truly_playing = self._music_truly_playing(state, now)
+        track_change_presence_ok = (
+            False if music_truly_playing else self._track_change_presence_ok(state, now)
+        )
+        if not music_truly_playing and not track_change_presence_ok:
             self._reset_change_refs(state)
             return None
 
@@ -291,7 +317,7 @@ class EventDetector:
         # not speak; runtime coach owns any audible reaction and remains a
         # separate grounding-review gate. DORMANT unless VIBEMIX_DROP_CALL is
         # opted in.
-        if self._drop_call_enabled:
+        if music_truly_playing and self._drop_call_enabled:
             predicted_drop = state.predicted_drop_in_sec
             arm = should_arm_drop_call(predicted_drop, self._last_predicted_drop)
             self._last_predicted_drop = predicted_drop
@@ -331,6 +357,9 @@ class EventDetector:
                 self._fire("TRACK_CHANGE", now, state)
                 return ev
         self.last_audible_track = state.audible_track
+
+        if not music_truly_playing:
+            return None
 
         # 2) Phase transition — significant change with cooldown
         if state.phase != self.last_phase and state.phase not in ("silent",):

@@ -35,6 +35,24 @@ def replay_session_from_env(environ: dict[str, str] | None = None) -> Path | Non
     return Path(raw).expanduser() if raw else None
 
 
+_REPLAY_CLOCK_LOCK = threading.Lock()
+_REPLAY_AUDIO_STARTED_AT: dict[Path, float] = {}
+
+
+def _replay_session_key(session_dir: Path) -> Path:
+    return Path(session_dir).expanduser()
+
+
+def _mark_replay_audio_started(session_dir: Path) -> None:
+    with _REPLAY_CLOCK_LOCK:
+        _REPLAY_AUDIO_STARTED_AT[_replay_session_key(session_dir)] = time.monotonic()
+
+
+def _replay_audio_started_at(session_dir: Path) -> float | None:
+    with _REPLAY_CLOCK_LOCK:
+        return _REPLAY_AUDIO_STARTED_AT.get(_replay_session_key(session_dir))
+
+
 def maybe_wrap_replay_audio_backend(backend: Any) -> Any:
     """Wrap ``backend`` only when ``VIBEMIX_REPLAY_SESSION`` is set."""
 
@@ -109,6 +127,7 @@ class ReplayAudioBackend:
     ) -> AudioStream:
         stream = ReplayCaptureStream(
             self.input_wav,
+            session_dir=self.session_dir,
             sample_rate=sample_rate,
             channels=channels,
             block_size=block_size,
@@ -125,12 +144,14 @@ class ReplayCaptureStream:
         self,
         wav_path: Path,
         *,
+        session_dir: Path,
         sample_rate: int,
         channels: int,
         block_size: int,
         callback: AudioCallback,
     ) -> None:
         self._wav_path = Path(wav_path)
+        self._session_dir = Path(session_dir).expanduser()
         self._sample_rate = max(1, int(sample_rate))
         self._channels = max(1, int(channels))
         self._block_size = max(1, int(block_size))
@@ -147,6 +168,7 @@ class ReplayCaptureStream:
         if self._started.is_set():
             return
         self._started.set()
+        _mark_replay_audio_started(self._session_dir)
         self._thread = threading.Thread(
             target=self._run,
             name="vibemix-replay-capture",
@@ -304,7 +326,8 @@ class ReplayTrackInfo:
     def poll_once(self) -> None:
         if not self._rows:
             return
-        elapsed = time.monotonic() - self._started
+        started_at = _replay_audio_started_at(self.session_dir) or self._started
+        elapsed = time.monotonic() - started_at
         row = self._rows[0]
         for candidate in self._rows:
             if float(candidate.get("ts") or 0.0) <= elapsed:
