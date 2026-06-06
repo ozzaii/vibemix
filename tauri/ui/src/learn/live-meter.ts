@@ -97,6 +97,27 @@ function saveHudVisible(payload: LiveGradePayload): boolean {
   );
 }
 
+function directionState(phase: number): "ahead" | "behind" | "center" {
+  if (Math.abs(phase) < 0.005) return "center";
+  return phase > 0 ? "behind" : "ahead";
+}
+
+function directionText(phase: number): string {
+  const direction = directionState(phase);
+  if (direction === "behind") return "drag";
+  if (direction === "ahead") return "rush";
+  return "hold";
+}
+
+function tierWord(payload: LiveGradePayload, phase: number): string {
+  if (payload.verdict === "locked") return "locked";
+  if (payload.verdict === "tempo_off") return "tempo";
+  if (payload.verdict === "trainwreck") return "off";
+  if (payload.verdict === "abstain") return "listen";
+  if (Math.abs(phase) <= 0.04) return "tight";
+  return "drift";
+}
+
 function nowMs(): number {
   return globalThis.performance?.now?.() ?? Date.now();
 }
@@ -240,6 +261,21 @@ export function LiveGradeMeter(host: HTMLElement): LiveGradeMeterHandle {
   canvas.width = CANVAS_WIDTH;
   canvas.height = CANVAS_HEIGHT;
 
+  const canvasWrap = document.createElement("div");
+  canvasWrap.className = "learn-live-meter__canvas-wrap";
+  const face = document.createElement("div");
+  face.className = "learn-live-meter__face";
+  const best = document.createElement("span");
+  best.className = "learn-live-meter__best";
+  const tier = document.createElement("strong");
+  tier.className = "learn-live-meter__tier";
+  tier.textContent = "listen";
+  const direction = document.createElement("span");
+  direction.className = "learn-live-meter__direction";
+  direction.textContent = "hold";
+  face.append(best, tier, direction);
+  canvasWrap.append(canvas, face);
+
   const phaseText = document.createElement("div");
   phaseText.className = "learn-live-meter__phase";
   phaseText.textContent = "waiting for decks";
@@ -259,13 +295,15 @@ export function LiveGradeMeter(host: HTMLElement): LiveGradeMeterHandle {
   saveStreak.className = "learn-live-meter__save-streak";
   save.append(saveLevel, saveTimer, saveStreak);
 
-  root.append(header, canvas, phaseText, save, receipt);
+  root.append(header, canvasWrap, phaseText, save, receipt);
   host.replaceChildren(root);
 
   let pending: LiveGradePayload | null = null;
   let frame: number | null = null;
   let previousVerdict: LiveGradeVerdict | null = null;
   let previousSaveLanded = false;
+  let bestAbsPhase: number | null = null;
+  let bestPhase = 0;
   let lockCount = 0;
   let savePulseRevision = 0;
   let suppressThunkUntilMs = 0;
@@ -330,6 +368,8 @@ export function LiveGradeMeter(host: HTMLElement): LiveGradeMeterHandle {
     root.dataset.lockEdge = enteredLock ? "true" : "false";
     root.dataset.lockCount = String(lockCount);
     root.dataset.locked = payload.verdict === "locked" ? "true" : "false";
+    root.dataset.direction = directionState(phase);
+    root.dataset.tier = tierWord(payload, phase);
     root.dataset.saveActive = payload.save_attempt_active ? "true" : "false";
     root.dataset.saveExpired = payload.save_floor_expired ? "true" : "false";
     root.dataset.saveLanded = payload.save_landed ? "true" : "false";
@@ -364,8 +404,17 @@ export function LiveGradeMeter(host: HTMLElement): LiveGradeMeterHandle {
     if (enteredSaveLanded) {
       triggerSavePulse();
     }
+    const currentAbsPhase = Math.abs(phase);
+    if (payload.verdict !== "abstain" && (bestAbsPhase === null || currentAbsPhase < bestAbsPhase)) {
+      bestAbsPhase = currentAbsPhase;
+      bestPhase = phase;
+      root.style.setProperty("--best-pct", `${50 + bestPhase * 100}%`);
+      root.dataset.bestPhase = bestPhase.toFixed(4);
+    }
     const receiptLine = receiptText(payload, phase);
     verdict.textContent = payload.verdict.replace("_", " ");
+    tier.textContent = tierWord(payload, phase);
+    direction.textContent = directionText(phase);
     phaseText.textContent = formatPhase(phase);
     receipt.textContent = receiptLine;
     root.setAttribute(
@@ -393,6 +442,8 @@ export function LiveGradeMeter(host: HTMLElement): LiveGradeMeterHandle {
     pending = null;
     previousVerdict = null;
     previousSaveLanded = false;
+    bestAbsPhase = null;
+    bestPhase = 0;
     lockCount = 0;
     root.dataset.state = "idle";
     root.dataset.needlePct = "50.0";
@@ -403,6 +454,9 @@ export function LiveGradeMeter(host: HTMLElement): LiveGradeMeterHandle {
     root.removeAttribute("data-phase");
     root.removeAttribute("data-score");
     root.removeAttribute("data-citation");
+    root.removeAttribute("data-direction");
+    root.removeAttribute("data-tier");
+    root.removeAttribute("data-best-phase");
     root.removeAttribute("data-save-active");
     root.removeAttribute("data-save-expired");
     root.removeAttribute("data-save-landed");
@@ -415,6 +469,9 @@ export function LiveGradeMeter(host: HTMLElement): LiveGradeMeterHandle {
     saveLevel.textContent = "";
     saveTimer.textContent = "";
     saveStreak.textContent = "";
+    root.style.removeProperty("--best-pct");
+    tier.textContent = "listen";
+    direction.textContent = "hold";
     verdict.textContent = "idle";
     phaseText.textContent = "waiting for decks";
     receipt.textContent = "no proof yet";

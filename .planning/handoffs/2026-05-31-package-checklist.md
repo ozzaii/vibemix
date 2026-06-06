@@ -11656,3 +11656,34 @@ Proof before staging:
 - `npm --prefix tauri/ui run build`
 - `git diff --check -- tauri/ui/src/learn/waveform-display.ts tauri/ui/src/learn/learn-window.ts tauri/ui/src/learn/styles/learn.css tauri/ui/tests/learn/test_waveform_hidden_until_ready.spec.ts tauri/ui/tests/learn/test_practice_booth_shell.spec.ts .planning/handoffs/2026-05-31-package-checklist.md`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+
+## Package 116 - Learn Directional Meter Face
+
+Suggested commit: `feat(learn-ui): add directional meter face`
+
+Include:
+
+- `tauri/ui/src/learn/live-meter.ts`
+- `tauri/ui/src/learn/styles/learn.css`
+- `tauri/ui/tests/learn/live-meter.spec.ts`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- New backend grading, waveform motion, and broader Learn layout changes. This
+  package only turns the existing live-grade phase into an actionable meter
+  face with direction, tier, and a session best marker.
+
+Reason:
+
+- The meter should be readable under hand pressure. Show `rush`/`drag`/`hold`,
+  a compact tier word (`tight`, `drift`, `off`, `locked`), and a best-so-far
+  phase marker so the DJ can chase a visible improvement without parsing the
+  receipt line.
+
+Proof before staging:
+
+- `npm --prefix tauri/ui test -- tests/learn/live-meter.spec.ts tests/learn/test_practice_booth_shell.spec.ts tests/learn/test_waveform_hidden_until_ready.spec.ts`
+- `npm --prefix tauri/ui run build`
+- `git diff --check -- tauri/ui/src/learn/live-meter.ts tauri/ui/src/learn/styles/learn.css tauri/ui/tests/learn/live-meter.spec.ts .planning/handoffs/2026-05-31-package-checklist.md`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
