@@ -11162,3 +11162,38 @@ Proof before staging:
 - `npm --prefix tauri/ui test -- tests/learn/test_practice_booth_shell.spec.ts tests/learn/test_skill_wall.spec.ts tests/learn/skill-tree-a11y.spec.ts tests/learn/skill-tree-quiet-fill.spec.ts`
 - `npm --prefix tauri/ui run build`
 - `git diff --check -- tauri/ui/src/learn/learn-window.ts tauri/ui/src/learn/styles/learn.css tauri/ui/tests/learn/test_practice_booth_shell.spec.ts .planning/handoffs/2026-05-31-package-checklist.md`
+
+## Package 102 - Learn Cited Receipt Feedback Parity
+
+Suggested commit: `feat(learn): speak cited practice receipts`
+
+Include:
+
+- `src/vibemix/learn/runtime.py`
+- `tests/learn/test_runtime_evidence_grounding.py`
+- `tests/learn/test_harmonic_practice_runtime.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- `ipc.learn.live_grade` schema expansion, UI lock-meter changes, owned-track
+  audio swaps, and any generated tutor copy. The current live-grade contract is
+  beatmatch-shaped, so this package uses the existing cited tutor-speak channel
+  instead of pretending EQ or harmonic receipts have phase error.
+
+Reason:
+
+- Beatmatch and cue practice already give immediate feedback, but matched
+  control and harmonic practice could write progress receipts without saying
+  anything unless the action flipped Mastered. Speak a short authored receipt
+  for ordinary cited control/harmonic grades, cite the evidence atom (and
+  library tracks for harmonic pairs), and suppress the receipt when the same
+  action already earns the one-time Mastered line.
+
+Proof before staging:
+
+- `uv run pytest -q tests/learn/test_runtime_evidence_grounding.py::test_matched_eq_lesson_action_writes_control_receipt_and_progress tests/learn/test_runtime_evidence_grounding.py::test_matched_control_mastered_flip_speaks_factual_proof_once tests/learn/test_harmonic_practice_runtime.py::test_l211_final_continue_writes_cited_harmonic_practice_receipt`
+- `uv run pytest -q tests/learn/test_runtime_evidence_grounding.py tests/learn/test_harmonic_practice_runtime.py tests/learn/test_scripts_are_fixtures.py`
+- `uv run ruff check src/vibemix/learn/runtime.py tests/learn/test_runtime_evidence_grounding.py tests/learn/test_harmonic_practice_runtime.py`
+- `uv run python -m compileall -q src/vibemix/learn/runtime.py tests/learn/test_runtime_evidence_grounding.py tests/learn/test_harmonic_practice_runtime.py`
+- `git diff --check -- src/vibemix/learn/runtime.py tests/learn/test_runtime_evidence_grounding.py tests/learn/test_harmonic_practice_runtime.py .planning/handoffs/2026-05-31-package-checklist.md`

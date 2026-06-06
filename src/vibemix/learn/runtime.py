@@ -1511,6 +1511,7 @@ class LessonRuntime(StateMachine):
                     file=sys.stderr,
                 )
             self._emit_progress_snapshot()
+        self._emit_control_practice_feedback(result, before_mastered=before_mastered)
         self._log_session_event(
             "learn_control_practice_graded",
             lesson_id=self._learn.current_lesson_id or "",
@@ -1587,6 +1588,7 @@ class LessonRuntime(StateMachine):
                     file=sys.stderr,
                 )
             self._emit_progress_snapshot()
+        self._emit_harmonic_practice_feedback(result, before_mastered=before_mastered)
         pair = result.pair
         self._log_session_event(
             "learn_harmonic_practice_graded",
@@ -2621,6 +2623,118 @@ class LessonRuntime(StateMachine):
                     f"[learn.runtime] mastered unlock emit failed: {exc!r}",
                     file=sys.stderr,
                 )
+
+    def _practice_result_flipped_mastered(
+        self,
+        skill_ids: tuple[str, ...] | list[str],
+        before_mastered: dict[str, bool],
+    ) -> bool:
+        """Return True when this practice receipt already earned a Mastered line."""
+        skills = getattr(self._progress, "skills", {}) or {}
+        if not isinstance(skills, dict):
+            return False
+        for skill_id in skill_ids:
+            row = skills.get(skill_id)
+            if not isinstance(row, dict):
+                continue
+            if not before_mastered.get(skill_id, False) and bool(row.get("mastered", False)):
+                return True
+        return False
+
+    def _emit_control_practice_feedback(
+        self,
+        result: ControlPracticeResult,
+        *,
+        before_mastered: dict[str, bool],
+    ) -> None:
+        """Speak an immediate, cited receipt for grounded control practice."""
+        if result.event is None or not result.skill_id:
+            return
+        if self._practice_result_flipped_mastered(result.credited, before_mastered):
+            return
+        citation = f"[ev:{CONTROL_PRACTICE_GRADED_EVENT}@{result.t_session:.3f}]"
+        text = self._control_practice_feedback_text(result)
+        if text is None:
+            return
+        try:
+            speak = LearnTutorSpeak.make(
+                text=text,
+                tts_marker=f"{self._learn.current_lesson_id or 'learn'}.control_grade",
+                citations=(citation,),
+                data_state="hint",
+            ).to_dict()
+            self._emit_tutor_speak(speak)
+        except Exception as exc:  # pragma: no cover - defensive
+            import sys
+
+            print(
+                f"[learn.runtime] control practice feedback emit failed: {exc!r}",
+                file=sys.stderr,
+            )
+
+    def _control_practice_feedback_text(self, result: ControlPracticeResult) -> str | None:
+        """Return concise authored feedback for a cited control-practice receipt."""
+        control = (result.control or "control").strip()
+        deck = (result.deck or "").strip()
+        deck_phrase = f" on deck {deck}" if deck else ""
+        if result.skill_id == "eq_mixing":
+            band_by_control = {
+                "eq_low": "low EQ",
+                "eq_mid": "mid EQ",
+                "eq_hi": "high EQ",
+                "filter": "filter",
+            }
+            band = band_by_control.get(control, "EQ")
+            if control == "filter":
+                return f"{band}{deck_phrase} landed - clean space without grabbing the mix."
+            return f"{band}{deck_phrase} landed - that is the space-making move."
+        if result.skill_id == "deck_control":
+            if control in {"cue", "headphone_cue"}:
+                return f"cue check{deck_phrase} landed - listen first, commit second."
+            if control in {"jog", "jog_touch", "jog_touched"}:
+                return f"jog touch{deck_phrase} landed - small correction, real control."
+            if control in {"loop_in", "loop_out"}:
+                return f"loop point{deck_phrase} landed - you are catching the phrase."
+            if control == "xfader":
+                return "crossfader move landed - place the blend, do not chase it."
+            if control == "play":
+                return f"play control{deck_phrase} landed - transport is under your hand."
+            return f"{control.replace('_', ' ')}{deck_phrase} landed - keep that touch."
+        return None
+
+    def _emit_harmonic_practice_feedback(
+        self,
+        result: HarmonicPracticeResult,
+        *,
+        before_mastered: dict[str, bool],
+    ) -> None:
+        """Speak an immediate, cited receipt for grounded compatible-key practice."""
+        if result.event is None or result.pair is None:
+            return
+        if self._practice_result_flipped_mastered(result.credited, before_mastered):
+            return
+        pair = result.pair
+        receipt = f"[ev:{HARMONIC_PRACTICE_GRADED_EVENT}@{result.t_session:.3f}]"
+        citations = (receipt, *harmonic_practice_citations(pair, self._evidence_registry))
+        text = (
+            f"compatible pair banked: {pair.source.camelot} into {pair.target.camelot}. "
+            f"{pair.why}."
+        )
+        try:
+            speak = LearnTutorSpeak.make(
+                text=text,
+                tts_marker=f"{self._learn.current_lesson_id or 'learn'}.harmonic_grade",
+                citations=citations[:4],
+                data_state="hint",
+            ).to_dict()
+            self._emit_tutor_speak(speak)
+        except Exception as exc:  # pragma: no cover - defensive
+            import sys
+
+            print(
+                f"[learn.runtime] harmonic practice feedback emit failed: {exc!r}",
+                file=sys.stderr,
+            )
 
     def _emit_highlight(self, expected: dict[str, Any]) -> None:
         """Emit the current expected-action highlight."""

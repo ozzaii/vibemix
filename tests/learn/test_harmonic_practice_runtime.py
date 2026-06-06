@@ -101,6 +101,7 @@ def test_l211_final_continue_writes_cited_harmonic_practice_receipt(monkeypatch)
     progress = LearnProgress()
     _make_competent(progress, "harmonic_mixing")
     registry = EvidenceRegistry()
+    registry.register_library(SimpleNamespace(tracks={"t1": None, "t2": None}))
     events: list[tuple[str, dict]] = []
     runtime, ipc = _runtime(
         pair=pair,
@@ -149,6 +150,23 @@ def test_l211_final_continue_writes_cited_harmonic_practice_receipt(monkeypatch)
     assert event["source_track_id"] == "t1"
     assert event["target_track_id"] == "t2"
     assert event["credited"] == ["harmonic_mixing"]
+    harmonic_grade_payloads = [
+        payload
+        for payload in _tutor_payloads(ipc)
+        if payload["tts_marker"] == "L2.11.harmonic_grade"
+    ]
+    assert harmonic_grade_payloads == [
+        {
+            "text": f"compatible pair banked: 8A into 9A. {pair.why}.",
+            "tts_marker": "L2.11.harmonic_grade",
+            "citations": [
+                "[ev:HARMONIC_PRACTICE_GRADED@91.250]",
+                "[track:t1]",
+                "[track:t2]",
+            ],
+            "data_state": "hint",
+        }
+    ]
 
 
 def _pair() -> HarmonicPracticePair:

@@ -410,6 +410,19 @@ def test_matched_eq_lesson_action_writes_control_receipt_and_progress(monkeypatc
     assert event["deck"] == "A"
     assert event["skill_id"] == "eq_mixing"
     assert event["credited"] == ["eq_mixing"]
+    control_grade_payloads = [
+        payload
+        for payload in _tutor_speak_payloads(ipc)
+        if payload["tts_marker"] == "L2.04.control_grade"
+    ]
+    assert control_grade_payloads == [
+        {
+            "text": "low EQ on deck A landed - that is the space-making move.",
+            "tts_marker": "L2.04.control_grade",
+            "citations": ["[ev:LEARN_CONTROL_GRADED@58.250]"],
+            "data_state": "hint",
+        }
+    ]
 
 
 def test_matched_control_mastered_flip_speaks_factual_proof_once(monkeypatch) -> None:
@@ -476,6 +489,11 @@ def test_matched_control_mastered_flip_speaks_factual_proof_once(monkeypatch) ->
         " ".join(mastered_payloads[0]["citations"]),
         registry.snapshot(),
     ).valid is True
+    assert [
+        payload
+        for payload in _tutor_speak_payloads(ipc)
+        if payload["tts_marker"] == "L2.04.control_grade"
+    ] == []
 
     second = runtime._record_learn_control_practice_action(
         midi,
@@ -490,6 +508,18 @@ def test_matched_control_mastered_flip_speaks_factual_proof_once(monkeypatch) ->
         for payload in _tutor_speak_payloads(ipc)
         if payload["tts_marker"] == "L2.04.mastered.eq_mixing"
     ] == mastered_payloads
+    assert [
+        payload
+        for payload in _tutor_speak_payloads(ipc)
+        if payload["tts_marker"] == "L2.04.control_grade"
+    ] == [
+        {
+            "text": "low EQ on deck A landed - that is the space-making move.",
+            "tts_marker": "L2.04.control_grade",
+            "citations": ["[ev:LEARN_CONTROL_GRADED@59.250]"],
+            "data_state": "hint",
+        }
+    ]
 
 
 def test_observer_ack_writes_control_receipt_before_lesson_cycle_ack(monkeypatch) -> None:
