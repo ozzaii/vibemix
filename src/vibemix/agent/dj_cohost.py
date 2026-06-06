@@ -1657,6 +1657,7 @@ class DJCoHostAgent(Agent):
             allow_interruptions=False,
         )
         self._genai_client = genai_client
+        self._tts_inst = tts_inst
         # 2026-05-21 — OpenRouter brain path (see kwarg docstring). Store the
         # resolved persona cell too: the OR path passes it as the system
         # message (the direct path carries it in _gen_cfg.system_instruction
@@ -2185,6 +2186,36 @@ class DJCoHostAgent(Agent):
         surfaces stay dark. Idempotent — safe to call at most once per agent.
         """
         self._ipc_bus = ipc_bus
+
+    def _tts_has_cached_text(self, text: str) -> bool:
+        """Return True when the live TTS chain can speak ``text`` without generation."""
+        wanted = str(text or "").strip()
+        if not wanted:
+            return False
+        seen: set[int] = set()
+        stack: list[Any] = [self._tts_inst]
+        while stack:
+            item = stack.pop()
+            if item is None:
+                continue
+            marker = id(item)
+            if marker in seen:
+                continue
+            seen.add(marker)
+            has_cached_text = getattr(item, "has_cached_text", None)
+            if callable(has_cached_text):
+                try:
+                    if bool(has_cached_text(wanted)):
+                        return True
+                except Exception:
+                    pass
+            for child in getattr(item, "_tts_instances", ()) or ():
+                stack.append(child)
+            for attr in ("_tts", "tts"):
+                child = getattr(item, attr, None)
+                if child is not None:
+                    stack.append(child)
+        return False
 
     def set_next_event(self, ev: Event) -> None:
         self._pending_event = ev
@@ -3265,6 +3296,7 @@ class DJCoHostAgent(Agent):
             language_matches: tuple[str, ...] = ()
             tts_yielded_any = False
             tts_yielded_ends_space = False
+            direct_voice_skip_reason: str | None = None
 
             def _prepare_tts_segment(segment: str) -> str:
                 nonlocal tts_yielded_any, tts_yielded_ends_space
@@ -3789,6 +3821,20 @@ class DJCoHostAgent(Agent):
             spoken_text, emote_intents = strip_emote_tags(full_text)
             audience_text = model_text_for_tts(full_text)
             audience_stripped = audience_text.strip()
+            if direct_grounded_response is not None and audience_stripped:
+                if not self._tts_has_cached_text(audience_text):
+                    direct_voice_skip_reason = "chatterbox_cache_miss"
+                    try:
+                        self._recorder.log_event(
+                            "voice_playback_skipped",
+                            event=ev_tag,
+                            response_id=response_id,
+                            reason=direct_voice_skip_reason,
+                            cache_state="direct_grounded_receipt",
+                            chars=len(audience_text),
+                        )
+                    except Exception:
+                        pass
             if has_emote_tag(full_text):
                 # Post-stream re-yield paths consume buffered_chunks only when
                 # nothing has reached TTS yet. Collapse to the spoken response
@@ -3925,7 +3971,12 @@ class DJCoHostAgent(Agent):
                         # already emitted the head + trailing chunks
                         # in-flight; the legacy re-yield from buffered_chunks
                         # would duplicate audio. Skip it.
-                        if not head_yielded:
+                        if direct_voice_skip_reason is not None:
+                            print(
+                                f"[ai_voice:skipped] reason={direct_voice_skip_reason}",
+                                flush=True,
+                            )
+                        elif not head_yielded:
                             if citation_lint_defer_stream:
                                 tts_txt = _prepare_tts_segment(audience_text)
                                 if tts_txt:
@@ -4224,6 +4275,7 @@ class DJCoHostAgent(Agent):
                 # on suppression/short-response.
                 "head_yielded": head_yielded,
                 "pre_llm_fast_path": direct_grounded_response is not None,
+                "direct_voice_skip_reason": direct_voice_skip_reason,
                 "avoided_audio_tokens_est": audio_tokens_est
                 if direct_grounded_response is not None
                 else 0,
@@ -4278,6 +4330,7 @@ class DJCoHostAgent(Agent):
                     "deck_audio_parts": len(deck_audio_parts),
                     "live_claim_defer_stream": live_claim_defer_stream,
                     "pre_llm_fast_path": direct_grounded_response is not None,
+                    "direct_voice_skip_reason": direct_voice_skip_reason,
                     "avoided_audio_tokens_est": audio_tokens_est
                     if direct_grounded_response is not None
                     else 0,

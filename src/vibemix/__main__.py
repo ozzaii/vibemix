@@ -1541,6 +1541,16 @@ async def main() -> None:
 
     def _live_next_voice_prefetch_sink(suggestion: dict) -> None:
         """Warm the exact short spoken next-suggestion line before TRACK_CHANGE."""
+        prefetch_flag = os.environ.get("VIBEMIX_LIVE_NEXT_VOICE_PREFETCH", "off").strip().lower()
+        if prefetch_flag not in ("1", "true", "on", "yes"):
+            try:
+                recorder.log_event(
+                    "voice_prefetch_skipped",
+                    reason="live_chatterbox_generation_disabled",
+                )
+            except Exception:
+                pass
+            return
         tts = live_voice_tts
         prefetch_text = getattr(tts, "prefetch_text", None)
         if not callable(prefetch_text):

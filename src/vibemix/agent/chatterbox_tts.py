@@ -468,6 +468,11 @@ class ChatterboxLocalTTS(agents_tts.TTS):
         self._ensure_worker().put(job)
         return True
 
+    def has_cached_text(self, text: str) -> bool:
+        """True only when ``text`` can be spoken without a fresh synth job."""
+        cache_key = self._speech_cache_key(text)
+        return bool(cache_key and self._cached_pcm(cache_key) is not None)
+
     def synthesize_pcm(self, text: str, on_pcm: Callable[[bytes], None]) -> None:
         """Synthesize mono PCM bytes for non-LiveKit sinks."""
         with self._synth_lock:
