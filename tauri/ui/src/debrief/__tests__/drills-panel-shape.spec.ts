@@ -104,6 +104,48 @@ describe("drills-panel", () => {
     expect(onClick).toHaveBeenCalledWith({ referral });
   });
 
+  it("moment feedback emits a debrief correction with citation context", () => {
+    const div = document.createElement("div");
+    document.body.append(div);
+    const onClick = vi.fn();
+    div.addEventListener("moment-feedback-click", (e: Event) => {
+      onClick((e as CustomEvent).detail);
+    });
+    mountDrillsPanel(div, [drill, drill, drill]);
+
+    const button = div.querySelector<HTMLButtonElement>(
+      '.vmx-drill-feedback__btn[data-verdict="disagree"]',
+    );
+    button?.click();
+
+    expect(button?.getAttribute("aria-pressed")).toBe("true");
+    expect(onClick).toHaveBeenCalledWith({
+      momentId: "drill-0",
+      citationId: "[ev:M@1]",
+      verdict: "disagree",
+      surface: "transition",
+    });
+  });
+
+  it("track citations mark feedback as cue surface", () => {
+    const div = document.createElement("div");
+    document.body.append(div);
+    const onClick = vi.fn();
+    div.addEventListener("moment-feedback-click", (e: Event) => {
+      onClick((e as CustomEvent).detail);
+    });
+    mountDrillsPanel(div, [{ ...drill, citation: "[track:t1]" }, drill, drill]);
+
+    div.querySelector<HTMLButtonElement>(".vmx-drill-feedback__btn")?.click();
+
+    expect(onClick).toHaveBeenCalledWith({
+      momentId: "drill-0",
+      citationId: "[track:t1]",
+      verdict: "agree",
+      surface: "cue",
+    });
+  });
+
   it("drill text is rendered via textContent (no XSS surface)", () => {
     const div = document.createElement("div");
     document.body.append(div);

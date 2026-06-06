@@ -11856,3 +11856,56 @@ Proof before staging:
 - `npm --prefix tauri/ui run build`
 - `git diff --check -- src/vibemix/debrief/persistence.py src/vibemix/ui_bus/schemas/debrief.py src/vibemix/ui_bus/messages.py src/vibemix/debrief/main.py src/vibemix/debrief/ws_server.py tests/debrief/test_friend_line.py tests/ui_bus/test_debrief_new_wrappers_roundtrip.py tests/debrief/test_ws_server_progressive_emit.py tauri/ui/src/ipc/messages.schema.json tauri/ui/src/ipc/messages.ts tauri/ui/src/ipc/validator.generated.mjs tauri/ui/src/debrief/components/morning-mirror.ts tauri/ui/src/debrief/__tests__/morning-mirror.spec.ts .planning/handoffs/2026-05-31-package-checklist.md`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+
+## Package 121 - Debrief Moment Feedback Loop
+
+Suggested commit: `feat(debrief): persist moment feedback`
+
+Include:
+
+- `src/vibemix/intel/feedback.py`
+- `src/vibemix/ui_bus/schemas/debrief.py`
+- `src/vibemix/ui_bus/messages.py`
+- `src/vibemix/ui_bus/__init__.py`
+- `src/vibemix/debrief/ws_server.py`
+- `tests/intel/test_feedback.py`
+- `tests/ui_bus/test_debrief_new_wrappers_roundtrip.py`
+- `tests/ui_bus/test_messages_schema.py`
+- `tests/debrief/test_ws_server_progressive_emit.py`
+- `scripts/check_ipc_schema.py`
+- `tauri/ui/src/ipc/messages.schema.json`
+- `tauri/ui/src/ipc/messages.ts`
+- `tauri/ui/src/ipc/validator.generated.mjs`
+- `tauri/ui/src/debrief/ws-client.ts`
+- `tauri/ui/src/debrief/components/drills-panel.ts`
+- `tauri/ui/src/debrief/debrief-window.ts`
+- `tauri/ui/src/debrief/styles/debrief.css`
+- `tauri/ui/src/debrief/__tests__/drills-panel-shape.spec.ts`
+- `tauri/ui/src/debrief/__tests__/ws-client-near-miss.spec.ts`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- New taste weighting for debrief labels, backend prompt changes, debrief
+  regeneration, and any cloud call. This package only lets the user mark a
+  cited debrief moment as right/off/unclear and persists that correction when
+  profile consent allows it.
+
+Reason:
+
+- The debrief can now show and speak grounded moments, but the correction
+  flywheel is still broken: the user cannot tell vibemix whether a cited
+  moment was actually right. Add the `ipc.debrief.moment-feedback` sender and
+  consent-gated backend persistence through the existing feedback JSONL path,
+  keeping debrief labels neutral so they become local evidence without
+  pretending to be track-pick taste weights.
+
+Proof before staging:
+
+- `uv run pytest -q tests/intel/test_feedback.py tests/ui_bus/test_debrief_new_wrappers_roundtrip.py tests/ui_bus/test_messages_schema.py tests/debrief/test_ws_server_progressive_emit.py`
+- `uv run python scripts/check_ipc_schema.py`
+- `npm --prefix tauri/ui run codegen:ipc`
+- `npm --prefix tauri/ui test -- src/debrief/__tests__/drills-panel-shape.spec.ts src/debrief/__tests__/ws-client-near-miss.spec.ts`
+- `npm --prefix tauri/ui run build`
+- `git diff --check -- src/vibemix/intel/feedback.py src/vibemix/ui_bus/schemas/debrief.py src/vibemix/ui_bus/messages.py src/vibemix/ui_bus/__init__.py src/vibemix/debrief/ws_server.py tests/intel/test_feedback.py tests/ui_bus/test_debrief_new_wrappers_roundtrip.py tests/ui_bus/test_messages_schema.py tests/debrief/test_ws_server_progressive_emit.py scripts/check_ipc_schema.py tauri/ui/src/ipc/messages.schema.json tauri/ui/src/ipc/messages.ts tauri/ui/src/ipc/validator.generated.mjs tauri/ui/src/debrief/ws-client.ts tauri/ui/src/debrief/components/drills-panel.ts tauri/ui/src/debrief/debrief-window.ts tauri/ui/src/debrief/styles/debrief.css tauri/ui/src/debrief/__tests__/drills-panel-shape.spec.ts tauri/ui/src/debrief/__tests__/ws-client-near-miss.spec.ts .planning/handoffs/2026-05-31-package-checklist.md`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`

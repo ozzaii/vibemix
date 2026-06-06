@@ -40,4 +40,35 @@ describe("DebriefWsClient near-miss frame", () => {
       duration_s: 600,
     });
   });
+
+  it("sends moment feedback on the debrief websocket", () => {
+    const client = new DebriefWsClient(8766);
+    const send = vi.fn();
+    (
+      client as unknown as {
+        ws: { readyState: number; send: (frame: string) => void };
+      }
+    ).ws = {
+      readyState: WebSocket.OPEN,
+      send,
+    };
+
+    client.sendMomentFeedback({
+      moment_id: "drill-0",
+      citation_id: "[ev:M@1]",
+      verdict: "agree",
+      surface: "transition",
+    });
+
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(send.mock.calls[0]?.[0] as string)).toMatchObject({
+      type: "ipc.debrief.moment-feedback",
+      payload: {
+        moment_id: "drill-0",
+        citation_id: "[ev:M@1]",
+        verdict: "agree",
+        surface: "transition",
+      },
+    });
+  });
 });

@@ -21,6 +21,7 @@ Locked field names + types (count-parity-tested at
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Literal
 
 
 @dataclass(frozen=True, slots=True)
@@ -197,6 +198,23 @@ class DebriefCitationTooltipReqPayload:
     """
 
     event_id: str
+
+
+@dataclass(frozen=True, slots=True)
+class DebriefMomentFeedbackPayload:
+    """Renderer → sidecar: explicit feedback on one debrief moment.
+
+    Fields:
+        moment_id: stable renderer-side id for the card/control the user judged.
+        citation_id: canonical citation tag/body attached to that moment.
+        verdict: user's correction label.
+        surface: coarse source surface for downstream analysis.
+    """
+
+    moment_id: str
+    citation_id: str
+    verdict: Literal["agree", "disagree", "unclear"]
+    surface: Literal["transition", "live_pill", "cue"]
 
 
 @dataclass(frozen=True, slots=True)

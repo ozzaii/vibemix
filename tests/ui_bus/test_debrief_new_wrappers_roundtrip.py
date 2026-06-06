@@ -21,6 +21,7 @@ from vibemix.ui_bus import (
     DebriefCitationTooltipReq,
     DebriefDrills,
     DebriefError,
+    DebriefMomentFeedback,
     DebriefNearMiss,
     DebriefTldrAudio,
     DrillPayload,
@@ -232,6 +233,35 @@ def test_debrief_citation_tooltip_request_roundtrip():
     assert parsed["type"] == "ipc.debrief.citation-tooltip-request"
     assert parsed["payload"]["event_id"] == "ev:MIX_MOVE@01:23"
     jsonschema.validate(parsed, _SCHEMA)
+
+
+def test_debrief_moment_feedback_roundtrip():
+    msg = DebriefMomentFeedback.make(
+        moment_id="drill-0",
+        citation_id="[ev:MIX_MOVE@01:23]",
+        verdict="agree",
+        surface="transition",
+    )
+    parsed = json.loads(msg.to_json())
+    assert parsed["type"] == "ipc.debrief.moment-feedback"
+    assert parsed["payload"] == {
+        "moment_id": "drill-0",
+        "citation_id": "[ev:MIX_MOVE@01:23]",
+        "verdict": "agree",
+        "surface": "transition",
+    }
+    jsonschema.validate(parsed, _SCHEMA)
+
+
+def test_debrief_moment_feedback_rejects_invalid_verdict():
+    msg = DebriefMomentFeedback.make(
+        moment_id="drill-0",
+        citation_id="[ev:MIX_MOVE@01:23]",
+        verdict="wrong",  # type: ignore[arg-type]
+        surface="transition",
+    )
+    with pytest.raises(jsonschema.ValidationError):
+        msg.to_json()
 
 
 def test_debrief_citation_tooltip_response_roundtrip():

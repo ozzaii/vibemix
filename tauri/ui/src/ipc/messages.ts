@@ -53,6 +53,7 @@ export type VibemixIPCMessages =
   | DebriefTldrAudio
   | DebriefDrills
   | DebriefCitationTooltipReq
+  | DebriefMomentFeedback
   | DebriefCitationTooltip
   | DebriefError
   | LibraryImport
@@ -659,6 +660,16 @@ export interface DebriefCitationTooltipReq {
   ts: string;
   payload: {
     event_id: string;
+  };
+}
+export interface DebriefMomentFeedback {
+  type: "ipc.debrief.moment-feedback";
+  ts: string;
+  payload: {
+    moment_id: string;
+    citation_id: string;
+    verdict: "agree" | "disagree" | "unclear";
+    surface: "transition" | "live_pill" | "cue";
   };
 }
 export interface DebriefCitationTooltip {

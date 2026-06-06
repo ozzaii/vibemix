@@ -23,6 +23,7 @@ import asyncio
 import json
 import logging
 import os
+import time
 from datetime import UTC, datetime
 from typing import Any
 
@@ -222,6 +223,9 @@ class DebriefWsServer:
             reply = self._build_tooltip_reply(event_id)
             await websocket.send(reply)
             return
+        if kind == "ipc.debrief.moment-feedback":
+            self._record_moment_feedback(msg.get("payload", {}))
+            return
         if kind == "hello":
             return  # ack via initial frames already sent on connect
         logger.warning("[debrief] unknown kind %r", kind)
@@ -230,6 +234,70 @@ class DebriefWsServer:
         await websocket.send(
             DebriefError.make(reason="unknown_kind", message=kind).to_json()
         )
+
+    def _record_moment_feedback(self, payload: object) -> bool:
+        """Persist explicit user feedback on a debrief moment when consent allows it."""
+        if not isinstance(payload, dict):
+            logger.warning("[debrief] dropped malformed moment feedback payload")
+            return False
+        moment_id = _str_field(payload.get("moment_id"))
+        citation_id = _str_field(payload.get("citation_id"))
+        verdict = _str_field(payload.get("verdict"))
+        surface = _str_field(payload.get("surface"))
+        if (
+            moment_id is None
+            or citation_id is None
+            or verdict not in {"agree", "disagree", "unclear"}
+            or surface not in {"transition", "live_pill", "cue"}
+        ):
+            logger.warning("[debrief] dropped invalid moment feedback payload")
+            return False
+
+        consent = self._profile_consent()
+        if not consent:
+            logger.info("[debrief] moment feedback ignored because profile consent is off")
+            return False
+
+        session_dir = self.state.get("session_dir")
+        session_id = getattr(session_dir, "name", None) or "unknown"
+        row = {
+            "event_id": (
+                f"debrief_moment_{session_id}_{_event_id_component(moment_id)}_"
+                f"{time.time_ns()}"
+            ),
+            "session_id": session_id,
+            "surface": f"debrief_{surface}",
+            "action": "moment_feedback",
+            "label": verdict,
+            "split": "calibration",
+            "candidate_id": moment_id,
+            "moment_id": moment_id,
+            "citation_id": citation_id,
+            "moment_surface": surface,
+            "profile_consent": True,
+        }
+        try:
+            from vibemix.intel.feedback import append_feedback_event, parse_feedback_event
+            from vibemix.runtime.config_store import app_data_dir
+
+            path = self.state.get("taste_feedback_path") or (
+                app_data_dir() / "taste_feedback.jsonl"
+            )
+            return append_feedback_event(path, parse_feedback_event(row), profile_consent=consent)
+        except Exception as exc:
+            logger.warning("[debrief] moment feedback persistence skipped: %s", exc)
+            return False
+
+    def _profile_consent(self) -> bool:
+        if "profile_consent" in self.state:
+            return bool(self.state.get("profile_consent"))
+        try:
+            from vibemix.profile import load_consent
+
+            return bool(load_consent())
+        except Exception as exc:
+            logger.warning("[debrief] profile consent read skipped: %s", exc)
+            return False
 
     def _build_tooltip_reply(self, event_id: str) -> str:
         from vibemix.debrief.drills import _parse_citation_atom, _parse_citation_tag
@@ -325,6 +393,18 @@ def _started_at_unix(session_dir) -> float:
     except Exception:
         return 0.0
     return 0.0
+
+
+def _str_field(value: object) -> str | None:
+    if value is None:
+        return None
+    text = str(value).strip()
+    return text or None
+
+
+def _event_id_component(value: str) -> str:
+    safe = "".join(ch if ch.isalnum() else "_" for ch in value).strip("_")
+    return (safe or "moment")[:64]
 
 
 def _estimate_mp3_duration(mp3_path) -> float:

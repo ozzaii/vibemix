@@ -152,6 +152,9 @@
       "$ref": "#/definitions/DebriefCitationTooltipReq"
     },
     {
+      "$ref": "#/definitions/DebriefMomentFeedback"
+    },
+    {
       "$ref": "#/definitions/DebriefCitationTooltip"
     },
     {
@@ -2603,6 +2606,33 @@
           "required": ["event_id"],
           "properties": {
             "event_id": { "type": "string", "minLength": 1 }
+          }
+        }
+      }
+    },
+    "DebriefMomentFeedback": {
+      "$comment": "Learn Revolution feedback flywheel. Renderer \u2192 sidecar. One explicit user correction on a debrief moment, consent-gated by the backend before becoming taste evidence.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "ts", "payload"],
+      "properties": {
+        "type": { "const": "ipc.debrief.moment-feedback" },
+        "ts": { "type": "string", "format": "date-time" },
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["moment_id", "citation_id", "verdict", "surface"],
+          "properties": {
+            "moment_id": { "type": "string", "minLength": 1 },
+            "citation_id": { "type": "string", "minLength": 1 },
+            "verdict": {
+              "type": "string",
+              "enum": ["agree", "disagree", "unclear"]
+            },
+            "surface": {
+              "type": "string",
+              "enum": ["transition", "live_pill", "cue"]
+            }
           }
         }
       }

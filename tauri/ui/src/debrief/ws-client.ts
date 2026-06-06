@@ -25,6 +25,16 @@ export interface DebriefFrame {
   payload: Record<string, unknown>;
 }
 
+export type DebriefMomentFeedbackVerdict = "agree" | "disagree" | "unclear";
+export type DebriefMomentFeedbackSurface = "transition" | "live_pill" | "cue";
+
+export interface DebriefMomentFeedbackPayload {
+  moment_id: string;
+  citation_id: string;
+  verdict: DebriefMomentFeedbackVerdict;
+  surface: DebriefMomentFeedbackSurface;
+}
+
 const KIND_MAP: Record<string, DebriefFrameKind> = {
   "ipc.debrief.session-loaded": "session-loaded",
   "ipc.debrief.chapter-list": "chapter-list",
@@ -78,6 +88,16 @@ export class DebriefWsClient extends EventTarget {
       type: "ipc.debrief.citation-tooltip-request",
       ts: new Date().toISOString(),
       payload: { event_id: eventId },
+    };
+    this.ws.send(JSON.stringify(frame));
+  }
+
+  sendMomentFeedback(payload: DebriefMomentFeedbackPayload): void {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
+    const frame = {
+      type: "ipc.debrief.moment-feedback",
+      ts: new Date().toISOString(),
+      payload,
     };
     this.ws.send(JSON.stringify(frame));
   }

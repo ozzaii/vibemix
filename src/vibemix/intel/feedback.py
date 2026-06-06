@@ -18,24 +18,28 @@ PRIVATE_PAYLOAD_PATTERNS = (
     re.compile(r"file://[^\"'\s]+", re.I),
 )
 ALLOWED_FEEDBACK_SPLITS: frozenset[str] = frozenset({"calibration", "holdout", "poison"})
-ALLOWED_FEEDBACK_LABELS: frozenset[str] = frozenset(
-    {
-        "would_play",
-        "maybe",
-        "no",
-        "vibe_no",
-        "played_next",
-        "accepted",
-        "not_now",
-        "rejected",
-        "ignored_timeout",
-        "different_track",
-        "cue_kept",
-        "cue_edited",
-        "technical_no",
-        "timing_no",
-        "wrong_timing",
-    }
+DEBRIEF_FEEDBACK_LABELS: frozenset[str] = frozenset({"agree", "disagree", "unclear"})
+ALLOWED_FEEDBACK_LABELS: frozenset[str] = (
+    frozenset(
+        {
+            "would_play",
+            "maybe",
+            "no",
+            "vibe_no",
+            "played_next",
+            "accepted",
+            "not_now",
+            "rejected",
+            "ignored_timeout",
+            "different_track",
+            "cue_kept",
+            "cue_edited",
+            "technical_no",
+            "timing_no",
+            "wrong_timing",
+        }
+    )
+    | DEBRIEF_FEEDBACK_LABELS
 )
 
 
@@ -267,6 +271,7 @@ def _bool_or_default(value: Any, *, default: bool) -> bool:
 __all__ = [
     "ALLOWED_FEEDBACK_LABELS",
     "ALLOWED_FEEDBACK_SPLITS",
+    "DEBRIEF_FEEDBACK_LABELS",
     "FeedbackEvent",
     "append_feedback_event",
     "feedback_event_to_row",

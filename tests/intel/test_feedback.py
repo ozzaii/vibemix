@@ -6,6 +6,7 @@ from pathlib import Path
 
 from vibemix.intel.feedback import (
     ALLOWED_FEEDBACK_LABELS,
+    DEBRIEF_FEEDBACK_LABELS,
     append_feedback_event,
     feedback_event_to_row,
     feedback_privacy_errors,
@@ -84,7 +85,10 @@ def test_feedback_validation_rejects_bad_split_and_label() -> None:
 
 
 def test_feedback_label_allowlist_matches_taste_model_labels() -> None:
-    assert ALLOWED_FEEDBACK_LABELS == frozenset(TASTE_LABEL_WEIGHTS) | TECHNICAL_LABELS
+    assert (
+        ALLOWED_FEEDBACK_LABELS
+        == frozenset(TASTE_LABEL_WEIGHTS) | TECHNICAL_LABELS | DEBRIEF_FEEDBACK_LABELS
+    )
 
 
 def test_feedback_validation_rejects_duplicate_event_ids() -> None:

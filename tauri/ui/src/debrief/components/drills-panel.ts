@@ -29,6 +29,18 @@ export interface LearnReferralClickEvent extends CustomEvent {
   detail: { referral: LearnReferralPayload };
 }
 
+export type MomentFeedbackVerdict = "agree" | "disagree" | "unclear";
+export type MomentFeedbackSurface = "transition" | "live_pill" | "cue";
+
+export interface MomentFeedbackClickEvent extends CustomEvent {
+  detail: {
+    momentId: string;
+    citationId: string;
+    verdict: MomentFeedbackVerdict;
+    surface: MomentFeedbackSurface;
+  };
+}
+
 export function mountDrillsPanel(
   container: HTMLElement,
   drills: DrillPayload[],
@@ -40,6 +52,8 @@ export function mountDrillsPanel(
     const article = document.createElement("article");
     article.className = "vmx-drill";
     article.dataset.drillIndex = String(i);
+    const momentId = `drill-${i}`;
+    const surface = feedbackSurfaceForCitation(d.citation);
 
     // The situation IS the title (the real line); "Drill N" was template filler.
     const h3 = document.createElement("h3");
@@ -76,7 +90,45 @@ export function mountDrillsPanel(
       );
     });
 
-    article.append(h3, dl, chip);
+    const feedback = document.createElement("div");
+    feedback.className = "vmx-drill-feedback";
+    feedback.setAttribute("aria-label", "moment feedback");
+    for (const [verdict, label] of [
+      ["agree", "right"],
+      ["disagree", "off"],
+      ["unclear", "?"],
+    ] as const) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "vmx-drill-feedback__btn";
+      button.dataset.verdict = verdict;
+      button.setAttribute("aria-pressed", "false");
+      button.title = `Mark this debrief moment ${label}`;
+      button.textContent = label;
+      button.addEventListener("click", (e) => {
+        e.stopPropagation();
+        for (const peer of Array.from(
+          feedback.querySelectorAll(".vmx-drill-feedback__btn"),
+        )) {
+          peer.setAttribute("aria-pressed", "false");
+        }
+        button.setAttribute("aria-pressed", "true");
+        container.dispatchEvent(
+          new CustomEvent("moment-feedback-click", {
+            detail: {
+              momentId,
+              citationId: d.citation,
+              verdict,
+              surface,
+            },
+            bubbles: true,
+          }),
+        );
+      });
+      feedback.append(button);
+    }
+
+    article.append(h3, dl, chip, feedback);
     if (d.learn_referral) {
       const referral = d.learn_referral;
       const route = document.createElement("div");
@@ -111,4 +163,8 @@ export function mountDrillsPanel(
     }
     container.append(article);
   }
+}
+
+function feedbackSurfaceForCitation(citation: string): MomentFeedbackSurface {
+  return citation.trim().startsWith("[track:") ? "cue" : "transition";
 }

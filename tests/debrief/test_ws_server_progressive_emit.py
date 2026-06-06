@@ -227,6 +227,80 @@ def test_citation_tooltip_resolves_existence_key_with_at(tmp_path: Path):
 
 
 @pytest.mark.anyio("asyncio")
+async def test_moment_feedback_persists_consent_gated_taste_row(tmp_path: Path):
+    sess = tmp_path / "20260515-aaaa"
+    sess.mkdir()
+    feedback_path = tmp_path / "taste_feedback.jsonl"
+    server = DebriefWsServer(
+        port=_free_port(),
+        state={
+            "session_dir": sess,
+            "profile_consent": True,
+            "taste_feedback_path": feedback_path,
+        },
+    )
+    from vibemix.ui_bus import DebriefMomentFeedback
+
+    class FakeWebsocket:
+        async def send(self, _raw: str) -> None:
+            raise AssertionError("moment feedback is fire-and-forget")
+
+    await server._dispatch_inbound(
+        FakeWebsocket(),
+        DebriefMomentFeedback.make(
+            moment_id="drill-0",
+            citation_id="[ev:MIX_MOVE@01:23]",
+            verdict="agree",
+            surface="transition",
+        ).to_json(),
+    )
+
+    from vibemix.intel.feedback import load_feedback_events
+
+    events = load_feedback_events(feedback_path)
+    assert len(events) == 1
+    event = events[0]
+    assert event.session_id == "20260515-aaaa"
+    assert event.surface == "debrief_transition"
+    assert event.action == "moment_feedback"
+    assert event.label == "agree"
+    assert event.candidate_id == "drill-0"
+    assert event.raw["citation_id"] == "[ev:MIX_MOVE@01:23]"
+
+
+@pytest.mark.anyio("asyncio")
+async def test_moment_feedback_respects_profile_consent(tmp_path: Path):
+    sess = tmp_path / "20260515-aaaa"
+    sess.mkdir()
+    feedback_path = tmp_path / "taste_feedback.jsonl"
+    server = DebriefWsServer(
+        port=_free_port(),
+        state={
+            "session_dir": sess,
+            "profile_consent": False,
+            "taste_feedback_path": feedback_path,
+        },
+    )
+    from vibemix.ui_bus import DebriefMomentFeedback
+
+    class FakeWebsocket:
+        async def send(self, _raw: str) -> None:
+            raise AssertionError("moment feedback is fire-and-forget")
+
+    await server._dispatch_inbound(
+        FakeWebsocket(),
+        DebriefMomentFeedback.make(
+            moment_id="drill-0",
+            citation_id="[ev:MIX_MOVE@01:23]",
+            verdict="disagree",
+            surface="transition",
+        ).to_json(),
+    )
+
+    assert not feedback_path.exists()
+
+
+@pytest.mark.anyio("asyncio")
 async def test_emit_error_frame(tmp_path: Path):
     """Client receives an ipc.debrief.error frame when emit_error called."""
     state = _fixture_state(tmp_path)

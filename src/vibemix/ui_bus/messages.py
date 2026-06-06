@@ -41,6 +41,7 @@ from vibemix.ui_bus.schemas.debrief import (
     DebriefCitationTooltipReqPayload,
     DebriefDrillsPayload,
     DebriefErrorPayload,
+    DebriefMomentFeedbackPayload,
     DebriefNearMissPayload,
     DebriefSessionLoadedPayload,
     DebriefTldrAudioPayload,
@@ -1864,6 +1865,36 @@ class DebriefCitationTooltipReq:
             type="ipc.debrief.citation-tooltip-request",
             ts=_now_iso(),
             payload=DebriefCitationTooltipReqPayload(event_id=event_id),
+        )
+
+    def to_json(self) -> str:
+        return _serialize(self)
+
+
+@dataclass(frozen=True, slots=True)
+class DebriefMomentFeedback:
+    type: Literal["ipc.debrief.moment-feedback"]
+    ts: str
+    payload: DebriefMomentFeedbackPayload
+
+    @classmethod
+    def make(
+        cls,
+        *,
+        moment_id: str,
+        citation_id: str,
+        verdict: Literal["agree", "disagree", "unclear"],
+        surface: Literal["transition", "live_pill", "cue"],
+    ) -> DebriefMomentFeedback:
+        return cls(
+            type="ipc.debrief.moment-feedback",
+            ts=_now_iso(),
+            payload=DebriefMomentFeedbackPayload(
+                moment_id=moment_id,
+                citation_id=citation_id,
+                verdict=verdict,
+                surface=surface,
+            ),
         )
 
     def to_json(self) -> str:

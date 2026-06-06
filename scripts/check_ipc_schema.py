@@ -50,6 +50,7 @@ from vibemix.ui_bus import (
     DebriefCitationTooltipReq,
     DebriefDrills,
     DebriefError,
+    DebriefMomentFeedback,
     DebriefNearMiss,
     DebriefSessionLoaded,
     DebriefTldrAudio,
@@ -397,6 +398,15 @@ def _minimal_examples() -> list[tuple[str, object]]:
         (
             "DebriefCitationTooltipReq",
             DebriefCitationTooltipReq.make(event_id="ev:MIX_MOVE@01:23"),
+        ),
+        (
+            "DebriefMomentFeedback",
+            DebriefMomentFeedback.make(
+                moment_id="drill-0",
+                citation_id="[ev:MIX_MOVE@01:23]",
+                verdict="agree",
+                surface="transition",
+            ),
         ),
         (
             "DebriefCitationTooltip",

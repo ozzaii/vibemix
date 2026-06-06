@@ -6,6 +6,7 @@ import {
   mountDrillsPanel,
   type DrillPayload,
   type LearnReferralPayload,
+  type MomentFeedbackClickEvent,
 } from "./components/drills-panel.js";
 import {
   mountTldrPlayer,
@@ -185,6 +186,15 @@ if (isMockMode) {
         referral?: LearnReferralPayload;
       };
       if (detail.referral) void openLearnReferral(detail.referral);
+    });
+    drillsEl.addEventListener("moment-feedback-click", (e: Event) => {
+      const detail = (e as MomentFeedbackClickEvent).detail;
+      client.sendMomentFeedback({
+        moment_id: detail.momentId,
+        citation_id: detail.citationId,
+        verdict: detail.verdict,
+        surface: detail.surface,
+      });
     });
   }
   if (waveformEl) {

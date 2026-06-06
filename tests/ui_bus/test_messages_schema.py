@@ -45,6 +45,8 @@ from vibemix.ui_bus import (
     DebriefCitationTooltipReq,
     DebriefDrills,
     DebriefError,
+    DebriefMomentFeedback,
+    DebriefNearMiss,
     DebriefSessionLoaded,
     DebriefTldrAudio,
     DeviceInfo,
@@ -372,6 +374,17 @@ def _make_examples() -> list[tuple[str, object]]:
             ),
         ),
         (
+            "DebriefNearMiss",
+            DebriefNearMiss.make(
+                input_wav_relative_path="input.wav",
+                t_center=42.0,
+                window=(36.0, 46.0),
+                receipt_text="the mix recovered by ear [mix:near_miss@42.000]",
+                friend_line_text="I heard it [mix:near_miss@42.000]",
+                duration_s=600.0,
+            ),
+        ),
+        (
             "DebriefTldrAudio",
             DebriefTldrAudio.make(
                 audio_relative_path="debrief_tldr.mp3",
@@ -398,6 +411,15 @@ def _make_examples() -> list[tuple[str, object]]:
         (
             "DebriefCitationTooltipReq",
             DebriefCitationTooltipReq.make(event_id="ev:MIX_MOVE@01:23"),
+        ),
+        (
+            "DebriefMomentFeedback",
+            DebriefMomentFeedback.make(
+                moment_id="drill-0",
+                citation_id="[ev:MIX_MOVE@01:23]",
+                verdict="agree",
+                surface="transition",
+            ),
         ),
         (
             "DebriefCitationTooltip",
@@ -687,7 +709,8 @@ def test_example_count_matches_schema_oneof() -> None:
     # Gemini-key field + proxy/direct brain toggle) → 79.
     # SHIP-WIRE START-gate adds SessionStart + SessionStop (live-session
     # arm/run control: idle until Start, Stop returns to idle) → 81.
-    assert len(_EXAMPLES) == len(_SCHEMA["oneOf"]) == 81
+    # Learn Revolution debrief adds DebriefNearMiss + DebriefMomentFeedback → 83.
+    assert len(_EXAMPLES) == len(_SCHEMA["oneOf"]) == 83
 
 
 @pytest.mark.parametrize(
@@ -794,8 +817,10 @@ def test_schema_oneof_count_is_72() -> None:
     # 82 definitions (both are top-level ipc.* messages; skew vs oneOf stays 3).
     # SHIP-WIRE START-gate adds SessionStart + SessionStop → 81 oneOf,
     # 84 definitions (both top-level ipc.* messages; skew vs oneOf stays 3).
-    assert len(_SCHEMA["oneOf"]) == 81
-    assert len(_SCHEMA["definitions"]) == 84
+    # Learn Revolution debrief adds DebriefNearMiss + DebriefMomentFeedback
+    # → 83 oneOf, 86 definitions.
+    assert len(_SCHEMA["oneOf"]) == 83
+    assert len(_SCHEMA["definitions"]) == 86
 
 
 def test_no_pydantic_imports_in_ui_bus() -> None:
