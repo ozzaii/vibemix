@@ -402,6 +402,7 @@ function mountSkeleton(): void {
     <div id="vmx-lib-model-state"></div>
     <button id="vmx-lib-install-models"></button>
     <div id="vmx-lib-agent-setup" hidden><div id="vmx-lib-agent-state"></div></div>
+    <h2 id="vmx-lib-rationale-title"></h2>
     <p id="vmx-lib-rationale-body"></p>
     <div id="vmx-lib-rationale-meta"></div>
     <div id="vmx-lib-export" style="display: none">
@@ -583,6 +584,9 @@ describe("build — real renderBuildSet path (jsdom, via mountLibrary)", () => {
     );
     expect(document.getElementById("vmx-lib-rationale-body")?.textContent).toContain(
       "peak-time",
+    );
+    expect(document.getElementById("vmx-lib-rationale-title")?.textContent).toBe(
+      "warehouse opener, melodic into rolling, 90 min",
     );
     // export receipt is shown + carries the path.
     const exportEl = document.getElementById("vmx-lib-export") as HTMLElement;

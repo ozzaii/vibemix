@@ -166,8 +166,8 @@ describe("library-panel — source drop routing", () => {
       "Feed Viber real tracks",
     );
     expect(
-      [...handle.element.querySelectorAll(".vmx-library-format-chip")].map((chip) =>
-        chip.textContent?.trim(),
+      Array.from(handle.element.querySelectorAll(".vmx-library-format-chip")).map(
+        (chip) => chip.textContent?.trim(),
       ),
     ).toEqual(["folders", "rekordbox", "traktor", "engine"]);
     const drop = handle.element.querySelector(".vmx-library-droptarget");

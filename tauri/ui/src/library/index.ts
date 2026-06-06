@@ -296,6 +296,7 @@ function agentFailureMarkup(
 
 function renderAgentFailureRationale(result: CurateResult, mode: AgentFailureMode): void {
   const copy = agentFailureCopy(result.stop_reason, mode);
+  setRationaleTitle(copy.title);
   $("vmx-lib-rationale-body").textContent = copy.detail;
   $("vmx-lib-rationale-meta").textContent =
     `${mode === "build" ? "no export" : "no playlist"} · ${result.stop_reason}`;
@@ -793,17 +794,26 @@ function renderResults(result: SearchResult, mode: LibraryMode): void {
   $("vmx-lib-scope").innerHTML = renderScope(result, mode);
 }
 
+function setRationaleTitle(title: string): void {
+  const el = $maybe("vmx-lib-rationale-title");
+  if (!el) return;
+  const clean = title.trim();
+  el.textContent = clean;
+  el.toggleAttribute("hidden", clean.length === 0);
+}
+
 /** Render an AI-curated playlist: a numbered set (reusing the row styling, but
  *  WITHOUT the score meter — a curated set is ordered by the agent's arc, not a
  *  cosine score) plus the agent's plain-language set notes. The track titles are
  *  whatever the CLI gave (often the id when no human title exists — honest, no
  *  fabrication). */
-function renderCurate(result: CurateResult): void {
+function renderCurate(result: CurateResult, setTitle = ""): void {
   const isAgentFailure =
     result.tracks.length === 0 && result.stop_reason !== "clarification_needed";
   if (isAgentFailure) {
     renderAgentFailureRationale(result, "curate");
   } else {
+    setRationaleTitle(setTitle);
     const bodyEl = $("vmx-lib-rationale-body");
     bodyEl.textContent = result.rationale || "No set notes returned.";
     $("vmx-lib-rationale-meta").textContent =
@@ -959,6 +969,7 @@ function buildAutoCueMeta(result: BuildSetResult): string | null {
  *  hidden by `body[data-mode]`, not emptied — without this it leaks the prior
  *  run's notes back into view the next time curate is shown). */
 function clearRationale(): void {
+  setRationaleTitle("");
   $("vmx-lib-rationale-body").textContent = "";
   $("vmx-lib-rationale-meta").textContent = "";
   // The export line is shared by build mode; clear it too so a stale "Exported
@@ -980,6 +991,7 @@ function clearRationale(): void {
  *  merely disabling is not enough feedback. Replaced wholesale by renderCurate
  *  / renderError when the run lands. */
 function renderCurateLoading(theme: string): void {
+  setRationaleTitle(theme);
   $("vmx-lib-rationale-body").textContent = `Building a set for "${theme}"…`;
   $("vmx-lib-rationale-meta").textContent = "viber · working";
   const el = $("vmx-lib-results");
@@ -999,12 +1011,13 @@ function renderCurateLoading(theme: string): void {
  *  behind each move) plus the Rekordbox export. When `export_path` is present we
  *  show an "Exported → <path>" line with a one-line import hint; honest empty
  *  state otherwise (a no-key run returns max_iters with no tracks — never faked). */
-function renderBuildSet(result: BuildSetResult): void {
+function renderBuildSet(result: BuildSetResult, setTitle = ""): void {
   const isAgentFailure =
     result.tracks.length === 0 && result.stop_reason !== "clarification_needed";
   if (isAgentFailure) {
     renderAgentFailureRationale(result, "build");
   } else {
+    setRationaleTitle(setTitle);
     const bodyEl = $("vmx-lib-rationale-body");
     bodyEl.textContent = result.rationale || "No set notes returned.";
     const cueMeta = buildAutoCueMeta(result);
@@ -1071,6 +1084,7 @@ const BUILD_SEQUENCE_STEPS = [
  *  keep the surface alive while the deterministic engine runs. Replaced
  *  wholesale by renderBuildSet / renderError when the run lands. */
 function renderBuildSetLoading(brief: string): void {
+  setRationaleTitle(brief);
   $("vmx-lib-rationale-body").textContent = `Sequencing a set for "${brief}"…`;
   $("vmx-lib-rationale-meta").textContent = "set prep · discovering / ordering / exporting";
   $("vmx-lib-export").style.display = "none";
@@ -2718,7 +2732,7 @@ export function mountLibrary(root: ParentNode = document): void {
     renderCurateLoading(state.theme); // working state before the (slow) agent call
     const result = await libraryCurate(state.theme);
     if (!isCurrentRun(runId, "curate")) return;
-    renderCurate(result);
+    renderCurate(result, state.theme);
   }
 
   async function runBuildSet(runId: number): Promise<void> {
@@ -2731,7 +2745,7 @@ export function mountLibrary(root: ParentNode = document): void {
       state.buildTagWriteGranted,
     );
     if (!isCurrentRun(runId, "build")) return;
-    renderBuildSet(result);
+    renderBuildSet(result, state.brief);
   }
 
   async function runCueExport(
