@@ -51,6 +51,21 @@ def test_competent_skill_surfaces_competent_stage():
     assert row["learn_fill"] >= 0.6
 
 
+def test_banked_practice_reps_surface_without_granting_fill():
+    progress = LearnProgress()
+    progress.mark_practice_source("course_1_anatomy", "L1.03", "click")
+    progress.mark_practice_source("course_1_anatomy", "L1.03", "midi")
+    progress.mark_practice_source("course_1_anatomy", "L1.04", "click")
+
+    row = next(r for r in skill_wall_payload(progress) if r["skill_id"] == "deck_control")
+
+    assert row["stage"] == "locked"
+    assert row["learn_fill"] == 0.0
+    assert row["what_remains"] == (
+        "3 banked practice reps; finish the matching lesson to keep them"
+    )
+
+
 def test_mastered_live_portion_surfaces_in_payload():
     # A cited live demo (Phase 103) stamps the live-portion; the wall must show it.
     progress = LearnProgress()

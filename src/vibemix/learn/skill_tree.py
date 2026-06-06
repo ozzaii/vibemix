@@ -357,7 +357,43 @@ class SkillTree:
         return results
 
 
-def _what_remains(sp: SkillProgress, spec: SkillSpec) -> str:
+def _safe_nonnegative_int(value: Any) -> int:
+    try:
+        raw = int(value)
+    except (TypeError, ValueError):
+        return 0
+    return max(0, raw)
+
+
+def _practice_bank_count_for_spec(progress: Any, spec: SkillSpec) -> int:
+    lessons = getattr(progress, "lessons", {}) or {}
+    if not isinstance(lessons, dict):
+        return 0
+    total = 0
+    for lesson_id in spec.lesson_ids:
+        row = lessons.get(lesson_id)
+        if not isinstance(row, dict) or row.get("completed") is True:
+            continue
+        sources = row.get("practice_sources")
+        if not isinstance(sources, dict):
+            continue
+        total += _safe_nonnegative_int(sources.get("hardware"))
+        total += _safe_nonnegative_int(sources.get("screen"))
+    return min(3, total)
+
+
+def _practice_bank_remains_line(count: int) -> str:
+    unit = "rep" if count == 1 else "reps"
+    pronoun = "it" if count == 1 else "them"
+    return f"{count} banked practice {unit}; finish the matching lesson to keep {pronoun}"
+
+
+def _what_remains(
+    sp: SkillProgress,
+    spec: SkillSpec,
+    *,
+    banked_practice_reps: int = 0,
+) -> str:
     """The plain "what remains to advance" line for one skill (SURF-01).
 
     Deterministic, never-raises UI affordance copy — single-sourced in Python so
@@ -383,6 +419,8 @@ def _what_remains(sp: SkillProgress, spec: SkillSpec) -> str:
     # locked: distinguish "needs the recital" (lessons done) from "needs lessons".
     if sp.learn_fill >= COMPETENT_THRESHOLD:
         return "Pass the recital to reach Competent"
+    if banked_practice_reps > 0:
+        return _practice_bank_remains_line(banked_practice_reps)
     return "Finish the lessons to reach Competent"
 
 
@@ -403,7 +441,14 @@ def skill_wall_payload(
     for skill_id, sp in tree.compute(progress).items():
         row = sp.as_payload()
         spec = tree._manifest.get(skill_id)
-        row["what_remains"] = _what_remains(sp, spec) if spec is not None else ""
+        if spec is not None:
+            row["what_remains"] = _what_remains(
+                sp,
+                spec,
+                banked_practice_reps=_practice_bank_count_for_spec(progress, spec),
+            )
+        else:
+            row["what_remains"] = ""
         rows.append(row)
     return rows
 
