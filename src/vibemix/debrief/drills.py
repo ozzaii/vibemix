@@ -85,9 +85,24 @@ class _GeminiClient(Protocol):
 def _parse_citation_tag(tag: str) -> tuple[str, str, float | None] | None:
     """``[ev:DROP_HIT@01:23]`` → ``("ev", "DROP_HIT", 83.0)``.
 
-    Accepts the 7 EBNF source identifiers. Returns ``None`` if the tag
-    is malformed.
+    Accepts the EvidenceRegistry EBNF source identifiers. Returns ``None`` if
+    the tag is malformed.
     """
+    parsed = _parse_citation_atom(tag)
+    if parsed is None:
+        return None
+    source, body = parsed
+    if "@" not in body:
+        return (source, body, None)
+    key, t_str = body.rsplit("@", 1)
+    t = _parse_timestamp(t_str)
+    if t is None:
+        return None
+    return (source, key, t)
+
+
+def _parse_citation_atom(tag: str) -> tuple[str, str] | None:
+    """Return the first ``(source, body)`` atom from a citation tag."""
     m = EVIDENCE_CITATION_RE.search(tag)
     if not m:
         return None
@@ -97,13 +112,7 @@ def _parse_citation_tag(tag: str) -> tuple[str, str, float | None] | None:
     if ":" not in atom:
         return None
     source, body = atom.split(":", 1)
-    t: float | None = None
-    if "@" in body:
-        key, t_str = body.rsplit("@", 1)
-        t = _parse_timestamp(t_str)
-    else:
-        key = body
-    return (source, key, t)
+    return (source, body)
 
 
 def _parse_timestamp(t_str: str) -> float | None:
@@ -137,16 +146,31 @@ def _citation_resolves(
     source, key, target_t = parsed
     source_map = evidence_snapshot.get(source) or {}
     ts = source_map.get(key)
-    if not ts:
-        return False
-    if target_t is None:
+    if ts and target_t is None:
         return True
-    return any(abs(t - target_t) <= tol for t in ts)
+    if ts and any(abs(t - target_t) <= tol for t in ts):
+        return True
+
+    # Some narration-time sources deliberately carry ``@`` inside the key itself
+    # (for example ``[judge:transition@128.4]`` and cue anchors like
+    # ``[cue:drop@180.0]``). The live linter treats those as existence-only.
+    # Fall back to the full body so debrief citations do not become decorative.
+    atom = _parse_citation_atom(citation)
+    if atom is None:
+        return False
+    _, raw_body = atom
+    raw_ts = source_map.get(raw_body)
+    return bool(raw_ts)
 
 
 # ---------------------------------------------------------------------------
 # Prompt + Gemini call
 # ---------------------------------------------------------------------------
+
+
+_EXISTENCE_KEY_ALLOWLIST_SOURCES = frozenset(
+    {"track", "screen", "key", "recall", "exemplar", "cue", "judge"}
+)
 
 
 def _allowlist_for(evidence_snapshot: dict[str, dict[str, list[float]]]) -> str:
@@ -155,6 +179,9 @@ def _allowlist_for(evidence_snapshot: dict[str, dict[str, list[float]]]) -> str:
     for source, keys in sorted(evidence_snapshot.items()):
         for key, ts in sorted(keys.items()):
             if not ts:
+                continue
+            if source in _EXISTENCE_KEY_ALLOWLIST_SOURCES:
+                out.append(f"[{source}:{key}]")
                 continue
             t = ts[0]
             mins = int(t) // 60

@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -196,6 +197,13 @@ def _build_cited_critique(events: list[dict], chapters: list[ChapterRegion]) -> 
             text = _learn_tutor_critique_line(e)
             if text:
                 out.append(text)
+        elif kind in {
+            "learn_beatmatch_practice_graded",
+            "learn_cue_placement_practice_graded",
+        }:
+            text = _learn_grade_critique_line(e)
+            if text:
+                out.append(text)
         elif kind == "transition_judged":
             text = _transition_judged_critique_line(e)
             if text:
@@ -237,6 +245,9 @@ def _build_debrief_near_miss_payload(
 
     chosen = lines.near_miss or lines.gap
     has_replay_window = near_miss is not None and lines.near_miss is not None
+    receipt_text = chosen.receipt_text if chosen else ""
+    if has_replay_window:
+        receipt_text = _near_miss_receipt_text(near_miss, receipt_text, events)
     return DebriefNearMissPayload(
         input_wav_relative_path="input.wav",
         t_center=near_miss.t_center_s if has_replay_window else None,
@@ -245,7 +256,7 @@ def _build_debrief_near_miss_payload(
             if has_replay_window
             else None
         ),
-        receipt_text=chosen.receipt_text if chosen else "",
+        receipt_text=receipt_text,
         friend_line_text=chosen.text if chosen else "",
         duration_s=max(duration_s, 0.0),
     )
@@ -285,6 +296,37 @@ def _learn_tutor_critique_line(event: dict) -> str:
     tts_marker = str(event.get("tts_marker") or "").strip()
     marker = f" {tts_marker}" if tts_marker else ""
     return f"Learn tutor {lesson_id}{marker}: {text} {' '.join(citation_list)}"
+
+
+def _learn_grade_critique_line(event: dict) -> str:
+    kind = str(event.get("kind") or "")
+    if kind == "learn_beatmatch_practice_graded":
+        label = "beatmatch practice"
+        evidence_key = "BEATMATCH_GRADED"
+    elif kind == "learn_cue_placement_practice_graded":
+        label = "cue placement practice"
+        evidence_key = "CUE_PLACEMENT_GRADED"
+    else:
+        return ""
+
+    citation_time = _learn_event_time_or_none(event)
+    if citation_time is None:
+        return ""
+    verdict = str(event.get("verdict") or "").strip()
+    if not verdict:
+        return ""
+
+    lesson_id = str(event.get("lesson_id") or "unknown").strip()
+    step_id = str(event.get("step_id") or "").strip()
+    step = f" step {step_id}" if step_id else ""
+    credited = event.get("credited")
+    credited_list = [str(item) for item in credited] if isinstance(credited, list) else []
+    credited_clause = f"; credited {', '.join(credited_list)}" if credited_list else ""
+    citation = f"[ev:{evidence_key}@{citation_time:.3f}]"
+    return (
+        f"Learn {lesson_id}{step}: {label} graded {verdict}"
+        f"{credited_clause} {citation}."
+    )
 
 
 def _transition_judged_critique_line(event: dict) -> str:
@@ -327,12 +369,72 @@ def _metric_value(value: object) -> float | None:
 
 
 def _learn_event_time(event: dict) -> float:
+    value = _learn_event_time_or_none(event)
+    return value if value is not None else 0.0
+
+
+def _learn_event_time_or_none(event: dict) -> float | None:
     for key in ("evidence_time", "t"):
         try:
             return max(0.0, float(event.get(key)))
         except (TypeError, ValueError):
             continue
-    return 0.0
+    return None
+
+
+def _near_miss_receipt_text(near_miss: Any, fallback_receipt: str, events: list[dict]) -> str:
+    parts = [fallback_receipt.rstrip(".")]
+    clock = _wall_clock_label(events, near_miss.t_center_s)
+    if clock:
+        parts.append(f"wall clock {clock}")
+    transition = _matching_transition_receipt(events, near_miss)
+    if transition:
+        parts.append(transition.rstrip("."))
+    return "; ".join(part for part in parts if part) + "."
+
+
+def _wall_clock_label(events: list[dict], t_s: float) -> str | None:
+    for event in events:
+        if str(event.get("kind") or "") != "session_start":
+            continue
+        iso = str(event.get("wall_clock_iso") or "").strip()
+        if not iso:
+            continue
+        try:
+            start = datetime.fromisoformat(iso)
+        except ValueError:
+            continue
+        return f"{(start + timedelta(seconds=max(0.0, t_s))).strftime('%H:%M:%S')} last night"
+    return None
+
+
+def _matching_transition_receipt(events: list[dict], near_miss: Any) -> str:
+    best: tuple[float, str] | None = None
+    for event in events:
+        if str(event.get("kind") or "") != "transition_judged":
+            continue
+        event_t = _event_time_or_none(event)
+        if event_t is None:
+            continue
+        if not (
+            near_miss.window_start_s <= event_t <= near_miss.window_end_s
+            or abs(event_t - near_miss.event_t_s) <= 2.0
+        ):
+            continue
+        line = _transition_judged_critique_line(event)
+        if not line:
+            continue
+        distance = abs(event_t - near_miss.event_t_s)
+        if best is None or distance < best[0]:
+            best = (distance, line)
+    return best[1] if best is not None else ""
+
+
+def _event_time_or_none(event: dict) -> float | None:
+    try:
+        return max(0.0, float(event.get("t")))
+    except (TypeError, ValueError):
+        return None
 
 
 def _chapter_summaries(chapters: list[ChapterRegion]) -> list[str]:

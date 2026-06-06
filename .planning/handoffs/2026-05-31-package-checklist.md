@@ -11368,3 +11368,38 @@ Proof before staging:
 - `uv run python -m compileall -q src/vibemix/debrief/main.py src/vibemix/debrief/ws_server.py src/vibemix/debrief/session_loader.py src/vibemix/ui_bus/messages.py src/vibemix/ui_bus/schemas/debrief.py src/vibemix/ui_bus/__init__.py scripts/check_ipc_schema.py tests/ui_bus/test_debrief_new_wrappers_roundtrip.py tests/debrief/test_ws_server_progressive_emit.py`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
 - `git diff --check -- src/vibemix/debrief/main.py src/vibemix/debrief/ws_server.py src/vibemix/debrief/session_loader.py src/vibemix/ui_bus/messages.py src/vibemix/ui_bus/schemas/debrief.py src/vibemix/ui_bus/__init__.py scripts/check_ipc_schema.py tests/ui_bus/test_debrief_new_wrappers_roundtrip.py tests/debrief/test_ws_server_progressive_emit.py tauri/ui/src/ipc/messages.schema.json tauri/ui/src/ipc/messages.ts tauri/ui/src/ipc/validator.generated.mjs .planning/handoffs/2026-05-31-package-checklist.md`
+
+## Package 108 - Debrief Receipt Assembly
+
+Suggested commit: `feat(debrief): assemble last-night receipts`
+
+Include:
+
+- `src/vibemix/debrief/drills.py`
+- `src/vibemix/debrief/main.py`
+- `src/vibemix/debrief/ws_server.py`
+- `tests/debrief/test_drill_citations_resolve.py`
+- `tests/debrief/test_transition_judged_critique.py`
+- `tests/debrief/test_ws_server_progressive_emit.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Debrief UI rendering, schema changes, waveform work, and own-track Save mode.
+  This package only makes backend receipts resolver-safe and richer.
+
+Reason:
+
+- The near-miss frame had a grounded friend line, but the receipt still needed
+  the A4/A6 glue: Learn beatmatch/cue grade receipts in the cited critique,
+  wall-clock context for the morning card, Judge context when the recording
+  actually logged it, and debrief resolver/tooltip support for existence-key
+  citations like `[judge:transition@128.4]` without double timestamping them.
+
+Proof before staging:
+
+- `uv run pytest -q tests/debrief/test_drill_citations_resolve.py tests/debrief/test_transition_judged_critique.py tests/debrief/test_ws_server_progressive_emit.py`
+- `uv run ruff check src/vibemix/debrief/drills.py src/vibemix/debrief/main.py src/vibemix/debrief/ws_server.py tests/debrief/test_drill_citations_resolve.py tests/debrief/test_transition_judged_critique.py tests/debrief/test_ws_server_progressive_emit.py`
+- `uv run python -m compileall -q src/vibemix/debrief/drills.py src/vibemix/debrief/main.py src/vibemix/debrief/ws_server.py tests/debrief/test_drill_citations_resolve.py tests/debrief/test_transition_judged_critique.py tests/debrief/test_ws_server_progressive_emit.py`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+- `git diff --check -- src/vibemix/debrief/drills.py src/vibemix/debrief/main.py src/vibemix/debrief/ws_server.py tests/debrief/test_drill_citations_resolve.py tests/debrief/test_transition_judged_critique.py tests/debrief/test_ws_server_progressive_emit.py .planning/handoffs/2026-05-31-package-checklist.md`

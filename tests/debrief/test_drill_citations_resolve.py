@@ -19,6 +19,7 @@ from vibemix.debrief.drills import (
     Drill,
     Drills,
     DrillsGenerationError,
+    _allowlist_for,
     _citation_resolves,
     generate_drills,
 )
@@ -55,6 +56,36 @@ def test_does_not_resolve_outside_tolerance():
 
 def test_resolves_without_timestamp_when_key_present():
     assert _citation_resolves("[track:54830]", SNAPSHOT)
+
+
+def test_resolves_existence_key_with_at_inside_body():
+    snapshot = {
+        "judge": {"transition@128.4": [128.4]},
+        "cue": {"drop@180.0": [180.0]},
+    }
+
+    assert _citation_resolves("[judge:transition@128.4]", snapshot)
+    assert _citation_resolves("[cue:drop@180.0]", snapshot)
+
+
+def test_time_keyed_malformed_timestamp_does_not_resolve():
+    assert not _citation_resolves("[ev:MIX_MOVE@bad]", SNAPSHOT)
+
+
+def test_allowlist_does_not_double_timestamp_existence_keys():
+    allowlist = _allowlist_for(
+        {
+            "ev": {"MIX_MOVE": [83.0]},
+            "judge": {"transition@128.4": [128.4]},
+            "track": {"54830": [687.889]},
+        }
+    )
+
+    assert "[ev:MIX_MOVE@01:23]" in allowlist
+    assert "[judge:transition@128.4]" in allowlist
+    assert "[judge:transition@128.4@02:08]" not in allowlist
+    assert "[track:54830]" in allowlist
+    assert "[track:54830@11:27]" not in allowlist
 
 
 def test_does_not_resolve_unknown_source():

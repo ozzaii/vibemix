@@ -228,7 +228,7 @@ class DebriefWsServer:
         )
 
     def _build_tooltip_reply(self, event_id: str) -> str:
-        from vibemix.debrief.drills import _parse_citation_tag
+        from vibemix.debrief.drills import _parse_citation_atom, _parse_citation_tag
         from vibemix.ui_bus import DebriefCitationTooltip
 
         evidence_snapshot = self.state.get("evidence_snapshot") or {}
@@ -244,6 +244,14 @@ class DebriefWsServer:
             ).to_json()
         source, key, t_target = parsed
         ts = (evidence_snapshot.get(source, {}) or {}).get(key, [])
+        if not ts:
+            atom = _parse_citation_atom(bracketed)
+            if atom is not None:
+                _source, raw_body = atom
+                ts = (evidence_snapshot.get(source, {}) or {}).get(raw_body, [])
+                if ts:
+                    key = raw_body
+                    t_target = None
         if not ts:
             return DebriefCitationTooltip.make(
                 event_id=event_id,

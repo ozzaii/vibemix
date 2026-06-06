@@ -1,7 +1,8 @@
 # SPDX-License-Identifier: Apache-2.0
 from __future__ import annotations
 
-from vibemix.debrief.main import _build_cited_critique
+from vibemix.debrief.main import _build_cited_critique, _near_miss_receipt_text
+from vibemix.debrief.near_miss_detector import NearMissResult
 from vibemix.debrief.stripper import assert_all_cited, strip_uncited_sentences
 
 
@@ -66,3 +67,76 @@ def test_debrief_critique_judged_clash() -> None:
     assert "key clash" in critique
     assert "both basslines up, low-end mud" in critique
     assert_all_cited(critique)
+
+
+def test_debrief_critique_includes_learn_grade_receipts() -> None:
+    critique = _build_cited_critique(
+        [
+            {
+                "kind": "learn_beatmatch_practice_graded",
+                "lesson_id": "L2.01",
+                "step_id": "lock",
+                "evidence_time": 42.4,
+                "verdict": "locked",
+                "credited": ["beatmatching"],
+            },
+            {
+                "kind": "learn_cue_placement_practice_graded",
+                "lesson_id": "L3.06",
+                "step_id": "drop",
+                "evidence_time": 64.0,
+                "verdict": "drop_locked",
+                "credited": ["phrasing_performance"],
+            },
+        ],
+        [],
+    )
+
+    assert "beatmatch practice graded locked" in critique
+    assert "[ev:BEATMATCH_GRADED@42.400]" in critique
+    assert "cue placement practice graded drop_locked" in critique
+    assert "[ev:CUE_PLACEMENT_GRADED@64.000]" in critique
+    assert_all_cited(critique)
+
+
+def test_near_miss_receipt_adds_wall_clock_and_matching_judge_context() -> None:
+    near_miss = NearMissResult(
+        t_center_s=42.0,
+        window_start_s=36.0,
+        window_end_s=46.0,
+        depth_beats=0.16,
+        recovery_bars=2.0,
+        confidence=0.82,
+        bpm=120.0,
+        phase_error_beats_peak=0.16,
+        citation="[mix:near_miss@42.000]",
+        event_type="MIX_MOVE",
+        event_t_s=40.0,
+    )
+    events = [
+        {
+            "t": 0.0,
+            "kind": "session_start",
+            "wall_clock_iso": "2026-05-15T11:21:39+00:00",
+        },
+        {
+            "t": 40.0,
+            "kind": "transition_judged",
+            "verdict_state": "judged",
+            "score": 0.71,
+            "components": {"harmonic": 0.75, "bass_collision": 1.0},
+            "citation_id": "judge:transition@40.0",
+        },
+    ]
+
+    receipt = _near_miss_receipt_text(
+        near_miss,
+        "the mix recovered by ear at 0:42 [mix:near_miss@42.000]",
+        events,
+    )
+
+    assert "wall clock 11:22:21 last night" in receipt
+    assert "[judge:transition@40.0]" in receipt
+    assert "compatible keys" in receipt
+    assert "clean low end" in receipt
+    assert_all_cited(receipt)

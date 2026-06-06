@@ -206,6 +206,19 @@ async def test_citation_tooltip_request_roundtrip(tmp_path: Path):
             pass
 
 
+def test_citation_tooltip_resolves_existence_key_with_at(tmp_path: Path):
+    state = _fixture_state(tmp_path)
+    state["evidence_snapshot"]["judge"] = {"transition@40.0": [40.0]}
+    server = DebriefWsServer(port=_free_port(), state=state)
+
+    msg = json.loads(server._build_tooltip_reply("judge:transition@40.0"))
+
+    assert msg["type"] == "ipc.debrief.citation-tooltip"
+    assert msg["payload"]["found"] is True
+    assert msg["payload"]["timestamp"] == 40.0
+    assert msg["payload"]["evidence_text"] == "judge:transition@40.0 @ 40.0s"
+
+
 @pytest.mark.anyio("asyncio")
 async def test_emit_error_frame(tmp_path: Path):
     """Client receives an ipc.debrief.error frame when emit_error called."""
