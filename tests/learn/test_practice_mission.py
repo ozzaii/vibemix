@@ -168,6 +168,21 @@ def test_cleared_competent_skill_turns_into_cited_proof_mission() -> None:
     assert mission["meter_caption"] == "2 proofs left to Mastery"
 
 
+def test_zpd_frontier_proof_mission_beats_linear_empty_lesson() -> None:
+    progress = LearnProgress(course_2_unlocked=True, course_3_unlocked=True)
+    _make_skill_competent(progress, "deck_control")
+    _make_skill_competent(progress, "beatmatching")
+    _make_skill_competent(progress, "eq_mixing")
+
+    mission = next_practice_mission(progress)
+
+    assert mission["mode"] == "prove"
+    assert mission["skill_id"] == "eq_mixing"
+    assert mission["lesson_id"] == "L1.14"
+    assert mission["focus"] == "proof"
+    assert mission["challenge"] == "Only cited live proof moves Mastery."
+
+
 def test_active_competent_lesson_becomes_the_current_proof_mission() -> None:
     progress = LearnProgress()
     _make_skill_competent(progress, "deck_control")

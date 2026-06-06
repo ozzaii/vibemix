@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from vibemix.learn.coaching_aim import resolve_coaching_aim_skill
 from vibemix.learn.curriculum import COURSE_REGISTRY, CURRICULUM
 from vibemix.learn.skill_tree import SKILL_MANIFEST, skill_wall_payload
 
@@ -131,11 +132,11 @@ def _recommended_lesson(
             return lesson_id, "finish"
         if first_empty is None and status != "completed" and lesson_id not in _INTRO_LESSON_IDS:
             first_empty = lesson_id
-    if first_empty is not None:
-        return first_empty, "start"
     proof_lesson_id = _proof_lesson(progress, wall)
     if proof_lesson_id is not None:
         return proof_lesson_id, "prove"
+    if first_empty is not None:
+        return first_empty, "start"
     if first_unlocked is not None:
         return first_unlocked, "replay"
     return "L1.01", "start"
@@ -172,19 +173,51 @@ def _mission_skill_id(lesson_id: str, wall: list[dict[str, Any]]) -> str:
 
 
 def _proof_lesson(progress: Any, wall: list[dict[str, Any]]) -> str | None:
+    started = _started_proof_lesson(progress, wall)
+    if started is not None:
+        return started
+    aim_skill = resolve_coaching_aim_skill(progress)
+    if aim_skill is not None:
+        aimed = _proof_lesson_for_skill(progress, aim_skill)
+        if aimed is not None:
+            return aimed
     for row in wall:
         if row.get("stage") != "competent":
             continue
         skill_id = row.get("skill_id")
         if not isinstance(skill_id, str):
             continue
-        spec = SKILL_MANIFEST.get(skill_id)
-        if spec is None or not spec.live_creditable:
+        lesson_id = _proof_lesson_for_skill(progress, skill_id)
+        if lesson_id is not None:
+            return lesson_id
+    return None
+
+
+def _started_proof_lesson(progress: Any, wall: list[dict[str, Any]]) -> str | None:
+    for row in wall:
+        if row.get("stage") != "competent":
             continue
-        for lesson_id in spec.lesson_ids:
-            meta = CURRICULUM.get(lesson_id)
-            if meta is not None and _course_unlocked(progress, meta.course_id):
-                return lesson_id
+        if _safe_int(row.get("live_proof_count"), default=0) <= 0:
+            continue
+        skill_id = row.get("skill_id")
+        if not isinstance(skill_id, str):
+            continue
+        lesson_id = _proof_lesson_for_skill(progress, skill_id)
+        if lesson_id is not None:
+            return lesson_id
+    return None
+
+
+def _proof_lesson_for_skill(progress: Any, skill_id: str) -> str | None:
+    spec = SKILL_MANIFEST.get(skill_id)
+    if spec is None or not spec.live_creditable:
+        return None
+    if not bool(getattr(progress, spec.gate, False)):
+        return None
+    for lesson_id in spec.lesson_ids:
+        meta = CURRICULUM.get(lesson_id)
+        if meta is not None and _course_unlocked(progress, meta.course_id):
+            return lesson_id
     return None
 
 
