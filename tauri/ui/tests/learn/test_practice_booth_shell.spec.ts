@@ -2238,6 +2238,74 @@ describe("practice booth shell", () => {
     }
   });
 
+  it("renders measured-miss recovery missions as fix loops", () => {
+    const root = document.getElementById("learn-root") as HTMLElement;
+    const { ws } = mountLearnWindow(root);
+    try {
+      window.dispatchEvent(
+        new CustomEvent("ipc.learn.progress_state", {
+          detail: {
+            action: "snapshot",
+            progress: {
+              schema_version: 2,
+              courses: {},
+              lessons: completedRows(["L2.01", "L2.02"]),
+              course_2_unlocked: true,
+              course_3_unlocked: false,
+              next_practice_mission: {
+                lesson_id: "L2.01",
+                course_id: "course_2_transitions",
+                course_label: "Course 2 · Transitions",
+                skill_id: "beatmatching",
+                skill_label: "beatmatching",
+                title: "beatmatching by ear",
+                mode: "prove",
+                command: "Fix phase drift on beatmatching by ear; deck B is late.",
+                payoff: "You hear drift tighten into lock instead of reading about it.",
+                proof: "last measured miss: phase drift",
+                why: "fix the measured miss before chasing the next proof",
+                estimated_minutes: 6,
+                focus: "recovery",
+                focus_label: "phase drift",
+                challenge: "Deck B is late; nudge it forward before chasing proof.",
+                meter_label: "recovery target",
+                meter_value: 0,
+                meter_max: 1,
+                meter_state: "retry",
+                meter_caption: "0.05 beats from lock",
+              },
+            },
+          },
+        }),
+      );
+
+      expect(
+        root.querySelector<HTMLButtonElement>("#learn-start-recommended")
+          ?.textContent,
+      ).toMatch(/fix beatmatching by ear/i);
+      expect(root.querySelector<HTMLElement>("#learn-booth-pulse")?.textContent).toBe(
+        "phase drift",
+      );
+      expect(
+        root.querySelector<HTMLElement>("#learn-booth-command-text")?.textContent,
+      ).toBe("Fix phase drift on beatmatching by ear; deck B is late.");
+      expect(root.querySelector<HTMLElement>("#learn-booth-proof")?.textContent).toBe(
+        "last measured miss: phase drift",
+      );
+      const reward = root.querySelector<HTMLElement>("#learn-booth-reward")!;
+      expect(reward.dataset.visible).toBe("true");
+      expect(reward.dataset.state).toBe("retry");
+      expect(
+        root.querySelector<HTMLElement>("#learn-booth-reward-label")?.textContent,
+      ).toBe("recovery target 0/1");
+      expect(
+        root.querySelector<HTMLElement>("#learn-booth-reward-caption")?.textContent,
+      ).toBe("0.05 beats from lock");
+    } finally {
+      ws.close();
+    }
+  });
+
   it("turns earned mastery into a review mission with a full booth meter", () => {
     const root = document.getElementById("learn-root") as HTMLElement;
     const { ws } = mountLearnWindow(root);

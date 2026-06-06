@@ -2096,6 +2096,7 @@ function applyMissionRecommendation(
 }
 
 function missionActionVerb(mission: LearnPracticeMission): string {
+  if (mission.focus === "recovery") return "fix";
   if (mission.mode === "prove") return "prove";
   if (mission.mode === "mastered") return "review";
   if (mission.mode === "replay") return "replay";

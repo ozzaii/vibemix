@@ -11024,3 +11024,31 @@ Proof before staging:
 - `npm --prefix tauri/ui test -- tests/learn/test_practice_booth_shell.spec.ts`
 - `npm --prefix tauri/ui run build`
 - `git diff --check -- src/vibemix/learn/progress.py src/vibemix/learn/practice_mission.py src/vibemix/learn/runtime.py src/vibemix/learn/curriculum_projection.py tests/learn/test_progress_persistence.py tests/learn/test_practice_mission.py tests/learn/test_runtime_evidence_grounding.py tauri/ui/src/ipc/messages.schema.json tauri/ui/src/ipc/messages.ts tauri/ui/src/ipc/validator.generated.mjs tauri/ui/src/learn/learn-window.ts tauri/ui/src/learn/lesson/curriculum-meta.ts .planning/handoffs/2026-05-31-package-checklist.md`
+
+## Package 98 - Learn Recovery Mission CTA
+
+Suggested commit: `fix(learn-ui): label recovery missions as fixes`
+
+Include:
+
+- `tauri/ui/src/learn/learn-window.ts`
+- `tauri/ui/tests/learn/test_practice_booth_shell.spec.ts`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Backend recovery feedback persistence, Mastery-credit rules, status-priority
+  redesign, and broader Learn visual layout. This package only changes the
+  primary practice CTA language for already-grounded recovery missions.
+
+Reason:
+
+- The backend now marks measured-miss missions with `focus: "recovery"`. The
+  first visible action should say "fix", not "prove", so learners understand the
+  app is sending them back to repair a specific miss before chasing Mastery.
+
+Proof before staging:
+
+- `npm --prefix tauri/ui test -- tests/learn/test_practice_booth_shell.spec.ts`
+- `npm --prefix tauri/ui run build`
+- `git diff --check -- tauri/ui/src/learn/learn-window.ts tauri/ui/tests/learn/test_practice_booth_shell.spec.ts .planning/handoffs/2026-05-31-package-checklist.md`
