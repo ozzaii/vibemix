@@ -2482,7 +2482,29 @@ describe("practice booth shell", () => {
 
       const reward = root.querySelector<HTMLElement>("#learn-booth-reward")!;
       expect(root.querySelector<HTMLElement>("#learn-booth-pulse")?.textContent).toBe(
-        "practice bank 3/3",
+        "controller checkpoint waiting",
+      );
+      expect(
+        root.querySelector<HTMLElement>("#learn-booth-pulse")?.getAttribute("aria-label"),
+      ).toContain("connect controller for channel strip");
+      expect(root.querySelector<HTMLElement>("#learn-booth-proof")?.textContent).toBe(
+        "connect your controller when ready; the screen deck keeps the drill warm.",
+      );
+      expect(
+        root.querySelector<HTMLElement>("#learn-booth-command-text")?.textContent,
+      ).toBe(
+        "controller checkpoint is waiting. connect it when ready; the screen deck keeps the drill warm.",
+      );
+      expect(root.querySelector<HTMLElement>("#learn-booth-input")?.textContent).toBe(
+        "controller next",
+      );
+      expect(root.querySelector<HTMLElement>("#learn-booth-credit")?.textContent).toBe(
+        "hardware pending",
+      );
+      expect(
+        root.querySelector<HTMLElement>("#learn-booth-mission-challenge")?.textContent,
+      ).toBe(
+        "Connect the controller for the hardware rep; screen practice stays banked.",
       );
       expect(reward.dataset.visible).toBe("true");
       expect(reward.dataset.state).toBe("armed");

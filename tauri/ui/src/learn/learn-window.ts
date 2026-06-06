@@ -144,6 +144,8 @@ interface StatusTickPayload {
   };
 }
 
+type BoothReadiness = "hardware" | "midi" | "screen";
+
 interface Course3LensPayload {
   session_active: boolean;
   phrase_position_confidence: number;
@@ -847,20 +849,20 @@ function mountLearnWindow(root: HTMLElement): {
       ? recommended.course_label
       : "Next lesson";
     boothTitle.textContent = recommended?.title ?? "pick a first lesson";
-    boothProof.textContent =
-      cleanMissionText(mission?.proof) ??
-      readinessProofLine(readiness, controllerDisplayName);
-    boothCommandText.textContent =
-      cleanMissionText(mission?.command) ??
-      practiceCommandLine(recommended, readiness, controllerDisplayName);
+    boothProof.textContent = mission
+      ? missionDisplayProof(mission, readiness, controllerDisplayName)
+      : readinessProofLine(readiness, controllerDisplayName);
+    boothCommandText.textContent = mission
+      ? missionDisplayCommand(mission, readiness, controllerDisplayName)
+      : practiceCommandLine(recommended, readiness, controllerDisplayName);
     boothInput.textContent = mission
       ? missionInputLine(mission, readiness, controllerDisplayName)
       : readinessInputLine(readiness, controllerDisplayName);
     boothCredit.textContent = mission
-      ? missionCreditLine(mission)
+      ? missionCreditLine(mission, readiness)
       : readinessCreditLine(readiness);
     boothVoice.textContent = voiceReadinessLine(latestVoiceStatus);
-    renderBoothMission(mission);
+    renderBoothMission(mission, readiness);
     renderBoothChain(mission, recommended, lessons);
     if (mission) {
       renderBoothReward(mission);
@@ -875,7 +877,10 @@ function mountLearnWindow(root: HTMLElement): {
       title: cue.title,
     });
   };
-  const renderBoothMission = (mission?: LearnPracticeMission): void => {
+  const renderBoothMission = (
+    mission: LearnPracticeMission | undefined,
+    readiness: BoothReadiness,
+  ): void => {
     if (!mission) {
       boothMission.dataset.visible = "false";
       boothMission.removeAttribute("aria-label");
@@ -884,7 +889,7 @@ function mountLearnWindow(root: HTMLElement): {
     const why = cleanMissionText(mission.why) ?? `move ${mission.skill_label} forward`;
     const payoff = cleanMissionText(mission.payoff) ??
       `${Math.max(1, Math.round(mission.estimated_minutes))} min drill`;
-    const challenge = cleanMissionText(mission.challenge) ??
+    const challenge = missionDisplayChallenge(mission, readiness) ??
       cleanMissionText(mission.proof) ??
       "one clean move";
     boothMission.dataset.visible = "true";
@@ -2210,7 +2215,7 @@ function missionActionVerb(mission: LearnPracticeMission): string {
 function missionBoothCue(
   mission: LearnPracticeMission,
   recommended: ProgressListEntry | undefined,
-  readiness: "hardware" | "midi" | "screen",
+  readiness: BoothReadiness,
   controllerName: string | null,
 ): {
   state: "ready";
@@ -2218,6 +2223,24 @@ function missionBoothCue(
   ariaLabel?: string;
   title?: string;
 } {
+  if (missionNeedsControllerConnection(mission, readiness)) {
+    const lesson = recommended?.title ?? mission.title;
+    const reward = missionRewardCaption(mission);
+    const label = [
+      `connect controller for ${lesson}`,
+      missionDisplayProof(mission, readiness, controllerName),
+      missionDisplayChallenge(mission, readiness),
+      reward,
+    ]
+      .filter((part): part is string => Boolean(part))
+      .join(". ");
+    return {
+      state: "ready",
+      text: "controller checkpoint waiting",
+      ariaLabel: label,
+      title: label,
+    };
+  }
   const action = `${missionActionVerb(mission)} ${recommended?.title ?? mission.title}`;
   const why = cleanMissionText(mission.why);
   const payoff = cleanMissionText(mission.payoff);
@@ -2390,9 +2413,50 @@ function missionPracticeSurface(
   return "screen_deck";
 }
 
+function missionNeedsControllerConnection(
+  mission: LearnPracticeMission,
+  readiness: BoothReadiness,
+): boolean {
+  return missionPracticeSurface(mission) === "controller" && readiness === "screen";
+}
+
+function missionDisplayProof(
+  mission: LearnPracticeMission,
+  readiness: BoothReadiness,
+  controllerName: string | null,
+): string {
+  if (missionNeedsControllerConnection(mission, readiness)) {
+    return missionProofPhraseForMission(mission, readiness, controllerName);
+  }
+  return cleanMissionText(mission.proof) ??
+    missionProofPhraseForMission(mission, readiness, controllerName);
+}
+
+function missionDisplayCommand(
+  mission: LearnPracticeMission,
+  readiness: BoothReadiness,
+  controllerName: string | null,
+): string {
+  if (missionNeedsControllerConnection(mission, readiness)) {
+    return "controller checkpoint is waiting. connect it when ready; the screen deck keeps the drill warm.";
+  }
+  return cleanMissionText(mission.command) ??
+    missionProofPhraseForMission(mission, readiness, controllerName);
+}
+
+function missionDisplayChallenge(
+  mission: LearnPracticeMission,
+  readiness: BoothReadiness,
+): string | null {
+  if (missionNeedsControllerConnection(mission, readiness)) {
+    return "Connect the controller for the hardware rep; screen practice stays banked.";
+  }
+  return cleanMissionText(mission.challenge);
+}
+
 function missionInputLine(
   mission: LearnPracticeMission,
-  readiness: "hardware" | "midi" | "screen",
+  readiness: BoothReadiness,
   controllerName: string | null,
 ): string {
   const surface = missionPracticeSurface(mission);
@@ -2405,16 +2469,20 @@ function missionInputLine(
   return "screen deck";
 }
 
-function missionCreditLine(mission: LearnPracticeMission): string {
+function missionCreditLine(
+  mission: LearnPracticeMission,
+  readiness: BoothReadiness,
+): string {
   const surface = missionPracticeSurface(mission);
   if (surface === "live_proof") return "cited proof";
+  if (surface === "controller" && readiness === "screen") return "hardware pending";
   if (surface === "controller") return "hardware rep";
   return "screen rep";
 }
 
 function missionProofPhraseForMission(
   mission: LearnPracticeMission,
-  readiness: "hardware" | "midi" | "screen",
+  readiness: BoothReadiness,
   controllerName: string | null,
 ): string {
   const surface = missionPracticeSurface(mission);
@@ -2431,7 +2499,7 @@ function missionProofPhraseForMission(
 
 
 function readinessProofLine(
-  readiness: "hardware" | "midi" | "screen",
+  readiness: BoothReadiness,
   controllerName: string | null,
 ): string {
   if (readiness === "hardware") {
@@ -2443,7 +2511,7 @@ function readinessProofLine(
 }
 
 function readinessInputLine(
-  readiness: "hardware" | "midi" | "screen",
+  readiness: BoothReadiness,
   controllerName: string | null,
 ): string {
   if (readiness === "hardware") {
@@ -2453,7 +2521,7 @@ function readinessInputLine(
   return "screen deck";
 }
 
-function readinessCreditLine(readiness: "hardware" | "midi" | "screen"): string {
+function readinessCreditLine(readiness: BoothReadiness): string {
   if (readiness === "hardware") return "hardware proof";
   if (readiness === "midi") return "midi proof";
   return "screen rep";
@@ -2491,7 +2559,7 @@ function nextUnlockedRouteLesson(
 
 function practiceCommandLine(
   recommended: ProgressListEntry | undefined,
-  readiness: "hardware" | "midi" | "screen",
+  readiness: BoothReadiness,
   controllerName: string | null,
 ): string {
   const target = practiceTargetLine(recommended);
@@ -2507,7 +2575,7 @@ function practiceCommandLine(
 }
 
 function missionProofPhrase(
-  readiness: "hardware" | "midi" | "screen",
+  readiness: BoothReadiness,
   controllerName: string | null,
 ): string {
   if (readiness === "hardware") {
@@ -2524,7 +2592,7 @@ function missionProofPhrase(
 
 function recommendationBoothCue(
   recommended: ProgressListEntry | undefined,
-  readiness: "hardware" | "midi" | "screen",
+  readiness: BoothReadiness,
   controllerName: string | null,
 ): {
   state: "ready";

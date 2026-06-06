@@ -12931,3 +12931,37 @@ Proof before staging:
 - `npm --prefix tauri/ui run build`
 - `git diff --check -- tauri/ui/src/library/index.ts tauri/ui/src/library/chat.test.ts .planning/handoffs/2026-05-31-package-checklist.md`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+
+## Package 149 - Learn Controller Checkpoint Readiness
+
+Suggested commit: `fix(learn-ui): tell controller checkpoints apart`
+
+Include:
+
+- `tauri/ui/src/learn/learn-window.ts`
+- `tauri/ui/tests/learn/test_practice_booth_shell.spec.ts`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Backend mission ranking, curriculum projection, controller mapping, MIDI
+  driver behavior, lesson scripts, live-grade math, beginner-path suites,
+  library ingest, and shell footer status. This package only changes how the
+  existing Learn booth renders a controller-surface mission when runtime
+  readiness is still screen-only.
+
+Reason:
+
+- After free-practice warmup, the backend can correctly ask for a hardware rep,
+  but a fresh user with no controller connected sees the same ready-looking
+  booth as a screen-deck mission. That reads like Learn is stalled. Keep the
+  mission target intact, but make the frontstage say the controller checkpoint
+  is waiting, keep the screen drill warm, and mark the hardware credit as
+  pending until MIDI/controller proof is available.
+
+Proof before staging:
+
+- `npm --prefix tauri/ui test -- tests/learn/test_practice_booth_shell.spec.ts`
+- `npm --prefix tauri/ui run build`
+- `git diff --check -- tauri/ui/src/learn/learn-window.ts tauri/ui/tests/learn/test_practice_booth_shell.spec.ts .planning/handoffs/2026-05-31-package-checklist.md`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
