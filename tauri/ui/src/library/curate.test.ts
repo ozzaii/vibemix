@@ -240,20 +240,6 @@ describe("curate — real renderCurate path (jsdom, via mountLibrary)", () => {
       "melodic",
     );
     expect(document.getElementById("vmx-lib-rcount")?.textContent).toBe("6 in set");
-    expect(document.getElementById("vmx-lib-scope-state")?.textContent).toBe(
-      "curated order",
-    );
-    expect(document.querySelectorAll("#vmx-lib-scope .vmx-lib-dot-near")).toHaveLength(0);
-    expect(document.querySelectorAll("#vmx-lib-scope .vmx-lib-dot-far")).toHaveLength(0);
-    expect(
-      document.querySelectorAll("#vmx-lib-scope .vmx-lib-dot-sequence"),
-    ).toHaveLength(6);
-    expect(document.getElementById("vmx-lib-scope-note")?.textContent).toContain(
-      "No cosine score",
-    );
-    expect(document.getElementById("vmx-lib-scope")?.getAttribute("aria-label")).toContain(
-      "No vibe-distance score is available",
-    );
   });
 
   it("does not auto-run Codex curation just by opening curate mode", async () => {

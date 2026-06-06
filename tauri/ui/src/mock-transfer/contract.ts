@@ -100,10 +100,8 @@ export const MOCK_TRANSFER_CONTRACT: readonly MockTransferSurface[] = [
       { wire: "library.chat-starters", purpose: "Viber starter prompt actions" },
       { wire: "library.ingest-progress", purpose: "folder ingest progress log" },
       { wire: "library.grounding-panel", purpose: "right-side grounding/receipts panel" },
-      { wire: "library.scope-wrap", purpose: "scope visualization frame" },
       { wire: "library.chat-tools", purpose: "tool trace / grounding receipts" },
       { wire: "library.chat-artifact", purpose: "playlist/export/source artifact" },
-      { wire: "library.scope", purpose: "grounding scope plot" },
       { wire: "library.chat-side", purpose: "chat sidecar receipts area" },
     ],
     dynamicWires: [

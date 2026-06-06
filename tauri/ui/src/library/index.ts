@@ -73,7 +73,6 @@ import {
   type SearchResult,
   type TrackResult,
 } from "./api.js";
-import { renderScope, renderSequenceScope } from "./scope.js";
 import {
   echoText,
   fieldLabel,
@@ -743,55 +742,6 @@ function richTrackRowMarkup(
   </div>`;
 }
 
-function renderSetScopeState(
-  tracks: readonly TrackDisplayInput[],
-  stateLabel: string,
-): void {
-  if (tracks.length === 0) return;
-  setScopeLegend("sequence");
-  $("vmx-lib-scope-state").textContent = `${stateLabel} order`;
-  const scope = $("vmx-lib-scope");
-  scope.innerHTML = renderSequenceScope(
-    tracks.map((track) => {
-      const d = trackDisplayDetails(track);
-      return {
-        track_id: track.track_id,
-        title: d.title,
-        meta: d.subtitle,
-      };
-    }),
-  );
-  scope.setAttribute(
-    "aria-label",
-    `${stateLabel} set order. Points show sequence only. No vibe-distance score is available for this set.`,
-  );
-}
-
-type ScopeLegendMode = "similarity" | "sequence";
-
-function setScopeLegend(mode: ScopeLegendMode): void {
-  const wrap = $maybe("vmx-lib-scope-wrap");
-  const origin = $maybe("vmx-lib-scope-legend-origin");
-  const near = $maybe("vmx-lib-scope-legend-near");
-  const far = $maybe("vmx-lib-scope-legend-far");
-  const note = $maybe("vmx-lib-scope-note");
-  wrap?.setAttribute("data-scope-mode", mode);
-  if (mode === "sequence") {
-    if (origin) origin.textContent = "Set start";
-    if (near) near.textContent = "Sequence order";
-    if (far) far.textContent = "Later slots";
-    if (note) {
-      note.textContent =
-        "Points show set order only. No cosine score is available for this set.";
-    }
-    return;
-  }
-  if (origin) origin.textContent = "Your track";
-  if (near) near.textContent = "Mixes cleanly";
-  if (far) far.textContent = "Different vibe";
-  if (note) note.textContent = "Closer to the center mixes more cleanly.";
-}
-
 function renderResults(result: SearchResult, mode: LibraryMode): void {
   const el = $("vmx-lib-results");
   el.innerHTML = "";
@@ -814,11 +764,7 @@ function renderResults(result: SearchResult, mode: LibraryMode): void {
 
   $("vmx-lib-rcount").textContent =
     `${result.results.length} of ${result.corpus_size}`;
-  setScopeLegend("similarity");
   $("vmx-lib-scope-state").textContent = result.centered ? "centered" : "raw";
-  const scope = $("vmx-lib-scope");
-  scope.removeAttribute("aria-label");
-  scope.innerHTML = renderScope(result, mode);
 }
 
 function setRationaleTitle(title: string): void {
@@ -864,7 +810,6 @@ function renderCurate(result: CurateResult, setTitle = ""): void {
       );
     });
     settleRows(el);
-    renderSetScopeState(result.tracks, "curated");
   }
 
   $("vmx-lib-rcount").textContent = `${result.tracks.length} in set`;
@@ -1092,7 +1037,6 @@ function renderBuildSet(result: BuildSetResult, setTitle = ""): void {
     });
     makeBuildRowsOpenExport(el, result);
     settleRows(el);
-    renderSetScopeState(result.tracks, "sequenced");
   }
 
   $("vmx-lib-rcount").textContent = `${result.tracks.length} in set`;

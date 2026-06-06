@@ -582,23 +582,6 @@ describe("build — real renderBuildSet path (jsdom, via mountLibrary)", () => {
     expect(rows[0]?.querySelector(".vmx-lib-track-chips")?.textContent).toContain(
       "Energy 64",
     );
-    expect(document.getElementById("vmx-lib-scope-state")?.textContent).toBe(
-      "sequenced order",
-    );
-    expect(document.querySelectorAll("#vmx-lib-scope .vmx-lib-dot-near")).toHaveLength(0);
-    expect(document.querySelectorAll("#vmx-lib-scope .vmx-lib-dot-far")).toHaveLength(0);
-    expect(
-      document.querySelectorAll("#vmx-lib-scope .vmx-lib-dot-sequence"),
-    ).toHaveLength(6);
-    expect(document.getElementById("vmx-lib-scope")?.getAttribute("aria-label")).toContain(
-      "No vibe-distance score is available",
-    );
-    expect(document.getElementById("vmx-lib-scope-note")?.textContent).toContain(
-      "No cosine score",
-    );
-    expect(document.getElementById("vmx-lib-scope-legend-near")?.textContent).toBe(
-      "Sequence order",
-    );
     expect(document.getElementById("vmx-lib-rationale-body")?.textContent).toContain(
       "peak-time",
     );

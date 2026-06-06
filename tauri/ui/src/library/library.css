@@ -137,7 +137,7 @@ body {
   flex: 1;
   min-height: 0;
   display: grid;
-  grid-template-columns: 326px minmax(420px, 1fr) 342px;
+  grid-template-columns: 326px minmax(420px, 1fr);
   gap: 0;
   border: 1px solid var(--glass-edge);
   border-radius: var(--rad-sm);
@@ -1288,8 +1288,7 @@ body {
 :is(body, .vmx-lib-app)[data-mode="chat"] .vmx-lib-results,
 :is(body, .vmx-lib-app)[data-mode="chat"] .vmx-lib-rationale,
 :is(body, .vmx-lib-app)[data-mode="chat"] .vmx-lib-export,
-:is(body, .vmx-lib-app)[data-mode="chat"] .vmx-lib-ingest,
-:is(body, .vmx-lib-app)[data-mode="chat"] .vmx-lib-scope-wrap {
+:is(body, .vmx-lib-app)[data-mode="chat"] .vmx-lib-ingest {
   display: none;
 }
 :is(body, .vmx-lib-app)[data-mode="chat"] .vmx-lib-panel:nth-child(2) .vmx-lib-panel-bd {
@@ -2296,117 +2295,13 @@ body {
   color: var(--silk-40);
 }
 
-/* ── right: vibe scope ──────────────────────────────────── */
-.vmx-lib-scope-wrap { display: flex; flex-direction: column; height: 100%; }
-.vmx-lib-scope {
-  position: relative;
-  aspect-ratio: 1;
-  width: 100%;
-  margin-top: 2px;
-  border: 1px solid rgba(214, 207, 199, 0.060);
-  border-radius: var(--rad-sm);
-  background:
-    radial-gradient(circle at 50% 50%, rgba(255, 165, 223, 0.018), transparent 46%),
-    linear-gradient(180deg, rgba(255, 251, 244, 0.010), transparent 42%, rgba(0, 0, 0, 0.18)),
-    rgba(0, 0, 0, 0.18);
-  box-shadow:
-    inset 0 2px 12px rgba(0, 0, 0, 0.66),
-    inset 0 1px 0 rgba(255, 251, 244, 0.020),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.70);
-  overflow: hidden;
-}
-.vmx-lib-scope::before {
-  content: "";
-  position: absolute;
-  inset: 9%;
-  border: 1px solid var(--glass-edge);
-  border-radius: 50%;
-  box-shadow:
-    inset 0 0 22px rgba(0, 0, 0, 0.45),
-    0 0 18px rgba(255, 165, 223, 0.035);
-  pointer-events: none;
-}
-.vmx-lib-scope svg { display: block; width: 100%; height: 100%; }
-.vmx-lib-ringlabel {
-  font-family: var(--type-mono);
-  font-size: 9px;
-  fill: var(--silk-40);
-  letter-spacing: 0.06em;
-}
-.vmx-lib-dot-near { filter: drop-shadow(0 0 6px var(--brand-40)); }
-.vmx-lib-dot-far { filter: drop-shadow(0 0 4px var(--brand-22)); opacity: 0.78; }
-.vmx-lib-dot-origin { filter: drop-shadow(0 0 8px var(--brand-65)); }
-.vmx-lib-sequence-line {
-  stroke: var(--silk-22);
-  stroke-width: 1.15;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  opacity: 0.76;
-}
-.vmx-lib-dot-sequence {
-  fill: var(--silk-65);
-  stroke: var(--silk-40);
-  stroke-width: 1;
-  filter: drop-shadow(0 2px 5px rgba(0, 0, 0, 0.45));
-}
-.vmx-lib-dot-sequence.is-start {
-  fill: var(--silk);
-  stroke: var(--silk-65);
-}
-.vmx-lib-sequence-label {
-  font-family: var(--type-mono);
-  font-size: 7.5px;
-  font-weight: 600;
-  letter-spacing: 0;
-  fill: var(--void-0);
-}
-
-.vmx-lib-legend {
-  margin-top: 12px;
-  padding-top: 12px;
-  border-top: 1px solid var(--glass-edge);
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-.vmx-lib-legend .ln {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  width: fit-content;
-  font-size: 12.5px;
-  color: var(--silk);
-}
-.vmx-lib-legend .ln .sw { width: 9px; height: 9px; border-radius: 50%; flex: none; }
-.vmx-lib-legend .ln .sw.origin { background: var(--amber); box-shadow: var(--glow-soft); }
-.vmx-lib-legend .ln .sw.near { background: var(--amber-pale); }
-.vmx-lib-legend .ln .sw.far { background: var(--silk-40); }
-.vmx-lib-scope-wrap[data-scope-mode="sequence"] .vmx-lib-legend .ln .sw.origin {
-  background: var(--silk);
-  box-shadow: none;
-}
-.vmx-lib-scope-wrap[data-scope-mode="sequence"] .vmx-lib-legend .ln .sw.near {
-  background: var(--silk-65);
-}
-.vmx-lib-scope-wrap[data-scope-mode="sequence"] .vmx-lib-legend .ln .sw.far {
-  background: var(--silk-22);
-}
-.vmx-lib-legend .ln .d {
-  margin-left: auto;
-  font-family: var(--type-mono);
-  font-size: 11px;
-  color: var(--silk-40);
-}
-.vmx-lib-scope-note { margin-top: 14px; font-size: 11.5px; line-height: 1.5; color: var(--silk-40); }
-.vmx-lib-scope-note b { color: var(--silk); font-weight: 500; }
-
-/* sonar ping on the origin dot */
-@keyframes vmx-lib-ping {
-  0% { r: 3; opacity: 0.9; }
-  70% { r: 13; opacity: 0; }
-  100% { opacity: 0; }
-}
-.vmx-lib-seed-ping { animation: vmx-lib-ping 2.8s var(--ease-brand) infinite; }
+/* ── right column (grounding aside) — VIBE SCOPE radar removed (F3/Q7) ──
+   The aside still hosts #vmx-lib-scope-state and the chat-side receipts nodes
+   that index.ts reaches via $() (which throws on a missing id), so it stays in
+   the DOM. It now has no visible content, so hide it and run a 2-col frame
+   with no empty third-column gap. Repurposing this column into a receipts panel
+   is deferred. */
+.vmx-lib-panel[data-wire="library.grounding-panel"] { display: none; }
 
 /* ── ingest mode (overlays center when active) ──────────── */
 .vmx-lib-ingest { display: none; flex-direction: column; gap: 14px; }
@@ -2483,7 +2378,6 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .vmx-lib-row { opacity: 1; transform: none; }
   .vmx-lib-row.settled { transition: none; }
-  .vmx-lib-seed-ping { animation: none; }
   .vmx-lib-brand .dot { animation: none; }
   .vmx-lib-chat-grade { transition: none; }
 }
@@ -2494,7 +2388,7 @@ body {
     gap: 10px;
   }
   .vmx-lib-frame {
-    grid-template-columns: 286px minmax(300px, 1fr) 268px;
+    grid-template-columns: 286px minmax(300px, 1fr);
   }
   .vmx-lib-panel-hd {
     padding: 14px 16px 10px;
@@ -2547,10 +2441,6 @@ body {
   }
   .vmx-lib-run {
     margin-top: 18px;
-  }
-  .vmx-lib-scope {
-    max-width: 360px;
-    align-self: center;
   }
   :is(body, .vmx-lib-app)[data-mode="chat"] .vmx-lib-panel:first-child {
     left: 18px;
