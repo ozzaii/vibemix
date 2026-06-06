@@ -364,6 +364,7 @@ function doMockApi(): void {
 function mountSkeleton(): void {
   document.body.dataset.mode = "chat";
   document.body.innerHTML = `
+    <div class="vmx-lib-app" data-auto-build-on-landing="true">
     <div class="vmx-lib-modeswitch">
       <button data-mode="search" aria-selected="false">Search</button>
       <button data-mode="similar" aria-selected="false">Similar</button>
@@ -420,7 +421,15 @@ function mountSkeleton(): void {
     <span id="vmx-lib-scope-state"></span>
     <div id="vmx-lib-chat-tools"></div>
     <div id="vmx-lib-chat-artifact"></div>
-    <svg id="vmx-lib-scope"></svg>`;
+    <svg id="vmx-lib-scope"></svg>
+    </div>`;
+}
+
+async function flushLandingTimer(): Promise<void> {
+  await Promise.resolve();
+  await Promise.resolve();
+  await new Promise<void>((resolve) => window.setTimeout(resolve, 0));
+  for (let i = 0; i < 6; i++) await Promise.resolve();
 }
 
 /** Boot the real window, switch to build mode, optionally click a curve seg,
@@ -560,9 +569,49 @@ describe("build — real renderBuildSet path (jsdom, via mountLibrary)", () => {
     ) as HTMLButtonElement;
     expect(reveal.hidden).toBe(false);
     expect(reveal.dataset.path).toBe("/tmp/warehouse.xml");
+    expect(reveal.textContent).toBe("Open set");
+    expect(reveal.getAttribute("aria-label")).toBe(
+      "Open exported set /tmp/warehouse.xml",
+    );
     reveal.click();
     await Promise.resolve();
     expect(revealMock).toHaveBeenCalledWith("/tmp/warehouse.xml");
+
+    revealMock.mockClear();
+    const firstRow = document.querySelector<HTMLElement>(".vmx-lib-row");
+    expect(firstRow?.dataset.openExport).toBe("/tmp/warehouse.xml");
+    expect(firstRow?.getAttribute("role")).toBe("button");
+    expect(firstRow?.tabIndex).toBe(0);
+    expect(firstRow?.querySelector(".open-hint")?.textContent).toBe("Open");
+    firstRow?.click();
+    await Promise.resolve();
+    expect(revealMock).toHaveBeenCalledWith("/tmp/warehouse.xml");
+  });
+
+  it("auto-starts set prep on landing when the indexed library is ready", async () => {
+    statsMock.mockResolvedValue({ ...STATS_READY, indexed: 42 });
+    buildMock.mockResolvedValue(DEV_FALLBACK.build);
+    vi.resetModules();
+    doMockApi();
+    const { mountLibrary } = await import("./index.js");
+    mountSkeleton();
+    mountLibrary();
+
+    await flushLandingTimer();
+
+    expect(document.body.dataset.mode).toBe("build");
+    expect(buildMock).toHaveBeenCalledTimes(1);
+    expect(buildMock).toHaveBeenCalledWith(
+      initialLibraryState.brief,
+      "peak_time",
+      false,
+    );
+    expect(
+      document.querySelector<HTMLElement>('button[data-mode="build"]')?.getAttribute(
+        "aria-selected",
+      ),
+    ).toBe("true");
+    expect(document.querySelectorAll(".vmx-lib-row")).toHaveLength(6);
   });
 
   it("sends per-run tag permission only when the build switch is on", async () => {
@@ -594,17 +643,16 @@ describe("build — real renderBuildSet path (jsdom, via mountLibrary)", () => {
   });
 
   it("does not auto-run AutoCrate just by opening build mode", async () => {
+    statsMock.mockResolvedValue({ ...STATS_READY, indexed: 42 });
     buildMock.mockResolvedValue(DEV_FALLBACK.build);
     vi.resetModules();
     doMockApi();
     const { mountLibrary } = await import("./index.js");
     mountSkeleton();
     mountLibrary();
-    await Promise.resolve();
-    await Promise.resolve();
 
     document.querySelector<HTMLElement>('button[data-mode="build"]')?.click();
-    for (let i = 0; i < 6; i++) await Promise.resolve();
+    await flushLandingTimer();
 
     expect(buildMock).not.toHaveBeenCalled();
     expect(document.getElementById("vmx-lib-rationale-body")?.textContent).toBe(

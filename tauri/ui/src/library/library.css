@@ -739,6 +739,17 @@ body {
     inset 0 -2px 0 rgba(0, 0, 0, 0.62),
     0 1px 0 rgba(0, 0, 0, 0.62);
 }
+.vmx-lib-row[data-open-export] {
+  cursor: pointer;
+}
+.vmx-lib-row[data-open-export]:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 251, 244, 0.034),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.62),
+    var(--glow-soft);
+}
 .vmx-lib-row.top {
   background:
     linear-gradient(90deg, var(--brand-12), transparent 50%),
@@ -810,6 +821,21 @@ body {
   letter-spacing: 0.02em;
 }
 .vmx-lib-row .score { text-align: right; }
+.vmx-lib-row .open-hint {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0 9px;
+  border: 1px solid var(--brand-22);
+  border-radius: var(--rad-sm);
+  background: var(--brand-04);
+  color: var(--brand);
+  font-family: var(--type-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
 .vmx-lib-row .score .num {
   font-family: var(--type-mono);
   font-size: 14px;

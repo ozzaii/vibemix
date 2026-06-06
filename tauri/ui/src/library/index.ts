@@ -671,26 +671,63 @@ function setExportRevealTarget(path: string | null): void {
   }
   button.hidden = false;
   button.disabled = false;
-  button.textContent = "Reveal";
+  button.textContent = "Open set";
   button.dataset.path = cleanPath;
-  button.setAttribute("aria-label", `Reveal export ${cleanPath}`);
+  button.setAttribute("aria-label", `Open exported set ${cleanPath}`);
+}
+
+async function revealExportPath(
+  path: string,
+  button?: HTMLButtonElement,
+): Promise<void> {
+  const cleanPath = path.trim();
+  if (!cleanPath) return;
+  const hint = $maybe("vmx-lib-export-hint");
+  const previousLabel = button?.textContent || "Open set";
+  if (button) {
+    button.disabled = true;
+    button.textContent = "Opening";
+  }
+  try {
+    const opened = await libraryRevealExport(cleanPath);
+    if (!opened && hint) {
+      hint.textContent = "Open the exported file from the path above.";
+    }
+  } catch (err) {
+    if (hint) hint.textContent = `Could not open export: ${errorMessage(err)}`;
+  } finally {
+    if (button) {
+      button.disabled = false;
+      button.textContent = previousLabel;
+    }
+  }
 }
 
 async function revealExportFromButton(button: HTMLButtonElement): Promise<void> {
   const path = button.dataset.path?.trim();
   if (!path) return;
-  const hint = $maybe("vmx-lib-export-hint");
-  const previousLabel = button.textContent || "Reveal";
-  button.disabled = true;
-  button.textContent = "Revealing";
-  try {
-    await libraryRevealExport(path);
-  } catch (err) {
-    if (hint) hint.textContent = `Could not reveal export: ${errorMessage(err)}`;
-  } finally {
-    button.disabled = false;
-    button.textContent = previousLabel;
-  }
+  await revealExportPath(path, button);
+}
+
+function makeBuildRowsOpenExport(
+  container: HTMLElement,
+  result: BuildSetResult,
+): void {
+  const openPath = buildExportRevealPath(result);
+  if (!openPath) return;
+  const rows = Array.from(container.querySelectorAll<HTMLElement>(".vmx-lib-row"));
+  rows.forEach((row, index) => {
+    row.dataset.openExport = openPath;
+    row.tabIndex = 0;
+    row.setAttribute("role", "button");
+    row.setAttribute("aria-label", `Open built set export ${index + 1}`);
+    row.addEventListener("click", () => void revealExportPath(openPath));
+    row.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter" && event.key !== " ") return;
+      event.preventDefault();
+      void revealExportPath(openPath);
+    });
+  });
 }
 
 function buildAutoCueMeta(result: BuildSetResult): string | null {
@@ -790,17 +827,22 @@ function renderBuildSet(result: BuildSetResult): void {
       ) ||
       agentFailureMarkup(result, "build");
   } else {
+    const openPath = buildExportRevealPath(result);
     result.tracks.forEach((t, i) => {
       const top = i === 0 ? " top" : "";
+      const openAffordance = openPath
+        ? `<span class="open-hint">Open</span>`
+        : "";
       el.insertAdjacentHTML(
         "beforeend",
         `<div class="vmx-lib-row${top}">
           <div class="rank">${String(i + 1).padStart(2, "0")}</div>
           <div><div class="title">${esc(t.title)}</div><div class="meta">${esc(t.meta)}</div></div>
-          <div class="score"></div>
+          <div class="score">${openAffordance}</div>
         </div>`,
       );
     });
+    makeBuildRowsOpenExport(el, result);
     Array.from(el.children).forEach((row, i) => {
       requestAnimationFrame(() =>
         setTimeout(() => row.classList.add("settled"), i * 55),
@@ -2226,6 +2268,9 @@ export function mountLibrary(root: ParentNode = document): void {
   let busy = false;
   let runSeq = 0;
   let cancelActiveRun: (() => void) | null = null;
+  let autoBuildOnLandingQueued = false;
+  let autoBuildOnLandingStarted = false;
+  let userSelectedMode = false;
 
   const qInput = $("vmx-lib-q") as HTMLInputElement;
   const folderInput = $("vmx-lib-folder") as HTMLInputElement;
@@ -2289,7 +2334,9 @@ export function mountLibrary(root: ParentNode = document): void {
 
   async function refreshStats(): Promise<void> {
     try {
-      renderStats(await libraryStats());
+      const stats = await libraryStats();
+      renderStats(stats);
+      maybeAutoBuildOnLanding(stats);
       if (state.mode === "chat" && !busy) renderChatIdleSide();
     } catch (err) {
       renderStatsError(err);
@@ -2312,6 +2359,33 @@ export function mountLibrary(root: ParentNode = document): void {
 
   function isCurrentRun(runId: number, mode: LibraryMode): boolean {
     return runSeq === runId && state.mode === mode;
+  }
+
+  function canAutoBuildOnLanding(stats: LibraryStats): boolean {
+    const app = runBtn.closest<HTMLElement>(".vmx-lib-app");
+    if (app?.dataset.autoBuildOnLanding !== "true") return false;
+    if (stats.indexed <= 0) return false;
+    if (stats.backend.trim().toLowerCase() === "unavailable") return false;
+    if (stats.agent_ready === false) return false;
+    if (stats.clap_model_installed === false) return false;
+    return true;
+  }
+
+  function maybeAutoBuildOnLanding(stats: LibraryStats): void {
+    if (autoBuildOnLandingStarted || autoBuildOnLandingQueued) return;
+    if (userSelectedMode || state.mode !== "chat") return;
+    if (!canAutoBuildOnLanding(stats)) return;
+
+    autoBuildOnLandingQueued = true;
+    window.setTimeout(() => {
+      autoBuildOnLandingQueued = false;
+      if (!runBtn.isConnected) return;
+      if (autoBuildOnLandingStarted || userSelectedMode || state.mode !== "chat") return;
+      if (busy) return;
+      autoBuildOnLandingStarted = true;
+      activateMode("build");
+      void run();
+    }, 0);
   }
 
   function cancelRun(): void {
@@ -2683,6 +2757,7 @@ export function mountLibrary(root: ParentNode = document): void {
   // ── event wiring ───────────────────────────────────────────────────────────
 
   runBtn.addEventListener("click", () => {
+    if (state.mode === "chat") userSelectedMode = true;
     if (busy && state.mode === "ingest" && cancelActiveRun) {
       cancelActiveRun();
       return;
@@ -2727,12 +2802,14 @@ export function mountLibrary(root: ParentNode = document): void {
   chatInput.addEventListener("keydown", (e) => {
     if (e.key === "Enter" && !e.shiftKey && state.mode === "chat") {
       e.preventDefault();
+      userSelectedMode = true;
       void run();
     }
   });
 
   $all(".vmx-lib-modeswitch button").forEach((b) => {
     b.addEventListener("click", () => {
+      userSelectedMode = true;
       activateMode(libraryModeFromDataset(b.dataset.mode) ?? "search");
     });
   });
@@ -2815,6 +2892,7 @@ export function mountLibrary(root: ParentNode = document): void {
   $all("[data-chat]").forEach((chip) => {
     chip.addEventListener("click", () => {
       if (state.mode !== "chat") return;
+      userSelectedMode = true;
       const message = chip.dataset.chat ?? chip.textContent ?? "";
       chatInput.value = message;
       state = setChatMessage(state, message);
@@ -2826,7 +2904,10 @@ export function mountLibrary(root: ParentNode = document): void {
     button.addEventListener("click", () => {
       if (state.mode !== "chat") return;
       const mode = libraryModeFromDataset(button.dataset.modeJump);
-      if (mode) activateMode(mode);
+      if (mode) {
+        userSelectedMode = true;
+        activateMode(mode);
+      }
     });
   });
 
