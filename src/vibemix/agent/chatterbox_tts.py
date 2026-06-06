@@ -17,11 +17,14 @@ honest reason instead of falling back to another voice.
 
 from __future__ import annotations
 
+import aifc
 import asyncio
 import importlib.util
 import os
 import queue
+import subprocess
 import sys
+import tempfile
 import threading
 from collections.abc import Callable
 from pathlib import Path
@@ -46,6 +49,9 @@ REF_ENV = "VIBEMIX_CHATTERBOX_REF"
 MODEL_ENV = "VIBEMIX_CHATTERBOX_MODEL"
 TEMP_ENV = "VIBEMIX_CHATTERBOX_TEMP"
 MAX_TOKENS_ENV = "VIBEMIX_CHATTERBOX_MAX_TOKENS"
+LIVE_CACHE_ONLY_ENV = "VIBEMIX_CHATTERBOX_LIVE_CACHE_ONLY"
+SYSTEM_FALLBACK_ENV = "VIBEMIX_SYSTEM_TTS_FALLBACK"
+SYSTEM_FALLBACK_VOICE_ENV = "VIBEMIX_SYSTEM_TTS_VOICE"
 
 _DEFAULT_MODEL = CHATTERBOX_MODEL_REPO
 _DEFAULT_TEMP = 0.4  # Kaan-locked: tags fire as SOUND (not read literally), quality holds
@@ -135,6 +141,32 @@ def engine_selected() -> bool:
     return os.environ.get(ENGINE_ENV, "chatterbox").strip().lower() == "chatterbox"
 
 
+def _env_truthy(name: str, *, default: bool = False) -> bool:
+    raw = os.environ.get(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() in {"1", "true", "on", "yes"}
+
+
+def live_cache_only_enabled() -> bool:
+    """True when live speech must avoid fresh MLX Chatterbox synthesis."""
+    return _env_truthy(LIVE_CACHE_ONLY_ENV)
+
+
+def system_fallback_enabled() -> bool:
+    """True when cache misses may use the local macOS speech renderer."""
+    return _env_truthy(SYSTEM_FALLBACK_ENV)
+
+
+def system_fallback_available() -> bool:
+    """Return True only when the local system speech renderer can run here."""
+    return (
+        system_fallback_enabled()
+        and sys.platform == "darwin"
+        and Path("/usr/bin/say").exists()
+    )
+
+
 def chatterbox_available() -> bool:
     """True when Chatterbox can render without first-line network downloads."""
     if importlib.util.find_spec("mlx_audio") is None:
@@ -155,6 +187,77 @@ def chatterbox_unavailable_reason() -> str:
             f"for {CHATTERBOX_MODEL_REPO}@{CHATTERBOX_MODEL_REVISION} before starting a set."
         )
     return "unknown"
+
+
+def _system_say_pcm(text: str) -> bytes:
+    """Render a short local macOS system-voice line as 24 kHz mono PCM16 LE."""
+    spoken = " ".join((text or "").split())
+    if not spoken:
+        return b""
+    if not system_fallback_available():
+        raise APIError("local system TTS fallback unavailable")
+
+    import numpy as np
+
+    tmp_path: str | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            prefix="vibemix-system-tts-",
+            suffix=".aiff",
+            delete=False,
+        ) as tmp:
+            tmp_path = tmp.name
+        Path(tmp_path).unlink(missing_ok=True)
+        cmd = [
+            "/usr/bin/say",
+            "--file-format=AIFF",
+            "-o",
+            tmp_path,
+        ]
+        voice = os.environ.get(SYSTEM_FALLBACK_VOICE_ENV, "").strip()
+        if voice:
+            cmd.extend(["-v", voice])
+        cmd.append(spoken)
+        subprocess.run(
+            cmd,
+            check=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.PIPE,
+            timeout=6.0,
+        )
+        with aifc.open(tmp_path, "rb") as aiff:
+            channels = int(aiff.getnchannels())
+            sample_rate = int(aiff.getframerate())
+            sample_width = int(aiff.getsampwidth())
+            frames = int(aiff.getnframes())
+            raw = aiff.readframes(frames)
+        if sample_width != 2:
+            raise APIError(f"local system TTS returned {sample_width * 8}-bit audio")
+        samples = np.frombuffer(raw, dtype=">i2")
+        if channels > 1:
+            samples = samples.reshape(-1, channels).mean(axis=1)
+        samples_f = samples.astype(np.float32) / 32767.0
+        if sample_rate != NATIVE_SR:
+            from vibemix.audio.resample import resample_audio
+
+            samples_f = resample_audio(
+                samples_f,
+                source_sr=sample_rate,
+                target_sr=NATIVE_SR,
+            )
+        return np.clip(samples_f * 32767.0, -32768.0, 32767.0).astype("<i2").tobytes()
+    except subprocess.CalledProcessError as exc:
+        stderr = (exc.stderr or b"").decode(errors="replace").strip()
+        detail = f": {stderr}" if stderr else ""
+        raise APIError(f"local system TTS synthesis failed{detail}") from exc
+    except subprocess.TimeoutExpired as exc:
+        raise APIError("local system TTS synthesis timed out") from exc
+    finally:
+        if tmp_path:
+            try:
+                Path(tmp_path).unlink(missing_ok=True)
+            except Exception:
+                pass
 
 
 class ChatterboxEngine:
@@ -368,7 +471,12 @@ class ChatterboxLocalTTS(agents_tts.TTS):
                         if on_pcm_callback is not None:
                             on_pcm_callback(pcm)
 
-                    self._get_engine().synthesize(job.text, _on_pcm)
+                    if live_cache_only_enabled() and system_fallback_available():
+                        fallback_pcm = _system_say_pcm(job.text)
+                        if fallback_pcm:
+                            _on_pcm(fallback_pcm)
+                    else:
+                        self._get_engine().synthesize(job.text, _on_pcm)
                     if job.cache_key is not None and cache_chunks:
                         self._store_pcm_cache(job.cache_key, tuple(cache_chunks))
                 else:
@@ -418,6 +526,10 @@ class ChatterboxLocalTTS(agents_tts.TTS):
         if not self._prewarm_done.wait(timeout_s):
             return False
         return self._engine is not None and self._prewarm_error is None
+
+    def requires_live_prewarm(self) -> bool:
+        """False when live cache misses use the fast local fallback."""
+        return not (live_cache_only_enabled() and system_fallback_available())
 
     def _speech_cache_key(self, text: str) -> str:
         return " ".join((text or "").split())
@@ -469,8 +581,10 @@ class ChatterboxLocalTTS(agents_tts.TTS):
         return True
 
     def has_cached_text(self, text: str) -> bool:
-        """True only when ``text`` can be spoken without a fresh synth job."""
+        """True when ``text`` can be spoken without a fresh MLX synth job."""
         cache_key = self._speech_cache_key(text)
+        if cache_key and live_cache_only_enabled() and system_fallback_available():
+            return True
         return bool(cache_key and self._cached_pcm(cache_key) is not None)
 
     def synthesize_pcm(self, text: str, on_pcm: Callable[[bytes], None]) -> None:
@@ -582,8 +696,9 @@ def build_chatterbox_adapter(
     *, ref_path: str | None = None, chatterbox: ChatterboxLocalTTS | None = None
 ) -> agents_tts.FallbackAdapter:
     """Build the Chatterbox-only live voice chain."""
-    if chatterbox is None and not chatterbox_available():
+    if chatterbox is None and not (chatterbox_available() or system_fallback_available()):
         raise ChatterboxUnavailable(chatterbox_unavailable_reason())
     cbt = chatterbox or ChatterboxLocalTTS(ref_path=ref_path)
-    cbt.prewarm()
+    if cbt.requires_live_prewarm():
+        cbt.prewarm()
     return agents_tts.FallbackAdapter(tts=[cbt], max_retry_per_tts=1)

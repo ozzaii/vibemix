@@ -33,10 +33,16 @@ def build_tts_chain(
         ChatterboxUnavailable,
         build_chatterbox_adapter,
         engine_selected,
+        system_fallback_available,
     )
 
     if not engine_selected():
         raise ChatterboxUnavailable("Chatterbox is the only supported local voice engine")
+    if chatterbox is None and not system_fallback_available():
+        from vibemix.agent.chatterbox_tts import chatterbox_available, chatterbox_unavailable_reason
+
+        if not chatterbox_available():
+            raise ChatterboxUnavailable(chatterbox_unavailable_reason())
     if chatterbox is not None and not isinstance(chatterbox, ChatterboxLocalTTS):
         raise TypeError("chatterbox must be a ChatterboxLocalTTS instance")
     return build_chatterbox_adapter(chatterbox=chatterbox)

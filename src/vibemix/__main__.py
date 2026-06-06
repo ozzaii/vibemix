@@ -1185,9 +1185,30 @@ def _voice_callback_factory(playback: PlaybackQueue):
     return callback
 
 
-def _passthrough_callback_factory(passthrough: PassthroughBuffer):
+def _passthrough_callback_factory(
+    passthrough: PassthroughBuffer,
+    voice_playback: PlaybackQueue | None = None,
+):
     """Verbatim port of cohost_v4.py:864-873 passthrough output callback."""
     bytes_per_frame = 2 * 4  # stereo float32 = 8 bytes/frame
+    voice_ratio = INPUT_SR_NATIVE // OUTPUT_SR if INPUT_SR_NATIVE % OUTPUT_SR == 0 else 0
+
+    def _mix_voice(arr: np.ndarray, frames: int) -> None:
+        if voice_playback is None or voice_ratio <= 0:
+            return
+        voice_frames = max(1, frames // voice_ratio)
+        voice_raw = voice_playback.pull(voice_frames * 2)
+        if not voice_raw:
+            return
+        voice_i16 = np.frombuffer(voice_raw, dtype="<i2")
+        if voice_i16.size == 0:
+            return
+        voice_f = voice_i16.astype(np.float32) / 32767.0
+        voice_f = np.repeat(voice_f, voice_ratio)[:frames]
+        if voice_f.size < frames:
+            voice_f = np.pad(voice_f, (0, frames - voice_f.size))
+        arr[:, 0] = np.clip(arr[:, 0] + voice_f, -1.0, 1.0)
+        arr[:, 1] = np.clip(arr[:, 1] + voice_f, -1.0, 1.0)
 
     def callback(outdata, frames, time_info, status):
         if status:
@@ -1195,9 +1216,12 @@ def _passthrough_callback_factory(passthrough: PassthroughBuffer):
         n_bytes = frames * bytes_per_frame
         raw = passthrough.pull(n_bytes)
         if not raw or len(raw) < n_bytes:
-            outdata.fill(0)
+            arr = np.zeros((frames, 2), dtype=np.float32)
+            _mix_voice(arr, frames)
+            outdata[:] = arr
             return
-        arr = np.frombuffer(raw, dtype=np.float32).reshape(-1, 2)
+        arr = np.frombuffer(raw, dtype=np.float32).reshape(-1, 2).copy()
+        _mix_voice(arr, frames)
         outdata[:] = arr
 
     return callback
@@ -1267,6 +1291,8 @@ def _apply_packaged_defaults() -> None:
         cfg = load_config()
         tts_engine = str(getattr(cfg, "tts_engine", DEFAULT_TTS_ENGINE) or DEFAULT_TTS_ENGINE)
         os.environ.setdefault("VIBEMIX_TTS_ENGINE", tts_engine)
+        os.environ.setdefault("VIBEMIX_CHATTERBOX_LIVE_CACHE_ONLY", "on")
+        os.environ.setdefault("VIBEMIX_SYSTEM_TTS_FALLBACK", "on")
     except Exception as exc:  # pragma: no cover - defensive boot default
         print(f"-> tts engine seed skipped: {exc!r}", file=sys.stderr)
 
@@ -1961,9 +1987,12 @@ async def main() -> None:
                     ChatterboxLocalTTS,
                     chatterbox_available,
                     engine_selected,
+                    system_fallback_available,
                 )
 
-                if not engine_selected() or not chatterbox_available():
+                if not engine_selected() or not (
+                    chatterbox_available() or system_fallback_available()
+                ):
                     return None
                 cached = ChatterboxLocalTTS()
                 learn_voice_tts_cache["tts"] = cached
@@ -2012,7 +2041,8 @@ async def main() -> None:
         run_stop_event: asyncio.Event,
         started_event: asyncio.Event,
     ) -> None:
-        nonlocal live_session_active, live_voice_muted, live_voice_tts, suggestion_service
+        nonlocal live_session_active, live_voice_muted, live_voice_tts
+        nonlocal learn_voice_stream, suggestion_service
         session = None
         tts_inst = None
         agent = None
@@ -2071,6 +2101,7 @@ async def main() -> None:
                     ChatterboxLocalTTS,
                     chatterbox_available,
                     engine_selected,
+                    system_fallback_available,
                 )
 
                 cached_learn_voice_tts = learn_voice_tts_cache.get("tts")
@@ -2079,7 +2110,8 @@ async def main() -> None:
                     if cached_learn_voice_tts is not None
                     else (
                         ChatterboxLocalTTS()
-                        if engine_selected() and chatterbox_available()
+                        if engine_selected()
+                        and (chatterbox_available() or system_fallback_available())
                         else None
                     )
                 )
@@ -2096,7 +2128,13 @@ async def main() -> None:
             else:
                 print("-> tts:   Chatterbox local only (provider=chatterbox-mlx)")
                 wait_until_warm = getattr(live_voice_tts, "wait_until_warm", None)
-                if callable(wait_until_warm):
+                requires_live_prewarm = getattr(live_voice_tts, "requires_live_prewarm", None)
+                should_prewarm = (
+                    bool(requires_live_prewarm())
+                    if callable(requires_live_prewarm)
+                    else True
+                )
+                if callable(wait_until_warm) and should_prewarm:
                     warm_timeout_s = _chatterbox_start_warmup_timeout_s()
                     print(
                         "-> tts:   warming Chatterbox before live capture "
@@ -2126,6 +2164,8 @@ async def main() -> None:
                             file=sys.stderr,
                             flush=True,
                         )
+                elif not should_prewarm:
+                    print("-> tts:   live Chatterbox cache misses use local system voice")
 
             anti_slop_flag = os.environ.get("VIBEMIX_ANTI_SLOP", "on").strip().lower()
             anti_slop_enabled = anti_slop_flag not in ("off", "0", "false")
@@ -2279,15 +2319,13 @@ async def main() -> None:
                     buffer_segments=True,
                 )
                 if learn_voice_stream is not None:
-                    print(f"-> AI voice -> {output_device_label} @ {OUTPUT_SR}Hz (shared Learn stream)")
-                else:
-                    voice_stream = audio_backend.open_voice_output(
-                        output_idx,
-                        sample_rate=OUTPUT_SR,
-                        block_size=VOICE_BLOCKSIZE,
-                        callback=_voice_callback_factory(playback),
-                    )
-                    print(f"-> AI voice -> {output_device_label} @ {OUTPUT_SR}Hz")
+                    try:
+                        learn_voice_stream.stop()
+                        learn_voice_stream.close()
+                    except Exception:
+                        pass
+                    learn_voice_stream = None
+                print(f"-> AI voice -> {output_device_label} @ {INPUT_SR_NATIVE}Hz (mixed)")
 
             await session.start(agent)
             print("-> agent started.")
@@ -2297,7 +2335,10 @@ async def main() -> None:
                 sample_rate=INPUT_SR_NATIVE,
                 channels=2,
                 block_size=OUTPUT_BLOCKSIZE,
-                callback=_passthrough_callback_factory(passthrough),
+                callback=_passthrough_callback_factory(
+                    passthrough,
+                    playback if not voice_muted else None,
+                ),
             )
             print(f"-> djay passthrough -> {output_device_label} @ {INPUT_SR_NATIVE}Hz")
 
