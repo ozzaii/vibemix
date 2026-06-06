@@ -2262,7 +2262,12 @@ async def main() -> None:
                 session.output.set_audio_enabled(False)
                 print("-> AI voice output muted (no local TTS); stream not opened")
             else:
-                session.output.audio = PlaybackQueueAudioOutput(playback, recorder, sample_rate=OUTPUT_SR)
+                session.output.audio = PlaybackQueueAudioOutput(
+                    playback,
+                    recorder,
+                    sample_rate=OUTPUT_SR,
+                    buffer_segments=True,
+                )
                 if learn_voice_stream is not None:
                     print(f"-> AI voice -> {output_device_label} @ {OUTPUT_SR}Hz (shared Learn stream)")
                 else:
