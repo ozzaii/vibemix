@@ -459,6 +459,114 @@ def repair_finished_headphone_line(text: str) -> str | None:
     return _clean_finished_line_candidate(candidate)
 
 
+def _line_for_grounded_citation_repair(text: str) -> str | None:
+    """Return a clean headphone line eligible for appending an existing cite."""
+
+    candidate_text = text or ""
+    if _has_unclosed_bracket_tail(candidate_text):
+        candidate_text = candidate_text.rsplit("[", 1)[0].rstrip()
+    candidate = repair_finished_headphone_line(candidate_text)
+    if not candidate:
+        return None
+    if parse_citations(candidate):
+        return None
+    if _META_LINE_RESIDUE_RE.search(candidate) or re.search(
+        r"^(?:thought|thinking)\b|^thought(?=[A-Z])|"
+        r"\b(?:citation|bracket|grounding_refs?|scratchpad)\b",
+        candidate,
+        re.IGNORECASE,
+    ):
+        return None
+    if _looks_like_broken_voice_fragment(candidate):
+        return None
+    if len(candidate.split()) < 4:
+        return None
+    if candidate[-1] not in ".!?":
+        candidate += "."
+    return candidate
+
+
+def _valid_repair_citation_from_texts(
+    texts: tuple[object, ...],
+    *,
+    linter: CitationLinter,
+    snapshot: dict[str, dict[str, tuple[float, ...]]] | None,
+) -> str | None:
+    """Pick the first already-grounded citation atom from trusted prompt text."""
+
+    if not snapshot:
+        return None
+    for value in texts:
+        if not isinstance(value, str) or not value.strip():
+            continue
+        for source, body in parse_citations(value):
+            citation = f"[{source}:{body}]"
+            if linter.check(citation, snapshot, mode="live").valid:
+                return citation
+    return None
+
+
+def _event_grounding_ref_citation(
+    ev: Event | None,
+    snapshot: dict[str, dict[str, tuple[float, ...]]] | None,
+    *,
+    linter: CitationLinter,
+) -> str | None:
+    if ev is None or not snapshot:
+        return None
+    observed = snapshot.get("ev", {}).get(ev.type)
+    if not observed:
+        return None
+    try:
+        latest = max(float(t) for t in observed)
+    except (TypeError, ValueError):
+        return None
+    citation = f"[ev:{ev.type}@{latest:.1f}]"
+    return citation if linter.check(citation, snapshot, mode="live").valid else None
+
+
+def _repair_missing_live_citation(
+    text: str,
+    *,
+    ev: Event | None,
+    ev_extra: dict[str, Any],
+    text_prompt: str,
+    linter: CitationLinter,
+    snapshot: dict[str, dict[str, tuple[float, ...]]] | None,
+) -> tuple[str, str] | None:
+    """Append one existing grounded citation when the model omitted it.
+
+    This is deliberately narrower than a fallback: it only repairs an otherwise
+    clean headphone line and only with a citation already present in the event
+    payload, current event registry, or prompt evidence. The linter re-checks
+    the repaired text before the caller may use it.
+    """
+
+    if parse_citations(text):
+        return None
+    candidate = _line_for_grounded_citation_repair(text)
+    if not candidate:
+        return None
+    receipt_values = tuple(
+        ev_extra.get(key)
+        for key in _GROUNDED_RECEIPT_EXTRA_KEYS
+        if isinstance(ev_extra.get(key), str)
+    )
+    citation = _valid_repair_citation_from_texts(
+        (*receipt_values, text_prompt),
+        linter=linter,
+        snapshot=snapshot,
+    )
+    if citation is None:
+        citation = _event_grounding_ref_citation(ev, snapshot, linter=linter)
+    if citation is None:
+        return None
+    repaired = f"{candidate} {citation}"
+    if not linter.check(repaired, snapshot, mode="live").valid:
+        return None
+    return repaired, citation
+
+
 def _strip_orphan_citation_tail(text: str) -> str:
     """Remove a leading half-citation tail such as ``108.0]``."""
 
@@ -3440,6 +3548,38 @@ class DJCoHostAgent(Agent):
                     line_scaffold_suppressed = True
             elif _starts_unspoken_packet_fragment(full_text):
                 packet_fragment_suppressed = True
+
+            if (
+                self._linter_wired
+                and self._linter is not None
+                and not option_scaffold_suppressed
+                and not line_scaffold_suppressed
+                and not packet_fragment_suppressed
+            ):
+                repaired_citation = _repair_missing_live_citation(
+                    full_text,
+                    ev=ev,
+                    ev_extra=ev_extra,
+                    text_prompt=text_prompt,
+                    linter=self._linter,
+                    snapshot=snapshot,
+                )
+                if repaired_citation is not None:
+                    raw_citation_repair_text = full_text
+                    full_text, citation_repair_atom = repaired_citation
+                    buffered_chunks = [full_text]
+                    stripped = full_text.strip()
+                    try:
+                        self._recorder.log_event(
+                            "citation_repair",
+                            event=ev_tag,
+                            raw_text=raw_citation_repair_text,
+                            repaired_text=full_text,
+                            citation=citation_repair_atom,
+                            latency_s=round(elapsed, 2),
+                        )
+                    except Exception:
+                        pass
 
             # ---- Plan 18-04: citation-count telemetry ----
             # Count citations in the FULL response text BEFORE the suppression

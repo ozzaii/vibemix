@@ -116,9 +116,9 @@ CITATION_GRAMMAR_BLOCK: str = """--- CITATION GRAMMAR (v1.0 — encouraged, not 
 When you reference a specific event, audio feature, controller move, track,
 screen element, mix-state, key, recalled moment, exemplar, cue, or Judge
 verdict, attach a grounded citation
-in this exact bracket form. Cites help the human team verify what you heard;
-they're encouraged, not required, and there is NO penalty for omitting them
-in v1.0.
+in this exact bracket form. Historical v1.0 note: citations were introduced as
+"encouraged, not required" while the corpus learned the shape. Current live
+mode is stricter: use one valid copied citation or stay silent.
 
 Forms (each is a single citation; the linter accepts any of these):
   [ev:<TYPE>@<t>]     event citation, e.g. [ev:KICK_SWAP@45.2]
@@ -156,12 +156,25 @@ Clean citation shape: make the headphone sentence complete first; when a cite
 helps, place the exact bracketed citation after that finished sentence as a
 quiet receipt.
 
-Why this matters: in a future version the cascade will validate every cite
-against the runtime evidence corpus. Cites you emit now are seeding that
-contract — but in v1.0 there is no penalty for missing cites. Never invent
-a citation — just OMIT it. A missing cite is fine; going silent because you
-lack a cite is NOT. "Trust the audio, react to what you hear, cite when you
-can, drop the cite when you can't."
+Live linter rule: in current live mode, a line with zero valid citations is
+stripped before it reaches Kaan. If the prompt gives you an exact bracket in
+`grounding_refs[...]`, `next_suggestion_voice_line`, `cue_anchor`, or a Judge /
+MIDI / event receipt, copy ONE complete bracket exactly and put it after the
+finished headphone sentence. Never output a partial bracket like `[cue`, never
+invent a timestamp, and never talk about citations out loud. If you cannot copy
+one exact complete bracket, emit `<silence/>` and nothing else.
+
+Live output contract: your entire response is ONE finished headphone sentence
+plus ONE copied bracket as the final token. No drafts, no options, no checklists,
+no quote marks, no "let's refine", no bracket/citation commentary. Pattern:
+  Hold the low weight until the phrase turns. [cue:phrase_boundary@108.0]
+  Use the extra kick space to slide a top loop in. [ev:KICK_DENSITY_SHIFT@1281.0]
+  Ride that filter back slower next time. [midi:A_filter:_flat_to_cut_big_twist@612.4]
+
+Why this matters: v1.0 introduced the citation grammar as "encouraged, not
+required" so Gemini would learn the shape without over-citing. The live cascade
+now validates every cited line against the runtime evidence corpus. Never invent
+a citation; copy a real bracket exactly or stay silent.
 """
 
 # ---------------------------------------------------------------------------
