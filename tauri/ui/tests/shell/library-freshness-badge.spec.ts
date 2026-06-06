@@ -12,7 +12,10 @@ import {
   libraryFreshnessBadgeModel,
   mountLibraryFreshnessBadge,
 } from "../../src/shell/LibraryFreshnessBadge.js";
-import type { LibraryStats } from "../../src/library/api.js";
+import type {
+  LibraryImportProgress,
+  LibraryStats,
+} from "../../src/library/api.js";
 
 function stats(overrides: Partial<LibraryStats> = {}): LibraryStats {
   return {
@@ -157,5 +160,56 @@ describe("library freshness badge", () => {
     expect(handle.element.hidden).toBe(true);
     expect(handle.element.textContent).toBe("");
     expect(handle.element.title).toContain("library stats offline");
+  });
+
+  it("paints an ambient indexing state from live import progress, then reverts", async () => {
+    let captured: ((p: LibraryImportProgress) => void) | null = null;
+    const getStats = vi.fn(async () =>
+      stats({
+        indexed: 0,
+        library_freshness: {
+          status: "not_indexed",
+          stale: false,
+          reason: "library_cache_missing",
+          age_days: 0,
+          cache_path: "/tmp/library.pkl",
+        },
+      }),
+    );
+    const footer = document.createElement("footer");
+    const handle = mountLibraryFreshnessBadge(footer, {
+      autoload: false,
+      pollMs: null,
+      getStats,
+      subscribeProgress: async (cb) => {
+        captured = cb;
+        return () => {};
+      },
+    });
+    await Promise.resolve();
+    expect(captured).not.toBeNull();
+
+    captured!({
+      total: 10,
+      done: 3,
+      current_track_name: "track.mp3",
+      cache_hits: 0,
+      cancelled: false,
+    });
+    expect(handle.element.dataset.state).toBe("indexing");
+    expect(handle.element.textContent).toBe("indexing 3/10");
+    expect(handle.element.title).toContain("go run a set");
+
+    const callsBefore = getStats.mock.calls.length;
+    captured!({
+      total: 10,
+      done: 10,
+      current_track_name: "",
+      cache_hits: 0,
+      cancelled: false,
+    });
+    await Promise.resolve();
+    expect(getStats.mock.calls.length).toBe(callsBefore + 1);
+    handle.teardown();
   });
 });

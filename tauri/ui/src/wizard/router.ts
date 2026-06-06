@@ -439,6 +439,7 @@ export function renderCurrentStep(): void {
           }),
         onRefreshCandidates: () => void refreshLibraryFeedCandidates(true),
         onIndexCandidate: (candidate) => void startLibraryFeedImport(candidate),
+        onPickFolder: () => void pickLaunchFolder(),
         onOpenVibemix: () => void finishLaunchStep(),
         onBack: () => back(),
       });
@@ -813,6 +814,49 @@ async function startLibraryFeedImport(
       },
     });
   }
+}
+
+function firstDialogPath(selection: unknown): string | null {
+  if (typeof selection === "string" && selection.length > 0) return selection;
+  if (Array.isArray(selection)) {
+    const first = selection.find(
+      (item): item is string => typeof item === "string" && item.length > 0,
+    );
+    return first ?? null;
+  }
+  return null;
+}
+
+async function pickLaunchFolder(): Promise<void> {
+  let sourcePath: string | null = null;
+  try {
+    const { open } = await import("@tauri-apps/plugin-dialog");
+    const selection = await open({
+      title: "Choose music folder",
+      directory: true,
+      multiple: false,
+    });
+    sourcePath = firstDialogPath(selection);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    setState({
+      libraryFeed: {
+        ...wizardState.libraryFeed,
+        status: "error",
+        error: `file picker unavailable: ${message}`,
+      },
+    });
+    return;
+  }
+  if (!sourcePath) return;
+  await startLibraryFeedImport({
+    kind: "music_folder",
+    path: sourcePath,
+    import_action: {
+      type: "ipc.library.import",
+      payload: { path: sourcePath },
+    },
+  });
 }
 
 async function runMidiListen(): Promise<void> {

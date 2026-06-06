@@ -6,6 +6,8 @@
 
 import {
   libraryStats,
+  onLibraryImportProgress,
+  type LibraryImportProgress,
   type LibrarySetupCandidate,
   type LibraryStats,
 } from "../library/api.js";
@@ -16,6 +18,7 @@ export type LibraryFreshnessBadgeState =
   | "fault"
   | "empty"
   | "setup"
+  | "indexing"
   | "unknown";
 
 export interface LibraryFreshnessBadgeModel {
@@ -35,6 +38,9 @@ export interface LibraryFreshnessBadgeOptions {
   autoload?: boolean;
   pollMs?: number | null;
   onOpenViber?: () => void;
+  subscribeProgress?: (
+    cb: (progress: LibraryImportProgress) => void,
+  ) => Promise<() => void>;
 }
 
 const DEFAULT_POLL_MS = 60_000;
@@ -140,6 +146,7 @@ export function mountLibraryFreshnessBadge(
   const autoload = options.autoload ?? true;
   const pollMs = options.pollMs === undefined ? DEFAULT_POLL_MS : options.pollMs;
   const onOpenViber = options.onOpenViber;
+  const subscribeProgress = options.subscribeProgress ?? onLibraryImportProgress;
 
   const separator = document.createElement("span");
   separator.className = "footer-separator";
@@ -177,11 +184,35 @@ export function mountLibraryFreshnessBadge(
   }
   if (autoload) void refresh();
 
+  let progressUnlisten: () => void = () => {};
+  void subscribeProgress((progress) => {
+    if (disposed) return;
+    const terminal =
+      progress.cancelled || progress.total <= 0 || progress.done >= progress.total;
+    if (terminal) {
+      void refresh();
+      return;
+    }
+    renderBadge(badge, separator, {
+      state: "indexing",
+      label: `indexing ${progress.done}/${progress.total}`,
+      title:
+        "Library embedding locally: go run a set, it'll be ready when you're back",
+    });
+  }).then((un) => {
+    if (disposed) {
+      un();
+      return;
+    }
+    progressUnlisten = un;
+  });
+
   return {
     element: badge,
     refresh,
     teardown(): void {
       disposed = true;
+      progressUnlisten();
       if (timer !== null) globalThis.clearInterval(timer);
       separator.remove();
       badge.remove();

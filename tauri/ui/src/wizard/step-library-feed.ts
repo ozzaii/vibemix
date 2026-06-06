@@ -45,6 +45,7 @@ export interface LibraryFeedCallbacks {
   onToggleTelemetry: (next: boolean) => void;
   onRefreshCandidates: () => void;
   onIndexCandidate: (candidate: LibrarySetupCandidate) => void;
+  onPickFolder?: () => void;
   onOpenVibemix: () => void;
   onBack?: () => void;
 }
@@ -433,6 +434,18 @@ function renderLibraryCard(
     );
   }
 
+  // Native folder pick at launch: selectable, not only auto-detected.
+  if (cb.onPickFolder) {
+    card.append(
+      Button({
+        variant: "secondary",
+        state: state.status === "indexing" ? "disabled" : "idle",
+        label: "Choose a folder",
+        onClick: cb.onPickFolder,
+      }),
+    );
+  }
+
   if (state.status === "indexing" || state.status === "done") {
     const progress = document.createElement("div");
     progress.className = "wizard-feed-progress";
@@ -472,7 +485,10 @@ function renderControllerCard(): HTMLElement {
   return card;
 }
 
-function renderPrivacyCard(cb: LibraryFeedCallbacks): HTMLElement {
+function renderPrivacyCard(
+  state: LibraryFeedState,
+  cb: LibraryFeedCallbacks,
+): HTMLElement {
   const card = document.createElement("section");
   card.className = "wizard-feed-card wizard-feed-privacy";
   card.dataset.role = "privacy";
@@ -506,6 +522,29 @@ function renderPrivacyCard(cb: LibraryFeedCallbacks): HTMLElement {
   telemetry.append(telemetryInput, telemetryText);
 
   card.append(title, copy, profile, telemetry);
+  if (state.status === "indexing" || state.status === "done") {
+    const note = document.createElement("p");
+    note.className = "wizard-feed-privacy__copy";
+    note.dataset.role = "embed-privacy";
+    note.textContent =
+      "Embedding locally on your device — your library never leaves this machine.";
+
+    const progress = document.createElement("div");
+    progress.className = "wizard-feed-progress";
+    progress.style.gridColumn = "1 / -1";
+    const bar = document.createElement("div");
+    bar.className = "wizard-feed-progress__bar";
+    const fill = document.createElement("i");
+    fill.className = "wizard-feed-progress__fill";
+    fill.style.setProperty("--feed-progress", `${progressPercent(state.progress)}%`);
+    bar.append(fill);
+    const label = document.createElement("div");
+    label.className = "wizard-feed-progress__label";
+    label.textContent = progressCopy(state);
+    progress.append(bar, label);
+
+    card.append(note, progress);
+  }
   return card;
 }
 
@@ -559,7 +598,7 @@ export function renderStepLibraryFeed(
 
   const support = document.createElement("div");
   support.className = "wizard-feed-support";
-  support.append(skillCard, renderControllerCard(), renderPrivacyCard(cb));
+  support.append(skillCard, renderControllerCard(), renderPrivacyCard(state, cb));
 
   grid.append(renderLibraryCard(state, cb), support);
 
