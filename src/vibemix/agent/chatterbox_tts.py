@@ -9,10 +9,10 @@ unit-testable without the heavy ``mlx-audio`` dependency or any model download.
 The real engine (:class:`_MlxChatterboxEngine`) renders speech through
 ``mlx-audio``'s ``chatterbox-turbo-8bit`` on Apple GPU: zero-shot voice clone from a
 reference clip, paralinguistic tags (``[laugh]``/``[gasp]``/``[sigh]``) at temperature
-0.4, streamed chunk-by-chunk for a ~0.2s time-to-first-audio. ``mlx-audio`` is
-Apple-only and is **never** a base dependency — it is imported lazily. When the
-engine or reference clip is unavailable, callers start voiceless with an honest
-reason instead of falling back to another voice.
+0.4, emitted as one contiguous PCM segment so the speaker buffer never underflows.
+``mlx-audio`` is Apple-only and is **never** a base dependency — it is imported lazily.
+When the engine or reference clip is unavailable, callers start voiceless with an
+honest reason instead of falling back to another voice.
 """
 
 from __future__ import annotations
@@ -45,10 +45,12 @@ ENGINE_ENV = "VIBEMIX_TTS_ENGINE"
 REF_ENV = "VIBEMIX_CHATTERBOX_REF"
 MODEL_ENV = "VIBEMIX_CHATTERBOX_MODEL"
 TEMP_ENV = "VIBEMIX_CHATTERBOX_TEMP"
+MAX_TOKENS_ENV = "VIBEMIX_CHATTERBOX_MAX_TOKENS"
 
 _DEFAULT_MODEL = CHATTERBOX_MODEL_REPO
 _DEFAULT_TEMP = 0.4  # Kaan-locked: tags fire as SOUND (not read literally), quality holds
 _DEFAULT_STREAM_INTERVAL = 0.5  # seconds of audio per streamed chunk (low TTFT)
+_DEFAULT_MAX_TOKENS = 96
 # Default co-host voice ref = the Kaan-locked "pranker" voice (music-stripped clip,
 # rendered at temp 0.4). Lives in the vibemix cache next to the other model assets.
 _DEV_REF = Path.home() / ".cache" / "vibemix" / "cohost_voice_ref.wav"
@@ -81,6 +83,16 @@ def configured_temperature() -> float:
 
 def configured_model() -> str:
     return os.environ.get(MODEL_ENV, "").strip() or _DEFAULT_MODEL
+
+
+def configured_max_tokens() -> int:
+    raw = os.environ.get(MAX_TOKENS_ENV, "").strip()
+    if raw:
+        try:
+            return max(32, min(256, int(raw)))
+        except ValueError:
+            pass
+    return _DEFAULT_MAX_TOKENS
 
 
 def configured_model_revision(model_name: str | None = None) -> str | None:
@@ -152,6 +164,7 @@ class ChatterboxEngine:
     """
 
     sample_rate: int = NATIVE_SR
+    buffer_before_playback: bool = False
 
     def synthesize(self, text: str, on_pcm: Callable[[bytes], None]) -> None:  # pragma: no cover - interface
         raise NotImplementedError
@@ -173,13 +186,23 @@ class _ChatterboxWorkerJob:
 
 
 class _MlxChatterboxEngine(ChatterboxEngine):
-    """Real engine: ``mlx-audio`` Chatterbox-Turbo, ref-conditioned once, streamed."""
+    """Real engine: ``mlx-audio`` Chatterbox-Turbo, ref-conditioned once."""
 
-    def __init__(self, model, ref_path: str, temperature: float, stream_interval: float) -> None:
+    buffer_before_playback = True
+
+    def __init__(
+        self,
+        model,
+        ref_path: str,
+        temperature: float,
+        stream_interval: float,
+        max_tokens: int,
+    ) -> None:
         self._m = model
         self._ref = ref_path
         self._temperature = temperature
         self._stream_interval = stream_interval
+        self._max_tokens = max_tokens
         self.sample_rate = NATIVE_SR
 
     @classmethod
@@ -199,17 +222,20 @@ class _MlxChatterboxEngine(ChatterboxEngine):
         model = load_model(model_name, **kwargs)
         # One-time conditional prime: pay the ref encode once, reuse for every line.
         model.prepare_conditionals(ref_path)
-        return cls(model, ref_path, temperature, _DEFAULT_STREAM_INTERVAL)
+        return cls(model, ref_path, temperature, _DEFAULT_STREAM_INTERVAL, configured_max_tokens())
 
     def synthesize(self, text: str, on_pcm: Callable[[bytes], None]) -> None:
         import numpy as np
 
-        # ref_audio=None reuses the primed conditional; stream chunks for low TTFT.
+        # ref_audio=None reuses the primed conditional. Use the one-shot path:
+        # Turbo's stream path repeatedly runs S3Gen over partial token windows,
+        # which is slower than real time on some Macs and causes audible buffer
+        # starvation when forwarded live.
         for seg in self._m.generate(
             text,
             temperature=self._temperature,
-            stream=True,
-            streaming_interval=self._stream_interval,
+            stream=False,
+            max_tokens=self._max_tokens,
         ):
             audio = np.asarray(seg.audio, dtype=np.float32).flatten()
             if audio.size:
@@ -381,7 +407,16 @@ class ChatterboxLocalTTS(agents_tts.TTS):
 
 
 class _ChatterboxChunkedStream(agents_tts.ChunkedStream):
-    """Runs blocking Chatterbox synthesis in an executor, then emits finished PCM."""
+    """Runs blocking Chatterbox synthesis on the worker and emits PCM safely.
+
+    The real MLX generator may produce partial PCM much slower than real time on
+    a busy machine. Forwarding those partial chunks immediately makes the
+    sounddevice output underflow, which sounds like repeated consonant ticks.
+    For that engine we coalesce the synthesized PCM and hand LiveKit one
+    contiguous segment; fake/unit-test engines can still stream chunk-by-chunk.
+    """
+
+    _DONE = object()
 
     async def _run(self, output_emitter: agents_tts.AudioEmitter) -> None:
         tts: ChatterboxLocalTTS = self._tts  # type: ignore[assignment]
@@ -394,21 +429,45 @@ class _ChatterboxChunkedStream(agents_tts.ChunkedStream):
         )
 
         loop = asyncio.get_running_loop()
-        chunks: list[bytes] = []
+        q: asyncio.Queue[object] = asyncio.Queue()
+        engine = getattr(tts, "_engine", None)
+        buffer_before_playback = bool(
+            engine is None or getattr(engine, "buffer_before_playback", False)
+        )
+        pending_pcm = bytearray()
+
+        def _on_pcm(pcm: bytes) -> None:
+            loop.call_soon_threadsafe(q.put_nowait, pcm)
 
         def _produce() -> None:
-            tts.synthesize_pcm(self._input_text, chunks.append)
+            try:
+                tts.synthesize_pcm(self._input_text, _on_pcm)
+            except BaseException as exc:
+                loop.call_soon_threadsafe(q.put_nowait, exc)
+            finally:
+                loop.call_soon_threadsafe(q.put_nowait, self._DONE)
 
+        fut = loop.run_in_executor(None, _produce)
         try:
-            await loop.run_in_executor(None, _produce)
+            while True:
+                item = await q.get()
+                if item is self._DONE:
+                    break
+                if isinstance(item, BaseException):
+                    raise item
+                if buffer_before_playback:
+                    pending_pcm.extend(item)
+                else:
+                    output_emitter.push(item)
         except asyncio.CancelledError:
             raise
         except BaseException as exc:
             raise APIError(f"Chatterbox local TTS synthesis failed: {exc}") from exc
+        finally:
+            await fut
 
-        for pcm in chunks:
-            output_emitter.push(pcm)
-
+        if pending_pcm:
+            output_emitter.push(bytes(pending_pcm))
         output_emitter.flush()
 
 

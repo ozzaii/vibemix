@@ -356,15 +356,26 @@ class SuggestionService:
         if current is not None:
             return current
 
-        fut = self._compute_future_for_seed(seed.track_id)
-        if fut is not None:
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + max(0.0, timeout_s)
+        while current is None and loop.time() < deadline:
+            fut = self._compute_future_for_seed(seed.track_id)
+            if fut is None:
+                await asyncio.sleep(min(0.025, max(0.0, deadline - loop.time())))
+                current = self.refresh_from_state(state, min_interval_s=0.0)
+                continue
             try:
-                await asyncio.wait_for(asyncio.shield(fut), timeout=max(0.0, timeout_s))
+                await asyncio.wait_for(
+                    asyncio.shield(fut),
+                    timeout=max(0.0, deadline - loop.time()),
+                )
             except TimeoutError:
-                pass
+                break
             except Exception as e:
                 logger.warning("[suggestion] voice wait failed: %s", e)
-        return self.refresh_from_state(state, min_interval_s=0.0)
+                break
+            current = self.refresh_from_state(state, min_interval_s=0.0)
+        return current
 
     def choose_alternative(
         self,

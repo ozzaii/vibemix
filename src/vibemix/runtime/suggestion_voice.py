@@ -22,6 +22,11 @@ _CUE_LOOKAHEAD_EVENT_TYPES = frozenset({"PHASE", "TRACK_CHANGE"})
 _CUE_LOOKAHEAD_CONFIDENCE_FLOOR = 0.7
 _CUE_LOOKAHEAD_MAX_ETA_S = 64.0
 _TEXT_ESCAPE = str.maketrans({"[": "(", "]": ")", "\n": " ", "\r": " ", "|": "/"})
+_RELEASE_SUFFIX_RE = re.compile(r"\s*(?:\([^)]*\)|\[[^\]]*\])\s*$")
+_MIX_MARKER_RE = re.compile(
+    r"\b(?:extended\s+free\s+dl|free\s+dl|extended\s+mix|original\s+mix|radio\s+edit)\b",
+    re.IGNORECASE,
+)
 
 
 def build_next_suggestion_voice_line(
@@ -83,6 +88,37 @@ def build_next_suggestion_voice_line(
         "Do not say it is loaded or playing; it is not a proven transition unless "
         "deck/live evidence says so."
     )
+
+
+def build_next_suggestion_fast_response(
+    suggestion: Mapping[str, Any] | None,
+    *,
+    event_type: str,
+    evidence_registry: EvidenceRegistry | None,
+) -> str | None:
+    """Return a direct citable Sven line for a grounded next suggestion.
+
+    This is the no-extra-model-pass path for latency-sensitive live nudges. It
+    carries the same track + selector citations as the receipt, so the
+    response-level linter remains the authority before anything reaches TTS.
+    """
+
+    if event_type not in _VOICE_EVENT_TYPES:
+        return None
+    if evidence_registry is None or suggestion is None:
+        return None
+    track_id = _clean_citation_body(suggestion.get("track_id"))
+    if track_id is None:
+        return None
+
+    mix_key = f"next_suggestion={track_id}"
+    evidence_registry.write("track", track_id, 0.0)
+    evidence_registry.write("mix", mix_key, 0.0)
+
+    title = _short_spoken_title(suggestion.get("title"), fallback="candidate")
+    artist = _short_spoken_title(suggestion.get("artist"), fallback="")
+    label = f"{artist} - {title}" if artist else title
+    return f"{label} next. [track:{track_id}] [mix:{mix_key}]"
 
 
 def _build_cue_lookahead_voice_line(
@@ -199,4 +235,19 @@ def _clean_text(value: object, *, fallback: str, cap: int = 72) -> str:
     return text[: cap - 1].rstrip() + "..."
 
 
-__all__ = ["build_next_suggestion_voice_line"]
+def _short_spoken_title(value: object, *, fallback: str) -> str:
+    text = _clean_text(value, fallback=fallback, cap=48)
+    original = text
+    while True:
+        shortened = _RELEASE_SUFFIX_RE.sub("", text).strip()
+        if shortened == text:
+            break
+        text = shortened or text
+    text = _MIX_MARKER_RE.sub("", text).strip(" -_/()")
+    text = " ".join(text.split())
+    if " - " in text:
+        text = text.rsplit(" - ", 1)[-1].strip() or text
+    return text or original or fallback
+
+
+__all__ = ["build_next_suggestion_fast_response", "build_next_suggestion_voice_line"]

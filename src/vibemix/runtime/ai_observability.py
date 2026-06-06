@@ -609,6 +609,7 @@ def _live_span_evidence_digest(
                 "avoided_audio_tokens_est",
                 "deck_audio_parts",
                 "live_claim_defer_stream",
+                "pre_llm_fast_path",
                 "pre_llm_short_circuit",
                 "raw_response_chars",
                 "spoken_response_chars",

@@ -3148,37 +3148,68 @@ class DJCoHostAgent(Agent):
                     )
                     cache_state = "warm"
 
-            self._recorder.log_event(
-                "llm_invoke",
-                event=ev_tag,
-                audible=bool(getattr(observability_state, "audible", False)),
-                deck=getattr(observability_state, "audible_deck", "none"),
-                track=getattr(observability_state, "audible_track", None),
-                phase=getattr(observability_state, "phase", ""),
-                audio_bytes=len(audio_wav),
-                audio_tokens_est=audio_tokens_est,
-                deck_audio_parts=len(deck_audio_parts),
-                has_screen=bool(screen_jpeg),
-                audio_seconds=int(audio_seconds),
-                diet=diet,
-                cache_state=cache_state,
-                provider=ai_provider,
-                model=ai_model,
-                **route_chain.event_fields(),
-                prompt=text_prompt,
-                invoke_dir=str(invoke_dir),
-            )
+            direct_grounded_response: str | None = None
+            if self._linter_wired:
+                raw_direct = ev_extra.get("next_suggestion_fast_response")
+                if isinstance(raw_direct, str) and raw_direct.strip():
+                    direct_grounded_response = raw_direct.strip()
+                    ai_provider = "local"
+                    ai_model = "grounded-next-suggestion"
+                    cache_state = "direct_grounded_receipt"
+
+            if direct_grounded_response is None:
+                self._recorder.log_event(
+                    "llm_invoke",
+                    event=ev_tag,
+                    audible=bool(getattr(observability_state, "audible", False)),
+                    deck=getattr(observability_state, "audible_deck", "none"),
+                    track=getattr(observability_state, "audible_track", None),
+                    phase=getattr(observability_state, "phase", ""),
+                    audio_bytes=len(audio_wav),
+                    audio_tokens_est=audio_tokens_est,
+                    deck_audio_parts=len(deck_audio_parts),
+                    has_screen=bool(screen_jpeg),
+                    audio_seconds=int(audio_seconds),
+                    diet=diet,
+                    cache_state=cache_state,
+                    provider=ai_provider,
+                    model=ai_model,
+                    **route_chain.event_fields(),
+                    prompt=text_prompt,
+                    invoke_dir=str(invoke_dir),
+                )
+            else:
+                self._recorder.log_event(
+                    "direct_grounded_receipt",
+                    event=ev_tag,
+                    audible=bool(getattr(observability_state, "audible", False)),
+                    deck=getattr(observability_state, "audible_deck", "none"),
+                    track=getattr(observability_state, "audible_track", None),
+                    response_chars=len(direct_grounded_response),
+                    avoided_audio_tokens_est=audio_tokens_est,
+                    deck_audio_parts=len(deck_audio_parts),
+                    provider=ai_provider,
+                    model=ai_model,
+                    reason="next_suggestion_fast_response",
+                    invoke_dir=str(invoke_dir),
+                )
             # Plan 20-01: surface the linter wiring state in the per-turn
             # log line so coach-loop tails show the gate decision next to
             # cache state. Actual gate decision (valid|invalid|skip) is
             # logged after the stream — see the meta.json dump below.
             linter_state = "wired" if self._linter_wired else "skip"
-            print(
-                f"\n[llm {ev_tag} #{invoke_n:04d}] audio={len(audio_wav) // 1024}KB"
-                f"({int(audio_seconds)}s) diet={diet} cache={cache_state} "
-                f"linter={linter_state} "
-                f"screen={'yes' if screen_jpeg else 'no'} dump={invoke_dir.name}"
-            )
+            if direct_grounded_response is None:
+                print(
+                    f"\n[llm {ev_tag} #{invoke_n:04d}] audio={len(audio_wav) // 1024}KB"
+                    f"({int(audio_seconds)}s) diet={diet} cache={cache_state} "
+                    f"linter={linter_state} "
+                    f"screen={'yes' if screen_jpeg else 'no'} dump={invoke_dir.name}"
+                )
+            else:
+                print(
+                    f"\n[direct {ev_tag} #{invoke_n:04d}] grounded next-suggestion "
+                    f"linter={linter_state} dump={invoke_dir.name}"
+                )
             live_claim_defer_stream = should_defer_live_claim_stream(
                 live_claim_state,
                 live_claim_moves,
@@ -3280,10 +3311,17 @@ class DJCoHostAgent(Agent):
             # reaction path NEVER stalls on the 5s timeout while the proxy is down
             # (the exact state in which the canary is armed). Mirrors the recall
             # pre-dispatch offload pattern (``set_next_event`` ~line 809).
-            await self._check_proxy_health_canary(time.monotonic())
+            if direct_grounded_response is None:
+                await self._check_proxy_health_canary(time.monotonic())
             # ---- end Plan 69-03 canary ---------------------------------------
             try:
-                if self._or_client is not None:
+                if direct_grounded_response is not None:
+
+                    async def _direct_stream(text: str) -> AsyncGenerator:
+                        yield type("Chunk", (), {"text": text})()
+
+                    stream = _direct_stream(direct_grounded_response)
+                elif self._or_client is not None:
                     # 2026-05-21 — OpenRouter brain. Same ``contents`` (text +
                     # inline-audio Parts) converted to OpenAI-compat messages by
                     # the adapter; system instruction passed explicitly (no
@@ -3465,47 +3503,48 @@ class DJCoHostAgent(Agent):
                 llm_err = repr(e)
                 print(f"\n[llm err] {e}", file=sys.stderr)
             else:
-                # ---- quick task 260525-fuv — once-per-stream cost record -------
-                # The stream completed without raising. Bill the live_coach usage
-                # ONCE here using the last-seen authoritative totals. The
-                # OpenRouter brain path yields chunks with usage_metadata=None →
-                # last_usage stays None → count the generation as untracked (no
-                # fabricated tokens). Best-effort: a meter write must NEVER break
-                # the stream consumer (T-fuv-01).
-                try:
-                    if last_usage is not None:
-                        get_session_meter().record(
-                            "live_coach",
-                            prompt=getattr(last_usage, "prompt_token_count", 0) or 0,
-                            cached=getattr(last_usage, "cached_content_token_count", 0) or 0,
-                            output=getattr(last_usage, "candidates_token_count", 0) or 0,
-                        )
-                    elif self._or_client is not None:
-                        get_session_meter().record_untracked()
-                except Exception:
-                    pass
-                # ---- end quick task 260525-fuv ---------------------------------
-                # ---- Plan 69-03 (OSS-02) — implicit recovery on next success --
-                # When the stream completed without raising AND the proxy
-                # fallback flag is currently armed, this is the "next real LLM
-                # call succeeded" recovery path (the second of two recovery
-                # triggers; the other is the 60s /health canary). One-shot
-                # guard means a duplicate emission is impossible.
-                if self._proxy_unavailable:
-                    self._maybe_emit_proxy_recovery()
-                # ---- end Plan 69-03 recovery ----------------------------------
-                # Reset the loud connection-error one-shot — the next failure in a
-                # fresh streak should log again. A successful stream means the
-                # connection/auth is healthy now.
-                if self._connection_error_emitted:
-                    self._connection_error_emitted = False
+                if direct_grounded_response is None:
+                    # ---- quick task 260525-fuv — once-per-stream cost record -------
+                    # The stream completed without raising. Bill the live_coach usage
+                    # ONCE here using the last-seen authoritative totals. The
+                    # OpenRouter brain path yields chunks with usage_metadata=None →
+                    # last_usage stays None → count the generation as untracked (no
+                    # fabricated tokens). Best-effort: a meter write must NEVER break
+                    # the stream consumer (T-fuv-01).
                     try:
-                        self._recorder.log_event("connection_recovered", path="live_coach")
+                        if last_usage is not None:
+                            get_session_meter().record(
+                                "live_coach",
+                                prompt=getattr(last_usage, "prompt_token_count", 0) or 0,
+                                cached=getattr(last_usage, "cached_content_token_count", 0) or 0,
+                                output=getattr(last_usage, "candidates_token_count", 0) or 0,
+                            )
+                        elif self._or_client is not None:
+                            get_session_meter().record_untracked()
                     except Exception:
                         pass
-                    # No transcript injection for diagnostics. A recovered
-                    # connection is observable via events/status; only actual
-                    # spoken model output enters transcript_delta.
+                    # ---- end quick task 260525-fuv ---------------------------------
+                    # ---- Plan 69-03 (OSS-02) — implicit recovery on next success --
+                    # When the stream completed without raising AND the proxy
+                    # fallback flag is currently armed, this is the "next real LLM
+                    # call succeeded" recovery path (the second of two recovery
+                    # triggers; the other is the 60s /health canary). One-shot
+                    # guard means a duplicate emission is impossible.
+                    if self._proxy_unavailable:
+                        self._maybe_emit_proxy_recovery()
+                    # ---- end Plan 69-03 recovery ----------------------------------
+                    # Reset the loud connection-error one-shot — the next failure in a
+                    # fresh streak should log again. A successful stream means the
+                    # connection/auth is healthy now.
+                    if self._connection_error_emitted:
+                        self._connection_error_emitted = False
+                        try:
+                            self._recorder.log_event("connection_recovered", path="live_coach")
+                        except Exception:
+                            pass
+                        # No transcript injection for diagnostics. A recovered
+                        # connection is observable via events/status; only actual
+                        # spoken model output enters transcript_delta.
             # === end Plan 41-04 streaming pipe-through ===
 
             print()
@@ -3958,7 +3997,12 @@ class DJCoHostAgent(Agent):
                     # path already emitted the chunks in-flight; skip the
                     # buffer re-yield to avoid duplicate audio.
                     if not head_yielded:
-                        for txt in buffered_chunks:
+                        replay_chunks = (
+                            [audience_text]
+                            if live_claim_defer_stream or language_defer_stream
+                            else buffered_chunks
+                        )
+                        for txt in replay_chunks:
                             tts_txt = _prepare_tts_segment(txt)
                             if tts_txt:
                                 yield tts_txt
@@ -4179,6 +4223,10 @@ class DJCoHostAgent(Agent):
                 # speculative head was emitted before stream completion; False
                 # on suppression/short-response.
                 "head_yielded": head_yielded,
+                "pre_llm_fast_path": direct_grounded_response is not None,
+                "avoided_audio_tokens_est": audio_tokens_est
+                if direct_grounded_response is not None
+                else 0,
             }
             try:
                 response_path.write_text(full_text)
@@ -4196,7 +4244,13 @@ class DJCoHostAgent(Agent):
                 event=ev_tag,
                 provider=ai_provider,
                 model=ai_model,
-                stop_reason=llm_err or suppression or citation_action,
+                stop_reason=llm_err
+                or suppression
+                or (
+                    "direct_grounded_receipt"
+                    if direct_grounded_response is not None and citation_action == "emit"
+                    else citation_action
+                ),
                 latency_s=round(elapsed, 2),
                 prompt_chars=len(full_prompt),
                 response_chars=len(full_text),
@@ -4223,6 +4277,10 @@ class DJCoHostAgent(Agent):
                     "audio_tokens_est": audio_tokens_est,
                     "deck_audio_parts": len(deck_audio_parts),
                     "live_claim_defer_stream": live_claim_defer_stream,
+                    "pre_llm_fast_path": direct_grounded_response is not None,
+                    "avoided_audio_tokens_est": audio_tokens_est
+                    if direct_grounded_response is not None
+                    else 0,
                     "language_defer_stream": language_defer_stream,
                     "language_matches": list(language_matches),
                     "raw_response_chars": len(full_text),

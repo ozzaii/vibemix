@@ -91,7 +91,7 @@ from vibemix.ui_bus import SessionCitation
 
 from .set_plan_voice import build_set_progress_voice_line
 from .speak_gate import decide_speak_gate, grounded_voice_payload_keys
-from .suggestion_voice import build_next_suggestion_voice_line
+from .suggestion_voice import build_next_suggestion_fast_response, build_next_suggestion_voice_line
 from .transition_verdict_voice import build_transition_verdict_voice_line
 
 if TYPE_CHECKING:
@@ -110,7 +110,8 @@ if TYPE_CHECKING:
 # line while the co-host is already silent.
 CITATION_PUBLISH_INTERVAL_S = 2.0
 CITATION_UNCHANGED_PUBLISH_INTERVAL_S = 30.0
-NEXT_SUGGESTION_VOICE_WAIT_S = 0.75
+NEXT_SUGGESTION_VOICE_WAIT_S = 1.25
+NEXT_SUGGESTION_GATE_RETRY_WAIT_S = 0.35
 _BEATMATCH_GRADED_EVENT = "BEATMATCH_GRADED"
 _BEATMATCH_GRADED_RECEIPT_FRESH_S = 2.0
 
@@ -614,6 +615,63 @@ async def coach_loop(
         except Exception as exc:
             _safe_print(f"\n[coach aim-refresh err] {exc}", file=sys.stderr)
 
+    async def _attach_grounded_suggestion_receipts(
+        ev: Any,
+        state: MusicState,
+        *,
+        timeout_s: float,
+    ) -> tuple[str, ...]:
+        if ev.type not in (
+            "PHASE",
+            "TRACK_CHANGE",
+            "TRANSITION_OPPORTUNITY",
+        ):
+            return grounded_voice_payload_keys(ev)
+        try:
+            current_suggestion = None
+            if suggestion_service is not None:
+                if hasattr(suggestion_service, "current_for_voice_from_state"):
+                    current_suggestion = await suggestion_service.current_for_voice_from_state(
+                        state,
+                        timeout_s=timeout_s,
+                    )
+                elif hasattr(suggestion_service, "current_for_state"):
+                    current_suggestion = suggestion_service.current_for_state(state)
+                elif hasattr(suggestion_service, "current"):
+                    current_suggestion = suggestion_service.current()
+                transition_line = build_transition_verdict_voice_line(
+                    current_suggestion,
+                    event_type=ev.type,
+                    evidence_registry=evidence_registry,
+                )
+                if transition_line:
+                    ev.extra["transition_verdict_voice_line"] = transition_line
+            voice_line = build_next_suggestion_voice_line(
+                current_suggestion,
+                event_type=ev.type,
+                evidence_registry=evidence_registry,
+                state=state,
+            )
+            if voice_line:
+                ev.extra["next_suggestion_voice_line"] = voice_line
+                fast_response = build_next_suggestion_fast_response(
+                    current_suggestion,
+                    event_type=ev.type,
+                    evidence_registry=evidence_registry,
+                )
+                if fast_response:
+                    ev.extra["next_suggestion_fast_response"] = fast_response
+            set_line = build_set_progress_voice_line(
+                getattr(state, "set_progress", None),
+                event_type=ev.type,
+                evidence_registry=evidence_registry,
+            )
+            if set_line:
+                ev.extra["set_progress_voice_line"] = set_line
+        except Exception as e:
+            _safe_print(f"\n[coach suggestion voice] {e}", file=sys.stderr)
+        return grounded_voice_payload_keys(ev)
+
     while not stop_event.is_set():
         await asyncio.sleep(0.1)
         now = time.time()
@@ -885,42 +943,11 @@ async def coach_loop(
             "TRACK_CHANGE",
             "TRANSITION_OPPORTUNITY",
         ):
-            try:
-                current_suggestion = None
-                if suggestion_service is not None:
-                    if hasattr(suggestion_service, "current_for_voice_from_state"):
-                        current_suggestion = await suggestion_service.current_for_voice_from_state(
-                            state,
-                            timeout_s=NEXT_SUGGESTION_VOICE_WAIT_S,
-                        )
-                    elif hasattr(suggestion_service, "current_for_state"):
-                        current_suggestion = suggestion_service.current_for_state(state)
-                    elif hasattr(suggestion_service, "current"):
-                        current_suggestion = suggestion_service.current()
-                    transition_line = build_transition_verdict_voice_line(
-                        current_suggestion,
-                        event_type=ev.type,
-                        evidence_registry=evidence_registry,
-                    )
-                    if transition_line:
-                        ev.extra["transition_verdict_voice_line"] = transition_line
-                voice_line = build_next_suggestion_voice_line(
-                    current_suggestion,
-                    event_type=ev.type,
-                    evidence_registry=evidence_registry,
-                    state=state,
-                )
-                if voice_line:
-                    ev.extra["next_suggestion_voice_line"] = voice_line
-                set_line = build_set_progress_voice_line(
-                    getattr(state, "set_progress", None),
-                    event_type=ev.type,
-                    evidence_registry=evidence_registry,
-                )
-                if set_line:
-                    ev.extra["set_progress_voice_line"] = set_line
-            except Exception as e:
-                _safe_print(f"\n[coach suggestion voice] {e}", file=sys.stderr)
+            await _attach_grounded_suggestion_receipts(
+                ev,
+                state,
+                timeout_s=NEXT_SUGGESTION_VOICE_WAIT_S,
+            )
 
         if wired:
             # ---- cancel-and-refire stale handle maintenance ----
@@ -944,6 +971,31 @@ async def coach_loop(
             kaan_just_spoke=kaan_just_spoke,
             recent_fingerprints=recent_fps,
         )
+        if (
+            ev.type == "TRACK_CHANGE"
+            and not speak_gate.should_speak
+            and speak_gate.reason == "describe_bank_only"
+            and suggestion_service is not None
+        ):
+            retry_before_keys = grounded_voice_payload_keys(ev)
+            retry_after_keys = await _attach_grounded_suggestion_receipts(
+                ev,
+                state,
+                timeout_s=NEXT_SUGGESTION_GATE_RETRY_WAIT_S,
+            )
+            if retry_after_keys and retry_after_keys != retry_before_keys:
+                _tr(
+                    "suggestion",
+                    "voice_retry_attached",
+                    keys=list(retry_after_keys),
+                    wait_s=NEXT_SUGGESTION_GATE_RETRY_WAIT_S,
+                )
+                speak_gate = decide_speak_gate(
+                    ev,
+                    manual=manual,
+                    kaan_just_spoke=kaan_just_spoke,
+                    recent_fingerprints=recent_fps,
+                )
         if not speak_gate.should_speak:
             grounded_keys = grounded_voice_payload_keys(ev)
             pill_route = (

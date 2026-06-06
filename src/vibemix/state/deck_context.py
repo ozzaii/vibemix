@@ -3564,20 +3564,21 @@ def _unsupported_audio_source_detail_reason(
     event_type: str | None = None,
 ) -> str | None:
     """Return a guard reason for hidden song-part claims audio did not prove."""
-    if not text.strip() or _LIVE_AUDIO_SOURCE_DETAIL_BOUNDARY_RE.search(text):
+    public_text = _CITATION_ATOM_RE.sub(" ", str(text or ""))
+    if not public_text.strip() or _LIVE_AUDIO_SOURCE_DETAIL_BOUNDARY_RE.search(public_text):
         return None
     has_source_claim = bool(
-        _LIVE_AUDIO_SOURCE_DETAIL_NOUN_RE.search(text)
-        and _LIVE_AUDIO_SOURCE_DETAIL_CLAIM_RE.search(text)
+        _LIVE_AUDIO_SOURCE_DETAIL_NOUN_RE.search(public_text)
+        and _LIVE_AUDIO_SOURCE_DETAIL_CLAIM_RE.search(public_text)
     )
-    has_source_tail = bool(_LIVE_AUDIO_SOURCE_DETAIL_TAIL_RE.search(text))
-    has_source_advice = bool(_LIVE_AUDIO_SOURCE_DETAIL_ADVICE_RE.search(text))
+    has_source_tail = bool(_LIVE_AUDIO_SOURCE_DETAIL_TAIL_RE.search(public_text))
+    has_source_advice = bool(_LIVE_AUDIO_SOURCE_DETAIL_ADVICE_RE.search(public_text))
     if not (has_source_claim or has_source_tail or has_source_advice):
         return None
 
     unsupported = [
         _source_detail_noun_key(match.group(1))
-        for match in _LIVE_AUDIO_SOURCE_DETAIL_NOUN_RE.finditer(text)
+        for match in _LIVE_AUDIO_SOURCE_DETAIL_NOUN_RE.finditer(public_text)
         if not _source_detail_noun_supported(match.group(1), state, event_type=event_type)
     ]
     if not unsupported:
@@ -3687,9 +3688,10 @@ def _has_unsupported_audio_source_detail_noun(
     *,
     event_type: str | None = None,
 ) -> bool:
+    public_text = _CITATION_ATOM_RE.sub(" ", str(text or ""))
     return any(
         not _source_detail_noun_supported(match.group(1), state, event_type=event_type)
-        for match in _LIVE_AUDIO_SOURCE_DETAIL_NOUN_RE.finditer(str(text or ""))
+        for match in _LIVE_AUDIO_SOURCE_DETAIL_NOUN_RE.finditer(public_text)
     )
 
 
@@ -3710,7 +3712,7 @@ def has_unsupported_audio_source_detail_mention(
     event_type: str | None = None,
 ) -> bool:
     """Return True for an unsupported source noun before a full claim forms."""
-    raw = str(text or "")
+    raw = _CITATION_ATOM_RE.sub(" ", str(text or ""))
     if not raw.strip() or _LIVE_AUDIO_SOURCE_DETAIL_BOUNDARY_RE.search(raw):
         return False
     return any(

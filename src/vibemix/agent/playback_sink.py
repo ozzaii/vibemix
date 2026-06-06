@@ -57,6 +57,15 @@ class PlaybackQueueAudioOutput(voice_io.AudioOutput):
         if self._segment_started_at is None:
             self._segment_started_at = time.time()
             self.on_playback_started(created_at=self._segment_started_at)
+            try:
+                self._recorder.log_event(
+                    "voice_playback_started",
+                    sample_rate=int(frame.sample_rate or self.sample_rate or OUTPUT_SR),
+                    samples_per_channel=int(frame.samples_per_channel),
+                    channels=int(getattr(frame, "num_channels", 1) or 1),
+                )
+            except Exception:
+                pass
         pcm = bytes(frame.data)
         if pcm:
             # Apply the AI-voice gain with int16 clip protection (speech
@@ -77,10 +86,19 @@ class PlaybackQueueAudioOutput(voice_io.AudioOutput):
     def flush(self) -> None:
         super().flush()
         if self._segment_started_at is not None:
+            duration = self._segment_duration
             self.on_playback_finished(
-                playback_position=self._segment_duration,
+                playback_position=duration,
                 interrupted=False,
             )
+            try:
+                self._recorder.log_event(
+                    "voice_playback_finished",
+                    playback_position_s=round(duration, 3),
+                    interrupted=False,
+                )
+            except Exception:
+                pass
         self._segment_started_at = None
         self._segment_duration = 0.0
 
