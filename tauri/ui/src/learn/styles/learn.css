@@ -1724,6 +1724,13 @@
 .vmx-progress-list__lesson[data-recommended="true"] {
   border-color: var(--amber-22);
 }
+.vmx-progress-list__lesson[data-practice-banked="true"] {
+  background: var(--brand-04);
+  border-color: var(--brand-16);
+}
+.vmx-progress-list__lesson[data-practice-banked="true"][data-recommended="true"] {
+  border-color: var(--amber-22);
+}
 .vmx-progress-list__lesson[data-locked="true"] {
   color: var(--silk-22);
   cursor: default;
@@ -1787,6 +1794,10 @@
 .vmx-progress-list__lesson[data-recommended="true"] .vmx-progress-list__tag {
   border-color: var(--amber-22);
   color: var(--amber-pale);
+}
+.vmx-progress-list__lesson[data-practice-banked="true"] .vmx-progress-list__tag[data-kind="banked"] {
+  border-color: var(--brand-22);
+  color: var(--brand);
 }
 .vmx-progress-list__lesson[data-locked="true"] .vmx-progress-list__tag {
   border-color: var(--silk-12);

@@ -109,6 +109,25 @@ describe("curriculum meta projection", () => {
     expect(retry?.is_recommended).toBe(true);
   });
 
+  it("turns banked free-practice reps into the active lesson row", () => {
+    const progress = {
+      lessons: {
+        "L1.03": {
+          practice_sources: { screen: 2, hardware: 4 },
+          last_practice_source: "hardware" as const,
+        },
+      },
+    };
+
+    const entries = buildProgressEntries(progress);
+    const banked = entries.find((entry) => entry.lesson_id === "L1.03");
+
+    expect(banked?.status).toBe("in-progress");
+    expect(banked?.practice_bank_count).toBe(3);
+    expect(banked?.is_recommended).toBe(true);
+    expect(firstRecommendedLessonId(progress)).toBe("L1.03");
+  });
+
   it("preserves completed locked-course rows for replay orientation", () => {
     const entries = buildProgressEntries({
       course_2_unlocked: false,

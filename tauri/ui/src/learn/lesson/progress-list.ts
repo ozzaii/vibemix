@@ -50,6 +50,8 @@ export interface ProgressListEntry {
   locked?: boolean;
   /** The single lesson the booth should offer as the recommended next step. */
   is_recommended?: boolean;
+  /** Capped free-practice reps banked for this lesson before starting it. */
+  practice_bank_count?: number;
   /** Optional short reason for the locked state. */
   lock_reason?: string;
 }
@@ -168,19 +170,14 @@ export function renderProgressList(
       btn.type = "button";
       btn.className = "vmx-progress-list__lesson";
       btn.dataset.lessonId = lesson.lesson_id;
-      btn.dataset.status = lesson.status;
-      btn.dataset.locked = lesson.locked ? "true" : "false";
-      btn.dataset.recommended = lesson.is_recommended ? "true" : "false";
       if (lesson.locked) {
         btn.setAttribute("aria-disabled", "true");
         if (lesson.lock_reason) btn.title = lesson.lock_reason;
       }
       btn.setAttribute("role", "listitem");
-      setButtonAriaLabel(btn, lesson);
 
       const dot = document.createElement("span");
       dot.className = "vmx-progress-list__dot";
-      dot.dataset.status = lesson.status;
       dot.setAttribute("aria-hidden", "true");
 
       const title = document.createElement("span");
@@ -188,12 +185,7 @@ export function renderProgressList(
       title.textContent = lesson.title;
 
       btn.append(dot, title);
-      if (lesson.locked || lesson.is_recommended) {
-        const tag = document.createElement("span");
-        tag.className = "vmx-progress-list__tag";
-        tag.textContent = lesson.locked ? "locked" : "next";
-        btn.append(tag);
-      }
+      syncLessonButton(btn, lesson);
 
       btn.addEventListener("click", () => {
         if (btn.dataset.locked === "true") {
@@ -240,10 +232,13 @@ export function renderProgressList(
         if (group) summary.textContent = groupSummary(group.lessons);
       }
     }
-    btn.dataset.status = status;
-    const dot = btn.querySelector<HTMLElement>(".vmx-progress-list__dot");
-    if (dot) dot.dataset.status = status;
-    if (entry) setButtonAriaLabel(btn, entry);
+    if (entry) {
+      syncLessonButton(btn, entry);
+    } else {
+      btn.dataset.status = status;
+      const dot = btn.querySelector<HTMLElement>(".vmx-progress-list__dot");
+      if (dot) dot.dataset.status = status;
+    }
     return true;
   };
 
@@ -284,12 +279,59 @@ function defaultExpandedCourseId(groups: ReadonlyArray<LessonGroup>): string | n
 function groupSummary(lessons: ReadonlyArray<ProgressListEntry>): string {
   const total = lessons.length;
   const completed = lessons.filter((lesson) => lesson.status === "completed").length;
+  const hasBanked = lessons.some((lesson) => effectivePracticeBankCount(lesson) > 0);
   const inProgress = lessons.some((lesson) => lesson.status === "in-progress");
   const allLocked = lessons.every((lesson) => lesson.locked && lesson.status !== "completed");
   if (allLocked) return `${total} locked`;
   if (completed === total) return `${total}/${total} complete`;
+  if (hasBanked) return `${completed}/${total} done, banked`;
   if (inProgress) return `${completed}/${total} done, in progress`;
   return `${completed}/${total} done`;
+}
+
+function syncLessonButton(
+  btn: HTMLButtonElement,
+  lesson: ProgressListEntry,
+): void {
+  btn.dataset.status = lesson.status;
+  btn.dataset.locked = lesson.locked ? "true" : "false";
+  btn.dataset.recommended = lesson.is_recommended ? "true" : "false";
+  const bankCount = effectivePracticeBankCount(lesson);
+  btn.dataset.practiceBanked = bankCount > 0 ? "true" : "false";
+  btn.dataset.practiceBank = String(bankCount);
+  const dot = btn.querySelector<HTMLElement>(".vmx-progress-list__dot");
+  if (dot) dot.dataset.status = lesson.status;
+  syncLessonTag(btn, lesson, bankCount);
+  setButtonAriaLabel(btn, lesson);
+}
+
+function syncLessonTag(
+  btn: HTMLButtonElement,
+  lesson: ProgressListEntry,
+  bankCount: number,
+): void {
+  const tagText = lessonTagText(lesson, bankCount);
+  const existing = btn.querySelector<HTMLElement>(".vmx-progress-list__tag");
+  if (!tagText) {
+    existing?.remove();
+    return;
+  }
+  const tag = existing ?? document.createElement("span");
+  tag.className = "vmx-progress-list__tag";
+  tag.dataset.kind = lesson.locked
+    ? "locked"
+    : lesson.is_recommended
+      ? "next"
+      : "banked";
+  tag.textContent = tagText;
+  if (!existing) btn.append(tag);
+}
+
+function lessonTagText(lesson: ProgressListEntry, bankCount: number): string | null {
+  if (lesson.locked) return "locked";
+  if (lesson.is_recommended) return "next";
+  if (bankCount > 0) return "banked";
+  return null;
 }
 
 function setButtonAriaLabel(btn: HTMLButtonElement, lesson: ProgressListEntry): void {
@@ -311,6 +353,8 @@ function lessonStateLabel(lesson: ProgressListEntry): string {
   }
   const parts: string[] = [lesson.status];
   if (lesson.is_recommended) parts.push("next");
+  const bankCount = effectivePracticeBankCount(lesson);
+  if (bankCount > 0) parts.push(`practice bank ${bankCount} of 3`);
   if (lesson.status === "completed") parts.push("press to replay");
   if (lesson.status === "in-progress") parts.push("retry");
   return parts.join(", ");
@@ -318,9 +362,16 @@ function lessonStateLabel(lesson: ProgressListEntry): string {
 
 function lessonTitle(lesson: ProgressListEntry): string | null {
   if (lesson.locked) return lesson.lock_reason ?? "locked";
+  const bankCount = effectivePracticeBankCount(lesson);
+  if (bankCount > 0) return `practice bank ${bankCount} of 3. press to finish this lesson.`;
   if (lesson.status === "completed") return "press to replay this lesson.";
   if (lesson.status === "in-progress") return "retry this lesson.";
   return null;
+}
+
+function effectivePracticeBankCount(lesson: ProgressListEntry): number {
+  if (lesson.status === "completed") return 0;
+  return Math.min(3, Math.max(0, Math.trunc(lesson.practice_bank_count ?? 0)));
 }
 
 /** Minimal CSS.escape polyfill for jsdom — the test env's CSS.escape can

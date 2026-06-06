@@ -300,6 +300,65 @@ describe("progress-list — pick + level", () => {
       "next",
     );
   });
+
+  it("marks banked practice rows without stealing the whole map", () => {
+    const root = renderProgressList({
+      lessons: [
+        mkLesson({
+          lesson_id: "L1.03",
+          title: "channel strip",
+          status: "in-progress",
+          practice_bank_count: 2,
+        }),
+      ],
+      onPickLesson: () => {},
+    });
+    document.body.append(root);
+
+    const btn = root.querySelector<HTMLButtonElement>(
+      "[data-lesson-id='L1.03']",
+    );
+    const tag = btn?.querySelector<HTMLElement>(".vmx-progress-list__tag");
+
+    expect(btn?.dataset.practiceBanked).toBe("true");
+    expect(btn?.dataset.practiceBank).toBe("2");
+    expect(tag?.textContent).toBe("banked");
+    expect(tag?.dataset.kind).toBe("banked");
+    expect(btn?.getAttribute("aria-label")).toBe(
+      "channel strip, in-progress, practice bank 2 of 3, retry",
+    );
+    expect(btn?.getAttribute("title")).toBe(
+      "practice bank 2 of 3. press to finish this lesson.",
+    );
+  });
+
+  it("keeps next as the visible tag when a banked row is recommended", () => {
+    const root = renderProgressList({
+      lessons: [
+        mkLesson({
+          lesson_id: "L1.03",
+          title: "channel strip",
+          status: "in-progress",
+          is_recommended: true,
+          practice_bank_count: 3,
+        }),
+      ],
+      onPickLesson: () => {},
+    });
+    document.body.append(root);
+
+    const btn = root.querySelector<HTMLButtonElement>(
+      "[data-lesson-id='L1.03']",
+    );
+    const tag = btn?.querySelector<HTMLElement>(".vmx-progress-list__tag");
+
+    expect(btn?.dataset.practiceBanked).toBe("true");
+    expect(tag?.textContent).toBe("next");
+    expect(tag?.dataset.kind).toBe("next");
+    expect(btn?.getAttribute("aria-label")).toBe(
+      "channel strip, in-progress, next, practice bank 3 of 3, retry",
+    );
+  });
 });
 
 describe("progress-list — empty state", () => {
@@ -497,5 +556,57 @@ describe("progress-list — setStatus", () => {
         "[data-course='course_1_anatomy'] .vmx-progress-list__group-summary",
       )?.textContent,
     ).toBe("3/4 done");
+  });
+
+  it("setStatus clears the banked row treatment after completion", () => {
+    const root = renderProgressList({
+      lessons: [
+        mkLesson({
+          lesson_id: "L1.03",
+          title: "channel strip",
+          status: "in-progress",
+          practice_bank_count: 2,
+        }),
+      ],
+      onPickLesson: () => {},
+    });
+    document.body.append(root);
+
+    root.setStatus("L1.03", "completed");
+
+    const btn = root.querySelector<HTMLButtonElement>(
+      "[data-lesson-id='L1.03']",
+    );
+    expect(btn?.dataset.practiceBanked).toBe("false");
+    expect(btn?.querySelector(".vmx-progress-list__tag")).toBeNull();
+    expect(btn?.getAttribute("aria-label")).toBe(
+      "channel strip, completed, press to replay",
+    );
+  });
+
+  it("course summaries call out a banked unfinished lesson", () => {
+    const root = renderProgressList({
+      lessons: [
+        mkLesson({
+          lesson_id: "L1.01",
+          title: "opening dialog",
+          status: "completed",
+        }),
+        mkLesson({
+          lesson_id: "L1.03",
+          title: "channel strip",
+          status: "in-progress",
+          practice_bank_count: 1,
+        }),
+      ],
+      onPickLesson: () => {},
+    });
+    document.body.append(root);
+
+    expect(
+      root.querySelector<HTMLElement>(
+        "[data-course='course_1_anatomy'] .vmx-progress-list__group-summary",
+      )?.textContent,
+    ).toBe("1/2 done, banked");
   });
 });

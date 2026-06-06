@@ -156,12 +156,14 @@ export function buildProgressEntries(
     const entry = lessonsMap[meta.lesson_id] ?? (
       legacyKey ? lessonsMap[legacyKey] : undefined
     );
+    const bankCount = practiceBankCount(entry);
     let status: LessonStatus = "empty";
     if (entry?.completed) {
       status = "completed";
     } else if (
       entry?.completed === false ||
-      (entry?.strikes_used && entry.strikes_used > 0)
+      (entry?.strikes_used && entry.strikes_used > 0) ||
+      bankCount > 0
     ) {
       status = "in-progress";
     }
@@ -175,6 +177,7 @@ export function buildProgressEntries(
       status,
       strikes_used: entry?.strikes_used,
       locked,
+      practice_bank_count: bankCount,
       lock_reason: locked ? lockReason(meta.course_id) : undefined,
     };
   });
@@ -202,4 +205,20 @@ function isCourseUnlocked(
 
 function lockReason(course_id: CourseId): string {
   return COURSE_REGISTRY[course_id]?.lock_reason ?? "locked";
+}
+
+function practiceBankCount(
+  entry: NonNullable<LearnProgressProjection["lessons"]>[string] | undefined,
+): number {
+  if (!entry || entry.completed) return 0;
+  const sources = entry.practice_sources ?? {};
+  return Math.min(
+    3,
+    nonNegativeInt(sources.hardware) + nonNegativeInt(sources.screen),
+  );
+}
+
+function nonNegativeInt(value: unknown): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) return 0;
+  return Math.max(0, Math.trunc(value));
 }

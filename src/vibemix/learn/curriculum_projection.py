@@ -171,11 +171,22 @@ def render_curriculum_meta_ts() -> str:
         '  focus: "first_rep" | "retry" | "proof" | "replay" | "hardware" | "lock" | "mastery";\n'
         "  focus_label: string;\n"
         "  challenge: string;\n"
+        "  chain?: LearnPracticeChainStep[];\n"
         "  meter_label: string;\n"
         "  meter_value: number;\n"
         "  meter_max: number;\n"
         '  meter_state: "armed" | "retry" | "proof" | "mastered" | "replay";\n'
         "  meter_caption: string;\n"
+        "}\n"
+        "\n"
+        "export interface LearnPracticeChainStep {\n"
+        "  lesson_id: string;\n"
+        "  course_id: string;\n"
+        "  course_label: string;\n"
+        "  title: string;\n"
+        '  state: "now" | "next" | "locked";\n'
+        '  mode: "start" | "finish" | "replay" | "prove" | "mastered";\n'
+        "  label: string;\n"
         "}\n"
         "\n"
         "/** Canonical lesson order generated from Python CURRICULUM. */\n"
@@ -207,12 +218,14 @@ def render_curriculum_meta_ts() -> str:
         "    const entry = lessonsMap[meta.lesson_id] ?? (\n"
         "      legacyKey ? lessonsMap[legacyKey] : undefined\n"
         "    );\n"
+        "    const bankCount = practiceBankCount(entry);\n"
         '    let status: LessonStatus = "empty";\n'
         "    if (entry?.completed) {\n"
         '      status = "completed";\n'
         "    } else if (\n"
         "      entry?.completed === false ||\n"
-        "      (entry?.strikes_used && entry.strikes_used > 0)\n"
+        "      (entry?.strikes_used && entry.strikes_used > 0) ||\n"
+        "      bankCount > 0\n"
         "    ) {\n"
         '      status = "in-progress";\n'
         "    }\n"
@@ -226,6 +239,7 @@ def render_curriculum_meta_ts() -> str:
         "      status,\n"
         "      strikes_used: entry?.strikes_used,\n"
         "      locked,\n"
+        "      practice_bank_count: bankCount,\n"
         "      lock_reason: locked ? lockReason(meta.course_id) : undefined,\n"
         "    };\n"
         "  });\n"
@@ -253,6 +267,22 @@ def render_curriculum_meta_ts() -> str:
         "\n"
         "function lockReason(course_id: CourseId): string {\n"
         '  return COURSE_REGISTRY[course_id]?.lock_reason ?? "locked";\n'
+        "}\n"
+        "\n"
+        "function practiceBankCount(\n"
+        '  entry: NonNullable<LearnProgressProjection["lessons"]>[string] | undefined,\n'
+        "): number {\n"
+        "  if (!entry || entry.completed) return 0;\n"
+        "  const sources = entry.practice_sources ?? {};\n"
+        "  return Math.min(\n"
+        "    3,\n"
+        "    nonNegativeInt(sources.hardware) + nonNegativeInt(sources.screen),\n"
+        "  );\n"
+        "}\n"
+        "\n"
+        "function nonNegativeInt(value: unknown): number {\n"
+        '  if (typeof value !== "number" || !Number.isFinite(value)) return 0;\n'
+        "  return Math.max(0, Math.trunc(value));\n"
         "}\n"
     )
 
