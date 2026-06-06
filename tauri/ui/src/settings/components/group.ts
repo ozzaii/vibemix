@@ -35,18 +35,17 @@ const CSS = `
   .vmx-settings-group {
     position: relative;
     flex: 0 0 auto;
-    margin: 10px 0;
+    margin: 12px 0;
     border-radius: var(--rad-sm);
-    border: 1px solid var(--border-subtle);
+    border: 0;
     background:
-      linear-gradient(180deg, rgba(255, 222, 242, 0.018) 0%, transparent 16%, transparent 100%),
-      linear-gradient(180deg, var(--void-8) 0%, var(--void-4) 100%);
+      linear-gradient(180deg, rgba(255, 222, 242, 0.032) 0%, transparent 18%, rgba(0, 0, 0, 0.20) 100%),
+      rgba(48, 42, 46, 0.50);
     box-shadow:
-      inset 0 1px 0 var(--glass-top),
+      var(--bevel-raised),
       inset 0 0 0 1px rgba(255, 255, 255, 0.014),
-      inset 0 -1px 0 rgba(0, 0, 0, 0.48),
-      0 1px 0 rgba(255, 255, 255, 0.025),
-      0 6px 18px rgba(0, 0, 0, 0.26);
+      0 14px 38px rgba(0, 0, 0, 0.26),
+      0 0 52px -34px var(--brand-22);
     overflow: hidden;
   }
   /* The leading rose seam — a vertical brand light down the left edge, the same
@@ -88,7 +87,7 @@ const CSS = `
     background:
       linear-gradient(180deg, rgba(255, 222, 242, 0.016) 0%, transparent 62%),
       rgba(0, 0, 0, 0.13);
-    box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.34);
+    box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.26);
   }
   /* Brand tick before the label — the section's heartbeat dot, same vocabulary
    * as the grounding panel-section-label (mock §1084-1095). */
@@ -107,8 +106,8 @@ const CSS = `
     right: var(--sp-4);
     bottom: 0;
     height: 1px;
-    background: linear-gradient(90deg, var(--brand-22) 0%, var(--border-subtle) 18%, transparent 64%);
-    opacity: 0.7;
+    background: linear-gradient(90deg, var(--brand-12) 0%, rgba(255, 222, 242, 0.045) 18%, transparent 64%);
+    opacity: 0.52;
   }
   .vmx-settings-group__badge {
     font-family: var(--type-mono);
@@ -133,8 +132,10 @@ const CSS = `
     display: flex;
     flex-direction: column;
     gap: 12px;
-    background: linear-gradient(180deg, rgba(0, 0, 0, 0.16) 0%, transparent 32%);
-    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.22);
+    background:
+      linear-gradient(180deg, rgba(0, 0, 0, 0.12) 0%, transparent 34%),
+      linear-gradient(90deg, rgba(255, 222, 242, 0.018), transparent 28%);
+    box-shadow: inset 0 1px 0 rgba(255, 222, 242, 0.030);
   }
   /* Mono numerics inside any group read in warm ink, tabular — the hardware
    * readout vocabulary (gold stays quarantined to Camelot/heat/energy). */

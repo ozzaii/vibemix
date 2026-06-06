@@ -70,6 +70,11 @@ import {
   wireSelector,
 } from "../../src/mock-transfer/contract.js";
 
+function styleText(scope: string): string {
+  return document.head.querySelector<HTMLStyleElement>(`style[data-scope="${scope}"]`)
+    ?.textContent ?? "";
+}
+
 const subscribeIpcMock = vi.mocked(subscribeIpc);
 
 beforeEach(() => {
@@ -137,6 +142,18 @@ describe("mountSettingsDrawer", () => {
         `${wire} should mount exactly once`,
       ).toBe(1);
     }
+  });
+
+  it("uses material depth instead of bordered web cards", () => {
+    mountSettingsDrawer(document.body);
+    const drawerCss = styleText("vmx-settings-drawer");
+    const groupCss = styleText("vmx-settings-group");
+
+    expect(drawerCss).toContain("backdrop-filter: blur(26px) saturate(1.12)");
+    expect(drawerCss).toContain("border-left: 0");
+    expect(groupCss).toContain("border: 0");
+    expect(groupCss).toContain("var(--bevel-raised)");
+    expect(groupCss).not.toContain("border: 1px solid var(--border-subtle)");
   });
 
   it("unmountSettingsDrawer removes shell nodes and resets open state", () => {

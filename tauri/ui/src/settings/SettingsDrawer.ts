@@ -99,10 +99,10 @@ const CSS = `
     position: fixed;
     inset: 0;
     background:
-      linear-gradient(90deg, rgba(0, 0, 0, 0.18), rgba(0, 0, 0, 0.58)),
-      rgba(0, 0, 0, 0.52);
-    backdrop-filter: blur(1.5px);
-    -webkit-backdrop-filter: blur(1.5px);
+      linear-gradient(90deg, rgba(0, 0, 0, 0.12), rgba(0, 0, 0, 0.62)),
+      rgba(0, 0, 0, 0.42);
+    backdrop-filter: blur(6px) saturate(0.86);
+    -webkit-backdrop-filter: blur(6px) saturate(0.86);
     z-index: 39;
     opacity: 0;
     pointer-events: none;
@@ -127,25 +127,22 @@ const CSS = `
      * the warm void ladder, so the panel reads as milled obsidian catching the
      * room's one rose key-light as it floats over the live stage. */
     background:
-      linear-gradient(115deg, var(--brand-06), transparent 30%),
-      linear-gradient(180deg, rgba(255, 222, 242, 0.024), transparent 18%),
-      linear-gradient(180deg, var(--void-15) 0%, var(--void-6) 58%, var(--void-0) 100%),
-      var(--glass-1);
-    backdrop-filter: var(--blur-glass);
-    -webkit-backdrop-filter: var(--blur-glass);
-    border-left: 1px solid var(--border-strong);
+      linear-gradient(115deg, var(--brand-08), transparent 34%),
+      linear-gradient(180deg, rgba(255, 222, 242, 0.042), transparent 20%, rgba(0, 0, 0, 0.20) 100%),
+      rgba(34, 29, 32, 0.82);
+    backdrop-filter: blur(26px) saturate(1.12);
+    -webkit-backdrop-filter: blur(26px) saturate(1.12);
+    border-left: 0;
     /* The full lit stack: a machined top lip (--glass-top) + a left-edge milled
      * highlight, a faint rose inner-glow bleeding from the leading edge, a hard
      * floor shadow, and a real ambient drop so it sits ABOVE the stage. */
     box-shadow:
-      inset 1px 0 0 var(--glass-top),
-      inset 0 1px 0 var(--glass-top),
-      inset 10px 0 24px var(--brand-03),
-      inset 0 -1px 0 rgba(0, 0, 0, 0.80),
-      -2px 0 0 rgba(255, 222, 242, 0.020),
-      -20px 0 54px rgba(0, 0, 0, 0.58),
-      -1px 0 0 rgba(255, 222, 242, 0.040);
-    transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
+      var(--bevel-raised),
+      inset 10px 0 26px var(--brand-04),
+      -24px 0 72px rgba(0, 0, 0, 0.60),
+      -72px 0 140px rgba(0, 0, 0, 0.34),
+      0 0 86px -42px var(--brand-22);
+    transition: transform 220ms var(--ease-brand);
     display: flex;
     flex-direction: column;
     overflow: hidden;
@@ -192,7 +189,6 @@ const CSS = `
     align-items: center;
     justify-content: space-between;
     padding: 0 22px;
-    border-bottom: 1px solid var(--border-default);
     /* Lit header — a machined cap on the slide-over: a warm-rose top sheen over
      * a darker base, a top lip catching light, a hard floor, and a real ambient
      * drop so the header reads as a raised crown above the scrolling body. */
@@ -282,7 +278,7 @@ const CSS = `
     background:
       linear-gradient(180deg, rgba(255, 222, 242, 0.05), transparent 50%),
       linear-gradient(180deg, var(--void-15) 0%, var(--void-5) 100%);
-    border: 1px solid var(--border-default);
+    border: 0;
     color: var(--text-tertiary);
     line-height: 1;
     cursor: pointer;
@@ -295,6 +291,7 @@ const CSS = `
                 box-shadow var(--motion-snap) ease-out,
                 transform var(--motion-snap) ease-out;
     box-shadow:
+      var(--bevel-raised),
       inset 0 1px 0 var(--glass-top),
       inset 0 -1px 0 rgba(0, 0, 0, 0.55),
       0 2px 6px rgba(0, 0, 0, 0.30);
@@ -336,7 +333,8 @@ const CSS = `
      * recess so the scroll region reads as the recessed channel the lit
      * recessed group modules seat into. */
     background:
-      linear-gradient(180deg, rgba(0, 0, 0, 0.22) 0%, transparent 5%);
+      linear-gradient(180deg, rgba(0, 0, 0, 0.18) 0%, transparent 6%),
+      linear-gradient(90deg, rgba(255, 165, 223, 0.018), transparent 32%);
   }
   .vmx-settings-drawer__body::-webkit-scrollbar { width: 6px; }
   .vmx-settings-drawer__body::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.3); }
