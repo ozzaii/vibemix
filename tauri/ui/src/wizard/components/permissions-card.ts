@@ -27,6 +27,8 @@ export interface PermissionsCardProps {
   state: PermissionState;
   onGrantClick?: () => void;
   onOpenSettings?: () => void;
+  awaitingRestart?: boolean;
+  onRestart?: () => void;
 }
 
 const CSS = `
@@ -214,14 +216,17 @@ export function PermissionsCard(props: PermissionsCardProps): HTMLElement {
     led.className = "cmp-perm-card__led";
     led.setAttribute("aria-hidden", "true");
     const txt = document.createElement("span");
-    // UI-SPEC §Step 1 — VERBATIM
-    txt.textContent = "DENIED · open Settings ↗";
+    const action = props.awaitingRestart ? props.onRestart : props.onOpenSettings;
+    txt.textContent = props.awaitingRestart
+      ? "GRANTED? RESTART TO APPLY ↻"
+      // UI-SPEC §Step 1 — VERBATIM
+      : "DENIED · open Settings ↗";
     denied.append(led, txt);
-    denied.addEventListener("click", () => props.onOpenSettings?.());
+    denied.addEventListener("click", () => action?.());
     denied.addEventListener("keydown", (e) => {
       if (e.key === "Enter" || e.key === " ") {
         e.preventDefault();
-        props.onOpenSettings?.();
+        action?.();
       }
     });
     right.append(denied);

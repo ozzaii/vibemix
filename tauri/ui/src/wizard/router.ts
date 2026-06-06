@@ -94,6 +94,7 @@ const DEFAULT_STATE: WizardState = {
   step1: {
     screenRecording: "pending",
     microphone: "pending",
+    screenSettingsOpened: false,
   },
   step2: {
     blackHolePresent: false, // sidecar replies fill this in
@@ -368,6 +369,9 @@ export function renderCurrentStep(): void {
           void invoke("open_screen_recording_settings").catch((err) => {
             console.warn("[step1] open_screen_recording_settings failed:", err);
           });
+          setState({
+            step1: { ...wizardState.step1, screenSettingsOpened: true },
+          });
         },
         onGrantMic: () => {
           // Trigger the OS mic prompt. Sidecar's AVCaptureDevice
@@ -379,9 +383,17 @@ export function renderCurrentStep(): void {
         },
         onOpenScreenSettings: () => {
           void invoke("open_screen_recording_settings").catch(() => {});
+          setState({
+            step1: { ...wizardState.step1, screenSettingsOpened: true },
+          });
         },
         onOpenMicSettings: () => {
           void invoke("open_microphone_settings").catch(() => {});
+        },
+        onRestartSidecar: () => {
+          void invoke("restart_sidecar").catch((err) => {
+            console.warn("[step1] restart_sidecar failed:", err);
+          });
         },
       });
       if (!step1PollerStarted) {
@@ -610,6 +622,8 @@ function scheduleCountdownTick(): void {
 
 let step1PollerStarted = false;
 let step1PollTimer: number | null = null;
+let hasTriedScreenRestart = false;
+let screenRestartFocusHandler: (() => void) | null = null;
 let step2BootStarted = false;
 let libraryFeedBootStarted = false;
 let step3ListenStarted = false;
@@ -618,11 +632,34 @@ let smokeTestStarted = false;
 /** Poll ipc.permission.check @1Hz for both kinds while Step 1 is active. */
 function startStep1PermissionPoll(): void {
   step1PollerStarted = true;
+  if (screenRestartFocusHandler === null) {
+    screenRestartFocusHandler = (): void => {
+      if (
+        wizardState.currentStep === "permissions" &&
+        wizardState.platform === "darwin" &&
+        wizardState.step1.screenRecording !== "granted" &&
+        !hasTriedScreenRestart
+      ) {
+        hasTriedScreenRestart = true;
+        void invoke("restart_sidecar").catch((err) => {
+          console.warn(
+            "[step1] restart_sidecar (screen-rec refresh) failed:",
+            err,
+          );
+        });
+      }
+    };
+    window.addEventListener("focus", screenRestartFocusHandler);
+  }
   const poll = async (): Promise<void> => {
     if (wizardState.currentStep !== "permissions") {
       if (step1PollTimer != null) {
         clearInterval(step1PollTimer);
         step1PollTimer = null;
+      }
+      if (screenRestartFocusHandler !== null) {
+        window.removeEventListener("focus", screenRestartFocusHandler);
+        screenRestartFocusHandler = null;
       }
       step1PollerStarted = false;
       return;

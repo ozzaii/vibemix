@@ -17,6 +17,7 @@ import { registerStyle } from "./components/_style-registry.js";
 export interface Step1State {
   screenRecording: PermissionState;
   microphone: PermissionState;
+  screenSettingsOpened?: boolean;
 }
 
 export interface Step1Callbacks {
@@ -26,6 +27,7 @@ export interface Step1Callbacks {
   onGrantMic: () => void;
   onOpenScreenSettings: () => void;
   onOpenMicSettings: () => void;
+  onRestartSidecar?: () => void;
   /** Impeccable Wave 5.A — walks the wizard one step backward. Optional
    *  for back-compat with existing tests; the router always wires it. */
   onBack?: () => void;
@@ -201,6 +203,8 @@ export function renderStep1(state: Step1State, cb: Step1Callbacks): HTMLElement 
         state: state.screenRecording,
         onGrantClick: cb.onGrantScreen,
         onOpenSettings: cb.onOpenScreenSettings,
+        awaitingRestart: state.screenSettingsOpened === true,
+        onRestart: cb.onRestartSidecar,
       })
     );
     required.push(state.screenRecording);

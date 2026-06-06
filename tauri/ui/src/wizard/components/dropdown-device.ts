@@ -100,11 +100,8 @@ const CSS = `
     color: var(--amber);
   }
   .cmp-dropdown-device__panel {
-    position: absolute;
-    top: calc(100% + 4px);
-    left: 0;
-    right: 0;
-    z-index: 100;
+    position: fixed;
+    z-index: 1000;
     background: var(--glass-2);
     backdrop-filter: var(--blur-glass-light);
     -webkit-backdrop-filter: var(--blur-glass-light);
@@ -237,26 +234,53 @@ export function DropdownDevice(props: DropdownDeviceProps): HTMLElement {
       row.addEventListener("click", () => {
         selectedId = d.id;
         refreshHead();
-        panel.hidden = true;
-        head.setAttribute("aria-expanded", "false");
+        closePanel();
         props.onSelect(d.id);
       });
       panel.append(row);
     });
   }
 
+  function positionPanel(): void {
+    if (typeof head.getBoundingClientRect !== "function") return;
+    const r = head.getBoundingClientRect();
+    panel.style.left = `${r.left}px`;
+    panel.style.top = `${r.bottom + 4}px`;
+    panel.style.width = `${r.width}px`;
+  }
+
+  function openPanel(): void {
+    refreshPanel();
+    if (panel.parentElement !== document.body) {
+      document.body.append(panel);
+    }
+    panel.hidden = false;
+    head.setAttribute("aria-expanded", "true");
+    positionPanel();
+    window.addEventListener("scroll", positionPanel, true);
+    window.addEventListener("resize", positionPanel);
+  }
+
+  function closePanel(): void {
+    panel.hidden = true;
+    head.setAttribute("aria-expanded", "false");
+    window.removeEventListener("scroll", positionPanel, true);
+    window.removeEventListener("resize", positionPanel);
+    if (panel.parentElement !== root) {
+      root.append(panel);
+    }
+  }
+
   head.addEventListener("click", () => {
-    const open = panel.hidden;
-    panel.hidden = !open;
-    head.setAttribute("aria-expanded", open ? "true" : "false");
-    if (open) refreshPanel();
+    if (panel.hidden) openPanel();
+    else closePanel();
   });
 
   // Click outside to close
   document.addEventListener("click", (e) => {
-    if (!root.contains(e.target as Node)) {
-      panel.hidden = true;
-      head.setAttribute("aria-expanded", "false");
+    const target = e.target as Node;
+    if (!root.contains(target) && !panel.contains(target)) {
+      closePanel();
     }
   });
 

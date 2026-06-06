@@ -72,7 +72,7 @@ describe("wizard step 2 - retired lesson headphone picker", () => {
     document.body.append(rendered);
 
     rendered.querySelector<HTMLElement>(".cmp-dropdown-device__head")?.click();
-    rendered
+    document
       .querySelector<HTMLElement>(".cmp-dropdown-device__option[data-id='1']")
       ?.click();
 
