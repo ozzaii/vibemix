@@ -10,8 +10,9 @@
  *   - Step 1 [ Grant ] buttons invoke Tauri commands open_*_settings /
  *     request_microphone_permission.
  *   - Step 2 mount -> ipc.calibration.list_devices.
- *   - Step 3 "Listen now" → ipc.calibration.start_midi_listen (timeout 10s).
- *   - Smoke-test mount → ipc.calibration.smoke_test (timeout 30s).
+ *   - Step 3 "Listen now" -> ipc.calibration.start_midi_listen (timeout 10s).
+ *   - Launch mount -> library_setup_candidates + ipc.library.import.
+ *   - Legacy smoke-test mount -> ipc.calibration.smoke_test (timeout 30s).
  *   - Wizard done → emitIpc ipc.wizard.done + invoke write_first_run_state.
  *
  * State transitions still use 250ms ease-in-out (UI-SPEC §Motion Budget cap).
@@ -20,6 +21,12 @@
 import { invoke } from "@tauri-apps/api/core";
 
 import { emitIpc, sendIpcRequest, subscribeIpc } from "../ipc/client.js";
+import {
+  libraryImportFromAction,
+  libraryStats,
+  onLibraryImportProgress,
+  type LibrarySetupCandidate,
+} from "../library/api.js";
 import { registerShortcuts } from "../session/shortcuts.js";
 import { StatusBar } from "./components/status-bar.js";
 import type { StatusBarProps } from "./components/status-bar.js";
@@ -41,11 +48,16 @@ import {
   renderStepSkillLevel,
   type SkillLevelState,
 } from "./step-skill-level.js";
+import {
+  renderStepLibraryFeed,
+  type LibraryFeedState,
+} from "./step-library-feed.js";
 
 export type WizardStep =
   | "intro"
   | "permissions"
   | "audio"
+  | "library-feed"
   | "controller"
   | "skill-level"
   // Phase 49 — new step types for the one-click install chain.
@@ -66,6 +78,7 @@ export interface WizardState {
   step2: Step2State;
   step3: Step3State;
   skillLevel: SkillLevelState;
+  libraryFeed: LibraryFeedState;
   profileConsent: ProfileConsentState;
   telemetryConsent: TelemetryConsentState;
   smokeTest: SmokeTestState;
@@ -87,10 +100,6 @@ const DEFAULT_STATE: WizardState = {
     blackHoleBannerPostClick: false,
     devices: [],
     selectedDeviceId: "",
-    // Phase 97 / ONBOARD-04 — headphone picker default = system default
-    // (null on the wire). The user can flip this to any real device
-    // index via the Step 2 picker.
-    selectedHeadphoneDeviceIndex: null,
   },
   step3: {
     detectedController: undefined,
@@ -103,6 +112,11 @@ const DEFAULT_STATE: WizardState = {
     // VIBEMIX_SKILL_LEVEL). Continue is always armed; the step is
     // non-blocking, the user picks their actual level explicitly.
     skill: "intermediate",
+  },
+  libraryFeed: {
+    status: "loading",
+    candidates: [],
+    indexed: 0,
   },
   profileConsent: {
     // PROFILE-05 default-OFF — non-negotiable. The toggle MUST start
@@ -158,11 +172,18 @@ function setState(
 const STEP_ORDER: WizardStep[] = [
   "permissions",
   "audio",
+  "library-feed",
+];
+
+const KNOWN_STEPS: WizardStep[] = [
+  "intro",
+  ...STEP_ORDER,
   "controller",
   "skill-level",
   "profile-consent",
   "telemetry-consent",
   "smoke-test",
+  "done",
 ];
 
 function indexOf(step: WizardStep): number {
@@ -171,17 +192,10 @@ function indexOf(step: WizardStep): number {
 
 function stepStripFor(current: WizardStep): HTMLElement {
   const idx = indexOf(current);
-  // 2026-05-19 /impeccable critique fix: indicator was 4 dots for a
-  // 5-step flow; telemetry-consent had no dot and shipped its own
-  // "STEP 5/5" header, breaking the denominator across surfaces.
-  // Added telemetry-consent so the strip + header count agree.
   const stepsConfig: Array<{ id: WizardStep; label: string }> = [
     { id: "permissions", label: "permissions" },
     { id: "audio", label: "device" },
-    { id: "controller", label: "controller" },
-    { id: "skill-level", label: "skill" },
-    { id: "profile-consent", label: "profile" },
-    { id: "telemetry-consent", label: "telemetry" },
+    { id: "library-feed", label: "music" },
   ];
   return StepIndicator({
     steps: stepsConfig.map((s, i) => {
@@ -192,7 +206,7 @@ function stepStripFor(current: WizardStep): HTMLElement {
           : stepIdx === idx
             ? ("active" as const)
             : ("pending" as const);
-      if (current === "smoke-test") {
+      if (current === "smoke-test" || current === "done") {
         return { ...s, state: "complete" as const };
       }
       if (
@@ -226,7 +240,7 @@ export function advanceTo(next: WizardStep): void {
 }
 
 /** Walk the wizard one step backward. Intro has no back (it's the first
- *  surface a user sees). Smoke-test goes back to controller. Wired to the
+ *  surface a user sees). Library-feed goes back to audio. Wired to the
  *  per-step `[ ← Back ]` button + the `esc` / `cmd+[` shortcut.
  *
  *  Impeccable Wave 5.A — closes the Heuristic 3 (User Control & Freedom)
@@ -243,6 +257,9 @@ export function back(): void {
       return;
     case "audio":
       advanceTo("permissions");
+      return;
+    case "library-feed":
+      advanceTo("audio");
       return;
     case "controller":
       advanceTo("audio");
@@ -307,8 +324,7 @@ function ensureWizardShortcuts(): void {
     "cmd+[": () => back(),
     "ctrl+[": () => back(),
     // `esc` from a wizard step walks back one. The intro returns no-op
-    // via back(), and the smoke-test surface absorbs esc (it's the last
-    // step before completion — `back()` is the safe action).
+    // via back(), and launch returns to the audio-picker step.
     escape: () => back(),
   });
 }
@@ -324,7 +340,7 @@ export function renderCurrentStep(): void {
     return;
   }
 
-  // Intro hero + smoke-test both own the full surface — no step strip.
+  // Intro hero + smoke-test both own the full surface, no step strip.
   if (
     wizardState.currentStep === "intro" ||
     wizardState.currentStep === "smoke-test"
@@ -379,7 +395,7 @@ export function renderCurrentStep(): void {
       }
       primary = renderStep2(wizardState.step2, {
         platform: wizardState.platform,
-        onContinue: () => advanceTo("controller"),
+        onContinue: () => advanceTo("library-feed"),
         onBack: () => back(),
         onSelectDevice: (id) =>
           setState({ step2: { ...wizardState.step2, selectedDeviceId: id } }),
@@ -395,26 +411,36 @@ export function renderCurrentStep(): void {
         onRecheckBlackHole: () => {
           void recheckBlackHole();
         },
-        // Phase 97 / ONBOARD-04 — headphone picker callback. Updates the
-        // local Step 2 state AND fires ipc.settings.set so the sidecar
-        // persists the choice via ConfigStore.extra. The schema's
-        // 'learn.headphone_device_index' field was landed in P93 with the
-        // EXEMPLAR-04 wiring; we're just adding the picker surface here.
-        onSelectHeadphoneDevice: (idx) => {
+      });
+      break;
+    case "library-feed":
+      if (!libraryFeedBootStarted) {
+        libraryFeedBootStarted = true;
+        void refreshLibraryFeedCandidates();
+      }
+      primary = renderStepLibraryFeed(wizardState.libraryFeed, {
+        skill: wizardState.skillLevel.skill,
+        profileConsent: wizardState.profileConsent.consent,
+        telemetryConsent: wizardState.telemetryConsent.consent,
+        onSelectSkill: (next) =>
           setState({
-            step2: {
-              ...wizardState.step2,
-              selectedHeadphoneDeviceIndex: idx,
+            skillLevel: { ...wizardState.skillLevel, skill: next },
+          }),
+        onToggleProfile: (next) =>
+          setState({
+            profileConsent: { ...wizardState.profileConsent, consent: next },
+          }),
+        onToggleTelemetry: (next) =>
+          setState({
+            telemetryConsent: {
+              ...wizardState.telemetryConsent,
+              consent: next,
             },
-          });
-          void emitIpc("ipc.settings.set", {
-            field: "learn.headphone_device_index",
-            value: idx,
-          }).catch((err: unknown) => {
-            // eslint-disable-next-line no-console
-            console.warn("[wizard] headphone device set failed:", err);
-          });
-        },
+          }),
+        onRefreshCandidates: () => void refreshLibraryFeedCandidates(true),
+        onIndexCandidate: (candidate) => void startLibraryFeedImport(candidate),
+        onOpenVibemix: () => void finishLaunchStep(),
+        onBack: () => back(),
       });
       break;
     case "controller":
@@ -584,6 +610,7 @@ function scheduleCountdownTick(): void {
 let step1PollerStarted = false;
 let step1PollTimer: number | null = null;
 let step2BootStarted = false;
+let libraryFeedBootStarted = false;
 let step3ListenStarted = false;
 let smokeTestStarted = false;
 
@@ -689,6 +716,105 @@ async function recheckBlackHole(): Promise<void> {
   await refreshDeviceList();
 }
 
+function libraryFeedStatus(
+  indexed: number,
+  candidates: LibrarySetupCandidate[],
+): LibraryFeedState["status"] {
+  if (candidates.length > 0) return "ready";
+  return indexed > 0 ? "done" : "empty";
+}
+
+async function refreshLibraryFeedCandidates(force = false): Promise<void> {
+  if (force) libraryFeedBootStarted = true;
+  setState({
+    libraryFeed: {
+      ...wizardState.libraryFeed,
+      status: "loading",
+      error: undefined,
+    },
+  });
+  try {
+    const stats = await libraryStats();
+    const candidates = stats.library_setup_candidates ?? [];
+    setState({
+      libraryFeed: {
+        ...wizardState.libraryFeed,
+        status: libraryFeedStatus(stats.indexed, candidates),
+        candidates,
+        indexed: stats.indexed,
+        error: undefined,
+      },
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    setState({
+      libraryFeed: {
+        ...wizardState.libraryFeed,
+        status: "error",
+        error: message,
+      },
+    });
+  }
+}
+
+async function startLibraryFeedImport(
+  candidate: LibrarySetupCandidate,
+): Promise<void> {
+  setState({
+    libraryFeed: {
+      ...wizardState.libraryFeed,
+      status: "indexing",
+      selectedPath: candidate.path,
+      progress: undefined,
+      error: undefined,
+    },
+  });
+
+  let unlisten = (): void => {};
+  try {
+    unlisten = await onLibraryImportProgress((progress) => {
+      const terminal =
+        progress.cancelled || progress.total <= 0 || progress.done >= progress.total;
+      setState({
+        libraryFeed: {
+          ...wizardState.libraryFeed,
+          status: terminal ? "done" : "indexing",
+          selectedPath: candidate.path,
+          progress,
+          error: undefined,
+        },
+      });
+      if (terminal) unlisten();
+    });
+    const accepted = await libraryImportFromAction(
+      candidate.import_action,
+      candidate.path,
+    );
+    if (!accepted) {
+      unlisten();
+      setState({
+        libraryFeed: {
+          ...wizardState.libraryFeed,
+          status: "error",
+          selectedPath: candidate.path,
+          error: "desktop bridge is not connected",
+        },
+      });
+    }
+  } catch (err) {
+    unlisten();
+    const message = err instanceof Error ? err.message : String(err);
+    setState({
+      libraryFeed: {
+        ...wizardState.libraryFeed,
+        status: "error",
+        selectedPath: candidate.path,
+        error: message,
+      },
+    });
+  }
+}
+
 async function runMidiListen(): Promise<void> {
   // Race the event handler against the timeout subscription so either
   // outcome resolves the listen.
@@ -718,9 +844,9 @@ async function runMidiListen(): Promise<void> {
         caughtLabel: label,
       },
     });
-    // Auto-advance after 1s per UI-SPEC §10. Quick 260529-ifq inserts the
-    // skill-level step after controller (then profile-consent → smoke-test).
-    setTimeout(() => advanceTo("skill-level"), 1000);
+    // Auto-advance after 1s per UI-SPEC §10. The collapsed wizard returns
+    // legacy direct controller probes to the launch step.
+    setTimeout(() => advanceTo("library-feed"), 1000);
   } catch (err) {
     if (!resolved) {
       console.warn("[step3] midi listen failed:", err);
@@ -761,6 +887,25 @@ async function runSmokeTest(): Promise<void> {
   } finally {
     if (unsubStarted) unsubStarted();
   }
+}
+
+async function persistLaunchPreferences(): Promise<void> {
+  await Promise.allSettled([
+    emitIpc("ipc.wizard.set_skill", {
+      skill: wizardState.skillLevel.skill,
+    }),
+    emitIpc("ipc.profile.set_consent", {
+      consent: wizardState.profileConsent.consent,
+    }),
+    emitIpc("ipc.telemetry.set_consent", {
+      consent: wizardState.telemetryConsent.consent,
+    }),
+  ]);
+}
+
+async function finishLaunchStep(): Promise<void> {
+  await persistLaunchPreferences();
+  await completeWizard();
 }
 
 async function completeWizard(): Promise<void> {
@@ -862,8 +1007,7 @@ export function getDevSurface(): DevSurface {
           caughtLabel: ev.label,
         },
       });
-      // Quick 260529-ifq — Step 3 routes through skill-level next.
-      setTimeout(() => advanceTo("skill-level"), 1000);
+      setTimeout(() => advanceTo("library-feed"), 1000);
     },
     setStatusBar: (status) => setState({ statusBar: status }),
   };
@@ -873,7 +1017,7 @@ export function consumeUrlParam(): void {
   try {
     const u = new URL(window.location.href);
     const step = u.searchParams.get("step") as WizardStep | null;
-    if (step && STEP_ORDER.includes(step)) {
+    if (step && KNOWN_STEPS.includes(step)) {
       wizardState = { ...wizardState, currentStep: step };
     }
   } catch (_err) {

@@ -1,18 +1,14 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// Phase 97 / ONBOARD-04 — Headphone device picker on wizard step 2.
-//
-// Pins the picker surface: an additional DropdownDevice below the
-// master-output picker. Users pick where tutor exemplar playback should
-// route (default = system output). The wire shape is the EXISTING
-// ipc.settings.set { field: 'learn.headphone_device_index' } envelope
-// landed in P93 — this plan adds the picker UI, not the wire field.
+// Session 2 activation cleanup: Learn is parked for launch, so Step 2 keeps
+// only the primary output-device picker. The old tutorial headphone picker
+// must stay gone.
 
-import { describe, it, expect, afterEach, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   renderStep2,
-  type Step2State,
   type Step2Callbacks,
+  type Step2State,
 } from "../../src/wizard/step2-output-device.js";
 
 function makeState(over: Partial<Step2State> = {}): Step2State {
@@ -25,7 +21,6 @@ function makeState(over: Partial<Step2State> = {}): Step2State {
       { id: "2", name: "BlackHole 2ch" },
     ],
     selectedDeviceId: "0",
-    selectedHeadphoneDeviceIndex: null,
     ...over,
   };
 }
@@ -38,7 +33,6 @@ function makeCallbacks(over: Partial<Step2Callbacks> = {}): Step2Callbacks {
     onOpenInstall: vi.fn(),
     onRecheckBlackHole: vi.fn(),
     onBack: vi.fn(),
-    onSelectHeadphoneDevice: vi.fn(),
     ...over,
   };
 }
@@ -47,185 +41,41 @@ afterEach(() => {
   document.body.replaceChildren();
 });
 
-describe("wizard step 2 — headphone picker (ONBOARD-04)", () => {
-  it("renders the headphone picker section when onSelectHeadphoneDevice is wired", () => {
-    const rendered = renderStep2(makeState(), makeCallbacks());
-    document.body.append(rendered);
-    const section = rendered.querySelector<HTMLElement>(
-      ".wizard-step__headphone-picker",
-    );
-    expect(section).not.toBeNull();
-  });
-
-  it("does NOT render the picker section when onSelectHeadphoneDevice is absent (back-compat)", () => {
-    const rendered = renderStep2(
-      makeState(),
-      makeCallbacks({ onSelectHeadphoneDevice: undefined }),
-    );
-    document.body.append(rendered);
-    const section = rendered.querySelector<HTMLElement>(
-      ".wizard-step__headphone-picker",
-    );
-    expect(section).toBeNull();
-  });
-
-  it("carries the verbatim heading + helper copy (tone-disciplined lowercase)", () => {
-    const rendered = renderStep2(makeState(), makeCallbacks());
-    document.body.append(rendered);
-    const heading = rendered.querySelector<HTMLElement>(
-      ".wizard-step__headphone-picker__heading",
-    );
-    const helper = rendered.querySelector<HTMLElement>(
-      ".wizard-step__headphone-picker__helper",
-    );
-    expect(heading?.textContent).toBe("tutor exemplar playback (headphones)");
-    expect(helper?.textContent).toBe(
-      "beginner lessons play short audio examples; pick where they should come out.",
-    );
-  });
-
-  it("does not render the retired tone or fake window controls", () => {
+describe("wizard step 2 - retired lesson headphone picker", () => {
+  it("does not render the Learn-only headphone picker", () => {
     const rendered = renderStep2(makeState(), makeCallbacks());
     document.body.append(rendered);
 
-    expect(rendered.querySelector(".cmp-audio-test")).toBeNull();
-    expect(rendered.querySelector(".cmp-window-picker")).toBeNull();
-    expect(rendered.textContent).not.toContain("1 kHz");
-    expect(rendered.textContent).not.toContain("clean tone");
-    expect(rendered.textContent).not.toContain("Pick a different window");
-    expect(rendered.textContent).not.toContain("Chrome");
+    expect(rendered.querySelector(".wizard-step__headphone-picker")).toBeNull();
+    expect(rendered.textContent).not.toContain("tutor exemplar playback");
+    expect(rendered.textContent).not.toContain("[ system default ]");
+    expect(rendered.textContent).not.toContain("beginner lessons play");
   });
 
-  it("the default selection is the '[ system default ]' pseudo-option", () => {
-    const rendered = renderStep2(
-      makeState({ selectedHeadphoneDeviceIndex: null }),
-      makeCallbacks(),
-    );
-    document.body.append(rendered);
-    const section = rendered.querySelector<HTMLElement>(
-      ".wizard-step__headphone-picker",
-    );
-    expect(section).not.toBeNull();
-    // The DropdownDevice surfaces the current selected name in its head row.
-    // When index is null, the picker shows "[ system default ]".
-    const headName = section!.querySelector<HTMLElement>(
-      ".cmp-dropdown-device__name",
-    );
-    expect(headName?.textContent).toBe("[ system default ]");
-  });
-
-  it("the system-default option lives at the top of the dropdown list (before any real device)", () => {
-    const rendered = renderStep2(makeState(), makeCallbacks());
-    document.body.append(rendered);
-    const section = rendered.querySelector<HTMLElement>(
-      ".wizard-step__headphone-picker",
-    );
-    expect(section).not.toBeNull();
-    // Open the dropdown
-    const head = section!.querySelector<HTMLElement>(
-      ".cmp-dropdown-device__head",
-    );
-    head!.click();
-    // First option in the panel should be "[ system default ]"
-    const firstOption = section!.querySelector<HTMLElement>(
-      ".cmp-dropdown-device__option",
-    );
-    expect(firstOption?.textContent).toContain("[ system default ]");
-  });
-
-  it("picking a real device fires onSelectHeadphoneDevice with the integer index", () => {
+  it("keeps the primary output device picker and Continue gate", () => {
     const cb = makeCallbacks();
-    const rendered = renderStep2(makeState(), cb);
+    const rendered = renderStep2(makeState({ selectedDeviceId: "" }), cb);
     document.body.append(rendered);
-    const section = rendered.querySelector<HTMLElement>(
-      ".wizard-step__headphone-picker",
+
+    expect(rendered.textContent).toContain("OUTPUT DEVICE");
+    expect(rendered.querySelector(".cmp-dropdown-device")).not.toBeNull();
+    const continueButton = Array.from(rendered.querySelectorAll("button")).find((button) =>
+      (button.textContent ?? "").toLowerCase().includes("continue"),
     );
-    const head = section!.querySelector<HTMLElement>(
-      ".cmp-dropdown-device__head",
-    );
-    head!.click();
-    // Find the option for device id "1" (AirPods Pro)
-    const airpodsOption = section!.querySelector<HTMLElement>(
-      ".cmp-dropdown-device__option[data-id='1']",
-    );
-    expect(airpodsOption).not.toBeNull();
-    airpodsOption!.click();
-    expect(cb.onSelectHeadphoneDevice).toHaveBeenCalledTimes(1);
-    expect(cb.onSelectHeadphoneDevice).toHaveBeenCalledWith(1);
+    expect(continueButton).toBeDefined();
+    expect(continueButton!.disabled).toBe(true);
   });
 
-  it("picking the system-default option fires onSelectHeadphoneDevice with null", () => {
+  it("selecting the primary output device still fires onSelectDevice", () => {
     const cb = makeCallbacks();
-    const rendered = renderStep2(
-      makeState({ selectedHeadphoneDeviceIndex: 1 }), // start on AirPods
-      cb,
-    );
+    const rendered = renderStep2(makeState({ selectedDeviceId: "0" }), cb);
     document.body.append(rendered);
-    const section = rendered.querySelector<HTMLElement>(
-      ".wizard-step__headphone-picker",
-    );
-    const head = section!.querySelector<HTMLElement>(
-      ".cmp-dropdown-device__head",
-    );
-    head!.click();
-    // Click "[ system default ]" option.
-    const sysDefaultOption = section!.querySelector<HTMLElement>(
-      ".cmp-dropdown-device__option[data-id='__system_default__']",
-    );
-    expect(sysDefaultOption).not.toBeNull();
-    sysDefaultOption!.click();
-    expect(cb.onSelectHeadphoneDevice).toHaveBeenCalledTimes(1);
-    expect(cb.onSelectHeadphoneDevice).toHaveBeenCalledWith(null);
-  });
 
-  it("a non-null selectedHeadphoneDeviceIndex surfaces the matching device name in the head row", () => {
-    const rendered = renderStep2(
-      makeState({ selectedHeadphoneDeviceIndex: 1 }), // AirPods
-      makeCallbacks(),
-    );
-    document.body.append(rendered);
-    const section = rendered.querySelector<HTMLElement>(
-      ".wizard-step__headphone-picker",
-    );
-    const headName = section!.querySelector<HTMLElement>(
-      ".cmp-dropdown-device__name",
-    );
-    expect(headName?.textContent).toBe("AirPods Pro");
-  });
+    rendered.querySelector<HTMLElement>(".cmp-dropdown-device__head")?.click();
+    rendered
+      .querySelector<HTMLElement>(".cmp-dropdown-device__option[data-id='1']")
+      ?.click();
 
-  it("does NOT block the wizard Continue button when the output is selected", () => {
-    // Continue arms on the real output-device selection. The picker is a
-    // side-affordance, not a gate.
-    const rendered = renderStep2(
-      makeState({ selectedDeviceId: "0" }),
-      makeCallbacks(),
-    );
-    document.body.append(rendered);
-    // Find the Continue button — primary CTA with text "Continue".
-    const buttons = Array.from(
-      rendered.querySelectorAll<HTMLButtonElement>("button"),
-    );
-    const continueBtn = buttons.find((b) =>
-      b.textContent?.includes("Continue"),
-    );
-    expect(continueBtn).not.toBeUndefined();
-    // The button should be armed (not disabled).
-    expect(continueBtn!.disabled).toBe(false);
-  });
-
-  it("keeps Continue disabled until an output device is selected", () => {
-    const rendered = renderStep2(
-      makeState({ selectedDeviceId: "" }),
-      makeCallbacks(),
-    );
-    document.body.append(rendered);
-    const buttons = Array.from(
-      rendered.querySelectorAll<HTMLButtonElement>("button"),
-    );
-    const continueBtn = buttons.find((b) =>
-      b.textContent?.includes("Continue"),
-    );
-    expect(continueBtn).not.toBeUndefined();
-    expect(continueBtn!.disabled).toBe(true);
+    expect(cb.onSelectDevice).toHaveBeenCalledWith("1");
   });
 });

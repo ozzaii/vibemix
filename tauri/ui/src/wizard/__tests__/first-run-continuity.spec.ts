@@ -1,15 +1,14 @@
 /* first-run-continuity.spec.ts — Phase 57 / Plan 57-02 (POLISH-03).
  *
  * The fresh-account continuity smoke. Drives the wizard router across the
- * full STEP_ORDER chain — intro → permissions → audio → controller →
- * skill-level → profile-consent → telemetry-consent → smoke-test — and pins the
+ * full STEP_ORDER chain - intro -> permissions -> audio -> library-feed - and pins the
  * POLISH-03 invariant: a fresh user is NEVER stuck before audio is live.
  *
  * For every step it asserts (a) the step renders into the #wizard-primary
  * mount and (b) a forward affordance exists (a control wired to advance to
  * the next step). It drives the chain with the real `advanceTo` and asserts
  * `currentStep()` advances accordingly, then asserts the chain terminates at
- * `smoke-test` with the wizard-done "Open vibemix" affordance reachable.
+ * the collapsed launch page with the wizard-done "Open vibemix" affordance reachable.
  *
  * This is a SMOKE, not a per-step behaviour suite: the existing step specs
  * (blackhole-step, windows-smartscreen-step, tcc-permissions, onboarding-
@@ -47,6 +46,18 @@ vi.mock("../../ipc/client.js", () => ({
   emitIpc: vi.fn(async () => undefined),
 }));
 
+vi.mock("../../library/api.js", () => ({
+  libraryStats: vi.fn(async () => ({
+    indexed: 0,
+    backend: "sqlite-vec",
+    library_setup_candidates: [],
+    spent_eur: 0,
+    failed: 0,
+  })),
+  libraryImportFromAction: vi.fn(async () => true),
+  onLibraryImportProgress: vi.fn(async () => () => {}),
+}));
+
 import {
   advanceTo,
   currentStep,
@@ -55,6 +66,7 @@ import {
   type WizardStep,
 } from "../router.js";
 import { sendIpcRequest } from "../../ipc/client.js";
+import { libraryImportFromAction } from "../../library/api.js";
 
 // Mirrors router.ts STEP_ORDER (the numbered chain after the intro hero).
 // Kept local so the test reads the chain it is asserting; if router's
@@ -62,11 +74,7 @@ import { sendIpcRequest } from "../../ipc/client.js";
 const STEP_ORDER: WizardStep[] = [
   "permissions",
   "audio",
-  "controller",
-  "skill-level",
-  "profile-consent",
-  "telemetry-consent",
-  "smoke-test",
+  "library-feed",
 ];
 
 /** Build the three DOM mounts the router renders into. */
@@ -131,15 +139,16 @@ function armStep(step: WizardStep): void {
         step3: { ...dev.getState().step3, probeState: "idle", secondsLeft: 0 },
       });
       break;
-    case "smoke-test":
-      // Greeting played (router sets this even on cascade failure) → Open arms.
+    case "library-feed":
       dev.setState({
-        smokeTest: { ...dev.getState().smokeTest, greetingPlayed: true },
+        libraryFeed: {
+          status: "empty",
+          candidates: [],
+          indexed: 0,
+        },
       });
       break;
     default:
-      // profile-consent / telemetry-consent have no gating — Continue is
-      // always armed.
       break;
   }
 }
@@ -158,13 +167,17 @@ describe("first-run continuity smoke (POLISH-03)", () => {
         blackHoleBannerPostClick: false,
         devices: [],
         selectedDeviceId: "",
-        selectedHeadphoneDeviceIndex: null,
       },
       step3: {
         detectedController: undefined,
         probeState: "idle",
         secondsLeft: 0,
         caughtLabel: undefined,
+      },
+      libraryFeed: {
+        status: "empty",
+        candidates: [],
+        indexed: 0,
       },
       smokeTest: { greetingPlayed: false, meterLevel: 0.5 },
     });
@@ -184,11 +197,7 @@ describe("first-run continuity smoke (POLISH-03)", () => {
     expect(STEP_ORDER).toEqual([
       "permissions",
       "audio",
-      "controller",
-      "skill-level",
-      "profile-consent",
-      "telemetry-consent",
-      "smoke-test",
+      "library-feed",
     ]);
   });
 
@@ -201,7 +210,7 @@ describe("first-run continuity smoke (POLISH-03)", () => {
     expect(currentStep()).toBe("permissions");
   });
 
-  it("drives the full STEP_ORDER chain with no dead-end and reaches smoke-test", () => {
+  it("drives the full STEP_ORDER chain with no dead-end and reaches launch", () => {
     // Start from intro (beforeEach). Step into permissions to begin the chain.
     advanceTo("permissions");
     vi.advanceTimersByTime(300);
@@ -230,13 +239,13 @@ describe("first-run continuity smoke (POLISH-03)", () => {
       }
     }
 
-    // The chain terminates at the terminal full-surface step.
-    expect(currentStep()).toBe("smoke-test");
+    // The chain terminates at the collapsed launch step.
+    expect(currentStep()).toBe("library-feed");
   });
 
-  it("smoke-test exposes the reachable wizard-done 'Open vibemix' affordance", () => {
-    getDevSurface().setState({ currentStep: "smoke-test" });
-    armStep("smoke-test"); // greetingPlayed → Open vibemix arms
+  it("launch exposes the reachable wizard-done 'Open vibemix' affordance", () => {
+    getDevSurface().setState({ currentStep: "library-feed" });
+    armStep("library-feed");
     renderCurrentStep();
 
     const buttons = Array.from(primary().querySelectorAll("button"));
@@ -248,6 +257,75 @@ describe("first-run continuity smoke (POLISH-03)", () => {
     // even on greeting failure, so the user is never stranded at the finish).
     expect(openCta!.disabled).toBe(false);
     expect(openCta!.getAttribute("aria-disabled")).not.toBe("true");
+  });
+
+  it("launch folds skill, library feed, controller note, and privacy onto one page", () => {
+    getDevSurface().setState({
+      currentStep: "library-feed",
+      libraryFeed: {
+        status: "ready",
+        indexed: 0,
+        candidates: [
+          {
+            kind: "engine_database",
+            path: "/Users/ozai/Music/Engine Library/Database2/m.db",
+            import_action: {
+              type: "ipc.library.import",
+              payload: {
+                path: "/Users/ozai/Music/Engine Library/Database2/m.db",
+              },
+            },
+          },
+        ],
+      },
+    });
+    renderCurrentStep();
+
+    const text = primary().textContent ?? "";
+    expect(text).toContain("LAUNCH");
+    expect(text).toContain("feed your music");
+    expect(text).toContain("Engine DJ");
+    expect(text).toContain("Index this");
+    expect(text).toContain("controller");
+    expect(text).toContain("build local profile");
+    expect(primary().querySelectorAll(".vmx-skill-level__radio-row")).toHaveLength(3);
+  });
+
+  it("launch Index this routes the structured import action", async () => {
+    const action = {
+      type: "ipc.library.import",
+      payload: {
+        path: "/Users/ozai/Music/Engine Library/Database2/m.db",
+      },
+    };
+    getDevSurface().setState({
+      currentStep: "library-feed",
+      libraryFeed: {
+        status: "ready",
+        indexed: 0,
+        candidates: [
+          {
+            kind: "engine_database",
+            path: action.payload.path,
+            import_action: action,
+          },
+        ],
+      },
+    });
+    renderCurrentStep();
+
+    const indexCta = Array.from(primary().querySelectorAll("button")).find((button) =>
+      (button.textContent ?? "").includes("Index this"),
+    );
+    expect(indexCta).toBeDefined();
+    indexCta!.click();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(libraryImportFromAction).toHaveBeenCalledWith(
+      action,
+      action.payload.path,
+    );
   });
 
   it("permissions Continue is gated-then-armable, not a permanent dead-end", () => {
