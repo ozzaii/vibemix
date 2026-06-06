@@ -11292,3 +11292,34 @@ Proof before staging:
 - `uv run python -m compileall -q src/vibemix/debrief/near_miss_detector.py src/vibemix/__main__.py src/vibemix/audio/recorder.py tests/debrief/test_near_miss_detector.py`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
 - `git diff --check -- src/vibemix/debrief/near_miss_detector.py src/vibemix/__main__.py src/vibemix/audio/recorder.py tests/debrief/test_near_miss_detector.py .planning/handoffs/2026-05-31-package-checklist.md`
+
+## Package 106 - Debrief Resolver-Backed Friend Line
+
+Suggested commit: `feat(debrief): ground last-night friend lines`
+
+Include:
+
+- `src/vibemix/debrief/friend_line.py`
+- `tests/debrief/test_friend_line.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Debrief UI frames, IPC schema changes, waveform rendering, Gemini prompts,
+  and broader receipt assembly. This package only builds the pure line/receipt
+  helper and the small local voice seam.
+
+Reason:
+
+- The "Last Night, Heard" line must feel like a friend, but it cannot be a
+  decorative citation. Build the near-miss and gap lines on the debrief drill
+  resolver, phrase timing as "the mix", and return honest nulls when the
+  citation source/key/timestamp does not resolve.
+
+Proof before staging:
+
+- `uv run pytest -q tests/debrief/test_friend_line.py`
+- `uv run ruff check src/vibemix/debrief/friend_line.py tests/debrief/test_friend_line.py`
+- `uv run python -m compileall -q src/vibemix/debrief/friend_line.py tests/debrief/test_friend_line.py`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+- `git diff --check -- src/vibemix/debrief/friend_line.py tests/debrief/test_friend_line.py .planning/handoffs/2026-05-31-package-checklist.md`
