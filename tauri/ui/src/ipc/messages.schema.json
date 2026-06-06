@@ -3331,7 +3331,17 @@
             },
             "save_floor_expired": {"type": "boolean"},
             "save_difficulty_level": {"type": "integer", "minimum": 1, "maximum": 5},
-            "save_streak": {"type": "integer", "minimum": 0}
+            "save_streak": {"type": "integer", "minimum": 0},
+            "practice_source": {
+              "anyOf": [
+                {"type": "string", "enum": ["bundled_demo", "library_save_mode"]},
+                {"type": "null"}
+              ]
+            },
+            "deck_a_track_id": {"type": ["string", "null"], "maxLength": 128},
+            "deck_b_track_id": {"type": ["string", "null"], "maxLength": 128},
+            "deck_a_title": {"type": ["string", "null"], "maxLength": 160},
+            "deck_b_title": {"type": ["string", "null"], "maxLength": 160}
             }
           }
         }
@@ -3390,7 +3400,17 @@
             }
           },
           "maxItems": 16
-        }
+        },
+        "track_id": {"type": ["string", "null"], "maxLength": 128},
+        "title": {"type": ["string", "null"], "maxLength": 160},
+        "artist": {"type": ["string", "null"], "maxLength": 160},
+        "source": {
+          "anyOf": [
+            {"type": "string", "enum": ["bundled_demo", "library_save_mode"]},
+            {"type": "null"}
+          ]
+        },
+        "source_start_s": {"type": ["number", "null"], "minimum": 0}
       }
     },
     "LearnPlayheadTick": {

@@ -267,6 +267,11 @@ class BeatmatchPracticeSnapshot:
     grid_a: BeatGrid
     grid_b: BeatGrid
     deck_state: DeckState
+    practice_source: str | None = None
+    deck_a_track_id: str | None = None
+    deck_b_track_id: str | None = None
+    deck_a_title: str | None = None
+    deck_b_title: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -3003,6 +3008,11 @@ class LessonRuntime(StateMachine):
                 event=None,
                 credited=(),
                 t_session=t_session,
+                practice_source=snapshot.practice_source,
+                deck_a_track_id=snapshot.deck_a_track_id,
+                deck_b_track_id=snapshot.deck_b_track_id,
+                deck_a_title=snapshot.deck_a_title,
+                deck_b_title=snapshot.deck_b_title,
                 **save_state,
             )
         feedback_cleared = self._clear_progress_practice_feedback()
@@ -3015,6 +3025,11 @@ class LessonRuntime(StateMachine):
                 event=None,
                 credited=(),
                 t_session=t_session,
+                practice_source=snapshot.practice_source,
+                deck_a_track_id=snapshot.deck_a_track_id,
+                deck_b_track_id=snapshot.deck_b_track_id,
+                deck_a_title=snapshot.deck_a_title,
+                deck_b_title=snapshot.deck_b_title,
                 **self._beatmatch_save_payload(),
             )
 
@@ -3031,7 +3046,15 @@ class LessonRuntime(StateMachine):
             progress=self._progress,
             now=datetime.now(UTC).isoformat(),
         )
-        result = replace(result, **self._beatmatch_save_payload())
+        result = replace(
+            result,
+            practice_source=snapshot.practice_source,
+            deck_a_track_id=snapshot.deck_a_track_id,
+            deck_b_track_id=snapshot.deck_b_track_id,
+            deck_a_title=snapshot.deck_a_title,
+            deck_b_title=snapshot.deck_b_title,
+            **self._beatmatch_save_payload(),
+        )
         if save_edge is not None:
             landed_payload = self._beatmatch_save_landed_payload(
                 t_session=t_session,
@@ -3297,6 +3320,11 @@ class LessonRuntime(StateMachine):
             event=None,
             credited=(),
             t_session=self._evidence_time(),
+            practice_source=snapshot.practice_source,
+            deck_a_track_id=snapshot.deck_a_track_id,
+            deck_b_track_id=snapshot.deck_b_track_id,
+            deck_a_title=snapshot.deck_a_title,
+            deck_b_title=snapshot.deck_b_title,
         )
 
     def _emit_live_beatmatch_grade(self, result: BeatmatchPracticeResult | None) -> None:
@@ -3351,6 +3379,11 @@ class LessonRuntime(StateMachine):
             ),
             result.save_difficulty_level,
             result.save_streak,
+            result.practice_source,
+            result.deck_a_track_id,
+            result.deck_b_track_id,
+            result.deck_a_title,
+            result.deck_b_title,
         )
 
         lesson_id = self._learn.current_lesson_id or "learn"
@@ -3372,6 +3405,11 @@ class LessonRuntime(StateMachine):
                     save_floor_expired=result.save_floor_expired,
                     save_difficulty_level=result.save_difficulty_level,
                     save_streak=result.save_streak,
+                    practice_source=result.practice_source,
+                    deck_a_track_id=result.deck_a_track_id,
+                    deck_b_track_id=result.deck_b_track_id,
+                    deck_a_title=result.deck_a_title,
+                    deck_b_title=result.deck_b_title,
                 ).to_dict()
                 self._ipc.emit(live_grade)
 

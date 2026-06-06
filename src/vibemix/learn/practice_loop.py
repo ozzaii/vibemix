@@ -59,6 +59,11 @@ class BeatmatchPracticeResult:
     save_floor_expired: bool = False
     save_difficulty_level: int = 1
     save_streak: int = 0
+    practice_source: str | None = None
+    deck_a_track_id: str | None = None
+    deck_b_track_id: str | None = None
+    deck_a_title: str | None = None
+    deck_b_title: str | None = None
 
 
 def grade_owned_beatmatch_attempt(

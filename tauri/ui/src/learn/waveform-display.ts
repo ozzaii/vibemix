@@ -13,6 +13,11 @@ interface WaveformDeck {
   duration_s: number;
   peaks: [number, number, number][];
   cues: WaveformCue[];
+  track_id?: string | null;
+  title?: string | null;
+  artist?: string | null;
+  source?: "bundled_demo" | "library_save_mode" | null;
+  source_start_s?: number | null;
 }
 
 export interface WaveformReadyPayload {

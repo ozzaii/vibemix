@@ -12016,3 +12016,55 @@ Proof before staging:
 - `uv run python -m compileall -q src/vibemix/learn/runtime.py tests/learn/test_runtime_evidence_grounding.py`
 - `git diff --check -- src/vibemix/learn/runtime.py tests/learn/test_runtime_evidence_grounding.py .planning/handoffs/2026-05-31-package-checklist.md`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+
+## Package 125 - Learn Save Source Metadata
+
+Suggested commit: `feat(learn): surface save-mode source metadata`
+
+Include:
+
+- `src/vibemix/learn/beatmatch_practice_driver.py`
+- `src/vibemix/learn/practice_loop.py`
+- `src/vibemix/learn/runtime.py`
+- `src/vibemix/ui_bus/learn_messages.py`
+- `tauri/ui/src/ipc/messages.schema.json`
+- `tauri/ui/src/ipc/messages.ts`
+- `tauri/ui/src/ipc/validator.generated.mjs`
+- `tauri/ui/src/learn/live-meter.ts`
+- `tauri/ui/src/learn/waveform-display.ts`
+- `tests/learn/test_beatmatch_practice_driver.py`
+- `tests/learn/test_runtime_evidence_grounding.py`
+- `tests/ui_bus/test_learn_live_grade_message.py`
+- `tests/ui_bus/test_learn_waveform_ready_message.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- New UI rendering/copy, new lesson text, Save-mode difficulty tuning, own-track
+  loading heuristics, and cue/harmonic/control grade behavior. This package
+  only preserves the already-grounded source metadata the owned-deck driver had
+  in memory.
+
+Reason:
+
+- Current source showed Save-mode own-track loading already builds waveform deck
+  rows with `track_id`, `title`, `artist`, `source`, and `source_start_s`, but
+  `LearnWaveformReady.make()` dropped that metadata before the webview could
+  see it. The runtime live-grade receipt also could not say whether the learner
+  was saving a drift on real library tracks or the bundled demo loops. Carry the
+  source metadata through driver snapshots, beatmatch practice results,
+  `ipc.learn.live_grade`, `ipc.learn.waveform_ready`, generated IPC types, and
+  the local Learn UI payload types. Optional fields stay absent for unrelated
+  cue/harmonic/control live grades.
+
+Proof before staging:
+
+- `uv run pytest -q tests/learn/test_beatmatch_practice_driver.py tests/learn/test_runtime_evidence_grounding.py tests/ui_bus/test_learn_live_grade_message.py tests/ui_bus/test_learn_waveform_ready_message.py`
+- `uv run python scripts/check_ipc_schema.py`
+- `npm --prefix tauri/ui run check:ipc`
+- `uv run pytest -q tests/ui_bus/test_messages_schema.py tests/ipc/test_learn_envelope_parity_p92.py`
+- `uv run ruff check src/vibemix/learn/beatmatch_practice_driver.py src/vibemix/learn/practice_loop.py src/vibemix/learn/runtime.py src/vibemix/ui_bus/learn_messages.py tests/learn/test_beatmatch_practice_driver.py tests/learn/test_runtime_evidence_grounding.py tests/ui_bus/test_learn_live_grade_message.py tests/ui_bus/test_learn_waveform_ready_message.py`
+- `uv run python -m compileall -q src/vibemix/learn/beatmatch_practice_driver.py src/vibemix/learn/practice_loop.py src/vibemix/learn/runtime.py src/vibemix/ui_bus/learn_messages.py tests/learn/test_beatmatch_practice_driver.py tests/learn/test_runtime_evidence_grounding.py tests/ui_bus/test_learn_live_grade_message.py tests/ui_bus/test_learn_waveform_ready_message.py`
+- `git diff --check -- src/vibemix/learn/beatmatch_practice_driver.py src/vibemix/learn/practice_loop.py src/vibemix/learn/runtime.py src/vibemix/ui_bus/learn_messages.py tauri/ui/src/ipc/messages.schema.json tauri/ui/src/ipc/messages.ts tauri/ui/src/ipc/validator.generated.mjs tauri/ui/src/learn/live-meter.ts tauri/ui/src/learn/waveform-display.ts tests/learn/test_beatmatch_practice_driver.py tests/learn/test_runtime_evidence_grounding.py tests/ui_bus/test_learn_live_grade_message.py tests/ui_bus/test_learn_waveform_ready_message.py .planning/handoffs/2026-05-31-package-checklist.md`
+- `uv run python .claude/skills/ipc-wiring-checker/scripts/check_ipc_wiring.py` (expected current-source fail: existing one-ended calibration/settings/library types; no new `ipc.learn.*` dead type)
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`

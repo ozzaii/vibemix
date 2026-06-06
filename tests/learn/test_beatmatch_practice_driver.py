@@ -124,7 +124,18 @@ def test_driver_accepts_own_track_sources_and_centers_pitch_to_real_bpm_lock() -
     assert payload["decks"]["B"]["bpm"] == pytest.approx(124.0)
 
     assert driver.record_action("L2.01", {"control": "tempo", "deck": "B", "value": 64}) is True
-    grade = _grade(driver)
+    snapshot = driver.snapshot()
+    assert snapshot is not None
+    assert snapshot.practice_source == "library_save_mode"
+    assert snapshot.deck_a_track_id == "seed"
+    assert snapshot.deck_b_track_id == "target"
+    assert snapshot.deck_a_title == "Track seed"
+    assert snapshot.deck_b_title == "Track target"
+    grade = grade_owned_beatmatch_state(
+        snapshot.grid_a,
+        snapshot.grid_b,
+        snapshot.deck_state,
+    )
 
     assert grade.verdict == "locked"
     playheads = driver.playhead_payload()

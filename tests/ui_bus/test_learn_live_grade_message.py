@@ -52,6 +52,28 @@ def test_live_grade_roundtrips_uncited_drift() -> None:
     _VALIDATOR.validate(wire)
 
 
+def test_live_grade_roundtrips_own_track_source_metadata() -> None:
+    env = LearnLiveGrade.make(
+        verdict="locked",
+        phase_error_beats=0.0,
+        score=1.0,
+        citation="[ev:BEATMATCH_GRADED@19.000]",
+        practice_source="library_save_mode",
+        deck_a_track_id="seed",
+        deck_b_track_id="target",
+        deck_a_title="Seed Track",
+        deck_b_title="Target Track",
+    )
+    wire = json.loads(env.to_json())
+
+    assert wire["payload"]["practice_source"] == "library_save_mode"
+    assert wire["payload"]["deck_a_track_id"] == "seed"
+    assert wire["payload"]["deck_b_track_id"] == "target"
+    assert wire["payload"]["deck_a_title"] == "Seed Track"
+    assert wire["payload"]["deck_b_title"] == "Target Track"
+    _VALIDATOR.validate(wire)
+
+
 def test_live_grade_roundtrips_save_landed_edge() -> None:
     env = LearnLiveGrade.make(
         verdict="locked",

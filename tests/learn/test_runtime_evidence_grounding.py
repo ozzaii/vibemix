@@ -63,6 +63,26 @@ def _locked_beatmatch_snapshot() -> BeatmatchPracticeSnapshot:
     )
 
 
+def _library_locked_beatmatch_snapshot() -> BeatmatchPracticeSnapshot:
+    grid = _beat_grid()
+    return BeatmatchPracticeSnapshot(
+        grid_a=grid,
+        grid_b=grid,
+        deck_state=DeckState(
+            a_frame=0.0,
+            b_frame=0.0,
+            rate_a=1.0,
+            rate_b=1.0,
+            xfader=0.5,
+        ),
+        practice_source="library_save_mode",
+        deck_a_track_id="seed",
+        deck_b_track_id="target",
+        deck_a_title="Seed Track",
+        deck_b_title="Target Track",
+    )
+
+
 def _drifting_beatmatch_snapshot() -> BeatmatchPracticeSnapshot:
     grid = _beat_grid()
     return BeatmatchPracticeSnapshot(
@@ -783,6 +803,34 @@ def test_live_beatmatch_grade_voices_locked_with_resolving_citation(monkeypatch)
     assert len(_tutor_speak_payloads(ipc)) == 1
     assert len(_live_grade_payloads(ipc)) == 2
     assert _live_grade_payloads(ipc)[-1]["citation"] is None
+
+
+def test_live_beatmatch_grade_carries_own_track_source_metadata(monkeypatch) -> None:
+    """Save-mode receipts can say when the practice decks are real library tracks."""
+
+    monkeypatch.setattr("vibemix.learn.progress.save_progress", lambda _progress: None)
+    progress = LearnProgress()
+    _make_beatmatching_competent(progress)
+    ipc = MagicMock(name="ipc_router")
+    runtime = LessonRuntime(
+        learn_state=LearnState(),
+        midi_mirror=MagicMock(name="midi_mirror"),
+        controller_state=MagicMock(name="controller_state"),
+        ipc_router=ipc,
+        progress_store=progress,
+        evidence_registry=EvidenceRegistry(),
+        evidence_clock=lambda: 42.4,
+        beatmatch_practice_loader=_library_locked_beatmatch_snapshot,
+    )
+
+    runtime._emit_live_beatmatch_grade(runtime._grade_beatmatch_practice_tick())
+
+    live_grade = _live_grade_payloads(ipc)[-1]
+    assert live_grade["practice_source"] == "library_save_mode"
+    assert live_grade["deck_a_track_id"] == "seed"
+    assert live_grade["deck_b_track_id"] == "target"
+    assert live_grade["deck_a_title"] == "Seed Track"
+    assert live_grade["deck_b_title"] == "Target Track"
 
 
 def test_beatmatch_mastered_flip_speaks_factual_proof_once(monkeypatch) -> None:

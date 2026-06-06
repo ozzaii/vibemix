@@ -53,6 +53,11 @@ def _control_from_midi(midi: dict[str, Any]) -> str:
     return control
 
 
+def _optional_text(value: Any) -> str | None:
+    text = str(value or "").strip()
+    return text or None
+
+
 def _tempo_rate_from_cc(value: Any) -> float:
     """Map the pitch-fader CC to the owned deck's playback rate.
 
@@ -280,6 +285,11 @@ class BeatmatchPracticeDriver:
                 "A": _source_waveform_deck(sources.deck_a),
                 "B": _source_waveform_deck(sources.deck_b),
             }
+        self._practice_source = str(
+            self._waveform_decks.get("A", {}).get("source")
+            or self._waveform_decks.get("B", {}).get("source")
+            or "bundled_demo"
+        )
         self._deck = MiniDeck(
             src_a,
             src_b,
@@ -470,6 +480,11 @@ class BeatmatchPracticeDriver:
             grid_a=self._grid_a,
             grid_b=self._grid_b,
             deck_state=self._deck.state(),
+            practice_source=self._practice_source,
+            deck_a_track_id=_optional_text(self._waveform_decks["A"].get("track_id")),
+            deck_b_track_id=_optional_text(self._waveform_decks["B"].get("track_id")),
+            deck_a_title=_optional_text(self._waveform_decks["A"].get("title")),
+            deck_b_title=_optional_text(self._waveform_decks["B"].get("title")),
         )
 
     def _tempo_rate_for_deck(self, deck: str, value: Any) -> float:

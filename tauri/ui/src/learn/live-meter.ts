@@ -15,6 +15,11 @@ export interface LiveGradePayload {
   save_floor_expired?: boolean;
   save_difficulty_level?: number;
   save_streak?: number;
+  practice_source?: "bundled_demo" | "library_save_mode" | null;
+  deck_a_track_id?: string | null;
+  deck_b_track_id?: string | null;
+  deck_a_title?: string | null;
+  deck_b_title?: string | null;
 }
 
 export interface LiveGradeMeterHandle {

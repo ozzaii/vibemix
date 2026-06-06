@@ -59,6 +59,19 @@ from vibemix.ui_bus.messages import _now_iso, _serialize, _tuples_to_lists, _val
 # ---------------------------------------------------------------------------
 
 
+def _optional_text(value: object) -> str | None:
+    text = str(value or "").strip()
+    return text or None
+
+
+def _optional_float(value: object) -> float | None:
+    try:
+        out = float(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return None
+    return out
+
+
 @dataclass(frozen=True, slots=True)
 class LearnControllerDetectedPayload:
     """Payload of ``ipc.learn.controller_detected``.
@@ -815,6 +828,11 @@ class LearnLiveGradePayload:
     save_floor_expired: bool = False
     save_difficulty_level: int = 1
     save_streak: int = 0
+    practice_source: Literal["bundled_demo", "library_save_mode"] | None = None
+    deck_a_track_id: str | None = None
+    deck_b_track_id: str | None = None
+    deck_a_title: str | None = None
+    deck_b_title: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -843,6 +861,11 @@ class LearnLiveGrade:
         save_floor_expired: bool = False,
         save_difficulty_level: int = 1,
         save_streak: int = 0,
+        practice_source: str | None = None,
+        deck_a_track_id: str | None = None,
+        deck_b_track_id: str | None = None,
+        deck_a_title: str | None = None,
+        deck_b_title: str | None = None,
     ) -> LearnLiveGrade:
         return cls(
             type="ipc.learn.live_grade",
@@ -862,11 +885,28 @@ class LearnLiveGrade:
                 save_floor_expired=bool(save_floor_expired),
                 save_difficulty_level=max(1, min(5, int(save_difficulty_level))),
                 save_streak=max(0, int(save_streak)),
+                practice_source=practice_source,  # type: ignore[arg-type]
+                deck_a_track_id=_optional_text(deck_a_track_id),
+                deck_b_track_id=_optional_text(deck_b_track_id),
+                deck_a_title=_optional_text(deck_a_title),
+                deck_b_title=_optional_text(deck_b_title),
             ),
         )
 
     def to_json(self) -> str:
-        return _serialize(self)
+        d = _tuples_to_lists(asdict(self))
+        payload = d["payload"]
+        for key in (
+            "practice_source",
+            "deck_a_track_id",
+            "deck_b_track_id",
+            "deck_a_title",
+            "deck_b_title",
+        ):
+            if payload.get(key) is None:
+                payload.pop(key, None)
+        _validate(d)
+        return json.dumps(d, separators=(",", ":"))
 
     def to_dict(self) -> dict:
         return json.loads(self.to_json())
@@ -888,6 +928,11 @@ class LearnWaveformDeck:
     duration_s: float
     peaks: tuple[tuple[int, int, int], ...]
     cues: tuple[LearnWaveformDeckCue, ...]
+    track_id: str | None = None
+    title: str | None = None
+    artist: str | None = None
+    source: Literal["bundled_demo", "library_save_mode"] | None = None
+    source_start_s: float | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -936,6 +981,11 @@ class LearnWaveformReady:
                             for cue in row.get("cues", ())
                             if isinstance(cue, dict)
                         ),
+                        track_id=_optional_text(row.get("track_id")),
+                        title=_optional_text(row.get("title")),
+                        artist=_optional_text(row.get("artist")),
+                        source=row.get("source"),  # type: ignore[arg-type]
+                        source_start_s=_optional_float(row.get("source_start_s")),
                     )
                     for side, row in decks.items()
                     if isinstance(row, dict)
@@ -944,7 +994,15 @@ class LearnWaveformReady:
         )
 
     def to_json(self) -> str:
-        return _serialize(self)
+        d = _tuples_to_lists(asdict(self))
+        for deck in d["payload"].get("decks", {}).values():
+            if not isinstance(deck, dict):
+                continue
+            for key in ("track_id", "title", "artist", "source", "source_start_s"):
+                if deck.get(key) is None:
+                    deck.pop(key, None)
+        _validate(d)
+        return json.dumps(d, separators=(",", ":"))
 
     def to_dict(self) -> dict:
         return json.loads(self.to_json())
