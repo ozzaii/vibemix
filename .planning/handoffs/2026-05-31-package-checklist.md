@@ -12270,3 +12270,34 @@ Proof before staging:
 - `uv run python -m compileall -q src/vibemix/debrief/main.py src/vibemix/debrief/ws_server.py src/vibemix/ui_bus/messages.py src/vibemix/ui_bus/schemas/debrief.py tests/debrief/test_near_miss_detector.py tests/debrief/test_ws_server_progressive_emit.py tests/ui_bus/test_debrief_new_wrappers_roundtrip.py`
 - `git diff --check -- src/vibemix/debrief/main.py src/vibemix/debrief/ws_server.py src/vibemix/ui_bus/messages.py src/vibemix/ui_bus/schemas/debrief.py tests/debrief/test_near_miss_detector.py tests/debrief/test_ws_server_progressive_emit.py tests/ui_bus/test_debrief_new_wrappers_roundtrip.py tauri/ui/src/ipc/messages.schema.json tauri/ui/src/ipc/messages.ts tauri/ui/src/ipc/validator.generated.mjs tauri/ui/src/debrief/components/morning-mirror.ts tauri/ui/src/debrief/__tests__/morning-mirror.spec.ts tauri/ui/src/debrief/__tests__/ws-client-near-miss.spec.ts .planning/handoffs/2026-05-31-package-checklist.md`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+
+## Package 131 - Tauri Dev Command Cwd Guard
+
+Suggested commit: `fix(tauri): harden dev command cwd`
+
+Include:
+
+- `tauri/src-tauri/tauri.conf.json5`
+- `tests/repo/test_tauri_dev_command.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Tauri window geometry, release build command changes, package scripts,
+  sidecar spawn behavior, and bundled app resources. This only hardens the
+  Vite dev-server command used by `cargo tauri dev`.
+
+Reason:
+
+- Live first-user testing hit the exact dev-loop failure this guard prevents:
+  some Tauri CLI invocations run `beforeDevCommand` from `tauri/`, while this
+  local path/version ran it from `tauri/ui/`, producing a bad `ui/ui` prefix.
+  Use a cwd guard so the command works from both launch directories.
+
+Proof before staging:
+
+- `uv run pytest -q tests/repo/test_tauri_dev_command.py`
+- `uv run ruff check tests/repo/test_tauri_dev_command.py`
+- `uv run python -m compileall -q tests/repo/test_tauri_dev_command.py`
+- `git diff --check -- tauri/src-tauri/tauri.conf.json5 tests/repo/test_tauri_dev_command.py .planning/handoffs/2026-05-31-package-checklist.md`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
