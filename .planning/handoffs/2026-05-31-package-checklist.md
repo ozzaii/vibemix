@@ -11197,3 +11197,33 @@ Proof before staging:
 - `uv run ruff check src/vibemix/learn/runtime.py tests/learn/test_runtime_evidence_grounding.py tests/learn/test_harmonic_practice_runtime.py`
 - `uv run python -m compileall -q src/vibemix/learn/runtime.py tests/learn/test_runtime_evidence_grounding.py tests/learn/test_harmonic_practice_runtime.py`
 - `git diff --check -- src/vibemix/learn/runtime.py tests/learn/test_runtime_evidence_grounding.py tests/learn/test_harmonic_practice_runtime.py .planning/handoffs/2026-05-31-package-checklist.md`
+
+## Package 103 - Learn Live Meter Lock Edge
+
+Suggested commit: `feat(learn-ui): celebrate earned lock edge`
+
+Include:
+
+- `tauri/ui/src/learn/live-meter.ts`
+- `tauri/ui/src/learn/styles/learn.css`
+- `tauri/ui/tests/learn/live-meter.spec.ts`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- New IPC payloads, backend grading changes, debrief replay UI, and broad Learn
+  layout work. This package only improves the existing beatmatch lock meter fed
+  by `ipc.learn.live_grade`.
+
+Reason:
+
+- The live meter moved the needle but did not treat a lock as an earned moment.
+  Add a real verdict edge detector, a compact receipt row, and one reduced-motion
+  safe pulse only when the grade crosses into `locked`. Sustained locked ticks do
+  not repeat the celebration; drift rearms the next edge.
+
+Proof before staging:
+
+- `npm --prefix tauri/ui test -- tests/learn/live-meter.spec.ts`
+- `npm --prefix tauri/ui run build`
+- `git diff --check -- tauri/ui/src/learn/live-meter.ts tauri/ui/src/learn/styles/learn.css tauri/ui/tests/learn/live-meter.spec.ts .planning/handoffs/2026-05-31-package-checklist.md`

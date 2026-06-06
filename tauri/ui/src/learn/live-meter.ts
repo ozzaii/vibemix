@@ -31,6 +31,22 @@ function formatPhase(phase: number): string {
   return `${Math.abs(phase).toFixed(2)} beat ${side}`;
 }
 
+function receiptText(payload: LiveGradePayload, phase: number): string {
+  if (payload.verdict === "locked") {
+    return payload.citation ? "proof caught" : "hold pocket";
+  }
+  if (payload.verdict === "drifting") {
+    return phase > 0 ? "deck B late" : "deck B early";
+  }
+  if (payload.verdict === "tempo_off") {
+    return "tempo first";
+  }
+  if (payload.verdict === "trainwreck") {
+    return "reset the 1";
+  }
+  return "listening";
+}
+
 function drawNeedle(canvas: HTMLCanvasElement, payload: LiveGradePayload | null): void {
   if (/jsdom/i.test(globalThis.navigator?.userAgent ?? "")) return;
   let ctx: CanvasRenderingContext2D | null = null;
@@ -92,6 +108,8 @@ export function LiveGradeMeter(host: HTMLElement): LiveGradeMeterHandle {
   root.className = "learn-live-meter";
   root.dataset.state = "idle";
   root.dataset.needlePct = "50.0";
+  root.dataset.lockEdge = "false";
+  root.dataset.lockCount = "0";
   root.setAttribute("aria-label", "beatmatch lock meter idle");
 
   const header = document.createElement("div");
@@ -113,11 +131,17 @@ export function LiveGradeMeter(host: HTMLElement): LiveGradeMeterHandle {
   phaseText.className = "learn-live-meter__phase";
   phaseText.textContent = "waiting for decks";
 
-  root.append(header, canvas, phaseText);
+  const receipt = document.createElement("div");
+  receipt.className = "learn-live-meter__receipt";
+  receipt.textContent = "no proof yet";
+
+  root.append(header, canvas, phaseText, receipt);
   host.replaceChildren(root);
 
   let pending: LiveGradePayload | null = null;
   let frame: number | null = null;
+  let previousVerdict: LiveGradeVerdict | null = null;
+  let lockCount = 0;
   const flush = (): void => {
     frame = null;
     drawNeedle(canvas, pending);
@@ -131,6 +155,11 @@ export function LiveGradeMeter(host: HTMLElement): LiveGradeMeterHandle {
   const update = (payload: LiveGradePayload): void => {
     const phase = clamp(payload.phase_error_beats, -0.5, 0.5);
     const score = clamp(payload.score, 0, 1);
+    const enteredLock = payload.verdict === "locked" && previousVerdict !== "locked";
+    previousVerdict = payload.verdict;
+    if (enteredLock) {
+      lockCount += 1;
+    }
     pending = {
       verdict: payload.verdict,
       phase_error_beats: phase,
@@ -143,30 +172,41 @@ export function LiveGradeMeter(host: HTMLElement): LiveGradeMeterHandle {
     root.dataset.phase = phase.toFixed(4);
     root.dataset.score = score.toFixed(4);
     root.dataset.needlePct = needlePct.toFixed(1);
+    root.dataset.lockEdge = enteredLock ? "true" : "false";
+    root.dataset.lockCount = String(lockCount);
+    root.dataset.locked = payload.verdict === "locked" ? "true" : "false";
     if (payload.citation) {
       root.dataset.citation = payload.citation;
     } else {
       root.removeAttribute("data-citation");
     }
+    const receiptLine = receiptText(payload, phase);
     verdict.textContent = payload.verdict.replace("_", " ");
     phaseText.textContent = formatPhase(phase);
+    receipt.textContent = receiptLine;
     root.setAttribute(
       "aria-label",
-      `beatmatch ${payload.verdict.replace("_", " ")}, ${formatPhase(phase)}`,
+      `beatmatch ${payload.verdict.replace("_", " ")}, ${formatPhase(phase)}, ${receiptLine}`,
     );
     scheduleDraw();
   };
 
   const reset = (): void => {
     pending = null;
+    previousVerdict = null;
+    lockCount = 0;
     root.dataset.state = "idle";
     root.dataset.needlePct = "50.0";
+    root.dataset.lockEdge = "false";
+    root.dataset.lockCount = "0";
+    root.removeAttribute("data-locked");
     root.removeAttribute("data-verdict");
     root.removeAttribute("data-phase");
     root.removeAttribute("data-score");
     root.removeAttribute("data-citation");
     verdict.textContent = "idle";
     phaseText.textContent = "waiting for decks";
+    receipt.textContent = "no proof yet";
     root.setAttribute("aria-label", "beatmatch lock meter idle");
     scheduleDraw();
   };
