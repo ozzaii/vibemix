@@ -51,45 +51,98 @@ export interface LibraryFeedCallbacks {
 
 const CSS = `
   .wizard-grid:has(.wizard-step--library-feed) {
-    grid-template-columns: minmax(0, min(860px, calc(100vw - 96px)));
+    grid-template-columns: minmax(0, min(980px, calc(100vw - 96px)));
   }
   .wizard-step--library-feed .cmp-primary-panel {
     padding: var(--sp-4) var(--sp-5);
   }
   .wizard-step--library-feed .cmp-primary-panel__body {
-    padding-top: var(--sp-3);
+    padding-top: 0;
   }
   .wizard-step--library-feed .wizard-step__subtitle {
     max-width: 64ch;
   }
-  .wizard-feed-grid {
+  .wizard-feed-hero {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: end;
+    gap: var(--sp-4);
+    margin-bottom: var(--sp-3);
+  }
+  .wizard-feed-hero__kicker {
+    margin-bottom: var(--sp-2);
+    font-family: var(--type-mono);
+    font-size: 10px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--brand);
+  }
+  .wizard-feed-hero__title {
+    margin: 0;
+    font-family: var(--type-serif);
+    font-size: 42px;
+    font-weight: 400;
+    line-height: 0.96;
+    letter-spacing: 0;
+    color: var(--silk);
+    text-shadow: 0 0 16px var(--brand-12);
+  }
+  .wizard-feed-hero__ready {
+    display: inline-flex;
+    align-items: center;
+    min-height: 28px;
+    padding: 0 var(--sp-3);
+    border: 1px solid var(--brand-22);
+    border-radius: var(--rad-sm);
+    background: var(--brand-04);
+    color: var(--brand);
+    font-family: var(--type-mono);
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    box-shadow: inset 0 1px 0 rgba(255, 251, 244, 0.035);
+  }
+  .wizard-feed-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1.12fr) minmax(280px, 0.88fr);
     gap: var(--sp-3);
+    align-items: start;
+  }
+  .wizard-feed-support {
+    display: grid;
+    gap: var(--sp-2);
   }
   .wizard-feed-card {
     min-width: 0;
     padding: var(--sp-3);
-    border: 1px solid var(--silk-22);
-    border-radius: 6px;
+    border: 0;
+    border-radius: var(--rad-md);
     background:
-      linear-gradient(180deg, var(--glass-2), var(--glass-1)),
+      linear-gradient(180deg, rgba(255, 251, 244, 0.022), transparent 48%, rgba(0, 0, 0, 0.18)),
       var(--void-8);
-    box-shadow: var(--chrome-highlight), inset 0 -20px 40px rgba(0, 0, 0, 0.18);
-  }
-  .wizard-feed-card[data-role="library"] {
-    border-color: var(--amber-40);
     box-shadow:
       var(--chrome-highlight),
-      inset 0 -20px 40px rgba(0, 0, 0, 0.18),
-      inset 0 0 18px var(--amber-08);
+      inset 0 -22px 42px rgba(0, 0, 0, 0.20),
+      var(--shadow-raised);
+  }
+  .wizard-feed-card[data-role="library"] {
+    min-height: 252px;
+    background:
+      radial-gradient(circle at 20% 8%, var(--brand-12), transparent 34%),
+      linear-gradient(180deg, rgba(255, 251, 244, 0.026), transparent 54%, rgba(0, 0, 0, 0.22)),
+      var(--void-10);
+    box-shadow:
+      var(--chrome-highlight),
+      inset 0 0 24px var(--brand-04),
+      inset 0 -26px 52px rgba(0, 0, 0, 0.24),
+      var(--shadow-float);
   }
   .wizard-feed-card__head {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: var(--sp-3);
-    margin-bottom: var(--sp-3);
+    margin-bottom: var(--sp-2);
   }
   .wizard-feed-card__title {
     margin: 0;
@@ -109,17 +162,39 @@ const CSS = `
     color: var(--silk-65);
   }
   .wizard-feed-card__body {
-    margin: 0 0 var(--sp-3);
+    margin: 0 0 var(--sp-2);
   }
   .wizard-feed-candidate {
     display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    gap: var(--sp-2);
-    align-items: start;
+    grid-template-columns: 58px minmax(0, 1fr) 132px;
+    gap: var(--sp-3);
+    align-items: center;
     padding: var(--sp-3);
-    border: 1px solid var(--silk-22);
-    border-radius: 4px;
-    background: var(--glass-3);
+    border: 0;
+    border-radius: var(--rad-md);
+    background:
+      linear-gradient(180deg, rgba(255, 251, 244, 0.018), transparent 52%),
+      var(--glass-3);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 251, 244, 0.035),
+      inset 0 -12px 24px rgba(0, 0, 0, 0.22);
+  }
+  .wizard-feed-candidate__badge {
+    width: 54px;
+    height: 54px;
+    border-radius: var(--rad-md);
+    display: grid;
+    place-items: center;
+    background:
+      radial-gradient(circle at 36% 24%, var(--brand-22), transparent 36%),
+      linear-gradient(145deg, var(--void-20), var(--void-8));
+    box-shadow:
+      inset 0 1px 0 rgba(255, 251, 244, 0.055),
+      inset 0 -10px 20px rgba(0, 0, 0, 0.34);
+    color: var(--silk);
+    font-family: var(--type-mono);
+    font-size: 10px;
+    letter-spacing: 0.05em;
   }
   .wizard-feed-candidate__kind {
     margin-bottom: var(--sp-1);
@@ -163,9 +238,13 @@ const CSS = `
     color: var(--silk-65);
   }
   .wizard-feed-privacy {
-    display: flex;
-    flex-direction: column;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: var(--sp-2);
+  }
+  .wizard-feed-privacy .wizard-feed-card__title,
+  .wizard-feed-privacy .wizard-feed-privacy__copy {
+    grid-column: 1 / -1;
   }
   .wizard-feed-toggle {
     display: flex;
@@ -218,10 +297,16 @@ const CSS = `
     box-shadow: 0 0 8px var(--amber-40);
   }
   .wizard-step--library-feed .vmx-skill-level {
-    padding: var(--sp-3);
+    padding: 0;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
   }
   .wizard-step--library-feed .vmx-skill-level__radio-row {
-    padding: 10px var(--sp-3);
+    padding: 8px var(--sp-3);
+  }
+  .wizard-step.wizard-step--library-feed > .wizard-step__cta-row {
+    margin-top: var(--sp-2);
   }
   @media (max-width: 900px) {
     .wizard-grid:has(.wizard-step--library-feed) {
@@ -229,6 +314,19 @@ const CSS = `
     }
     .wizard-feed-grid {
       grid-template-columns: 1fr;
+    }
+    .wizard-feed-layout {
+      grid-template-columns: 1fr;
+    }
+    .wizard-feed-hero {
+      grid-template-columns: 1fr;
+      align-items: start;
+    }
+    .wizard-feed-candidate {
+      grid-template-columns: 54px minmax(0, 1fr);
+    }
+    .wizard-feed-candidate .cmp-btn {
+      grid-column: 1 / -1;
     }
   }
 `;
@@ -277,6 +375,7 @@ function renderLibraryCard(
   const card = document.createElement("section");
   card.className = "wizard-feed-card";
   card.dataset.role = "library";
+  card.dataset.status = state.status;
 
   const head = document.createElement("div");
   head.className = "wizard-feed-card__head";
@@ -292,13 +391,17 @@ function renderLibraryCard(
   const body = document.createElement("p");
   body.className = "wizard-feed-card__body";
   body.textContent =
-    "Viber builds from your local library. Index the source it found, or add music later from the Music tab.";
+    "Viber builds from your local library. Index the source it found, then every set build starts from music you actually own.";
   card.append(body);
 
   const candidate = state.candidates[0];
   if (candidate) {
     const row = document.createElement("div");
     row.className = "wizard-feed-candidate";
+    const badge = document.createElement("div");
+    badge.className = "wizard-feed-candidate__badge";
+    badge.setAttribute("aria-hidden", "true");
+    badge.textContent = candidate.path.endsWith(".m3u") ? "M3U" : "m.db";
 
     const copy = document.createElement("div");
     const kind = document.createElement("div");
@@ -309,8 +412,8 @@ function renderLibraryCard(
     path.textContent = candidate.path;
     copy.append(kind, path);
 
+    row.append(badge, copy);
     row.append(
-      copy,
       Button({
         variant: "primary",
         state: state.status === "indexing" ? "loading" : "armed",
@@ -352,6 +455,7 @@ function renderLibraryCard(
 function renderControllerCard(): HTMLElement {
   const card = document.createElement("section");
   card.className = "wizard-feed-card";
+  card.dataset.role = "controller";
   const title = document.createElement("h2");
   title.className = "wizard-feed-card__title";
   title.textContent = "controller";
@@ -371,6 +475,7 @@ function renderControllerCard(): HTMLElement {
 function renderPrivacyCard(cb: LibraryFeedCallbacks): HTMLElement {
   const card = document.createElement("section");
   card.className = "wizard-feed-card wizard-feed-privacy";
+  card.dataset.role = "privacy";
   const title = document.createElement("h2");
   title.className = "wizard-feed-card__title";
   title.textContent = "local choices";
@@ -411,21 +516,36 @@ export function renderStepLibraryFeed(
   const body = document.createElement("div");
   body.className = "wizard-step--library-feed";
 
+  const hero = document.createElement("div");
+  hero.className = "wizard-feed-hero";
+  const heroCopy = document.createElement("div");
+  const kicker = document.createElement("div");
+  kicker.className = "wizard-feed-hero__kicker";
+  kicker.textContent = "LAUNCH";
+  withStepLeadGlyph(kicker, 3);
   const heading = document.createElement("h1");
-  heading.className = "wizard-step__heading";
-  heading.textContent = "LAUNCH";
-  withStepLeadGlyph(heading, 3);
+  heading.className = "wizard-step__heading wizard-feed-hero__title";
+  heading.textContent = "Feed your library";
 
   const subtitle = document.createElement("p");
   subtitle.className = "wizard-step__subtitle";
   subtitle.textContent =
     "Pick your level, feed Viber your music, and open the deck.";
+  heroCopy.append(kicker, heading, subtitle);
+  const ready = document.createElement("div");
+  ready.className = "wizard-feed-hero__ready";
+  ready.textContent =
+    state.status === "ready" || state.status === "done"
+      ? "source found"
+      : progressCopy(state);
+  hero.append(heroCopy, ready);
 
   const grid = document.createElement("div");
-  grid.className = "wizard-feed-grid";
+  grid.className = "wizard-feed-layout";
 
   const skillCard = document.createElement("section");
   skillCard.className = "wizard-feed-card";
+  skillCard.dataset.role = "skill";
   const skillTitle = document.createElement("h2");
   skillTitle.className = "wizard-feed-card__title";
   skillTitle.textContent = "skill";
@@ -437,14 +557,13 @@ export function renderStepLibraryFeed(
     }),
   );
 
-  grid.append(
-    skillCard,
-    renderLibraryCard(state, cb),
-    renderControllerCard(),
-    renderPrivacyCard(cb),
-  );
+  const support = document.createElement("div");
+  support.className = "wizard-feed-support";
+  support.append(skillCard, renderControllerCard(), renderPrivacyCard(cb));
 
-  body.append(heading, subtitle, grid);
+  grid.append(renderLibraryCard(state, cb), support);
+
+  body.append(hero, grid);
 
   const panel = PrimaryPanel({ children: body });
   panel.classList.add("wizard-step__panel-rise");
