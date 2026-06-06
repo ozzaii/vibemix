@@ -137,6 +137,7 @@ async def test_progressive_emit_includes_near_miss_frame_when_present(tmp_path: 
         receipt_text="the mix recovered by ear [mix:near_miss@42.000]",
         friend_line_text="I heard the mix pull back in [mix:near_miss@42.000]",
         duration_s=600.0,
+        waveform_peaks=((12, 80, 22), (24, 120, 34)),
     )
     port = _free_port()
     server = DebriefWsServer(port=port, state=state)
@@ -162,6 +163,7 @@ async def test_progressive_emit_includes_near_miss_frame_when_present(tmp_path: 
             assert frames[0]["payload"]["duration_s"] == 600.0
             assert frames[1]["payload"]["input_wav_relative_path"] == "input.wav"
             assert frames[1]["payload"]["window"] == [36.0, 46.0]
+            assert frames[1]["payload"]["waveform_peaks"] == [[12, 80, 22], [24, 120, 34]]
     finally:
         server_handle.cancel()
         try:

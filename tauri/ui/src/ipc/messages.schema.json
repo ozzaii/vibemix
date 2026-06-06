@@ -2478,7 +2478,23 @@
             },
             "receipt_text": { "type": "string" },
             "friend_line_text": { "type": "string" },
-            "duration_s": { "type": "number", "minimum": 0 }
+            "duration_s": { "type": "number", "minimum": 0 },
+            "waveform_peaks": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "minItems": 1,
+                  "maxItems": 512,
+                  "items": {
+                    "type": "array",
+                    "minItems": 3,
+                    "maxItems": 3,
+                    "items": { "type": "integer", "minimum": 0, "maximum": 255 }
+                  }
+                },
+                { "type": "null" }
+              ]
+            }
           }
         }
       }

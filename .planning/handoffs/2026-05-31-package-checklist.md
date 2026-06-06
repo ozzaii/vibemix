@@ -11761,3 +11761,52 @@ Proof before staging:
 - `npm --prefix tauri/ui run build`
 - `git diff --check -- tauri/ui/debrief.html tauri/ui/src/debrief/ws-client.ts tauri/ui/src/debrief/components/timeline.ts tauri/ui/src/debrief/components/morning-mirror.ts tauri/ui/src/debrief/debrief-window.ts tauri/ui/src/debrief/styles/debrief.css tauri/ui/src/mock-transfer/contract.ts tauri/ui/src/debrief/__tests__/timeline-regions-click-seek.spec.ts tauri/ui/src/debrief/__tests__/morning-mirror.spec.ts tauri/ui/src/debrief/__tests__/ws-client-near-miss.spec.ts .planning/handoffs/2026-05-31-package-checklist.md`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+
+## Package 119 - Debrief Real Master Peaks
+
+Suggested commit: `feat(debrief): surface real master peaks`
+
+Include:
+
+- `src/vibemix/audio/waveform_peaks.py`
+- `src/vibemix/ui_bus/schemas/debrief.py`
+- `src/vibemix/ui_bus/messages.py`
+- `src/vibemix/debrief/main.py`
+- `src/vibemix/debrief/ws_server.py`
+- `tests/audio/test_waveform_peaks.py`
+- `tests/debrief/test_near_miss_detector.py`
+- `tests/ui_bus/test_debrief_new_wrappers_roundtrip.py`
+- `tests/debrief/test_ws_server_progressive_emit.py`
+- `tauri/ui/src/ipc/messages.schema.json`
+- `tauri/ui/src/ipc/messages.ts`
+- `tauri/ui/src/ipc/validator.generated.mjs`
+- `tauri/ui/src/debrief/components/timeline.ts`
+- `tauri/ui/src/debrief/components/morning-mirror.ts`
+- `tauri/ui/src/debrief/debrief-window.ts`
+- `tauri/ui/src/debrief/__tests__/timeline-regions-click-seek.spec.ts`
+- `tauri/ui/src/debrief/__tests__/morning-mirror.spec.ts`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- WaveSurfer adoption, new npm dependencies, new debrief detector semantics, and
+  any extra generated copy. This package only makes the existing replay rail
+  use bounded real master-output peaks when the recording can be decoded.
+
+Reason:
+
+- The Morning Mirror can play `input.wav`, but the rail beneath it is still a
+  synthetic sine/cosine bed. That reads polished but not truthful. Emit a
+  small optional `waveform_peaks` matrix from the backend, keep corrupt/legacy
+  recordings fail-soft, and let the timeline render grounded bar heights
+  whenever the sidecar supplies them.
+
+Proof before staging:
+
+- `uv run pytest -q tests/audio/test_waveform_peaks.py tests/debrief/test_near_miss_detector.py tests/ui_bus/test_debrief_new_wrappers_roundtrip.py tests/debrief/test_ws_server_progressive_emit.py`
+- `uv run python scripts/check_ipc_schema.py`
+- `npm --prefix tauri/ui run codegen:ipc`
+- `npm --prefix tauri/ui test -- src/debrief/__tests__/morning-mirror.spec.ts src/debrief/__tests__/timeline-regions-click-seek.spec.ts`
+- `npm --prefix tauri/ui run build`
+- `git diff --check -- src/vibemix/audio/waveform_peaks.py src/vibemix/ui_bus/schemas/debrief.py src/vibemix/ui_bus/messages.py src/vibemix/debrief/main.py src/vibemix/debrief/ws_server.py tests/audio/test_waveform_peaks.py tests/debrief/test_near_miss_detector.py tests/ui_bus/test_debrief_new_wrappers_roundtrip.py tests/debrief/test_ws_server_progressive_emit.py tauri/ui/src/ipc/messages.schema.json tauri/ui/src/ipc/messages.ts tauri/ui/src/ipc/validator.generated.mjs tauri/ui/src/debrief/components/timeline.ts tauri/ui/src/debrief/components/morning-mirror.ts tauri/ui/src/debrief/debrief-window.ts tauri/ui/src/debrief/__tests__/timeline-regions-click-seek.spec.ts tauri/ui/src/debrief/__tests__/morning-mirror.spec.ts .planning/handoffs/2026-05-31-package-checklist.md`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`

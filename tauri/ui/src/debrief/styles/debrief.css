@@ -569,7 +569,7 @@
   grid-area: rail;
   align-self: stretch;
   display: grid;
-  grid-template-columns: repeat(34, minmax(2px, 1fr));
+  grid-template-columns: repeat(var(--vmx-mirror-bars, 34), minmax(2px, 1fr));
   align-items: end;
   gap: 3px;
   min-height: 118px;
@@ -832,7 +832,7 @@
 .vmx-debrief-signal-bed {
   inset: 22px 14px 52px;
   display: grid;
-  grid-template-columns: repeat(96, minmax(1px, 1fr));
+  grid-template-columns: repeat(var(--vmx-signal-bars, 96), minmax(1px, 1fr));
   align-items: end;
   gap: 2px;
   opacity: 0.88;

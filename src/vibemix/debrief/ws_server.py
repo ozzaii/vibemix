@@ -106,6 +106,7 @@ class DebriefWsServer:
                     receipt_text=near_miss_payload.receipt_text,
                     friend_line_text=near_miss_payload.friend_line_text,
                     duration_s=near_miss_payload.duration_s,
+                    waveform_peaks=near_miss_payload.waveform_peaks,
                 )
             )
 

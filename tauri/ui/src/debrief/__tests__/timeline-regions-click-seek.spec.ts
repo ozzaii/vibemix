@@ -75,6 +75,29 @@ describe("timeline placeholder", () => {
     expect(div.textContent).toContain("No regions to render");
   });
 
+  it("renders real master-input peaks when supplied", () => {
+    const div = document.createElement("div");
+    document.body.append(div);
+    mountTimelinePlaceholder(
+      div,
+      chapters,
+      900,
+      [
+        [0, 0, 0],
+        [255, 255, 255],
+        [30, 90, 150],
+      ],
+    );
+
+    const bed = div.querySelector<HTMLElement>(".vmx-debrief-signal-bed");
+    const bars = bed?.querySelectorAll<HTMLElement>("span") ?? [];
+    expect(bed?.dataset.source).toBe("master-input");
+    expect(bed?.style.getPropertyValue("--vmx-signal-bars")).toBe("3");
+    expect(bars.length).toBe(3);
+    expect(bars[1]?.dataset.low).toBe("255");
+    expect(bars[1]?.style.getPropertyValue("--vmx-bar-h")).toBe("92%");
+  });
+
   it("deep-link highlights exact citation ids with percent signs", () => {
     const div = document.createElement("div");
     document.body.append(div);

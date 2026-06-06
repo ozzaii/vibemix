@@ -87,7 +87,12 @@ if (isMockMode) {
       kind: c.kind,
     }));
     if (waveformEl && totalDurationS > 0) {
-      mountTimelinePlaceholder(waveformEl, chapters, totalDurationS);
+      mountTimelinePlaceholder(
+        waveformEl,
+        chapters,
+        totalDurationS,
+        morningPayload?.waveform_peaks ?? null,
+      );
       if (morningPayload?.window) {
         setTimelineReplayWindow(
           waveformEl,
@@ -120,6 +125,21 @@ if (isMockMode) {
       mountMorningMirror(morningEl, morningPayload, sessionDir, {
         timelineEl: waveformEl,
       });
+    }
+    if (waveformEl && chapters.length > 0 && totalDurationS > 0) {
+      mountTimelinePlaceholder(
+        waveformEl,
+        chapters,
+        totalDurationS,
+        morningPayload.waveform_peaks ?? null,
+      );
+      if (morningPayload.window) {
+        setTimelineReplayWindow(
+          waveformEl,
+          { start: morningPayload.window[0], end: morningPayload.window[1] },
+          morningPayload.duration_s || totalDurationS,
+        );
+      }
     }
   });
 
@@ -231,6 +251,7 @@ function mountMockDebrief(): void {
   if (errorBanner) errorBanner.hidden = true;
 
   const totalDurationS = 47 * 60;
+  const waveformPeaks = mockWaveformPeaks(192);
   const chapters: ChapterPayload[] = [
     {
       id: "warm-pressure",
@@ -287,6 +308,7 @@ function mountMockDebrief(): void {
         kind: c.kind,
       })),
       totalDurationS,
+      waveformPeaks,
     );
   }
   if (morningEl) {
@@ -301,6 +323,7 @@ function mountMockDebrief(): void {
         friend_line_text:
           "I heard the mix drift, then you pulled it back inside two bars.",
         duration_s: totalDurationS,
+        waveform_peaks: waveformPeaks,
       },
       "/recordings/mock",
       { timelineEl: waveformEl },
@@ -354,6 +377,21 @@ async function openLearnReferral(referral: LearnReferralPayload): Promise<void> 
       // Not running under Tauri (dev / test).
     }
   }
+}
+
+function mockWaveformPeaks(count: number): [number, number, number][] {
+  const peaks: [number, number, number][] = [];
+  for (let i = 0; i < count; i += 1) {
+    const phraseLift = 0.5 + 0.5 * Math.sin(i * 0.08);
+    const kick = 0.5 + 0.5 * Math.sin(i * 0.31);
+    const hats = 0.5 + 0.5 * Math.cos(i * 0.19);
+    peaks.push([
+      Math.round(55 + kick * 170),
+      Math.round(40 + phraseLift * 130),
+      Math.round(24 + hats * 92),
+    ]);
+  }
+  return peaks;
 }
 
 function mountMockTldrPlayer(totalDurationS: number, regionCount: number): void {

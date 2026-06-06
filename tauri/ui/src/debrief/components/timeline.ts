@@ -30,10 +30,13 @@ export interface TimelineReplayWindow {
   end: number;
 }
 
+export type TimelineWaveformPeak = [number, number, number];
+
 export function mountTimelinePlaceholder(
   container: HTMLElement,
   chapters: TimelineChapter[],
   totalDurationS: number,
+  waveformPeaks: TimelineWaveformPeak[] | null = null,
 ): void {
   container.textContent = "";
   container.classList.add("vmx-debrief-timeline-placeholder");
@@ -50,19 +53,34 @@ export function mountTimelinePlaceholder(
   const signalBed = document.createElement("div");
   signalBed.className = "vmx-debrief-signal-bed";
   signalBed.setAttribute("aria-hidden", "true");
+  const realPeaks = sanitizeWaveformPeaks(waveformPeaks);
+  const barCount = realPeaks.length > 0 ? realPeaks.length : 96;
+  signalBed.dataset.source = realPeaks.length > 0 ? "master-input" : "synthetic";
+  signalBed.style.setProperty("--vmx-signal-bars", String(barCount));
   const firstChapter = chapters[0]!;
-  for (let i = 0; i < 96; i += 1) {
+  for (let i = 0; i < barCount; i += 1) {
     const bar = document.createElement("span");
-    const chapter = chapters[Math.floor((i / 96) * chapters.length)] ?? firstChapter;
-    const chapterSpan = Math.max(1, chapter.end - chapter.start);
-    const normalizedSpan = Math.min(1, chapterSpan / Math.max(1, totalDurationS));
-    const pulse =
-      Math.sin(i * 0.48) * 0.5 +
-      Math.cos(i * 0.17) * 0.32 +
-      Math.sin(i * 0.91) * 0.18;
-    const height = 22 + Math.round((pulse + 1) * 18 + normalizedSpan * 42);
-    bar.style.setProperty("--vmx-bar-h", `${Math.max(12, Math.min(84, height))}%`);
-    bar.style.setProperty("--vmx-bar-alpha", String(0.12 + (i % 5) * 0.025));
+    const realPeak = realPeaks[i];
+    if (realPeak) {
+      const strength = peakStrength(realPeak);
+      const height = 10 + Math.round(strength * 82);
+      bar.dataset.low = String(realPeak[0]);
+      bar.dataset.mid = String(realPeak[1]);
+      bar.dataset.high = String(realPeak[2]);
+      bar.style.setProperty("--vmx-bar-h", `${Math.max(8, Math.min(92, height))}%`);
+      bar.style.setProperty("--vmx-bar-alpha", String(0.14 + strength * 0.42));
+    } else {
+      const chapter = chapters[Math.floor((i / 96) * chapters.length)] ?? firstChapter;
+      const chapterSpan = Math.max(1, chapter.end - chapter.start);
+      const normalizedSpan = Math.min(1, chapterSpan / Math.max(1, totalDurationS));
+      const pulse =
+        Math.sin(i * 0.48) * 0.5 +
+        Math.cos(i * 0.17) * 0.32 +
+        Math.sin(i * 0.91) * 0.18;
+      const height = 22 + Math.round((pulse + 1) * 18 + normalizedSpan * 42);
+      bar.style.setProperty("--vmx-bar-h", `${Math.max(12, Math.min(84, height))}%`);
+      bar.style.setProperty("--vmx-bar-alpha", String(0.12 + (i % 5) * 0.025));
+    }
     signalBed.append(bar);
   }
 
@@ -335,4 +353,28 @@ function renderReadout(container: HTMLElement, values: string[]): void {
     item.textContent = value;
     container.append(item);
   }
+}
+
+function sanitizeWaveformPeaks(
+  peaks: TimelineWaveformPeak[] | null | undefined,
+): TimelineWaveformPeak[] {
+  if (!Array.isArray(peaks)) return [];
+  const out: TimelineWaveformPeak[] = [];
+  for (const row of peaks.slice(0, 512)) {
+    if (!Array.isArray(row) || row.length < 3) continue;
+    const low = clampPeak(row[0]);
+    const mid = clampPeak(row[1]);
+    const high = clampPeak(row[2]);
+    out.push([low, mid, high]);
+  }
+  return out;
+}
+
+function clampPeak(value: unknown): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) return 0;
+  return Math.max(0, Math.min(255, Math.round(value)));
+}
+
+function peakStrength(peak: TimelineWaveformPeak): number {
+  return Math.max(0, Math.min(1, (peak[0] * 0.5 + peak[1] * 0.32 + peak[2] * 0.18) / 255));
 }

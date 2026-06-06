@@ -6,6 +6,7 @@ import { convertFileSrc } from "@tauri-apps/api/core";
 import {
   setTimelinePlayhead,
   setTimelineReplayWindow,
+  type TimelineWaveformPeak,
 } from "./timeline.js";
 
 export interface MorningMirrorPayload {
@@ -15,6 +16,7 @@ export interface MorningMirrorPayload {
   receipt_text: string;
   friend_line_text: string;
   duration_s: number;
+  waveform_peaks?: TimelineWaveformPeak[] | null;
 }
 
 export interface MorningMirrorOptions {
@@ -74,9 +76,21 @@ export function mountMorningMirror(
   const rail = document.createElement("div");
   rail.className = "vmx-morning-mirror__rail";
   rail.setAttribute("aria-hidden", "true");
-  for (let i = 0; i < 34; i += 1) {
+  const mirrorPeaks = sampleMirrorPeaks(payload.waveform_peaks, 34);
+  rail.dataset.source = mirrorPeaks.length > 0 ? "master-input" : "synthetic";
+  const tickCount = mirrorPeaks.length > 0 ? mirrorPeaks.length : 34;
+  rail.style.setProperty("--vmx-mirror-bars", String(tickCount));
+  for (let i = 0; i < tickCount; i += 1) {
     const tick = document.createElement("span");
-    tick.style.setProperty("--vmx-mirror-tick", String(2 + ((i * 7) % 9)));
+    const realPeak = mirrorPeaks[i];
+    if (realPeak) {
+      tick.style.setProperty("--vmx-mirror-tick", String(2 + Math.round(peakStrength(realPeak) * 11)));
+      tick.dataset.low = String(realPeak[0]);
+      tick.dataset.mid = String(realPeak[1]);
+      tick.dataset.high = String(realPeak[2]);
+    } else {
+      tick.style.setProperty("--vmx-mirror-tick", String(2 + ((i * 7) % 9)));
+    }
     rail.append(tick);
   }
 
@@ -157,4 +171,38 @@ function buildAssetUrl(path: string): string {
     return convertFileSrc(path);
   }
   return `asset://localhost/${path}`;
+}
+
+function sampleMirrorPeaks(
+  peaks: TimelineWaveformPeak[] | null | undefined,
+  count: number,
+): TimelineWaveformPeak[] {
+  if (!Array.isArray(peaks) || peaks.length === 0 || count <= 0) return [];
+  const out: TimelineWaveformPeak[] = [];
+  const max = Math.min(512, peaks.length);
+  for (let i = 0; i < count; i += 1) {
+    const start = Math.floor((i / count) * max);
+    const end = Math.max(start + 1, Math.floor(((i + 1) / count) * max));
+    let low = 0;
+    let mid = 0;
+    let high = 0;
+    for (let j = start; j < end; j += 1) {
+      const row = peaks[j];
+      if (!row) continue;
+      low = Math.max(low, clampPeak(row[0]));
+      mid = Math.max(mid, clampPeak(row[1]));
+      high = Math.max(high, clampPeak(row[2]));
+    }
+    out.push([low, mid, high]);
+  }
+  return out;
+}
+
+function clampPeak(value: unknown): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) return 0;
+  return Math.max(0, Math.min(255, Math.round(value)));
+}
+
+function peakStrength(peak: TimelineWaveformPeak): number {
+  return Math.max(0, Math.min(1, (peak[0] * 0.5 + peak[1] * 0.32 + peak[2] * 0.18) / 255));
 }

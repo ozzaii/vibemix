@@ -259,7 +259,45 @@ def _build_debrief_near_miss_payload(
         receipt_text=receipt_text,
         friend_line_text=chosen.text if chosen else "",
         duration_s=max(duration_s, 0.0),
+        waveform_peaks=_build_debrief_waveform_peaks(input_wav),
     )
+
+
+def _build_debrief_waveform_peaks(
+    input_wav: Path,
+    *,
+    buckets: int = 192,
+) -> tuple[tuple[int, int, int], ...] | None:
+    """Return bounded display peaks for the debrief replay rail.
+
+    Failure means "no waveform proof", not "silent recording", so callers keep
+    the near-miss payload and let the renderer fall back to its quiet placeholder.
+    """
+
+    try:
+        from vibemix.audio.waveform_peaks import compute_three_band_peaks
+        from vibemix.debrief.near_miss_detector import _read_wav_mono_float32
+
+        decoded = _read_wav_mono_float32(input_wav)
+        if decoded is None:
+            return None
+        samples, sample_rate = decoded
+        raw_peaks = compute_three_band_peaks(
+            samples,
+            sample_rate=sample_rate,
+            buckets=max(1, min(512, int(buckets))),
+        )
+    except Exception as exc:  # pragma: no cover - defensive debrief add-on
+        logger.warning("[debrief] waveform peaks skipped: %s", exc)
+        return None
+
+    peaks: list[tuple[int, int, int]] = []
+    for row in raw_peaks:
+        if len(row) < 3:
+            continue
+        low, mid, high = (max(0, min(255, int(v))) for v in row[:3])
+        peaks.append((low, mid, high))
+    return tuple(peaks) if peaks else None
 
 
 def _learn_action_critique_line(event: dict) -> str:

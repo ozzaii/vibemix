@@ -70,6 +70,11 @@ describe("morning mirror", () => {
         receipt_text: "the mix recovered by ear [mix:near_miss@42.000]",
         friend_line_text: "I heard the mix pull back in [mix:near_miss@42.000]",
         duration_s: 600,
+        waveform_peaks: [
+          [0, 0, 0],
+          [255, 120, 30],
+          [40, 90, 180],
+        ],
       },
       "/recordings/set-001",
       { timelineEl: timeline },
@@ -79,6 +84,9 @@ describe("morning mirror", () => {
     expect(container.textContent).toContain("I was there");
     expect(container.textContent).toContain("the mix recovered by ear");
     expect(convertFileSrcMock).toHaveBeenCalledWith("/recordings/set-001/input.wav");
+    expect(container.querySelector(".vmx-morning-mirror__rail")?.getAttribute("data-source")).toBe(
+      "master-input",
+    );
     expect(
       timeline.querySelector(".vmx-debrief-replay-window")?.getAttribute("aria-label"),
     ).toContain("0:36");

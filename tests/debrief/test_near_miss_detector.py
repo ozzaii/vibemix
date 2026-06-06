@@ -9,6 +9,7 @@ import numpy as np
 import pytest
 
 from vibemix.__main__ import _run_debrief_cli, cli_entry
+from vibemix.debrief.main import _build_debrief_waveform_peaks
 from vibemix.debrief.near_miss_detector import detect_near_miss_from_samples
 
 _SR = 16_000
@@ -105,6 +106,17 @@ def test_debrief_near_miss_cli_validates_root_and_emits_json(
     payload = json.loads(capsys.readouterr().out)
     assert payload["near_miss"]["event_type"] == "MIX_MOVE"
     assert payload["near_miss"]["citation"].startswith("[mix:near_miss@")
+
+
+def test_debrief_waveform_peaks_are_read_from_input_wav(tmp_path: Path) -> None:
+    session = _write_session(tmp_path, _kick_loop(36.0, shifted=True))
+
+    peaks = _build_debrief_waveform_peaks(session / "input.wav", buckets=16)
+
+    assert peaks is not None
+    assert len(peaks) == 16
+    assert all(len(row) == 3 for row in peaks)
+    assert max(max(row) for row in peaks) > 0
 
 
 def test_cli_entry_dispatches_debrief_near_miss_before_live_runtime(

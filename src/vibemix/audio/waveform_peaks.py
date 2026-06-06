@@ -28,28 +28,27 @@ def compute_three_band_peaks(
         return [[0, 0, 0] for _ in range(max(1, int(buckets)))]
     bucket_count = max(1, int(buckets))
     samples_per_bucket = max(64, int(np.ceil(mono.size / bucket_count)))
-    padded = np.pad(
-        mono,
-        (0, max(0, samples_per_bucket * bucket_count - mono.size)),
-        mode="constant",
-    )
-    frames = padded.reshape(bucket_count, samples_per_bucket)
     window = np.hanning(samples_per_bucket).astype(np.float32)
     freqs = np.fft.rfftfreq(samples_per_bucket, d=1.0 / float(sample_rate))
-    spectrum = np.abs(np.fft.rfft(frames * window[None, :], axis=1))
-
     bands = (
         (freqs < 250.0),
         (freqs >= 250.0) & (freqs < 2_500.0),
         (freqs >= 2_500.0),
     )
-    values: list[np.ndarray] = []
-    for band in bands:
-        if not np.any(band):
-            values.append(np.zeros(bucket_count, dtype=np.float32))
-            continue
-        values.append(np.sqrt(np.mean(np.square(spectrum[:, band]), axis=1)).astype(np.float32))
-    matrix = np.stack(values, axis=1)
+    matrix = np.zeros((bucket_count, 3), dtype=np.float32)
+    for bucket_idx in range(bucket_count):
+        start = bucket_idx * samples_per_bucket
+        end = start + samples_per_bucket
+        frame = mono[start:end]
+        if frame.size < samples_per_bucket:
+            frame = np.pad(frame, (0, samples_per_bucket - frame.size), mode="constant")
+        spectrum = np.abs(np.fft.rfft(frame * window))
+        for band_idx, band in enumerate(bands):
+            if not np.any(band):
+                continue
+            matrix[bucket_idx, band_idx] = np.sqrt(
+                np.mean(np.square(spectrum[band]), dtype=np.float64)
+            )
     peak = float(np.max(matrix))
     if peak <= 1e-9 or not np.isfinite(peak):
         return [[0, 0, 0] for _ in range(bucket_count)]

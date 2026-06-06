@@ -96,10 +96,12 @@ def test_debrief_near_miss_roundtrip_with_replay_window():
         receipt_text="the mix recovered by ear [mix:near_miss@42.000]",
         friend_line_text="I heard the mix pull back in [mix:near_miss@42.000]",
         duration_s=600.0,
+        waveform_peaks=((12, 80, 22), (24, 120, 34)),
     )
     parsed = json.loads(msg.to_json())
     assert parsed["type"] == "ipc.debrief.near-miss"
     assert parsed["payload"]["window"] == [36.0, 46.0]
+    assert parsed["payload"]["waveform_peaks"] == [[12, 80, 22], [24, 120, 34]]
     jsonschema.validate(parsed, _SCHEMA)
 
 
@@ -115,6 +117,7 @@ def test_debrief_near_miss_roundtrip_quiet_state():
     parsed = json.loads(msg.to_json())
     assert parsed["payload"]["t_center"] is None
     assert parsed["payload"]["window"] is None
+    assert parsed["payload"]["waveform_peaks"] is None
     jsonschema.validate(parsed, _SCHEMA)
 
 

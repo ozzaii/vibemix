@@ -1773,7 +1773,13 @@ class DebriefNearMiss:
         receipt_text: str,
         friend_line_text: str,
         duration_s: float,
+        waveform_peaks: tuple[tuple[int, int, int], ...] | list[list[int]] | None = None,
     ) -> DebriefNearMiss:
+        normalized_peaks = (
+            tuple(tuple(int(v) for v in row[:3]) for row in waveform_peaks)
+            if waveform_peaks is not None
+            else None
+        )
         return cls(
             type="ipc.debrief.near-miss",
             ts=_now_iso(),
@@ -1784,6 +1790,7 @@ class DebriefNearMiss:
                 receipt_text=receipt_text,
                 friend_line_text=friend_line_text,
                 duration_s=duration_s,
+                waveform_peaks=normalized_peaks,
             ),
         )
 

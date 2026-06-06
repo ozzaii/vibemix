@@ -577,6 +577,7 @@ export interface DebriefNearMiss {
     receipt_text: string;
     friend_line_text: string;
     duration_s: number;
+    waveform_peaks?: [[number, number, number], ...[number, number, number][]] | null;
   };
 }
 export interface DebriefTldrAudio {

@@ -94,6 +94,9 @@ class DebriefNearMissPayload:
         receipt_text: resolver-backed proof text for the card.
         friend_line_text: one human line that may be spoken/rendered.
         duration_s: real set duration from events/input, not ``voice.wav``.
+        waveform_peaks: optional ``[[low, mid, high], ...]`` master-input
+            display peaks scaled 0..255. ``None`` means the recording could
+            not be decoded, not that silence was proven.
     """
 
     input_wav_relative_path: str
@@ -102,6 +105,7 @@ class DebriefNearMissPayload:
     receipt_text: str
     friend_line_text: str
     duration_s: float
+    waveform_peaks: tuple[tuple[int, int, int], ...] | None = None
 
 
 @dataclass(frozen=True, slots=True)
