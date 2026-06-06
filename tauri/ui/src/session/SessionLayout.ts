@@ -168,6 +168,12 @@ export interface Mounted {
   muteButton: HTMLElement;
   /** Cross-fade liveness labels (always mounted; opacity toggled by mode). */
   liveFault: HTMLElement;
+  armedContext: {
+    capture: HTMLElement;
+    midi: HTMLElement;
+    output: HTMLElement;
+    persona: HTMLElement;
+  };
   ghosts: [HTMLElement, HTMLElement];
   now: HTMLElement;
   receipt: HTMLElement;
@@ -430,26 +436,156 @@ const LAYOUT_CSS = `
   .vmx-armed { display: none; }
   .vmx-session[data-runstate="armed"] .vmx-voice { display: none; }
   .vmx-session[data-runstate="armed"] .vmx-live { visibility: hidden; }
+  .vmx-session[data-runstate="armed"] .vmx-deck__rail {
+    align-self: start;
+    justify-content: flex-end;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+  }
+  .vmx-session[data-runstate="armed"] .vmx-persona {
+    border-color: transparent;
+    background: transparent;
+    box-shadow: none;
+  }
   .vmx-session[data-runstate="armed"] .vmx-armed {
-    display: flex; flex-direction: column; align-items: center; justify-content: center;
-    gap: var(--sp-4); min-height: 0; text-align: center;
-    animation: vmxArmedIn 420ms cubic-bezier(0.16, 1, 0.3, 1);
+    position: relative;
+    isolation: isolate;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(288px, 360px);
+    align-items: end;
+    gap: clamp(28px, 5vw, 72px);
+    min-height: 0;
+    width: 100%;
+    max-width: 1120px;
+    margin: 0 auto;
+    padding: clamp(28px, 6vh, 72px) clamp(4px, 1.8vw, 22px) clamp(34px, 7vh, 86px);
+    text-align: left;
+    animation: vmxArmedIn 520ms var(--ease-brand);
+  }
+  .vmx-armed__field {
+    position: absolute;
+    inset: -10% -8% -16%;
+    z-index: -1;
+    pointer-events: none;
+    background:
+      linear-gradient(112deg, transparent 0%, var(--brand-04) 28%, transparent 52%),
+      radial-gradient(112% 78% at 18% 82%, var(--brand-12), transparent 62%),
+      repeating-linear-gradient(90deg, transparent 0 72px, rgba(255, 222, 242, 0.026) 72px 73px);
+    filter: blur(0.2px);
+    opacity: 0.72;
+    transform: translate3d(0, 0, 0);
+    animation: vmxArmedField 8600ms var(--ease-brand) infinite alternate;
+  }
+  .vmx-armed__copy {
+    display: grid;
+    gap: var(--sp-4);
+    align-content: end;
+    min-width: 0;
+  }
+  .vmx-armed__eyebrow,
+  .vmx-armed__kicker,
+  .vmx-armed__context-label {
+    font-family: var(--type-mono);
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+  }
+  .vmx-armed__eyebrow {
+    color: var(--brand);
+    text-shadow: 0 0 18px var(--brand-22);
+  }
+  .vmx-armed__title {
+    margin: 0;
+    max-width: 11ch;
+    font-family: var(--type-serif);
+    font-weight: 400;
+    font-size: 72px;
+    line-height: 0.96;
+    letter-spacing: 0;
+    color: var(--text-primary);
+    text-wrap: balance;
+    text-shadow:
+      0 1px 0 rgba(176, 112, 160, 0.20),
+      0 22px 58px rgba(0, 0, 0, 0.58);
+  }
+  .vmx-armed__lead {
+    max-width: 48ch;
+    margin: 0;
+    font-family: var(--type-body);
+    font-size: 15px;
+    line-height: 1.55;
+    color: var(--text-muted);
+  }
+  .vmx-armed__context {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: var(--sp-3);
+    margin-top: var(--sp-3);
+  }
+  .vmx-armed__context-item {
+    min-width: 0;
+    padding: 13px 14px 12px;
+    border-radius: var(--rad-md);
+    background:
+      linear-gradient(180deg, rgba(255, 251, 244, 0.024), rgba(0, 0, 0, 0.16)),
+      rgba(48, 42, 46, 0.30);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 210, 240, 0.075),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.46),
+      0 10px 28px rgba(0, 0, 0, 0.20);
+  }
+  .vmx-armed__context-label {
+    display: block;
+    margin-bottom: 8px;
+    color: var(--text-disabled);
+  }
+  .vmx-armed__context-value {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-family: var(--type-display);
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0;
+    color: var(--text-secondary);
+  }
+  .vmx-armed__module {
+    position: relative;
+    display: grid;
+    gap: var(--sp-4);
+    align-self: center;
+    padding: 24px;
+    border-radius: var(--rad-md);
+    background:
+      linear-gradient(180deg, rgba(255, 251, 244, 0.040), rgba(0, 0, 0, 0.26)),
+      rgba(34, 29, 32, 0.74);
+    box-shadow:
+      var(--bevel-raised),
+      var(--shadow-raised),
+      0 0 66px -28px var(--brand-22);
   }
   .vmx-armed__kicker {
-    font-family: var(--type-mono); font-size: 10px; letter-spacing: 0.28em;
-    text-transform: uppercase; color: var(--silk-40);
+    color: var(--silk-40);
   }
   .vmx-armed__note {
-    font-family: var(--type-mono); font-size: 11px; letter-spacing: 0.04em; color: var(--silk-22);
+    font-family: var(--type-mono);
+    font-size: 11px;
+    letter-spacing: 0.04em;
+    color: var(--silk-22);
   }
-  /* Start — THE primary ship action: larger + warmer than the rail controls.
-     Rose primary (gold stays quarantined to heat/Camelot numerics). */
+  /* Start: the primary ship action. Rose primary, with a physical press bloom. */
   .vmx-armed__start {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
     font-family: var(--type-display);
     font-variation-settings: 'wdth' 88, 'wght' 600;
-    font-size: 15px; letter-spacing: 0.26em; text-transform: uppercase;
+    font-size: 16px; letter-spacing: 0.26em; text-transform: uppercase;
     color: var(--amber-pale);
-    padding: 13px 38px;
+    min-height: 68px;
+    padding: 18px 38px;
     border: 1px solid var(--amber-40); border-radius: var(--rad-sm);
     background:
       linear-gradient(180deg, rgba(255, 165, 223, 0.13), rgba(255, 165, 223, 0.03) 58%, rgba(0, 0, 0, 0.24)),
@@ -458,9 +594,19 @@ const LAYOUT_CSS = `
       inset 0 1px 0 rgba(255, 251, 244, 0.05),
       inset 0 -1px 0 var(--amber-22),
       inset 0 0 20px rgba(255, 165, 223, 0.10),
-      0 8px 24px rgba(0, 0, 0, 0.5);
+      0 18px 46px rgba(0, 0, 0, 0.56);
     cursor: pointer;
-    transition: color var(--motion-step) ease-out, border-color var(--motion-step) ease-out, box-shadow var(--motion-step) ease-out, filter var(--motion-step) ease-out;
+    transition: color var(--motion-step) var(--ease-brand), border-color var(--motion-step) var(--ease-brand), box-shadow var(--motion-step) var(--ease-brand), filter var(--motion-step) var(--ease-brand), transform var(--motion-step) var(--ease-brand);
+  }
+  .vmx-armed__start::before {
+    content: "";
+    position: absolute;
+    inset: -28%;
+    z-index: -1;
+    background: radial-gradient(70% 70% at 50% 100%, var(--brand-22), transparent 62%);
+    opacity: 0;
+    transform: scale(0.72);
+    transition: opacity var(--motion-step) var(--ease-brand), transform var(--motion-step) var(--ease-brand);
   }
   .vmx-armed__start:hover {
     color: var(--amber); border-color: var(--amber); filter: brightness(1.08);
@@ -470,11 +616,27 @@ const LAYOUT_CSS = `
       inset 0 0 26px rgba(255, 165, 223, 0.15),
       0 8px 26px rgba(0, 0, 0, 0.55);
   }
-  .vmx-armed__start:active { transform: translateY(1px); }
+  .vmx-armed__start:hover::before,
+  .vmx-armed__start:focus-visible::before {
+    opacity: 1;
+    transform: scale(1);
+  }
+  .vmx-armed__start:active {
+    transform: translateY(2px) scale(0.992);
+    box-shadow:
+      inset 0 3px 8px rgba(0, 0, 0, 0.58),
+      inset 0 1px 0 rgba(255, 251, 244, 0.03),
+      0 10px 28px rgba(0, 0, 0, 0.52);
+  }
   .vmx-armed__start:focus-visible { outline: 2px solid var(--amber); outline-offset: 3px; }
-  @keyframes vmxArmedIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes vmxArmedIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes vmxArmedField {
+    from { opacity: 0.46; transform: translate3d(-8px, 5px, 0) scale(0.992); }
+    to { opacity: 0.76; transform: translate3d(8px, -5px, 0) scale(1.006); }
+  }
   @media (prefers-reduced-motion: reduce) {
     .vmx-session[data-runstate="armed"] .vmx-armed { animation: none; }
+    .vmx-armed__field { animation: none; }
   }
 
   /* --- THE HERO: the co-host speaks, anchored low on void --- */
@@ -852,6 +1014,22 @@ const LAYOUT_CSS = `
       padding: 6px 10px;
       letter-spacing: 0.14em;
     }
+    .vmx-session[data-runstate="armed"] .vmx-armed {
+      grid-template-columns: 1fr;
+      gap: var(--sp-5);
+      padding: var(--sp-5) 0 var(--sp-6);
+    }
+    .vmx-armed__title {
+      font-size: 44px;
+      max-width: 10ch;
+    }
+    .vmx-armed__context {
+      grid-template-columns: 1fr 1fr;
+    }
+    .vmx-armed__module {
+      width: 100%;
+      box-sizing: border-box;
+    }
     .vmx-voice {
       width: 100%;
       padding: var(--sp-5) var(--sp-4);
@@ -1040,6 +1218,36 @@ export function mountSessionLayout(
   // "ready" — never a fault (Invariant #5: idle is calm, not broken).
   const armed = document.createElement("div");
   armed.className = "vmx-armed";
+  const armedField = document.createElement("div");
+  armedField.className = "vmx-armed__field";
+  armedField.setAttribute("aria-hidden", "true");
+  const armedCopy = document.createElement("div");
+  armedCopy.className = "vmx-armed__copy";
+  const armedEyebrow = document.createElement("span");
+  armedEyebrow.className = "vmx-armed__eyebrow";
+  armedEyebrow.textContent = "armed and waiting";
+  const armedTitle = document.createElement("h1");
+  armedTitle.className = "vmx-armed__title";
+  armedTitle.textContent = "I'm awake before the first bar.";
+  const armedLead = document.createElement("p");
+  armedLead.className = "vmx-armed__lead";
+  armedLead.textContent =
+    "Start when the mix is moving. I will only speak from audio, controller, and screen proof.";
+  const armedContext = document.createElement("div");
+  armedContext.className = "vmx-armed__context";
+  const captureContext = makeArmedContextItem("capture");
+  const midiContext = makeArmedContextItem("controller");
+  const outputContext = makeArmedContextItem("output");
+  const personaContext = makeArmedContextItem("persona");
+  armedContext.append(
+    captureContext.wrap,
+    midiContext.wrap,
+    outputContext.wrap,
+    personaContext.wrap,
+  );
+  armedCopy.append(armedEyebrow, armedTitle, armedLead, armedContext);
+  const armedModule = document.createElement("div");
+  armedModule.className = "vmx-armed__module";
   const armedKicker = document.createElement("span");
   armedKicker.className = "vmx-armed__kicker";
   armedKicker.textContent = "co-host ready";
@@ -1059,7 +1267,8 @@ export function mountSessionLayout(
   const armedNote = document.createElement("span");
   armedNote.className = "vmx-armed__note";
   armedNote.textContent = "press start to go live";
-  armed.append(armedKicker, startBtn, armedNote);
+  armedModule.append(armedKicker, startBtn, armedNote);
+  armed.append(armedField, armedCopy, armedModule);
 
   speak.append(voice, armed);
   deck.append(speak);
@@ -1116,6 +1325,12 @@ export function mountSessionLayout(
     personaValue,
     muteButton: muteBtn,
     liveFault,
+    armedContext: {
+      capture: captureContext.value,
+      midi: midiContext.value,
+      output: outputContext.value,
+      persona: personaContext.value,
+    },
     ghosts: [ghost1, ghost2],
     now,
     receipt,
@@ -1171,6 +1386,18 @@ function makeReadout(label: string, isKey = false): { wrap: HTMLElement; value: 
   const value = document.createElement("span");
   value.className = isKey ? "vmx-read__key" : "vmx-read__num";
   wrap.append(lab, value);
+  return { wrap, value };
+}
+
+function makeArmedContextItem(label: string): { wrap: HTMLElement; value: HTMLElement } {
+  const wrap = document.createElement("div");
+  wrap.className = "vmx-armed__context-item";
+  const labelEl = document.createElement("span");
+  labelEl.className = "vmx-armed__context-label";
+  labelEl.textContent = label;
+  const value = document.createElement("span");
+  value.className = "vmx-armed__context-value";
+  wrap.append(labelEl, value);
   return { wrap, value };
 }
 
@@ -1259,6 +1486,7 @@ function applyState(mounted: Mounted, next: SessionState, isMount: boolean): voi
   if (mounted.root.dataset.runstate !== runState) {
     mounted.root.dataset.runstate = runState;
   }
+  syncArmedContext(mounted, next);
 
   // Fault label states the cause; refresh whenever the cause changes.
   if (downInput) {
@@ -1430,6 +1658,40 @@ function setGhost(el: HTMLElement, line: TranscriptLine | null): void {
 function setGhostText(el: HTMLElement, text: string): void {
   if (el.textContent !== text) el.textContent = text;
   el.style.display = text ? "" : "none";
+}
+
+function syncArmedContext(mounted: Mounted, state: SessionState): void {
+  setText(mounted.armedContext.capture, armedCaptureText(state));
+  setText(mounted.armedContext.midi, armedMidiText(state));
+  setText(mounted.armedContext.output, outputLabel(state.output));
+  setText(
+    mounted.armedContext.persona,
+    `${state.persona.mood.toLowerCase()} / ${state.persona.voice}`,
+  );
+}
+
+function setText(el: HTMLElement, text: string): void {
+  if (el.textContent !== text) el.textContent = text;
+}
+
+function armedCaptureText(state: SessionState): string {
+  if (state.status.livekit === "ok" && musicSignalActive(state.meters.music)) {
+    return "master in";
+  }
+  if (state.status.livekit === "ok") return "armed";
+  if (state.status.livekit === "connecting") return "connecting";
+  if (state.status.livekit === "down") return "dropped";
+  return "checking";
+}
+
+function armedMidiText(state: SessionState): string {
+  const device = midiDeviceLabel(state.status.midiDevice);
+  if (state.status.midi != null && state.status.midi > 0) return `${device} seen`;
+  if (state.status.midiActivity === "connected_no_midi_traffic") return `${device} connected`;
+  if (state.status.midiActivity === "midi_traffic_unmapped") return `${device} unmapped`;
+  if (state.status.midiActivity === "midi_events_no_moves") return `${device} needs move`;
+  if (state.status.midiActivity === "disconnected") return "controller offline";
+  return "motion pending";
 }
 
 function idleReadinessLines(state: SessionState): { inputs: string; action: string } {

@@ -63,6 +63,37 @@ describe("SHIP-WIRE START-gate", () => {
     ).toBe("start");
   });
 
+  it("boots armed as a composed premium deck face with grounded context", () => {
+    const h = host();
+    const state = defaultState();
+    state.runState = "armed";
+    state.status.livekit = "ok";
+    state.status.midi = 2;
+    state.status.midiDevice = "DDJ-FLX4";
+    state.persona.mood = "HYPE";
+    state.persona.voice = "Adam";
+    state.output.profile = "HP";
+    state.output.device = "AUTO";
+    mountSessionLayout(h, state);
+    const root = sessionRoot(h);
+
+    expect(root.querySelector(".vmx-armed__title")?.textContent).toBe(
+      "I'm awake before the first bar.",
+    );
+    expect(root.querySelector(".vmx-armed__field")).toBeTruthy();
+    expect(root.querySelector(".vmx-armed__module")).toBeTruthy();
+    const contextValues = Array.from(
+      root.querySelectorAll(".vmx-armed__context-value"),
+      (el) => el.textContent,
+    );
+    expect(contextValues).toEqual([
+      "armed",
+      "DDJ-FLX4 seen",
+      "HP default out",
+      "hype / Adam",
+    ]);
+  });
+
   it("running deck shows Stop; defaultState() is running (existing fixtures keep the live deck)", () => {
     const h = host();
     mountSessionLayout(h); // defaultState() → runState "running"
