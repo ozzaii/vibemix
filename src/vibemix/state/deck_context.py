@@ -342,6 +342,22 @@ _TRACK_IDENTITY_BY_RE = re.compile(
     r"\b[A-Z][A-Za-z0-9&'.,:/+-]{1,}(?:\s+[A-Z][A-Za-z0-9&'.,:/+-]{1,}){0,8}"
     r"\s+by\s+[A-Z][A-Za-z0-9&'.,:/+-]{1,}",
 )
+_TRACK_IDENTITY_NAME_WORD = r"(?:[A-Z0-9][\w&'.,:/+()[\]]{1,}|[A-Z]{2,})"
+_TRACK_IDENTITY_NAME_PHRASE = (
+    rf"{_TRACK_IDENTITY_NAME_WORD}(?:\s+{_TRACK_IDENTITY_NAME_WORD}){{0,8}}"
+)
+_TRACK_IDENTITY_DASHED_RE = re.compile(
+    rf"(?:"
+    rf"(?i:\b(?:this\s+(?:is|was)|that(?:'s|\s+is|\s+was)|sounds?\s+like|"
+    rf"hearing|playing|track|song|tune|record|id)\b)"
+    rf"[^.?!]{{0,36}}\b{_TRACK_IDENTITY_NAME_PHRASE}\s*(?:-|\u2013|\u2014)\s*"
+    rf"{_TRACK_IDENTITY_NAME_PHRASE}"
+    rf"|"
+    rf"\b{_TRACK_IDENTITY_NAME_PHRASE}\s*(?:-|\u2013|\u2014)\s*"
+    rf"{_TRACK_IDENTITY_NAME_PHRASE}\b[^.?!]{{0,32}}"
+    rf"(?i:\b(?:is|was|just)?\s*(?:playing|loaded|coming\s+in|running|on\s+now)\b)"
+    rf")"
+)
 _EVIDENCE_TOKEN_RE = re.compile(r"[^A-Za-z0-9_.:+-]+")
 _AUDIO_WINDOW_CONTEXT_REQUIRED_ATOMS: tuple[str, ...] = (
     "P1=master_global_mix",
@@ -3489,6 +3505,7 @@ def _has_uncited_track_identity_claim(text: str, state: MusicState) -> bool:
         _TRACK_IDENTITY_QUOTED_RE.search(raw)
         or _TRACK_IDENTITY_CALLED_RE.search(raw)
         or _TRACK_IDENTITY_BY_RE.search(raw)
+        or _TRACK_IDENTITY_DASHED_RE.search(raw)
         or _mentions_known_track_identity(raw, state)
     )
 

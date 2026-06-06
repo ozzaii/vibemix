@@ -3135,6 +3135,57 @@ def test_live_claim_guard_corrects_multi_deck_outcome_category() -> None:
     assert "second_deck=independent_source_required" not in result.text
 
 
+def test_live_claim_guard_blocks_uncited_dashed_track_identity() -> None:
+    state = MusicState(audible=True, audible_deck="A")
+
+    result = apply_live_claim_guard("This is Mitro - Atencion [WHA068].", state)
+
+    assert result.corrected is True
+    assert result.policy == "track_identity_not_cited"
+    assert result.reason == "missing_track_citation"
+    assert "citable track match" in result.text
+    assert "Mitro" not in result.text
+    assert "Atencion" not in result.text
+
+
+def test_live_claim_guard_salvages_audio_read_after_uncited_track_identity() -> None:
+    state = MusicState(audible=True, audible_deck="A")
+    reply = (
+        "This is Mitro - Atencion [WHA068]. "
+        "Keep the low weight steady [ev:TRACK_CHANGE@87.0]."
+    )
+
+    result = apply_live_claim_guard(reply, state, event_type="TRACK_CHANGE")
+
+    assert result.corrected is True
+    assert result.emit_corrected is True
+    assert result.policy == "track_identity_not_cited"
+    assert result.reason == "missing_track_citation"
+    assert result.text == "Keep the low weight steady [ev:TRACK_CHANGE@87.0]."
+    assert "Mitro" not in result.text
+    assert "Atencion" not in result.text
+
+
+def test_live_claim_guard_allows_cited_dashed_track_identity() -> None:
+    state = MusicState(audible=True, audible_deck="A")
+    reply = "This is Mitro - Atencion [WHA068]. [track:folder:9ebd6d84e987c993]"
+
+    result = apply_live_claim_guard(reply, state, event_type="TRACK_CHANGE")
+
+    assert result.corrected is False
+    assert result.text == reply
+
+
+def test_live_claim_guard_does_not_treat_plain_audio_read_as_track_identity() -> None:
+    state = MusicState(audible=True, audible_deck="A")
+    reply = "This is a heavy one [ev:TRACK_CHANGE@87.0]."
+
+    result = apply_live_claim_guard(reply, state, event_type="TRACK_CHANGE")
+
+    assert result.corrected is False
+    assert result.text == reply
+
+
 def test_live_claim_guard_allows_cited_next_suggestion_nudge_on_single_deck() -> None:
     state = MusicState(audible_deck="A")
     state.controller_connected = True
