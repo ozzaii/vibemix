@@ -70,6 +70,7 @@ describe("morning mirror", () => {
         receipt_text: "the mix recovered by ear [mix:near_miss@42.000]",
         friend_line_text: "I heard the mix pull back in [mix:near_miss@42.000]",
         duration_s: 600,
+        ear_test_clip_relative_path: "near_miss_ear_test.wav",
         friend_line_audio_relative_path: "debrief_friend_line.mp3",
         waveform_peaks: [
           [0, 0, 0],
@@ -84,11 +85,16 @@ describe("morning mirror", () => {
     expect(container.dataset.state).toBe("replay");
     expect(container.textContent).toContain("I was there");
     expect(container.textContent).toContain("the mix recovered by ear");
-    expect(convertFileSrcMock).toHaveBeenCalledWith("/recordings/set-001/input.wav");
+    expect(convertFileSrcMock).toHaveBeenCalledWith(
+      "/recordings/set-001/near_miss_ear_test.wav",
+    );
     expect(convertFileSrcMock).toHaveBeenCalledWith(
       "/recordings/set-001/debrief_friend_line.mp3",
     );
     expect(container.textContent).toContain("Play line");
+    expect(container.querySelector(".vmx-morning-mirror__audio")?.getAttribute("src")).toBe(
+      "asset://converted/recordings/set-001/near_miss_ear_test.wav",
+    );
     expect(
       container.querySelector(".vmx-morning-mirror__friend-audio")?.getAttribute("src"),
     ).toBe("asset://converted/recordings/set-001/debrief_friend_line.mp3");
@@ -98,6 +104,32 @@ describe("morning mirror", () => {
     expect(
       timeline.querySelector(".vmx-debrief-replay-window")?.getAttribute("aria-label"),
     ).toContain("0:36");
+  });
+
+  it("falls back to the master input when no focused ear-test clip is present", () => {
+    Object.defineProperty(window, "__TAURI_INTERNALS__", {
+      configurable: true,
+      value: {},
+    });
+
+    mountMorningMirror(
+      container,
+      {
+        input_wav_relative_path: "input.wav",
+        t_center: 42,
+        window: [36, 46],
+        receipt_text: "the mix recovered by ear [mix:near_miss@42.000]",
+        friend_line_text: "I heard the mix pull back in [mix:near_miss@42.000]",
+        duration_s: 600,
+      },
+      "/recordings/set-001",
+      { timelineEl: timeline },
+    );
+
+    expect(convertFileSrcMock).toHaveBeenCalledWith("/recordings/set-001/input.wav");
+    expect(container.querySelector(".vmx-morning-mirror__audio")?.getAttribute("src")).toBe(
+      "asset://converted/recordings/set-001/input.wav",
+    );
   });
 
   it("renders calm-night state without audio when the detector abstains", () => {

@@ -248,6 +248,11 @@ def _build_debrief_near_miss_payload(
     receipt_text = chosen.receipt_text if chosen else ""
     if has_replay_window:
         receipt_text = _near_miss_receipt_text(near_miss, receipt_text, events)
+    ear_test_clip_relative_path = (
+        _near_miss_ear_test_clip_relative_path(session_dir, near_miss)
+        if has_replay_window
+        else None
+    )
     return DebriefNearMissPayload(
         input_wav_relative_path="input.wav",
         t_center=near_miss.t_center_s if has_replay_window else None,
@@ -259,12 +264,31 @@ def _build_debrief_near_miss_payload(
         receipt_text=receipt_text,
         friend_line_text=chosen.text if chosen else "",
         duration_s=max(duration_s, 0.0),
+        ear_test_clip_relative_path=ear_test_clip_relative_path,
         friend_line_audio_relative_path=_friend_line_audio_relative_path(
             session_dir,
             chosen,
         ),
         waveform_peaks=_build_debrief_waveform_peaks(input_wav),
     )
+
+
+def _near_miss_ear_test_clip_relative_path(session_dir: Path, near_miss: Any) -> str | None:
+    """Write the focused near-miss replay clip for the debrief renderer."""
+
+    import wave
+
+    from vibemix.debrief.ear_test import write_near_miss_clip
+
+    try:
+        clip_path = write_near_miss_clip(session_dir, near_miss)
+    except (EOFError, OSError, ValueError, wave.Error) as exc:
+        logger.warning("[debrief] near-miss ear-test clip skipped: %s", exc)
+        return None
+    try:
+        return clip_path.relative_to(session_dir).as_posix()
+    except ValueError:
+        return clip_path.name
 
 
 def _friend_line_audio_relative_path(

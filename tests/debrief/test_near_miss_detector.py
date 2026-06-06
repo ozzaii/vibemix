@@ -10,7 +10,10 @@ import pytest
 
 from vibemix.__main__ import _run_debrief_cli, cli_entry
 from vibemix.debrief import DEFAULT_NEAR_MISS_CLIP, write_near_miss_clip
-from vibemix.debrief.main import _build_debrief_waveform_peaks
+from vibemix.debrief.main import (
+    _build_debrief_near_miss_payload,
+    _build_debrief_waveform_peaks,
+)
 from vibemix.debrief.near_miss_detector import detect_near_miss_from_samples
 
 _SR = 16_000
@@ -154,6 +157,28 @@ def test_debrief_near_miss_cli_writes_ear_test_clip(
     clip_path = Path(payload["clip_path"])
     assert clip_path == session / DEFAULT_NEAR_MISS_CLIP
     assert clip_path.exists()
+
+
+def test_build_debrief_near_miss_payload_writes_ear_test_clip(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    session = _write_session(tmp_path, _kick_loop(36.0, shifted=True))
+    monkeypatch.setattr(
+        "vibemix.debrief.main._friend_line_audio_relative_path",
+        lambda *_args, **_kwargs: None,
+    )
+
+    payload = _build_debrief_near_miss_payload(
+        session,
+        events=_events(),
+        evidence_snapshot={},
+        duration_s=36.0,
+    )
+
+    assert payload is not None
+    assert payload.ear_test_clip_relative_path == DEFAULT_NEAR_MISS_CLIP
+    assert (session / DEFAULT_NEAR_MISS_CLIP).exists()
 
 
 def test_debrief_waveform_peaks_are_read_from_input_wav(tmp_path: Path) -> None:

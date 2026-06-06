@@ -16,6 +16,7 @@ export interface MorningMirrorPayload {
   receipt_text: string;
   friend_line_text: string;
   duration_s: number;
+  ear_test_clip_relative_path?: string | null;
   friend_line_audio_relative_path?: string | null;
   waveform_peaks?: TimelineWaveformPeak[] | null;
 }
@@ -106,6 +107,11 @@ export function mountMorningMirror(
 
   let masterAudio: HTMLAudioElement | null = null;
   if (hasReplay) {
+    const clipAudioPath = String(payload.ear_test_clip_relative_path ?? "").trim();
+    const replayUsesClip = clipAudioPath.length > 0;
+    const replayAudioPath = replayUsesClip ? clipAudioPath : payload.input_wav_relative_path;
+    const replayStart = payload.window![0];
+
     const play = document.createElement("button");
     play.type = "button";
     play.className = "vmx-morning-mirror__play";
@@ -119,21 +125,23 @@ export function mountMorningMirror(
     masterAudio.className = "vmx-morning-mirror__audio";
     masterAudio.controls = true;
     masterAudio.preload = "metadata";
-    masterAudio.src = buildAssetUrl(`${sessionDirAbs}/${payload.input_wav_relative_path}`);
+    masterAudio.src = buildAssetUrl(`${sessionDirAbs}/${replayAudioPath}`);
 
     const syncTimeline = (active: boolean): void => {
       if (!opts.timelineEl || !masterAudio) return;
       const duration = payload.duration_s > 0 ? payload.duration_s : masterAudio.duration;
+      const sessionTime = replayUsesClip
+        ? replayStart + masterAudio.currentTime
+        : masterAudio.currentTime;
       const fraction = duration && Number.isFinite(duration)
-        ? masterAudio.currentTime / duration
+        ? sessionTime / duration
         : 0;
       setTimelinePlayhead(opts.timelineEl, fraction, active);
     };
 
     const seekToWindow = (): void => {
       if (!masterAudio) return;
-      const [start] = payload.window!;
-      masterAudio.currentTime = Math.max(0, start);
+      masterAudio.currentTime = replayUsesClip ? 0 : Math.max(0, replayStart);
       syncTimeline(true);
     };
 

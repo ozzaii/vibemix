@@ -1774,6 +1774,7 @@ class DebriefNearMiss:
         receipt_text: str,
         friend_line_text: str,
         duration_s: float,
+        ear_test_clip_relative_path: str | None = None,
         friend_line_audio_relative_path: str | None = None,
         waveform_peaks: tuple[tuple[int, int, int], ...] | list[list[int]] | None = None,
     ) -> DebriefNearMiss:
@@ -1792,6 +1793,7 @@ class DebriefNearMiss:
                 receipt_text=receipt_text,
                 friend_line_text=friend_line_text,
                 duration_s=duration_s,
+                ear_test_clip_relative_path=ear_test_clip_relative_path,
                 friend_line_audio_relative_path=friend_line_audio_relative_path,
                 waveform_peaks=normalized_peaks,
             ),

@@ -12222,3 +12222,51 @@ Proof before staging:
 - `uv run python -m compileall -q src/vibemix/__main__.py src/vibemix/debrief/__init__.py src/vibemix/debrief/ear_test.py tests/debrief/test_near_miss_detector.py`
 - `git diff --check -- src/vibemix/__main__.py src/vibemix/debrief/__init__.py src/vibemix/debrief/ear_test.py tests/debrief/test_near_miss_detector.py .planning/handoffs/2026-05-31-package-checklist.md`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+
+## Package 130 - Debrief Near-Miss Clip Payload
+
+Suggested commit: `feat(debrief-ui): play focused near-miss clip`
+
+Include:
+
+- `src/vibemix/debrief/main.py`
+- `src/vibemix/debrief/ws_server.py`
+- `src/vibemix/ui_bus/messages.py`
+- `src/vibemix/ui_bus/schemas/debrief.py`
+- `tests/debrief/test_near_miss_detector.py`
+- `tests/debrief/test_ws_server_progressive_emit.py`
+- `tests/ui_bus/test_debrief_new_wrappers_roundtrip.py`
+- `tauri/ui/src/ipc/messages.schema.json`
+- `tauri/ui/src/ipc/messages.ts`
+- `tauri/ui/src/ipc/validator.generated.mjs`
+- `tauri/ui/src/debrief/components/morning-mirror.ts`
+- `tauri/ui/src/debrief/__tests__/morning-mirror.spec.ts`
+- `tauri/ui/src/debrief/__tests__/ws-client-near-miss.spec.ts`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Morning Mirror visual redesign, new playback controls, detector tuning,
+  debrief persistence migrations, and any change to the main full-set audio
+  timeline. This only adds an optional focused clip pointer and uses it when
+  present.
+
+Reason:
+
+- Package 129 made the detector's near-miss window playable from the headless
+  CLI. Carry the same proof artifact through `ipc.debrief.near-miss` so the
+  Morning Mirror play action can target the short clip directly while keeping
+  the existing `input.wav` seek fallback.
+
+Proof before staging:
+
+- `uv run pytest -q tests/debrief/test_near_miss_detector.py tests/debrief/test_ws_server_progressive_emit.py tests/ui_bus/test_debrief_new_wrappers_roundtrip.py tests/ui_bus/test_messages_schema.py`
+- `npm --prefix tauri/ui test -- src/debrief/__tests__/morning-mirror.spec.ts src/debrief/__tests__/ws-client-near-miss.spec.ts`
+- `uv run python scripts/check_ipc_schema.py`
+- `npm --prefix tauri/ui run check:ipc`
+- `uv run python .claude/skills/ipc-wiring-checker/scripts/check_ipc_wiring.py` (expected current-source fail: existing one-ended calibration/settings/library types; no new debrief type)
+- `npm --prefix tauri/ui run build`
+- `uv run ruff check src/vibemix/debrief/main.py src/vibemix/debrief/ws_server.py src/vibemix/ui_bus/messages.py src/vibemix/ui_bus/schemas/debrief.py tests/debrief/test_near_miss_detector.py tests/debrief/test_ws_server_progressive_emit.py tests/ui_bus/test_debrief_new_wrappers_roundtrip.py`
+- `uv run python -m compileall -q src/vibemix/debrief/main.py src/vibemix/debrief/ws_server.py src/vibemix/ui_bus/messages.py src/vibemix/ui_bus/schemas/debrief.py tests/debrief/test_near_miss_detector.py tests/debrief/test_ws_server_progressive_emit.py tests/ui_bus/test_debrief_new_wrappers_roundtrip.py`
+- `git diff --check -- src/vibemix/debrief/main.py src/vibemix/debrief/ws_server.py src/vibemix/ui_bus/messages.py src/vibemix/ui_bus/schemas/debrief.py tests/debrief/test_near_miss_detector.py tests/debrief/test_ws_server_progressive_emit.py tests/ui_bus/test_debrief_new_wrappers_roundtrip.py tauri/ui/src/ipc/messages.schema.json tauri/ui/src/ipc/messages.ts tauri/ui/src/ipc/validator.generated.mjs tauri/ui/src/debrief/components/morning-mirror.ts tauri/ui/src/debrief/__tests__/morning-mirror.spec.ts tauri/ui/src/debrief/__tests__/ws-client-near-miss.spec.ts .planning/handoffs/2026-05-31-package-checklist.md`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`

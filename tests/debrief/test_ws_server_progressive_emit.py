@@ -137,6 +137,7 @@ async def test_progressive_emit_includes_near_miss_frame_when_present(tmp_path: 
         receipt_text="the mix recovered by ear [mix:near_miss@42.000]",
         friend_line_text="I heard the mix pull back in [mix:near_miss@42.000]",
         duration_s=600.0,
+        ear_test_clip_relative_path="near_miss_ear_test.wav",
         friend_line_audio_relative_path="debrief_friend_line.mp3",
         waveform_peaks=((12, 80, 22), (24, 120, 34)),
     )
@@ -164,6 +165,10 @@ async def test_progressive_emit_includes_near_miss_frame_when_present(tmp_path: 
             assert frames[0]["payload"]["duration_s"] == 600.0
             assert frames[1]["payload"]["input_wav_relative_path"] == "input.wav"
             assert frames[1]["payload"]["window"] == [36.0, 46.0]
+            assert (
+                frames[1]["payload"]["ear_test_clip_relative_path"]
+                == "near_miss_ear_test.wav"
+            )
             assert (
                 frames[1]["payload"]["friend_line_audio_relative_path"]
                 == "debrief_friend_line.mp3"

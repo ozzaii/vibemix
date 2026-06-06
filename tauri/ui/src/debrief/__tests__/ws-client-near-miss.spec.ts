@@ -27,6 +27,7 @@ describe("DebriefWsClient near-miss frame", () => {
           receipt_text: "the mix recovered by ear [mix:near_miss@42.000]",
           friend_line_text: "I heard it [mix:near_miss@42.000]",
           duration_s: 600,
+          ear_test_clip_relative_path: "near_miss_ear_test.wav",
         },
       }),
     );
@@ -38,6 +39,7 @@ describe("DebriefWsClient near-miss frame", () => {
       receipt_text: "the mix recovered by ear [mix:near_miss@42.000]",
       friend_line_text: "I heard it [mix:near_miss@42.000]",
       duration_s: 600,
+      ear_test_clip_relative_path: "near_miss_ear_test.wav",
     });
   });
 
