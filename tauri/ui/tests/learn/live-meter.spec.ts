@@ -161,6 +161,58 @@ describe("LiveGradeMeter", () => {
     expect(meter.root.querySelector(".learn-live-meter__receipt")?.textContent).toBe(
       "save landed",
     );
+    expect(meter.root.dataset.savePulse).toBe("a");
+    expect(meter.root.dataset.saveThunk).toBe("silent");
+
+    meter.update({
+      verdict: "locked",
+      phase_error_beats: 0,
+      score: 1,
+      citation: "[ev:BEATMATCH_GRADED@22.000]",
+    });
+    expect(meter.root.dataset.lockEdge).toBe("false");
+    expect(meter.root.dataset.savePulse).toBe("a");
+
+    meter.update({
+      verdict: "locked",
+      phase_error_beats: 0,
+      score: 1,
+      citation: "[ev:LEARN_BEATMATCH_SAVE_LANDED@23.000]",
+      save_landed: true,
+      save_difficulty_level: 4,
+      save_streak: 3,
+    });
+
+    expect(meter.root.dataset.savePulse).toBe("b");
+    expect(meter.root.dataset.saveStreak).toBe("3");
+
+    meter.dispose();
+  });
+
+  it("mutes the save thunk while tutor speech is active", () => {
+    const host = document.createElement("div");
+    document.body.append(host);
+    const meter = LiveGradeMeter(host);
+
+    window.dispatchEvent(
+      new CustomEvent("ipc.learn.tutor_speak", {
+        detail: {
+          text: "pull them into one pulse, then breathe.",
+        },
+      }),
+    );
+    meter.update({
+      verdict: "locked",
+      phase_error_beats: 0,
+      score: 1,
+      citation: "[ev:LEARN_BEATMATCH_SAVE_LANDED@24.000]",
+      save_landed: true,
+      save_difficulty_level: 2,
+      save_streak: 1,
+    });
+
+    expect(meter.root.dataset.savePulse).toBe("a");
+    expect(meter.root.dataset.saveThunk).toBe("muted");
 
     meter.dispose();
   });
@@ -187,6 +239,8 @@ describe("LiveGradeMeter", () => {
     expect(meter.root.dataset.locked).toBeUndefined();
     expect(meter.root.dataset.saveActive).toBeUndefined();
     expect(meter.root.dataset.saveRemaining).toBeUndefined();
+    expect(meter.root.dataset.savePulse).toBeUndefined();
+    expect(meter.root.dataset.saveThunk).toBeUndefined();
     meter.dispose();
   });
 });

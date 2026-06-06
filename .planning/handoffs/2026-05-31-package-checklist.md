@@ -11591,3 +11591,34 @@ Proof before staging:
 - `npm --prefix tauri/ui run build`
 - `git diff --check -- tauri/ui/src/learn/live-meter.ts tauri/ui/src/learn/styles/learn.css tauri/ui/src/learn/learn-window.ts tauri/ui/tests/learn/live-meter.spec.ts tauri/ui/tests/learn/test_practice_booth_shell.spec.ts .planning/handoffs/2026-05-31-package-checklist.md`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+
+## Package 114 - Learn Save-Only Thunk Ring
+
+Suggested commit: `feat(learn-ui): add save-only thunk ring`
+
+Include:
+
+- `tauri/ui/src/learn/live-meter.ts`
+- `tauri/ui/src/learn/styles/learn.css`
+- `tauri/ui/tests/learn/live-meter.spec.ts`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Galloping beat-train waveform motion, backend save-landed semantics, and
+  broader Learn/debrief surfaces. This package only adds the earned save
+  effect on the existing `save_landed` live-grade flag.
+
+Reason:
+
+- A save should land like a physical close, not another text tick. Gate the
+  WebAudio thunk and closing ring strictly on the `save_landed` edge, replay it
+  only after the flag falls false, and mute the thunk while tutor speech is
+  active so the effect stays rare and never talks over Sven.
+
+Proof before staging:
+
+- `npm --prefix tauri/ui test -- tests/learn/live-meter.spec.ts tests/learn/test_practice_booth_shell.spec.ts`
+- `npm --prefix tauri/ui run build`
+- `git diff --check -- tauri/ui/src/learn/live-meter.ts tauri/ui/src/learn/styles/learn.css tauri/ui/tests/learn/live-meter.spec.ts .planning/handoffs/2026-05-31-package-checklist.md`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`

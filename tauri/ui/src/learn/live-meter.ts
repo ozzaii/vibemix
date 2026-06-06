@@ -26,6 +26,9 @@ export interface LiveGradeMeterHandle {
 
 const CANVAS_WIDTH = 220;
 const CANVAS_HEIGHT = 96;
+const TUTOR_SPEAK_MIN_SUPPRESS_MS = 1200;
+const TUTOR_SPEAK_MAX_SUPPRESS_MS = 4200;
+const TUTOR_SPEAK_MS_PER_WORD = 310;
 
 function clamp(value: number, min: number, max: number): number {
   if (!Number.isFinite(value)) return min;
@@ -94,8 +97,71 @@ function saveHudVisible(payload: LiveGradePayload): boolean {
   );
 }
 
+function nowMs(): number {
+  return globalThis.performance?.now?.() ?? Date.now();
+}
+
+function isJsdom(): boolean {
+  return /jsdom/i.test(globalThis.navigator?.userAgent ?? "");
+}
+
+type AudioContextCtor = new () => AudioContext;
+type WebAudioWindow = Window & typeof globalThis & {
+  webkitAudioContext?: AudioContextCtor;
+};
+
+let saveThunkContext: AudioContext | null = null;
+
+function webAudioConstructor(): AudioContextCtor | null {
+  const view = window as WebAudioWindow;
+  return window.AudioContext ?? view.webkitAudioContext ?? null;
+}
+
+function playSaveThunk(suppressUntilMs: number, revision: number): "played" | "muted" | "silent" {
+  if (nowMs() < suppressUntilMs) return "muted";
+  if (isJsdom()) return "silent";
+  const AudioCtor = webAudioConstructor();
+  if (!AudioCtor) return "silent";
+  try {
+    const ctx = saveThunkContext ?? new AudioCtor();
+    saveThunkContext = ctx;
+    if (ctx.state === "suspended") {
+      void ctx.resume().catch(() => undefined);
+    }
+    const start = ctx.currentTime + 0.008;
+    const drift = (revision % 5) * 4;
+
+    const body = ctx.createOscillator();
+    const bodyGain = ctx.createGain();
+    body.type = "triangle";
+    body.frequency.setValueAtTime(132 + drift, start);
+    body.frequency.exponentialRampToValueAtTime(72, start + 0.085);
+    bodyGain.gain.setValueAtTime(0.0001, start);
+    bodyGain.gain.exponentialRampToValueAtTime(0.16, start + 0.012);
+    bodyGain.gain.exponentialRampToValueAtTime(0.0001, start + 0.11);
+    body.connect(bodyGain).connect(ctx.destination);
+    body.start(start);
+    body.stop(start + 0.13);
+
+    const click = ctx.createOscillator();
+    const clickGain = ctx.createGain();
+    click.type = "sine";
+    click.frequency.setValueAtTime(420 + drift * 2, start);
+    click.frequency.exponentialRampToValueAtTime(560 + drift * 2, start + 0.045);
+    clickGain.gain.setValueAtTime(0.0001, start);
+    clickGain.gain.exponentialRampToValueAtTime(0.045, start + 0.006);
+    clickGain.gain.exponentialRampToValueAtTime(0.0001, start + 0.06);
+    click.connect(clickGain).connect(ctx.destination);
+    click.start(start);
+    click.stop(start + 0.075);
+    return "played";
+  } catch {
+    return "silent";
+  }
+}
+
 function drawNeedle(canvas: HTMLCanvasElement, payload: LiveGradePayload | null): void {
-  if (/jsdom/i.test(globalThis.navigator?.userAgent ?? "")) return;
+  if (isJsdom()) return;
   let ctx: CanvasRenderingContext2D | null = null;
   try {
     ctx = canvas.getContext("2d");
@@ -199,7 +265,10 @@ export function LiveGradeMeter(host: HTMLElement): LiveGradeMeterHandle {
   let pending: LiveGradePayload | null = null;
   let frame: number | null = null;
   let previousVerdict: LiveGradeVerdict | null = null;
+  let previousSaveLanded = false;
   let lockCount = 0;
+  let savePulseRevision = 0;
+  let suppressThunkUntilMs = 0;
   const flush = (): void => {
     frame = null;
     drawNeedle(canvas, pending);
@@ -210,11 +279,39 @@ export function LiveGradeMeter(host: HTMLElement): LiveGradeMeterHandle {
     frame = requestAnimationFrame(flush);
   };
 
+  const noteTutorSpeak = (ev: Event): void => {
+    const detail = (ev as CustomEvent<{ text?: string }>).detail;
+    const wordCount =
+      typeof detail?.text === "string" && detail.text.trim()
+        ? detail.text.trim().split(/\s+/).length
+        : 8;
+    const suppressionMs = clamp(
+      wordCount * TUTOR_SPEAK_MS_PER_WORD,
+      TUTOR_SPEAK_MIN_SUPPRESS_MS,
+      TUTOR_SPEAK_MAX_SUPPRESS_MS,
+    );
+    suppressThunkUntilMs = nowMs() + suppressionMs;
+  };
+  window.addEventListener("ipc.learn.tutor_speak", noteTutorSpeak);
+
+  const triggerSavePulse = (): void => {
+    savePulseRevision += 1;
+    root.removeAttribute("data-save-pulse");
+    // Force the attr-backed CSS animation to replay on back-to-back saves.
+    // eslint-disable-next-line @typescript-eslint/no-unused-expressions
+    void root.offsetWidth;
+    root.dataset.savePulse = savePulseRevision % 2 === 0 ? "b" : "a";
+    root.dataset.saveThunk = playSaveThunk(suppressThunkUntilMs, savePulseRevision);
+  };
+
   const update = (payload: LiveGradePayload): void => {
     const phase = clamp(payload.phase_error_beats, -0.5, 0.5);
     const score = clamp(payload.score, 0, 1);
     const enteredLock = payload.verdict === "locked" && previousVerdict !== "locked";
+    const saveLanded = payload.save_landed === true;
+    const enteredSaveLanded = saveLanded && !previousSaveLanded;
     previousVerdict = payload.verdict;
+    previousSaveLanded = saveLanded;
     if (enteredLock) {
       lockCount += 1;
     }
@@ -264,6 +361,9 @@ export function LiveGradeMeter(host: HTMLElement): LiveGradeMeterHandle {
       }
       saveStreak.textContent = streak > 0 ? `x${streak}` : "x0";
     }
+    if (enteredSaveLanded) {
+      triggerSavePulse();
+    }
     const receiptLine = receiptText(payload, phase);
     verdict.textContent = payload.verdict.replace("_", " ");
     phaseText.textContent = formatPhase(phase);
@@ -292,6 +392,7 @@ export function LiveGradeMeter(host: HTMLElement): LiveGradeMeterHandle {
   const reset = (): void => {
     pending = null;
     previousVerdict = null;
+    previousSaveLanded = false;
     lockCount = 0;
     root.dataset.state = "idle";
     root.dataset.needlePct = "50.0";
@@ -308,6 +409,8 @@ export function LiveGradeMeter(host: HTMLElement): LiveGradeMeterHandle {
     root.removeAttribute("data-save-level");
     root.removeAttribute("data-save-remaining");
     root.removeAttribute("data-save-streak");
+    root.removeAttribute("data-save-pulse");
+    root.removeAttribute("data-save-thunk");
     save.hidden = true;
     saveLevel.textContent = "";
     saveTimer.textContent = "";
@@ -324,6 +427,7 @@ export function LiveGradeMeter(host: HTMLElement): LiveGradeMeterHandle {
       cancelAnimationFrame(frame);
       frame = null;
     }
+    window.removeEventListener("ipc.learn.tutor_speak", noteTutorSpeak);
     host.replaceChildren();
   };
 
