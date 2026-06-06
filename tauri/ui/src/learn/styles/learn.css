@@ -1854,6 +1854,34 @@
   display: none;
 }
 
+.learn-earned-wall {
+  position: fixed;
+  top: calc(var(--titlebar-h) + var(--sp-4));
+  left: var(--sp-4);
+  bottom: calc(var(--statusbar-h) + var(--sp-4));
+  z-index: 18;
+  width: min(340px, calc(100vw - var(--sp-8)));
+  min-height: 0;
+  pointer-events: auto;
+}
+
+.learn-earned-wall .skill-wall-mount,
+.learn-earned-wall .skill-wall {
+  height: 100%;
+  min-height: 0;
+}
+
+.learn-earned-wall .skill-wall {
+  overflow-y: auto;
+  padding: var(--sp-4);
+}
+
+@media (max-width: 1180px), (max-height: 760px) {
+  .learn-earned-wall {
+    display: none;
+  }
+}
+
 .learn-progress-list-shell {
   display: grid;
   grid-template-rows: 48px 1fr;

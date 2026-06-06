@@ -11132,3 +11132,33 @@ Proof before staging:
 - `npm --prefix tauri/ui test -- tests/learn/test_curriculum_meta.spec.ts tests/learn/test_progress_list.spec.ts`
 - `npm --prefix tauri/ui run build`
 - `git diff --check -- src/vibemix/learn/curriculum_projection.py tauri/ui/src/learn/lesson/curriculum-meta.ts tauri/ui/src/learn/lesson/progress-list.ts tauri/ui/src/learn/styles/learn.css tauri/ui/tests/learn/test_curriculum_meta.spec.ts tauri/ui/tests/learn/test_progress_list.spec.ts .planning/handoffs/2026-05-31-package-checklist.md`
+
+## Package 101 - Learn Earned Wall Frontstage Mount
+
+Suggested commit: `feat(learn-ui): mount earned wall in learn window`
+
+Include:
+
+- `tauri/ui/src/learn/learn-window.ts`
+- `tauri/ui/src/learn/styles/learn.css`
+- `tauri/ui/tests/learn/test_practice_booth_shell.spec.ts`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Skill-tree backend math, Mastered credit rules, new wall copy, and beginner
+  path suites. This package only mounts the already-built Earned Wall into the
+  real Learn frontstage and verifies it consumes the existing progress snapshot.
+
+Reason:
+
+- `SkillWall.ts` and `skill_wall` snapshots were built and tested, but the real
+  Learn window only imported the row type. Mount the wall as a quiet desktop
+  rail so Competent and Mastered progress is visible during practice, and tear
+  its subscription down with the Learn window lifecycle.
+
+Proof before staging:
+
+- `npm --prefix tauri/ui test -- tests/learn/test_practice_booth_shell.spec.ts tests/learn/test_skill_wall.spec.ts tests/learn/skill-tree-a11y.spec.ts tests/learn/skill-tree-quiet-fill.spec.ts`
+- `npm --prefix tauri/ui run build`
+- `git diff --check -- tauri/ui/src/learn/learn-window.ts tauri/ui/src/learn/styles/learn.css tauri/ui/tests/learn/test_practice_booth_shell.spec.ts .planning/handoffs/2026-05-31-package-checklist.md`

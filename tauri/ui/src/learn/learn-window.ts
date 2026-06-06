@@ -91,7 +91,11 @@ import {
   type LearnPracticeChainStep,
   type LearnPracticeMission,
 } from "./lesson/curriculum-meta.js";
-import type { SkillWallRow } from "./SkillWall.js";
+import {
+  mountSkillWall,
+  type MountedSkillWall,
+  type SkillWallRow,
+} from "./SkillWall.js";
 import {
   normalizeOperatorAction,
   type LearnOperatorAction,
@@ -426,6 +430,7 @@ function mountLearnWindow(root: HTMLElement): {
     </div>
     <div id="learn-waveform-host" class="learn-waveform-host"></div>
     <div id="learn-live-meter-host" class="learn-live-meter-host"></div>
+    <aside id="learn-earned-wall-host" class="learn-earned-wall" aria-label="earned skill wall"></aside>
     <aside id="learn-progress-list-host" class="learn-progress-list-host" data-visible="false" aria-hidden="true">
       <div class="learn-progress-list-shell">
         <div class="learn-progress-list-head">
@@ -507,6 +512,10 @@ function mountLearnWindow(root: HTMLElement): {
   const waveformHost = root.querySelector("#learn-waveform-host") as HTMLElement;
   const liveMeterHost = root.querySelector("#learn-live-meter-host") as HTMLElement;
   const waveforms = WaveformDisplay(waveformHost);
+  const earnedWallHost = root.querySelector("#learn-earned-wall-host") as HTMLElement;
+  const earnedWall: MountedSkillWall = mountSkillWall(earnedWallHost, {
+    initialRows: [],
+  });
   let latestProgress: LearnProgressProjection | null = null;
   let recommendedLessonId = firstRecommendedLessonId(latestProgress);
   let recommendedLessonLevel: "fresh" | "replay" = "fresh";
@@ -1726,6 +1735,11 @@ function mountLearnWindow(root: HTMLElement): {
     }
     try {
       waveforms.dispose();
+    } catch {
+      /* swallow */
+    }
+    try {
+      earnedWall.teardown();
     } catch {
       /* swallow */
     }

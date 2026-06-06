@@ -144,10 +144,18 @@ describe("practice booth shell", () => {
     try {
       const booth = root.querySelector<HTMLElement>("#learn-booth-panel");
       const map = root.querySelector<HTMLElement>("#learn-progress-list-host");
+      const earned = root.querySelector<HTMLElement>("#learn-earned-wall-host");
       await waitForMountedControl(root, "eq_hi:A");
       expect(booth?.dataset.visible).toBe("true");
       expect(map?.dataset.visible).toBe("false");
       expect(map?.getAttribute("aria-hidden")).toBe("true");
+      expect(earned?.getAttribute("aria-label")).toBe("earned skill wall");
+      expect(earned?.querySelector(".skill-wall__empty")?.textContent).toContain(
+        "Your skills light up",
+      );
+      expect(earned?.querySelector(".skill-wall__empty")?.textContent).toContain(
+        "earn their stars",
+      );
       expect(
         Array.from(booth?.querySelectorAll("button") ?? []).map(
           (button) => button.id,
@@ -161,6 +169,51 @@ describe("practice booth shell", () => {
       expect(root.querySelector(".learn-booth-command")).toBeTruthy();
       expect(root.textContent).toContain("your move");
       expect(root.textContent).toContain("use the on-screen controls");
+    } finally {
+      ws.close();
+    }
+  });
+
+  it("updates the Earned wall from progress snapshots", () => {
+    const root = document.getElementById("learn-root") as HTMLElement;
+    const { ws } = mountLearnWindow(root);
+    try {
+      window.dispatchEvent(
+        new CustomEvent("ipc.learn.progress_state", {
+          detail: {
+            action: "snapshot",
+            progress: {
+              schema_version: 2,
+              courses: {},
+              lessons: {},
+              skill_wall: [
+                {
+                  skill_id: "deck_control",
+                  stage: "competent",
+                  learn_fill: 1,
+                  competent: true,
+                  live_proof_count: 1,
+                  mastered: false,
+                  first_mastered_at: null,
+                  what_remains: "2 more cited proofs to Master",
+                },
+              ],
+            },
+          },
+        }),
+      );
+
+      const row = root.querySelector<HTMLElement>(
+        "#learn-earned-wall-host .skill-wall__row",
+      );
+      expect(row?.dataset.skill).toBe("deck_control");
+      expect(row?.dataset.stage).toBe("competent");
+      expect(row?.querySelector(".skill-wall__name")?.textContent).toBe(
+        "Deck Control",
+      );
+      expect(row?.querySelector(".skill-wall__remains")?.textContent).toBe(
+        "2 more cited proofs to Master",
+      );
     } finally {
       ws.close();
     }
