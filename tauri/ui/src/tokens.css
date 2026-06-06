@@ -708,7 +708,7 @@ button[disabled] { cursor: not-allowed; }
 .titlebar .wordmark .wm-mix { color: var(--brand); }
 
 .titlebar .traffic-spacer {
-  /* macOS native traffic-light buttons render here when decorations:false */
+  /* macOS native traffic-light buttons render here under the overlay titlebar. */
   width: 72px;
   height: 100%;
   -webkit-app-region: no-drag;

@@ -3,7 +3,7 @@
 // LOCKED VALUES (do NOT change after Phase 11):
 //   - identifier: world.bravoh.vibemix  (D-Area-1 + entitlements.plist; permissions reset on change)
 //   - bundle.resources: binaries/vibemix-core-<triple>/**/*  (PyInstaller onedir sidecar)
-//   - app.windows[0]: 960×680, decorations:false (UI-SPEC §Window Dimensions)
+//   - app.windows[0]: 1440×900, native macOS decorations with overlay titlebar
 //
 // Phase 18 takes over signing/notarization with the hardenedRuntime + entitlements.plist.
 // Tauri 2 supports JSON5 here (comments + trailing commas allowed).
@@ -45,7 +45,7 @@
         "minWidth": 1180,
         "minHeight": 760,
         "resizable": true,
-        "decorations": false,
+        "decorations": true,
         "transparent": false,
         "fullscreen": false,
         "hiddenTitle": true,
