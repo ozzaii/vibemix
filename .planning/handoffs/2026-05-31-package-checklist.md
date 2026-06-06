@@ -12301,3 +12301,39 @@ Proof before staging:
 - `uv run python -m compileall -q tests/repo/test_tauri_dev_command.py`
 - `git diff --check -- tauri/src-tauri/tauri.conf.json5 tests/repo/test_tauri_dev_command.py .planning/handoffs/2026-05-31-package-checklist.md`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+
+## Package 132 - Learn Screen-to-Hardware Mission Escalation
+
+Suggested commit: `feat(learn): escalate screen practice to hardware proof`
+
+Include:
+
+- `src/vibemix/learn/runtime.py`
+- `src/vibemix/learn/practice_mission.py`
+- `tests/learn/test_practice_mission.py`
+- `tests/learn/test_ipc_handlers_dispatch.py`
+- `tests/learn/test_beatmatch_practice_audio_lifecycle.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Progress persistence migrations, lesson completion gates, controller
+  detection changes, and UI layout work. This package only changes derived
+  mission/prelude copy so screen practice remains useful but stops being the
+  strongest target after three screen-only reps.
+
+Reason:
+
+- Free-practice banking made Learn feel playable, but screen-only repetition
+  could fill the visible bank without nudging the learner toward physical
+  control. Three screen reps should become warm-up: the next mission asks for
+  one controller checkpoint while preserving screen fallback and all existing
+  progress credit.
+
+Proof before staging:
+
+- `uv run pytest -q tests/learn/test_practice_mission.py tests/learn/test_ipc_handlers_dispatch.py::test_banked_practice_lesson_starts_with_proof_preface tests/learn/test_beatmatch_practice_audio_lifecycle.py::test_free_practice_distinct_controls_fill_practice_bank`
+- `uv run ruff check src/vibemix/learn/runtime.py src/vibemix/learn/practice_mission.py tests/learn/test_practice_mission.py tests/learn/test_ipc_handlers_dispatch.py tests/learn/test_beatmatch_practice_audio_lifecycle.py`
+- `uv run python -m compileall -q src/vibemix/learn/runtime.py src/vibemix/learn/practice_mission.py tests/learn/test_practice_mission.py tests/learn/test_ipc_handlers_dispatch.py tests/learn/test_beatmatch_practice_audio_lifecycle.py`
+- `git diff --check -- src/vibemix/learn/runtime.py src/vibemix/learn/practice_mission.py tests/learn/test_practice_mission.py tests/learn/test_ipc_handlers_dispatch.py tests/learn/test_beatmatch_practice_audio_lifecycle.py .planning/handoffs/2026-05-31-package-checklist.md`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`

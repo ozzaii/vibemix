@@ -975,7 +975,8 @@ def test_banked_practice_lesson_starts_with_proof_preface() -> None:
         if call.args and call.args[0].get("type") == "ipc.learn.tutor_speak"
     ]
     assert tutor_lines[:3] == [
-        "3 screen reps are banked. prove one clean move here.",
+        "3 screen reps are banked. prove one clean move here; "
+        "use the controller if it is connected.",
         "the channel strip is the vertical column above each deck: "
         "gain on top, three EQ knobs, fader at the bottom.",
         "twist the top EQ knob on deck A and listen for the cymbals "

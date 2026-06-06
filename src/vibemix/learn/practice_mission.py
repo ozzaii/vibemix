@@ -41,6 +41,7 @@ _COURSE_ESTIMATES: dict[str, int] = {
     "course_2_transitions": 6,
     "course_3_play_mode": 10,
 }
+_SCREEN_WARMUP_REP_TARGET = 3
 
 
 def next_practice_mission(
@@ -308,6 +309,11 @@ def _command_for(
     if mode == "finish":
         if _strike_count(row) > 0:
             return f"Retry {clean_title}; no hints, one clean move is the checkpoint."
+        if _screen_warmup_needs_hardware(row):
+            return (
+                f"Move {clean_title} onto the controller; screen reps warmed it up, "
+                "one hardware touch is the checkpoint."
+            )
         return f"Finish {clean_title}; use one clean move, then let Learn verify it."
     if mode == "prove":
         return f"Prove {skill_label}; earn the next cited proof on {clean_title}."
@@ -345,6 +351,8 @@ def _proof_for(
         return f"{count} cited {unit} banked; Mastery earned"
     row = _lesson_row(progress, lesson_id)
     if isinstance(row, dict):
+        if _screen_warmup_needs_hardware(row):
+            return "screen warm-up is banked; controller rep is next"
         last_source = str(row.get("last_practice_source") or "")
         if last_source == "hardware":
             return "last pass used hardware; repeat it on the controller"
@@ -400,6 +408,8 @@ def _focus_for(
         return "retry"
     if mode == "replay":
         return "replay"
+    if _screen_warmup_needs_hardware(row):
+        return "hardware"
     if _source_total(row, "hardware") > 0:
         return "hardware"
     if skill_id == "beatmatching":
@@ -430,6 +440,8 @@ def _focus_label_for(
     if focus == "replay":
         return "clean replay"
     if focus == "hardware":
+        if _screen_warmup_needs_hardware(row):
+            return "controller rep next"
         return _practice_bank_label(row)
     if _source_total(row, "screen") > 0:
         return _practice_bank_label(row)
@@ -456,6 +468,8 @@ def _challenge_for(
         return "Only cited live proof moves Mastery."
     if mode == "finish" and _strike_count(row) > 0:
         return "No hint this time; one clean move clears the loop."
+    if mode == "finish" and _screen_warmup_needs_hardware(row):
+        return "Screen warm-up is banked; repeat it once on the controller when connected."
     if mode == "finish" and _source_total(row, "hardware") > 0:
         return "Repeat the controller move inside the lesson."
     if mode == "finish" and _source_total(row, "screen") > 0:
@@ -524,6 +538,14 @@ def _meter_for(
             "meter_max": 1,
             "meter_state": "replay",
             "meter_caption": f"keep {skill_label} warm",
+        }
+    if _screen_warmup_needs_hardware(row):
+        return {
+            "meter_label": "controller checkpoint",
+            "meter_value": 0,
+            "meter_max": 1,
+            "meter_state": "armed",
+            "meter_caption": "3 screen reps banked; controller rep next",
         }
     if _source_total(row, "hardware") > 0:
         count = _practice_bank_count(row)
@@ -643,6 +665,8 @@ def _locked_chain_label(course_id: str) -> str:
 def _chain_label_for(row: dict[str, Any] | None, status: str) -> str:
     if status == "empty":
         return "next rep"
+    if _screen_warmup_needs_hardware(row):
+        return "controller next"
     bank_count = _practice_bank_count(row)
     if bank_count > 0:
         return f"banked {bank_count}/3"
@@ -707,6 +731,13 @@ def _practice_bank_count(row: dict[str, Any] | None) -> int:
     return max(
         0,
         min(3, _source_total(row, "hardware") + _source_total(row, "screen")),
+    )
+
+
+def _screen_warmup_needs_hardware(row: dict[str, Any] | None) -> bool:
+    return (
+        _source_total(row, "screen") >= _SCREEN_WARMUP_REP_TARGET
+        and _source_total(row, "hardware") <= 0
     )
 
 

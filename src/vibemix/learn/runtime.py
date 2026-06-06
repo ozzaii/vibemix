@@ -340,6 +340,11 @@ def _practice_bank_preface_text(row: Any) -> str | None:
     if count <= 0:
         return None
     counts = _practice_bank_counts(row)
+    if counts["screen"] >= 3 and counts["hardware"] <= 0:
+        return (
+            "3 screen reps are banked. prove one clean move here; "
+            "use the controller if it is connected."
+        )
     source = _practice_bank_source_label(counts)
     unit = "rep" if count == 1 else "reps"
     verb = "is" if count == 1 else "are"

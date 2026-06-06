@@ -508,9 +508,10 @@ def test_free_practice_distinct_controls_fill_practice_bank(monkeypatch) -> None
         if call.args and call.args[0].get("type") == "ipc.learn.progress_state"
     ]
     mission = progress_snapshots[-1]["payload"]["progress"]["next_practice_mission"]
-    assert mission["focus_label"] == "practice bank 3/3"
-    assert mission["meter_value"] == 3
-    assert mission["meter_caption"] == "3 screen reps banked"
+    assert mission["focus_label"] == "controller rep next"
+    assert mission["meter_label"] == "controller checkpoint"
+    assert mission["meter_value"] == 0
+    assert mission["meter_caption"] == "3 screen reps banked; controller rep next"
 
 
 def test_loading_another_lesson_stops_active_practice_player() -> None:

@@ -129,6 +129,31 @@ def test_mixed_free_practice_receipts_build_a_three_rep_bank() -> None:
     assert mission["meter_caption"] == "3 reps banked: screen + hardware"
 
 
+def test_screen_only_practice_bank_escalates_to_controller_checkpoint() -> None:
+    progress = LearnProgress()
+    for _idx in range(3):
+        progress.mark_practice_source("course_1_anatomy", "L1.03", "screen")
+
+    mission = next_practice_mission(progress)
+
+    assert mission["lesson_id"] == "L1.03"
+    assert mission["mode"] == "finish"
+    assert mission["focus"] == "hardware"
+    assert mission["focus_label"] == "controller rep next"
+    assert mission["command"] == (
+        "Move channel strip onto the controller; screen reps warmed it up, "
+        "one hardware touch is the checkpoint."
+    )
+    assert mission["proof"] == "screen warm-up is banked; controller rep is next"
+    assert mission["challenge"] == (
+        "Screen warm-up is banked; repeat it once on the controller when connected."
+    )
+    assert mission["meter_label"] == "controller checkpoint"
+    assert mission["meter_value"] == 0
+    assert mission["meter_max"] == 1
+    assert mission["meter_caption"] == "3 screen reps banked; controller rep next"
+
+
 def test_practice_chain_labels_later_banked_steps() -> None:
     progress = LearnProgress()
     progress.mark_practice_source("course_1_anatomy", "L1.04", "screen")
