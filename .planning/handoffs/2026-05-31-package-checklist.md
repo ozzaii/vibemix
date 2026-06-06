@@ -11982,3 +11982,37 @@ Proof before staging:
 - `uv run python -m compileall -q src/vibemix/learn/runtime.py tests/learn/test_runtime_evidence_grounding.py tests/learn/test_harmonic_practice_runtime.py`
 - `git diff --check -- src/vibemix/learn/runtime.py tests/learn/test_runtime_evidence_grounding.py tests/learn/test_harmonic_practice_runtime.py .planning/handoffs/2026-05-31-package-checklist.md`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+
+## Package 124 - Learn Cue Live Grade Parity
+
+Suggested commit: `feat(learn): emit live grades for cue placement`
+
+Include:
+
+- `src/vibemix/learn/runtime.py`
+- `tests/learn/test_runtime_evidence_grounding.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- New IPC schema, UI meter changes, cue judge retuning, new lesson copy, and
+  any changes to skill credit. This package only mirrors cue-placement grades
+  onto the existing `ipc.learn.live_grade` stream.
+
+Reason:
+
+- Current source showed `_emit_live_cue_placement_grade` only spoke tutor
+  feedback. Map cue placement onto the existing beatmatch-shaped payload:
+  beat/drop-locked cues emit `locked` with the citable
+  `CUE_PLACEMENT_GRADED` atom, wrong-drop emits an uncited `drifting` tick
+  using target error, and off-beat cues emit uncited drift/trainwreck based
+  on beat error. The meter can now react to cue placement without schema or
+  UI lane churn.
+
+Proof before staging:
+
+- `uv run pytest -q tests/learn/test_runtime_evidence_grounding.py`
+- `uv run ruff check src/vibemix/learn/runtime.py tests/learn/test_runtime_evidence_grounding.py`
+- `uv run python -m compileall -q src/vibemix/learn/runtime.py tests/learn/test_runtime_evidence_grounding.py`
+- `git diff --check -- src/vibemix/learn/runtime.py tests/learn/test_runtime_evidence_grounding.py .planning/handoffs/2026-05-31-package-checklist.md`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`

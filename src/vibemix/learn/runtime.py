@@ -3552,6 +3552,10 @@ class LessonRuntime(StateMachine):
             text = self._cue_placement_miss_text(result.grade)
         if text is None:
             return
+        self._emit_live_cue_placement_meter_grade(
+            result,
+            citation=citations[0] if citations else None,
+        )
         lesson_id = self._learn.current_lesson_id or "learn"
         try:
             speak = LearnTutorSpeak.make(
@@ -3566,6 +3570,60 @@ class LessonRuntime(StateMachine):
 
             print(
                 f"[learn.runtime] cue placement live grade emit failed: {exc!r}",
+                file=sys.stderr,
+            )
+
+    def _emit_live_cue_placement_meter_grade(
+        self,
+        result: CuePlacementPracticeResult,
+        *,
+        citation: str | None,
+    ) -> None:
+        """Emit a beatmatch-shaped live-grade tick for cue-placement practice."""
+
+        grade = result.grade
+        raw_verdict = str(getattr(grade, "verdict", "") or "")
+        if raw_verdict in {"beat_locked", "drop_locked"}:
+            verdict = "locked"
+        elif raw_verdict == "off_beat" and abs(float(grade.beat_error_beats)) >= 0.25:
+            verdict = "trainwreck"
+        elif raw_verdict in {"off_beat", "wrong_drop"}:
+            verdict = "drifting"
+        else:
+            verdict = "abstain"
+
+        phase_error = grade.beat_error_beats
+        if raw_verdict == "wrong_drop" and grade.target_error_beats is not None:
+            phase_error = grade.target_error_beats
+        try:
+            phase_error = float(phase_error)
+        except (TypeError, ValueError):
+            phase_error = 0.0
+        if not math.isfinite(phase_error):
+            phase_error = 0.0
+        phase_error = max(-0.5, min(0.5, phase_error))
+
+        try:
+            score = float(grade.score)
+        except (TypeError, ValueError):
+            score = 0.0
+        if not math.isfinite(score):
+            score = 0.0
+        score = max(0.0, min(1.0, score))
+
+        try:
+            live_grade = LearnLiveGrade.make(
+                verdict=verdict,
+                phase_error_beats=phase_error,
+                score=score,
+                citation=citation,
+            ).to_dict()
+            self._ipc.emit(live_grade)
+        except Exception as exc:  # pragma: no cover - defensive
+            import sys
+
+            print(
+                f"[learn.runtime] cue placement live grade meter emit failed: {exc!r}",
                 file=sys.stderr,
             )
 

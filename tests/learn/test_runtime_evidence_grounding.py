@@ -1697,6 +1697,12 @@ def test_cue_placement_practice_tick_writes_receipt_and_credits_once(monkeypatch
     )
     assert events[-1][0] == "learn_cue_placement_practice_graded"
     assert events[-1][1]["credited"] == ["phrasing_performance"]
+    runtime._emit_live_cue_placement_grade(result)
+    live_grade = _live_grade_payloads(ipc)[-1]
+    assert live_grade["verdict"] == "locked"
+    assert live_grade["phase_error_beats"] == 0.0
+    assert live_grade["score"] == 1.0
+    assert live_grade["citation"] == "[ev:CUE_PLACEMENT_GRADED@64.000]"
 
     repeated = runtime._grade_cue_placement_practice_tick()
 
@@ -1998,6 +2004,11 @@ def test_cue_placement_wrong_drop_speaks_uncited_correction() -> None:
     assert len(cue_grade_payloads) == 1
     assert cue_grade_payloads[0]["text"] == "on beat, but 1 beat late - aim at the drop."
     assert cue_grade_payloads[0]["citations"] == []
+    live_grade = _live_grade_payloads(ipc)[-1]
+    assert live_grade["verdict"] == "drifting"
+    assert live_grade["phase_error_beats"] == 0.5
+    assert live_grade["score"] == 0.0
+    assert live_grade["citation"] is None
 
 
 def test_cue_placement_offbeat_speaks_uncited_timing_fix() -> None:
@@ -2034,3 +2045,8 @@ def test_cue_placement_offbeat_speaks_uncited_timing_fix() -> None:
     assert len(cue_grade_payloads) == 1
     assert cue_grade_payloads[0]["text"] == "hot cue is late - move it back onto the beat."
     assert cue_grade_payloads[0]["citations"] == []
+    live_grade = _live_grade_payloads(ipc)[-1]
+    assert live_grade["verdict"] == "drifting"
+    assert live_grade["phase_error_beats"] == pytest.approx(0.2)
+    assert live_grade["score"] == 0.0
+    assert live_grade["citation"] is None
