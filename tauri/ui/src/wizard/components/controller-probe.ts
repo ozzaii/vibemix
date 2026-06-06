@@ -317,23 +317,27 @@ export function ControllerProbe(props: ControllerProbeProps): HTMLElement {
   caption.className = "cmp-ctrl-probe__caption";
   const hint = document.createElement("div");
   hint.className = "cmp-ctrl-probe__hint";
-  hint.textContent =
-    "Need mapping now? Click Listen now, then move a fader, knob, pad, cue, or play.";
 
   if (props.state === "caught") {
     lcd.textContent = "✓";
     // UI-SPEC §Step 3 "Caught state" — VERBATIM template
     caption.textContent = `✓ ${props.caughtLabel ?? "control"} · CONNECTED`;
+    hint.textContent = "";
   } else if (props.state === "timeout") {
     lcd.textContent = "--:--";
     caption.textContent = "no controller move received. continue is ready.";
+    hint.textContent =
+      "DDJ-FLX4 over USB not seen. Turn on controller output in your DJ app, then move a fader, knob, pad, cue, or play.";
   } else if (props.state === "idle") {
     lcd.textContent = "READY";
     caption.textContent = "controller detection is optional.";
+    hint.textContent =
+      "Need mapping now? Click Listen now, then move a fader, knob, pad, cue, or play.";
   } else {
     lcd.textContent = fmtCountdown(props.secondsLeft ?? 10);
     // UI-SPEC §Step 3 "Listen instruction" — VERBATIM
     caption.textContent = "PRESS ANY PAD OR BUTTON";
+    hint.textContent = "";
   }
 
   frame.append(rings, lcd);
