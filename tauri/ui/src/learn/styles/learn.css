@@ -295,6 +295,38 @@
   overflow: hidden;
 }
 
+.learn-waveforms__source {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 22px;
+  margin: 0 0 6px;
+  color: var(--text-tertiary);
+  font-family: var(--type-mono);
+  font-size: 10px;
+  line-height: 1.2;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.learn-waveforms__source-kind {
+  flex: 0 0 auto;
+  padding: 3px 7px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--rad-sm);
+  color: var(--brand);
+  background: var(--brand-04);
+  box-shadow: var(--chrome-highlight);
+}
+
+.learn-waveforms__source-decks {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-secondary);
+  text-overflow: ellipsis;
+}
+
 .learn-waveform {
   display: block;
   width: 100%;

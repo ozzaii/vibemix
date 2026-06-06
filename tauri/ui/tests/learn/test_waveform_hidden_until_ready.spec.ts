@@ -24,12 +24,15 @@ function host(): HTMLElement {
   return el;
 }
 
-function deck(): WaveformReadyPayload["decks"]["A"] {
+function deck(
+  overrides: Partial<NonNullable<WaveformReadyPayload["decks"]["A"]>> = {},
+): WaveformReadyPayload["decks"]["A"] {
   return {
     bpm: 128,
     duration_s: 180,
     peaks: [[10, 20, 5]],
     cues: [],
+    ...overrides,
   };
 }
 
@@ -65,6 +68,30 @@ describe("learn waveform strips hide until audio is ready", () => {
     expect(h.dataset.ready).toBe("partial");
     wf.updateWaveforms(ready({ A: deck(), B: deck() }));
     expect(h.dataset.ready).toBe("true");
+  });
+
+  it("surfaces whether waveform decks are own tracks or bundled practice loops", () => {
+    const h = host();
+    const wf = WaveformDisplay(h);
+    wf.updateWaveforms(ready({
+      A: deck({
+        source: "library_save_mode",
+        title: "Seed Track",
+        artist: "Library Artist",
+      }),
+      B: deck({
+        source: "library_save_mode",
+        title: "Target Track",
+      }),
+    }));
+
+    expect(h.querySelector("[data-source-kind]")?.textContent).toBe("own tracks");
+    expect(h.querySelector("[data-source-decks]")?.textContent).toContain("A: Seed Track");
+    expect(h.querySelector("[data-source-decks]")?.textContent).toContain("Library Artist");
+    expect(h.querySelector("[data-source-decks]")?.textContent).toContain("B: Target Track");
+
+    wf.updateWaveforms(ready({ A: deck(), B: deck() }));
+    expect(h.querySelector("[data-source-kind]")?.textContent).toBe("practice loops");
   });
 
   it("hides again (false) when both decks unload (back to idle)", () => {

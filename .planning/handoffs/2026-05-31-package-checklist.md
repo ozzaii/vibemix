@@ -12068,3 +12068,39 @@ Proof before staging:
 - `git diff --check -- src/vibemix/learn/beatmatch_practice_driver.py src/vibemix/learn/practice_loop.py src/vibemix/learn/runtime.py src/vibemix/ui_bus/learn_messages.py tauri/ui/src/ipc/messages.schema.json tauri/ui/src/ipc/messages.ts tauri/ui/src/ipc/validator.generated.mjs tauri/ui/src/learn/live-meter.ts tauri/ui/src/learn/waveform-display.ts tests/learn/test_beatmatch_practice_driver.py tests/learn/test_runtime_evidence_grounding.py tests/ui_bus/test_learn_live_grade_message.py tests/ui_bus/test_learn_waveform_ready_message.py .planning/handoffs/2026-05-31-package-checklist.md`
 - `uv run python .claude/skills/ipc-wiring-checker/scripts/check_ipc_wiring.py` (expected current-source fail: existing one-ended calibration/settings/library types; no new `ipc.learn.*` dead type)
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+
+## Package 126 - Learn Waveform Source Readout
+
+Suggested commit: `feat(learn-ui): show save-mode source readout`
+
+Include:
+
+- `tauri/ui/src/learn/waveform-display.ts`
+- `tauri/ui/src/learn/styles/learn.css`
+- `tauri/ui/tests/learn/test_waveform_hidden_until_ready.spec.ts`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Backend metadata changes, new schema fields, live-meter animation changes,
+  lesson copy, and broader Learn layout work. Package 125 supplies the
+  metadata; this package only renders it in the existing waveform host.
+
+Reason:
+
+- Package 125 made Save-mode source truth available to the webview, but the
+  learner still could not see whether the practice decks were real library
+  tracks or bundled loops. Add a compact source readout above the waveform
+  strips: `own tracks` when `library_save_mode` metadata is present, otherwise
+  `practice loops`, plus bounded deck title/artist text. The readout follows
+  the existing hidden-until-ready behavior and does not add another card,
+  modal, or motion source.
+
+Proof before staging:
+
+- `npm --prefix tauri/ui test -- tests/learn/test_waveform_hidden_until_ready.spec.ts`
+- `npm --prefix tauri/ui test -- tests/learn/test_practice_booth_shell.spec.ts`
+- `cd tauri/ui && npx playwright test -c tests/learn/playwright.config.ts tests/learn/browser-responsive.pw.ts`
+- `npm --prefix tauri/ui run build`
+- `git diff --check -- tauri/ui/src/learn/waveform-display.ts tauri/ui/src/learn/styles/learn.css tauri/ui/tests/learn/test_waveform_hidden_until_ready.spec.ts .planning/handoffs/2026-05-31-package-checklist.md`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`

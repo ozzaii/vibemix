@@ -57,6 +57,7 @@ const STRIP_WIDTH = 720;
 const STRIP_HEIGHT = 72;
 const DPR_MAX = 2;
 const GALLOP_SHIFT_PX = 96;
+const SOURCE_LABEL_MAX = 54;
 
 function clamp(value: number, min: number, max: number): number {
   if (!Number.isFinite(value)) return min;
@@ -69,6 +70,33 @@ function beatTrainMarkup(deck: DeckId): string {
     (_value, index) => `<i style="--beat-index:${index}"></i>`,
   ).join("");
   return `<div class="learn-waveforms__train" data-deck="${deck}">${beats}</div>`;
+}
+
+function cleanLabel(value: string | null | undefined, max = SOURCE_LABEL_MAX): string {
+  const text = `${value ?? ""}`.trim().replace(/\s+/g, " ");
+  if (!text) return "";
+  if (text.length <= max) return text;
+  return `${text.slice(0, Math.max(1, max - 3)).trimEnd()}...`;
+}
+
+function deckSourceLabel(deck: DeckId, row: WaveformDeck | undefined): string {
+  if (!row) return "";
+  const fallback = row.source === "library_save_mode" ? "library track" : "practice loop";
+  const title = cleanLabel(row.title) || cleanLabel(row.track_id) || fallback;
+  const artist = cleanLabel(row.artist, 34);
+  return artist ? `${deck}: ${title} / ${artist}` : `${deck}: ${title}`;
+}
+
+function sourceKindLabel(decks: WaveformReadyPayload["decks"]): string {
+  const rows = DECKS.map((deck) => decks[deck]).filter(Boolean);
+  if (rows.some((row) => row?.source === "library_save_mode")) return "own tracks";
+  if (rows.length > 0) return "practice loops";
+  return "waiting";
+}
+
+function sourceDecksLabel(decks: WaveformReadyPayload["decks"]): string {
+  const labels = DECKS.map((deck) => deckSourceLabel(deck, decks[deck])).filter(Boolean);
+  return labels.join("  ");
 }
 
 function makeCanvas(width: number, height: number): HTMLCanvasElement | OffscreenCanvas {
@@ -136,6 +164,10 @@ function drawCachedDeck(
 
 export function WaveformDisplay(host: HTMLElement): WaveformDisplayHandle {
   host.innerHTML = `
+    <div class="learn-waveforms__source" aria-live="polite">
+      <span class="learn-waveforms__source-kind" data-source-kind>waiting</span>
+      <span class="learn-waveforms__source-decks" data-source-decks></span>
+    </div>
     <div class="learn-waveforms" role="img" aria-label="practice waveforms">
       <canvas class="learn-waveform" data-deck="A"></canvas>
       <canvas class="learn-waveform" data-deck="B"></canvas>
@@ -158,6 +190,8 @@ export function WaveformDisplay(host: HTMLElement): WaveformDisplayHandle {
     const deck = canvas.dataset.deck as DeckId;
     canvases.set(deck, canvas);
   });
+  const sourceKind = host.querySelector<HTMLElement>("[data-source-kind]");
+  const sourceDecks = host.querySelector<HTMLElement>("[data-source-decks]");
 
   let cache: Partial<Record<DeckId, CachedDeck>> = {};
   let playheads: PlayheadTickPayload["decks"] = {};
@@ -219,6 +253,8 @@ export function WaveformDisplay(host: HTMLElement): WaveformDisplayHandle {
       // host hides again when a deck unloads (back to the idle empty state).
       const loaded = Object.keys(next).length;
       host.dataset.ready = loaded >= 2 ? "true" : loaded === 1 ? "partial" : "false";
+      if (sourceKind) sourceKind.textContent = sourceKindLabel(payload.decks);
+      if (sourceDecks) sourceDecks.textContent = sourceDecksLabel(payload.decks);
       requestDraw();
     },
     updatePlayhead(payload: PlayheadTickPayload): void {
