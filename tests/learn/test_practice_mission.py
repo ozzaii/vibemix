@@ -169,6 +169,34 @@ def test_latest_measured_recovery_target_beats_older_miss() -> None:
     assert mission["meter_caption"] == "1 beat from the target drop"
 
 
+def test_fresh_recovery_target_can_reopen_completed_lesson() -> None:
+    progress = LearnProgress()
+    progress.mark_completed("course_1_anatomy", "L1.03")
+    progress.mark_practice_feedback(
+        "course_1_anatomy",
+        "L1.03",
+        kind="control",
+        label="recital miss",
+        message=(
+            "The mixed check stopped here; repeat this move before "
+            "replaying the recital."
+        ),
+        detail="turn the high EQ knob on deck A all the way one direction.",
+    )
+
+    mission = next_practice_mission(progress)
+
+    assert mission["lesson_id"] == "L1.03"
+    assert mission["mode"] == "finish"
+    assert mission["focus"] == "recovery"
+    assert mission["focus_label"] == "recital miss"
+    assert mission["practice_surface"] == "controller"
+    assert mission["proof"] == "last measured miss: recital miss"
+    assert mission["meter_caption"] == (
+        "turn the high EQ knob on deck A all the way one direction."
+    )
+
+
 def test_mixed_free_practice_receipts_build_a_three_rep_bank() -> None:
     progress = LearnProgress()
     progress.mark_practice_source("course_1_anatomy", "L1.03", "screen")

@@ -13106,3 +13106,41 @@ Proof before staging:
 - `npm --prefix tauri/ui run build`
 - `git diff --check -- src/vibemix/learn/progress.py src/vibemix/learn/practice_mission.py src/vibemix/learn/curriculum_projection.py tauri/ui/src/learn/lesson/curriculum-meta.ts tauri/ui/src/learn/lesson/progress-list.ts tauri/ui/tests/learn/test_curriculum_meta.spec.ts tauri/ui/src/ipc/messages.schema.json tauri/ui/src/ipc/messages.ts tauri/ui/src/ipc/validator.generated.mjs tests/learn/test_progress_persistence.py tests/learn/test_practice_mission.py .planning/handoffs/2026-05-31-package-checklist.md`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+
+## Package 153 - Learn Recital Recovery Targets
+
+Suggested commit: `feat(learn): route failed recitals to recovery practice`
+
+Include:
+
+- `src/vibemix/learn/recital.py`
+- `src/vibemix/learn/practice_mission.py`
+- `tests/learn/test_recital.py`
+- `tests/learn/test_course_2_recital.py`
+- `tests/learn/test_practice_mission.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Beginner-path suites, new lesson content, UI layout changes, spoken tutor
+  rewrite work, live co-host routing, and new grading algorithms. This package
+  only lets an already-scored recital fail persist the first missed source
+  prompt as the same bounded recovery target that Learn missions already know
+  how to render.
+
+Reason:
+
+- Recital fail copy told the learner to replay the check, but did not feed the
+  missed checkpoint back into the practice loop. Persist the first unscored
+  recital prompt as a measured miss, emit a progress snapshot after the save,
+  and let recovery missions reopen a completed lesson only when a fresh
+  measured miss exists. Completion still clears stale targets, so normal course
+  progress does not nag forever.
+
+Proof before staging:
+
+- `uv run pytest -q tests/learn/test_recital.py tests/learn/test_course_2_recital.py tests/learn/test_practice_mission.py tests/learn/test_progress_persistence.py`
+- `uv run ruff check src/vibemix/learn/recital.py src/vibemix/learn/practice_mission.py tests/learn/test_recital.py tests/learn/test_course_2_recital.py tests/learn/test_practice_mission.py`
+- `uv run python -m compileall -q src/vibemix/learn/recital.py src/vibemix/learn/practice_mission.py tests/learn/test_recital.py tests/learn/test_course_2_recital.py tests/learn/test_practice_mission.py`
+- `git diff --check -- src/vibemix/learn/recital.py src/vibemix/learn/practice_mission.py tests/learn/test_recital.py tests/learn/test_course_2_recital.py tests/learn/test_practice_mission.py .planning/handoffs/2026-05-31-package-checklist.md`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`

@@ -234,12 +234,12 @@ def _proof_lesson_for_skill(progress: Any, skill_id: str) -> str | None:
 
 
 def _recovery_lesson(progress: Any, wall: list[dict[str, Any]]) -> tuple[str, str] | None:
-    """Return the freshest unfinished lesson carrying a measured-miss target."""
+    """Return the freshest lesson carrying a measured-miss target."""
     best_lesson_id: str | None = None
     best_rank: tuple[int, int, int] = (-1, -1, -1)
     for index, lesson_id in enumerate(CURRICULUM):
         row = _lesson_row(progress, lesson_id)
-        if row is None or _lesson_status(row) == "completed" or _feedback_for(row) is None:
+        if row is None or _feedback_for(row) is None:
             continue
         meta = CURRICULUM.get(lesson_id)
         if meta is None or not _course_unlocked(progress, meta.course_id):

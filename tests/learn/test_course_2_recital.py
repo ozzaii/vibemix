@@ -32,7 +32,7 @@ Ten tests:
      hit the same transition over and over → stays locked. Anti-grind.
 
   5. Fail at <5 + 4 distinct types — variety alone isn't enough,
-     score floor still binds.
+     score floor still binds, and the missed prompt becomes recovery.
 
   6. course_2_unlocked is NOT flipped by a Course 2 recital pass
      (only course_3_unlocked).
@@ -471,20 +471,51 @@ def test_low_score_with_high_variety_still_fails() -> None:
     User performs 3 prompts correctly across 3 distinct transitions
     then gives up via skip_remaining(). Score=3 < 5 → fail.
     """
-    rt, _emitted, progress, save = _build_c2_rt(seed=42)
+    progress = LearnProgress(course_2_unlocked=True)
+    rt, emitted, progress, save = _build_c2_rt(progress=progress, seed=42)
     rt.start(script=_make_c2_script(), lesson_id="L2.14-course-2-recital")
     rt.ack(lesson_id="L2.14-course-2-recital")  # 1 scored
     rt.ack(lesson_id="L2.14-course-2-recital")  # 2 scored
     rt.ack(lesson_id="L2.14-course-2-recital")  # 3 scored
     rt.skip_remaining(lesson_id="L2.14-course-2-recital")  # finalize @ 3
+    sampled = random.Random(42).sample(_COURSE_2_POOL, k=_RECITAL_SUBSET_SIZE)
+    missed = sampled[3]
+    missed_lesson = str(missed["from_lesson"])
 
     assert progress.course_3_unlocked is False, (
         f"score=3 must NOT unlock course_3 even with variety; got "
         f"course_3_unlocked={progress.course_3_unlocked!r}"
     )
-    assert save.call_count == 0, (
-        f"low-score fail must NOT save_fn; got {save.call_count} calls"
+    assert save.call_count == 1, (
+        f"low-score fail must save the recovery target once; got "
+        f"{save.call_count} calls"
     )
+    save.assert_called_with(progress)
+    assert progress.lessons[missed_lesson]["practice_feedback"] == {
+        "kind": "control",
+        "label": "recital miss",
+        "message": (
+            "The mixed check stopped here; repeat this move before "
+            "replaying the recital."
+        ),
+        "detail": missed["prompt"],
+    }
+    mission = progress.snapshot()["next_practice_mission"]
+    assert mission["lesson_id"] == missed_lesson
+    assert mission["focus"] == "recovery"
+    progress_snapshots = [
+        e
+        for e in emitted
+        if e["type"] == "ipc.learn.progress_state"
+        and isinstance(e.get("payload", {}).get("progress"), dict)
+    ]
+    assert progress_snapshots, (
+        "Course 2 score fail should repaint Learn with the recovery target"
+    )
+    snapshot_mission = progress_snapshots[-1]["payload"]["progress"][
+        "next_practice_mission"
+    ]
+    assert snapshot_mission["lesson_id"] == missed_lesson
 
 
 # ---------------------------------------------------------------------------

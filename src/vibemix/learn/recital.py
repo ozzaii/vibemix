@@ -96,6 +96,7 @@ import time
 from collections.abc import Callable
 from typing import Any
 
+from vibemix.learn.curriculum import CURRICULUM
 from vibemix.learn.progress import LearnProgress, save_progress
 from vibemix.ui_bus.learn_messages import (
     LearnAdvance,
@@ -536,6 +537,8 @@ class RecitalRuntime:
                 lesson_id=lesson_id, schema_reason="completed"
             )
         else:
+            if not score_passed:
+                self._record_recovery_target()
             # Fail copy with {score} + {types} substituted. Both
             # placeholders are replaced even when the fixture author
             # only uses one — extra-placeholder substitutions are
@@ -555,6 +558,67 @@ class RecitalRuntime:
             # to the UI (it reads the fail copy that preceded this).
             self._emit_complete(
                 lesson_id=lesson_id, schema_reason="user_skip"
+            )
+
+    def _record_recovery_target(self) -> None:
+        """Persist the first unscored recital prompt as the next recovery target."""
+        entry = self._first_unscored_entry()
+        if entry is None:
+            return
+        from_lesson = str(entry.get("from_lesson") or "").strip()
+        meta = CURRICULUM.get(from_lesson)
+        if meta is None:
+            return
+        prompt = str(entry.get("prompt") or "").strip()
+        changed = self._progress.mark_practice_feedback(
+            meta.course_id,
+            from_lesson,
+            kind="control",
+            label="recital miss",
+            message=(
+                "The mixed check stopped here; repeat this move before "
+                "replaying the recital."
+            ),
+            detail=prompt or None,
+        )
+        if not changed:
+            return
+        try:
+            self._save(self._progress)
+        except Exception as exc:  # pragma: no cover — defensive
+            print(
+                f"[learn.recital] save_progress failed: {exc!r}",
+                file=sys.stderr,
+            )
+        self._emit_progress_state_snapshot()
+
+    def _first_unscored_entry(self) -> dict[str, Any] | None:
+        """Return the sampled prompt the user stopped on, if one exists."""
+        if not self._sampled:
+            return None
+        index = max(0, min(self._active_idx, len(self._sampled) - 1))
+        if self._score < len(self._sampled):
+            index = max(index, self._score)
+            index = min(index, len(self._sampled) - 1)
+        entry = self._sampled[index]
+        return entry if isinstance(entry, dict) else None
+
+    def _emit_progress_state_snapshot(self) -> None:
+        """Emit a progress snapshot after progress persistence changes."""
+        try:
+            snapshot = self._progress.snapshot()
+            if not isinstance(snapshot, dict):
+                snapshot = None
+            envelope = LearnProgressState.make(
+                action="snapshot",
+                was_recovered=False,
+                progress=snapshot,
+            ).to_dict()
+            self._emit(envelope)
+        except Exception as exc:  # pragma: no cover — defensive
+            print(
+                f"[learn.recital] progress_state emit failed: {exc!r}",
+                file=sys.stderr,
             )
 
     def _emit_advance(
