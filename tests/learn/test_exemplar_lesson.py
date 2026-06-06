@@ -164,6 +164,8 @@ def test_start_emits_play_and_speak_with_citation_for_first_band() -> None:
     assert play["payload"]["track_id"] == "library:low:0", (
         f"exemplar_play.track_id must be the finder's pick; got {play['payload']['track_id']!r}"
     )
+    assert play["payload"]["source"] == "library"
+    assert play["payload"]["reason"] == "from your library — strongest low-band track"
 
     # The tutor_speak citation contains the [exemplar:<track_id>] atom —
     # Invariant #2 binding. ExemplarFinder.find() pre-registered the pick

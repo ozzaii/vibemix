@@ -12965,3 +12965,48 @@ Proof before staging:
 - `npm --prefix tauri/ui run build`
 - `git diff --check -- tauri/ui/src/learn/learn-window.ts tauri/ui/tests/learn/test_practice_booth_shell.spec.ts .planning/handoffs/2026-05-31-package-checklist.md`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+
+## Package 150 - Learn Exemplar Provenance Chip
+
+Suggested commit: `feat(learn): label packaged exemplar playback`
+
+Include:
+
+- `src/vibemix/learn/exemplar_lesson.py`
+- `src/vibemix/ui_bus/learn_messages.py`
+- `tauri/ui/src/ipc/messages.schema.json`
+- `tauri/ui/src/ipc/messages.ts`
+- `tauri/ui/src/ipc/validator.generated.mjs`
+- `tauri/ui/src/learn/learn-window.ts`
+- `tauri/ui/tests/learn/test_practice_booth_shell.spec.ts`
+- `tests/learn/test_exemplar_lesson.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Exemplar ranking, packaged-bank audio assets, player routing, live Course 3
+  audio guards, lesson transcript copy, citation grammar, library ingest, and
+  controller mapping. This package only carries the already-known exemplar
+  provenance through the closed IPC envelope and renders it in the Learn chip.
+
+Reason:
+
+- The engine already knows whether an EQ exemplar came from the user's library
+  or from the packaged fallback bank, but `ipc.learn.exemplar_play` only sent a
+  track id. Fresh-library users could see an opaque `_packaged:*` id while
+  hearing a bundled example, which makes the lesson feel synthetic instead of
+  honest. Add optional `source` and `reason` fields, preserve old payload
+  compatibility, and let the UI show `packaged example` or `library example`
+  with the reason in aria/title.
+
+Proof before staging:
+
+- `uv run pytest -q tests/learn/test_exemplar_lesson.py tests/ipc/test_learn_envelope_parity_p92.py`
+- `npm --prefix tauri/ui run codegen:ipc`
+- `npm --prefix tauri/ui test -- tests/learn/test_practice_booth_shell.spec.ts`
+- `uv run python scripts/check_ipc_schema.py`
+- `uv run ruff check src/vibemix/learn/exemplar_lesson.py src/vibemix/ui_bus/learn_messages.py tests/learn/test_exemplar_lesson.py`
+- `uv run python -m compileall -q src/vibemix/learn/exemplar_lesson.py src/vibemix/ui_bus/learn_messages.py tests/learn/test_exemplar_lesson.py`
+- `npm --prefix tauri/ui run build`
+- `git diff --check -- src/vibemix/learn/exemplar_lesson.py src/vibemix/ui_bus/learn_messages.py tauri/ui/src/ipc/messages.schema.json tauri/ui/src/ipc/messages.ts tauri/ui/src/ipc/validator.generated.mjs tauri/ui/src/learn/learn-window.ts tauri/ui/tests/learn/test_practice_booth_shell.spec.ts tests/learn/test_exemplar_lesson.py .planning/handoffs/2026-05-31-package-checklist.md`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`

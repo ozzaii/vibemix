@@ -3242,9 +3242,11 @@ describe("practice booth shell", () => {
       window.dispatchEvent(
         new CustomEvent("ipc.learn.exemplar_play", {
           detail: {
-            track_id: "track_123456789abcdef",
+            track_id: "_packaged:low:eq_demo_loop",
             duration_s: 12.4,
             gain_db: -9,
+            source: "packaged",
+            reason: "Your library doesn't have a great example of this, listen to this one we packaged",
           },
         }),
       );
@@ -3252,13 +3254,18 @@ describe("practice booth shell", () => {
       const chip = root.querySelector<HTMLElement>("#learn-exemplar-chip")!;
       expect(chip.hidden).toBe(false);
       expect(chip.dataset.active).toBe("true");
-      expect(chip.textContent).toContain("example playing");
-      expect(chip.textContent).toContain("track_12...cdef");
+      expect(chip.dataset.source).toBe("packaged");
+      expect(chip.textContent).toContain("packaged example");
+      expect(chip.textContent).toContain("low band");
+      expect(chip.textContent).toContain("packaged · 12s");
+      expect(chip.getAttribute("aria-label")).toContain(
+        "Your library doesn't have a great example",
+      );
 
       window.dispatchEvent(
         new CustomEvent("ipc.learn.exemplar_stop", {
           detail: {
-            track_id: "track_123456789abcdef",
+            track_id: "_packaged:low:eq_demo_loop",
             reason: "completed",
           },
         }),

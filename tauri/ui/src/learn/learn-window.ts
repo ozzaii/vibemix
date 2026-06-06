@@ -259,6 +259,8 @@ interface ExemplarPlayPayload {
   track_id: string;
   duration_s: number;
   gain_db: number;
+  source?: "library" | "packaged" | null;
+  reason?: string | null;
 }
 
 interface ExemplarStopPayload {
@@ -650,24 +652,39 @@ function mountLearnWindow(root: HTMLElement): {
     exemplarChip.hidden = true;
     exemplarChip.dataset.active = "false";
     exemplarChip.removeAttribute("aria-label");
+    exemplarChip.removeAttribute("title");
+    exemplarChip.removeAttribute("data-source");
     exemplarLabel.textContent = "example";
     exemplarTrack.textContent = "";
     exemplarMeta.textContent = "";
   };
   const showExemplarPlay = (payload: ExemplarPlayPayload): void => {
     clearExemplarTimer();
-    const track = shortTrackId(payload.track_id);
+    const source = exemplarPlaySource(payload);
+    const track = exemplarTrackLabel(payload, source);
     const duration = Math.max(0, Math.round(payload.duration_s));
+    const reason = cleanMissionText(payload.reason);
+    const label = exemplarPlayLabel(source);
     exemplarChip.hidden = false;
     exemplarChip.dataset.active = "true";
     exemplarChip.removeAttribute("data-reason");
-    exemplarLabel.textContent = "example playing";
+    if (source) {
+      exemplarChip.dataset.source = source;
+    } else {
+      exemplarChip.removeAttribute("data-source");
+    }
+    exemplarLabel.textContent = label;
     exemplarTrack.textContent = track;
-    exemplarMeta.textContent = `${duration}s`;
-    exemplarChip.setAttribute(
-      "aria-label",
-      `example playing, ${track}, ${duration}s`,
-    );
+    exemplarMeta.textContent = source ? `${source} · ${duration}s` : `${duration}s`;
+    const ariaLabel = [label, track, `${duration}s`, reason]
+      .filter((part): part is string => Boolean(part))
+      .join(". ");
+    exemplarChip.setAttribute("aria-label", ariaLabel);
+    if (reason) {
+      exemplarChip.title = reason;
+    } else {
+      exemplarChip.removeAttribute("title");
+    }
   };
   const showExemplarStop = (payload: ExemplarStopPayload): void => {
     clearExemplarTimer();
@@ -2674,6 +2691,32 @@ function pluralizeHint(count: number): string {
 function shortTrackId(trackId: string): string {
   if (trackId.length <= 16) return trackId;
   return `${trackId.slice(0, 8)}...${trackId.slice(-4)}`;
+}
+
+function exemplarPlaySource(
+  payload: ExemplarPlayPayload,
+): "library" | "packaged" | null {
+  if (payload.source === "library" || payload.source === "packaged") {
+    return payload.source;
+  }
+  if (payload.track_id.startsWith("_packaged:")) return "packaged";
+  return null;
+}
+
+function exemplarPlayLabel(source: "library" | "packaged" | null): string {
+  if (source === "packaged") return "packaged example";
+  if (source === "library") return "library example";
+  return "example playing";
+}
+
+function exemplarTrackLabel(
+  payload: ExemplarPlayPayload,
+  source: "library" | "packaged" | null,
+): string {
+  if (source !== "packaged") return shortTrackId(payload.track_id);
+  const parts = payload.track_id.split(":");
+  const band = parts.length >= 2 ? parts[1]?.trim() : "";
+  return band ? `${band} band` : "packaged track";
 }
 
 if (typeof document !== "undefined") {

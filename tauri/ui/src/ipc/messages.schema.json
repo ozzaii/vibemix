@@ -3529,7 +3529,9 @@
           "properties": {
             "track_id": {"type": "string", "minLength": 1},
             "duration_s": {"type": "number", "minimum": 0, "maximum": 300},
-            "gain_db": {"type": "number", "minimum": -24, "maximum": 0}
+            "gain_db": {"type": "number", "minimum": -24, "maximum": 0},
+            "source": {"type": ["string", "null"], "enum": ["library", "packaged", null]},
+            "reason": {"type": ["string", "null"], "maxLength": 240}
           }
         }
       }

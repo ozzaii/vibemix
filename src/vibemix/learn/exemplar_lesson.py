@@ -347,6 +347,8 @@ class ExemplarLessonController:
                 track_id=pick.track_id,
                 duration_s=_DEFAULT_EXEMPLAR_DURATION_S,
                 gain_db=_DEFAULT_EXEMPLAR_GAIN_DB,
+                source=_pick_source(pick),
+                reason=pick.reason,
             ).to_dict()
             self._emit(envelope)
         except Exception as exc:  # pragma: no cover — defensive
@@ -490,6 +492,10 @@ class ExemplarLessonController:
                 f"[learn.exemplar_lesson] complete_lesson emit failed: {exc!r}",
                 file=sys.stderr,
             )
+
+
+def _pick_source(pick: ExemplarPick) -> str:
+    return "packaged" if pick.track_id.startswith("_packaged:") else "library"
 
 
 __all__ = [

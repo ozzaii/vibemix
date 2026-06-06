@@ -1783,6 +1783,8 @@ export interface LearnExemplarPlay {
     track_id: string;
     duration_s: number;
     gain_db: number;
+    source?: "library" | "packaged" | null;
+    reason?: string | null;
   };
 }
 export interface LearnExemplarStop {

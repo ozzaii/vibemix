@@ -1075,6 +1075,8 @@ class LearnExemplarPlayPayload:
     track_id: str
     duration_s: float  # 0..300
     gain_db: float  # -24..0
+    source: Literal["library", "packaged"] | None = None
+    reason: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -1092,6 +1094,8 @@ class LearnExemplarPlay:
         track_id: str,
         duration_s: float,
         gain_db: float,
+        source: Literal["library", "packaged"] | None = None,
+        reason: str | None = None,
     ) -> LearnExemplarPlay:
         return cls(
             type="ipc.learn.exemplar_play",
@@ -1100,6 +1104,8 @@ class LearnExemplarPlay:
                 track_id=track_id,
                 duration_s=float(duration_s),
                 gain_db=float(gain_db),
+                source=source,
+                reason=reason,
             ),
         )
 
