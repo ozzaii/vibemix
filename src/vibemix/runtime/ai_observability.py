@@ -22,6 +22,45 @@ from typing import Any
 AI_MESSAGE_SCHEMA_VERSION = 1
 LIVE_RESPAN_SPAN_SCHEMA_VERSION = 1
 LIVE_RESPAN_SPAN_CATEGORY = "sven-live-session"
+SVEN_FEEDBACK_SCHEMA_VERSION = 1
+SVEN_FEEDBACK_LABELS: frozenset[str] = frozenset(
+    {
+        "good",
+        "bad",
+        "not_actionable",
+        "late",
+        "early",
+        "wrong",
+        "too_much",
+        "unsafe",
+    }
+)
+_SVEN_FEEDBACK_ALIASES: dict[str, str] = {
+    "up": "good",
+    "thumbs_up": "good",
+    "helpful": "good",
+    "useful": "good",
+    "actionable": "good",
+    "keep": "good",
+    "yes": "good",
+    "down": "bad",
+    "thumbs_down": "bad",
+    "no": "bad",
+    "narration": "not_actionable",
+    "narrator": "not_actionable",
+    "not-actionable": "not_actionable",
+    "not actionable": "not_actionable",
+    "vague": "not_actionable",
+    "too_late": "late",
+    "wrong_timing": "late",
+    "too_early": "early",
+    "incorrect": "wrong",
+    "hallucinated": "wrong",
+    "slop": "wrong",
+    "chatty": "too_much",
+    "too_long": "too_much",
+    "too much": "too_much",
+}
 _ENV_ENABLED = "VIBEMIX_AI_OBSERVABILITY"
 _LOG_LOCK = threading.Lock()
 _SLUG_RE = re.compile(r"[^A-Za-z0-9_.-]+")
@@ -365,6 +404,167 @@ def build_live_respan_span(record: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def normalize_sven_feedback_label(value: object) -> str | None:
+    """Return a canonical fast by-ear label for a Sven line."""
+
+    raw = str(value or "").strip().lower()
+    if not raw:
+        return None
+    key = re.sub(r"[^a-z0-9]+", "_", raw).strip("_")
+    label = _SVEN_FEEDBACK_ALIASES.get(key, key)
+    return label if label in SVEN_FEEDBACK_LABELS else None
+
+
+def record_session_sven_feedback(
+    recorder: object | None,
+    *,
+    label: object,
+    response_id: object | None = None,
+    note: object | None = None,
+    source: object | None = None,
+    raw: dict[str, Any] | None = None,
+) -> dict[str, Any] | None:
+    """Append one operator by-ear label for a live Sven decision.
+
+    If ``response_id`` is omitted, the latest session ``ai_message`` row is used.
+    The row is local and text-only: no raw audio bytes, screen frames, or prompt
+    body are copied into the feedback artifact.
+    """
+
+    canonical = normalize_sven_feedback_label(label)
+    if canonical is None:
+        return None
+    target = _resolve_ai_feedback_target(recorder, response_id=response_id)
+    if target is None:
+        return None
+    session_dir = getattr(recorder, "session_dir", None)
+    session_id = getattr(session_dir, "name", None) if session_dir is not None else None
+    message = str(target.get("message") or "")
+    citation = target.get("citation") if isinstance(target.get("citation"), dict) else {}
+    feedback = {
+        "schema": "vibemix_sven_feedback_v1",
+        "schema_version": SVEN_FEEDBACK_SCHEMA_VERSION,
+        "ts_iso": _now_iso(),
+        "session_id": session_id,
+        "response_id": target.get("response_id"),
+        "label": canonical,
+        "score": _sven_feedback_score(canonical),
+        "note": _bounded_text(note, limit=500),
+        "source": str(source or "ws"),
+        "target": {
+            "event": target.get("event"),
+            "live_decision": "spoke" if message.strip() else "silent",
+            "message_preview": _bounded_text(message, limit=320) or "",
+            "stop_reason": target.get("stop_reason"),
+            "suppression": target.get("suppression"),
+            "citation_action": citation.get("action"),
+            "citation_count": citation.get("count"),
+        },
+        "privacy": {
+            "contains_audio_bytes": False,
+            "contains_screen_frames": False,
+            "contains_full_prompt": False,
+            "source": "operator_label",
+        },
+    }
+    compact_raw = _compact_sven_feedback_raw(raw)
+    if compact_raw:
+        feedback["raw"] = compact_raw
+    if recorder is None or not _enabled():
+        return feedback
+    try:
+        path = _session_sven_feedback_path(recorder)
+        artifacts = {"session_sven_feedback_path": str(path)} if path is not None else {}
+        if artifacts:
+            feedback["artifacts"] = artifacts
+        _append_session_sven_feedback(recorder, feedback, path=path)
+        recorder.log_event(
+            "sven_feedback",
+            schema=feedback["schema"],
+            response_id=feedback["response_id"],
+            label=feedback["label"],
+            score=feedback["score"],
+            source=feedback["source"],
+            event=feedback["target"]["event"],
+            live_decision=feedback["target"]["live_decision"],
+            path=artifacts.get("session_sven_feedback_path"),
+        )
+    except Exception:
+        pass
+    return feedback
+
+
+def _sven_feedback_score(label: str) -> int:
+    return 1 if label == "good" else -1
+
+
+def _compact_sven_feedback_raw(raw: dict[str, Any] | None) -> dict[str, Any]:
+    if not isinstance(raw, dict):
+        return {}
+    out: dict[str, Any] = {}
+    for key in ("action", "feedback", "label", "response_id", "source"):
+        if key in raw:
+            out[key] = _bounded_text(raw.get(key), limit=160)
+    return out
+
+
+def _resolve_ai_feedback_target(
+    recorder: object | None,
+    *,
+    response_id: object | None,
+) -> dict[str, Any] | None:
+    wanted = str(response_id or "").strip()
+    if recorder is not None:
+        latest = getattr(recorder, "_vibemix_latest_ai_message_record", None)
+        if isinstance(latest, dict) and (not wanted or str(latest.get("response_id")) == wanted):
+            return dict(latest)
+    session_dir = getattr(recorder, "session_dir", None)
+    if session_dir is None:
+        return None
+    events_path = Path(session_dir) / "events.jsonl"
+    try:
+        rows = events_path.read_text(encoding="utf-8").splitlines()
+    except Exception:
+        return None
+    for line in reversed(rows):
+        try:
+            row = json.loads(line)
+        except Exception:
+            continue
+        if not isinstance(row, dict) or row.get("kind") != "ai_message":
+            continue
+        if wanted and str(row.get("response_id")) != wanted:
+            continue
+        return row
+    return None
+
+
+def _session_sven_feedback_path(recorder: object) -> Path | None:
+    session_dir = getattr(recorder, "session_dir", None)
+    return Path(session_dir) / "sven_feedback.jsonl" if session_dir is not None else None
+
+
+def _append_session_sven_feedback(
+    recorder: object,
+    feedback: dict[str, Any],
+    *,
+    path: Path | None,
+) -> None:
+    if path is None:
+        return
+    line = json.dumps(feedback, ensure_ascii=False)
+    lock = getattr(recorder, "_lock", None)
+    if lock is not None:
+        with lock:
+            with path.open("a", encoding="utf-8") as fh:
+                fh.write(line)
+                fh.write("\n")
+    else:
+        with path.open("a", encoding="utf-8") as fh:
+            fh.write(line)
+            fh.write("\n")
+
+
 def _live_span_evidence_digest(
     *,
     response_id: str,
@@ -473,6 +673,10 @@ def record_session_ai_message(recorder: object | None, **kwargs: Any) -> dict[st
         _write_session_ai_artifacts(recorder, rec, prompt=prompt, response=response)
         span = _append_session_respan_span(recorder, rec)
         recorder.log_event("ai_message", **rec)
+        try:
+            recorder._vibemix_latest_ai_message_record = dict(rec)
+        except Exception:
+            pass
         if span is not None:
             metadata = span.get("metadata") if isinstance(span.get("metadata"), dict) else {}
             recorder.log_event(
@@ -616,12 +820,15 @@ def compact_prompt_preview(prompt: object, *, limit: int = 4000) -> str | None:
 __all__ = [
     "AI_MESSAGE_SCHEMA_VERSION",
     "LIVE_RESPAN_SPAN_SCHEMA_VERSION",
+    "SVEN_FEEDBACK_SCHEMA_VERSION",
     "append_global_ai_message",
     "build_ai_message_record",
     "build_live_respan_span",
     "compact_prompt_preview",
     "move_context",
     "normalize_recent_moves",
+    "normalize_sven_feedback_label",
     "record_session_ai_message",
+    "record_session_sven_feedback",
     "snapshot_state_for_ai_message",
 ]

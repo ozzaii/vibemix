@@ -1528,6 +1528,20 @@ async def main() -> None:
             except Exception as e:
                 print(f"-> pill taste: live update skipped ({e})", file=sys.stderr)
 
+    def _live_sven_feedback_sink(frame: dict[str, object]):
+        """Record a fast by-ear label for the latest live Sven decision."""
+        from vibemix.runtime.ai_observability import record_session_sven_feedback
+
+        label = frame.get("label") or frame.get("feedback")
+        return record_session_sven_feedback(
+            recorder,
+            label=label,
+            response_id=frame.get("response_id"),
+            note=frame.get("note"),
+            source=frame.get("source") or "ws",
+            raw=frame,
+        )
+
     def _load_live_taste_scores() -> dict[tuple[str, str], float] | None:
         """Load consent-gated taste feedback for live transition scoring."""
         from vibemix.intel.taste_model import load_taste_model
@@ -2564,6 +2578,7 @@ async def main() -> None:
             transcript_buf=transcript_buf,
             controller_state=midi_macos.controller_state,
             suggestion_holder=lambda: suggestion_service,
+            sven_feedback_sink=_live_sven_feedback_sink,
             tracer=tracer,
             ipc_router=ipc_router,
             screen_available=screen_available,

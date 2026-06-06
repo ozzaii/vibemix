@@ -1042,6 +1042,7 @@ async def ws_broadcast(
     transcript_buf: deque | None = None,
     controller_state: Any | None = None,
     suggestion_holder: Any | None = None,
+    sven_feedback_sink: Callable[[dict[str, Any]], object | None] | None = None,
     tracer: Any | None = None,
     ipc_router: IpcRouterBus | None = None,
     screen_available: bool | None = None,
@@ -1156,6 +1157,19 @@ async def ws_broadcast(
                             feedback=data.get("feedback"),
                             ok=event is not None,
                         )
+                elif data.get("action") in ("sven.feedback", "ai_message.feedback"):
+                    feedback = None
+                    if sven_feedback_sink is not None:
+                        try:
+                            feedback = sven_feedback_sink(data)
+                        except Exception as e:
+                            _safe_print(f"[ws] Sven feedback failed: {e}", file=sys.stderr)
+                    _tr(
+                        "sven_feedback",
+                        response_id=data.get("response_id"),
+                        feedback=data.get("feedback") or data.get("label"),
+                        ok=feedback is not None,
+                    )
                 elif ipc_router is not None and isinstance(data.get("type"), str):
                     # Route ipc.settings.* / ipc.profile.* / ipc.recordings.*
                     # into SessionLoop's handlers (2026-05-25 GUI-control fix).
