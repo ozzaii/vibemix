@@ -378,6 +378,16 @@ function midiBadgeSpec(props: StatusBarProps): BadgeSpec {
       tooltip: `${device} is visible. move a deck control once so vibemix can cite it`,
     };
   }
+  if (activity === "disconnected") {
+    return {
+      key: "midi",
+      state: "down",
+      label: "● CONTROLLER · OFF",
+      clickable: true,
+      title: "Controller · not connected · click for recovery",
+      tooltip: "no MIDI input port is visible. connect the controller, enable MIDI output, then recheck",
+    };
+  }
   return {
     key: "midi",
     state: "down",

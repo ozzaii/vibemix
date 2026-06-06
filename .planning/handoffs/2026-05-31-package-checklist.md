@@ -13544,3 +13544,35 @@ Proof before staging:
 - `uv run python -m compileall -q src/vibemix/runtime/ws_bus.py src/vibemix/runtime/session_loop.py tests/runtime/test_ws_bus_status_tick.py tests/runtime/test_session_loop.py`
 - `git diff --check -- src/vibemix/runtime/ws_bus.py src/vibemix/runtime/session_loop.py tests/runtime/test_ws_bus_status_tick.py tests/runtime/test_session_loop.py .planning/handoffs/2026-05-31-package-checklist.md`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+
+## Package 165 - Controller Disconnect UI Copy
+
+Suggested commit: `fix(status-ui): distinguish disconnected controllers`
+
+Include:
+
+- `tauri/ui/src/session/components/status-bar.ts`
+- `tauri/ui/src/session/SessionLayout.ts`
+- `tauri/ui/tests/session/components.spec.ts`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- IPC schema changes, controller hotplug/listener changes, Learn lesson
+  routing, visual redesign, and library status badges. This package only
+  consumes the existing `midi_activity:"disconnected"` diagnostic in session
+  UI copy.
+
+Reason:
+
+- After the backend can honestly report `midi_activity:"disconnected"`, the
+  session status badge and idle readiness line should not collapse it into
+  generic "missing motion" copy. A disconnected controller needs a connection
+  action, while connected-but-idle still needs a movement action.
+
+Proof before staging:
+
+- `npm --prefix tauri/ui test -- tests/session/components.spec.ts`
+- `npm --prefix tauri/ui run build`
+- `git diff --check -- tauri/ui/src/session/components/status-bar.ts tauri/ui/src/session/SessionLayout.ts tauri/ui/tests/session/components.spec.ts .planning/handoffs/2026-05-31-package-checklist.md`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`

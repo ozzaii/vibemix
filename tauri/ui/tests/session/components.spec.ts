@@ -341,6 +341,31 @@ describe("renderStatusBar", () => {
     ).toContain("enable MIDI output");
   });
 
+  it("names a disconnected controller separately from missing motion", () => {
+    const sb = renderStatusBar({
+      livekit: "ok",
+      gemini: "ok",
+      midi: 0,
+      midiActivity: "disconnected",
+      screen: "ok",
+      muted: false,
+      hotkey: "⌘⇧M",
+    });
+    host().append(sb);
+    const midiBadge = sb.querySelector<HTMLButtonElement>(
+      '.vmx-statusbar__badge[data-key="midi"]',
+    );
+    expect(midiBadge?.dataset.clickable).toBe("true");
+    expect(midiBadge?.dataset.state).toBe("down");
+    expect(midiBadge?.textContent).toContain("CONTROLLER · OFF");
+    expect(midiBadge?.getAttribute("title")).toBe(
+      "Controller · not connected · click for recovery",
+    );
+    expect(
+      midiBadge?.querySelector(".vmx-statusbar__tooltip-msg")?.textContent,
+    ).toContain("no MIDI input port is visible");
+  });
+
   it("names a connected controller that has not sent motion yet", () => {
     const sb = renderStatusBar({
       livekit: "ok",
@@ -754,6 +779,22 @@ describe("SessionLayout", () => {
     expect(root.textContent).not.toContain("audio hearing");
     expect(root.textContent).not.toContain("controller not proven");
     expect(root.textContent).not.toContain("screen proof ready");
+  });
+
+  it("asks for a controller connection when MIDI is disconnected", () => {
+    const root = host();
+    const state = defaultState();
+    state.meters.music = { rms: 0.08, peak: 0.14 };
+    state.status.livekit = "ok";
+    state.status.gemini = "ok";
+    state.status.midi = 0;
+    state.status.midiActivity = "disconnected";
+    state.status.screen = "ok";
+
+    mountSessionLayout(root, state);
+
+    expect(root.textContent).toContain("Connect the controller, then recheck MIDI.");
+    expect(root.textContent).not.toContain("Move a control once, I will not guess.");
   });
 
   it("names the connected controller in the idle readiness line when motion is not proven", () => {

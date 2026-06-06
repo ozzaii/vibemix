@@ -1530,6 +1530,9 @@ function midiProofAction(
   if (midiActivity === "midi_events_no_moves") {
     return `${device}: Move a deck control.`;
   }
+  if (midiActivity === "disconnected") {
+    return "Connect the controller, then recheck MIDI.";
+  }
   return "Move a control once, I will not guess.";
 }
 
