@@ -699,7 +699,7 @@ def _feedback_for(row: dict[str, Any] | None) -> dict[str, str] | None:
     kind = str(raw.get("kind") or "").strip()
     label = str(raw.get("label") or "").strip()
     message = str(raw.get("message") or "").strip()
-    if kind not in {"beatmatch", "cue_placement"} or not label or not message:
+    if kind not in {"beatmatch", "cue_placement", "control"} or not label or not message:
         return None
     feedback = {
         "kind": kind,

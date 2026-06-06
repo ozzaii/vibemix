@@ -1820,7 +1820,7 @@ export interface LearnProgressState {
           last_practice_source?: "hardware" | "screen" | null;
           last_practice_seq?: number;
           practice_feedback?: {
-            kind: "beatmatch" | "cue_placement";
+            kind: "beatmatch" | "cue_placement" | "control";
             label: string;
             message: string;
             detail?: string;

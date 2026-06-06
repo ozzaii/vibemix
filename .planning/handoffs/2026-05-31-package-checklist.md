@@ -12368,3 +12368,46 @@ Proof before staging:
 - `uv run python -m compileall -q src/vibemix/debrief/main.py tests/debrief/test_transition_judged_critique.py`
 - `git diff --check -- src/vibemix/debrief/main.py tests/debrief/test_transition_judged_critique.py .planning/handoffs/2026-05-31-package-checklist.md`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+
+## Package 134 - Learn Mismatch Recovery Targets
+
+Suggested commit: `feat(learn): turn wrong moves into recovery targets`
+
+Include:
+
+- `src/vibemix/learn/progress.py`
+- `src/vibemix/learn/practice_mission.py`
+- `src/vibemix/learn/runtime.py`
+- `tauri/ui/src/ipc/messages.schema.json`
+- `tauri/ui/src/ipc/messages.ts`
+- `tauri/ui/src/ipc/validator.generated.mjs`
+- `tauri/ui/src/learn/lesson/curriculum-meta.ts`
+- `tauri/ui/src/learn/lesson/progress-list.ts`
+- `tests/learn/test_ipc_handlers_dispatch.py`
+- `tests/learn/test_runtime_evidence_grounding.py`
+- `tests/learn/test_harmonic_practice_runtime.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- New lesson content, new visual treatment, co-host prompt rewrites, and Learn
+  completion-gate changes. This package only routes existing deterministic
+  mismatch evidence into the already-built next-practice mission spine.
+
+Reason:
+
+- Learn could speak an adaptive wrong-control hint but forgot it immediately.
+  Persist the wrong control / wrong deck / move-farther target as bounded
+  `practice_feedback`, let the booth foreground it as a recovery mission, and
+  clear the stale target when a grounded control or harmonic receipt lands.
+
+Proof before staging:
+
+- `uv run pytest -q tests/learn/test_ipc_handlers_dispatch.py tests/learn/test_runtime_evidence_grounding.py tests/learn/test_harmonic_practice_runtime.py tests/learn/test_practice_mission.py tests/learn/test_progress_persistence.py`
+- `npm --prefix tauri/ui test -- tests/learn/test_progress_list.spec.ts tests/learn/test_ws_client_tauri_bridge.spec.ts`
+- `npm --prefix tauri/ui run check:ipc`
+- `uv run python scripts/check_ipc_schema.py`
+- `uv run ruff check src/vibemix/learn/progress.py src/vibemix/learn/practice_mission.py src/vibemix/learn/runtime.py tests/learn/test_ipc_handlers_dispatch.py tests/learn/test_runtime_evidence_grounding.py tests/learn/test_harmonic_practice_runtime.py`
+- `uv run python -m compileall -q src/vibemix/learn/progress.py src/vibemix/learn/practice_mission.py src/vibemix/learn/runtime.py tests/learn/test_ipc_handlers_dispatch.py tests/learn/test_runtime_evidence_grounding.py tests/learn/test_harmonic_practice_runtime.py`
+- `git diff --check -- src/vibemix/learn/progress.py src/vibemix/learn/practice_mission.py src/vibemix/learn/runtime.py tauri/ui/src/ipc/messages.schema.json tauri/ui/src/ipc/messages.ts tauri/ui/src/ipc/validator.generated.mjs tauri/ui/src/learn/lesson/curriculum-meta.ts tauri/ui/src/learn/lesson/progress-list.ts tests/learn/test_ipc_handlers_dispatch.py tests/learn/test_runtime_evidence_grounding.py tests/learn/test_harmonic_practice_runtime.py .planning/handoffs/2026-05-31-package-checklist.md`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`

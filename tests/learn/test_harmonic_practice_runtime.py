@@ -108,6 +108,14 @@ def test_l211_final_continue_writes_cited_harmonic_practice_receipt(monkeypatch)
     pair = _pair()
     progress = LearnProgress()
     _make_competent(progress, "harmonic_mixing")
+    progress.mark_practice_feedback(
+        "course_2_transitions",
+        "L2.11",
+        kind="control",
+        label="wrong control",
+        message="tap continue after checking the pair.",
+        detail="target continue",
+    )
     registry = EvidenceRegistry()
     registry.register_library(SimpleNamespace(tracks={"t1": None, "t2": None}))
     events: list[tuple[str, dict]] = []
@@ -141,6 +149,7 @@ def test_l211_final_continue_writes_cited_harmonic_practice_receipt(monkeypatch)
 
     assert registry.has("ev", HARMONIC_PRACTICE_GRADED_EVENT, 91.25, tol=1.0)
     assert progress.skills["harmonic_mixing"]["live_proof_count"] == 1
+    assert "practice_feedback" not in progress.lessons["L2.11"]
     assert progress in saved
     assert any(
         call.args[0].get("type") == "ipc.learn.progress_state"

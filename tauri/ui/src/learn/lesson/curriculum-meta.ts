@@ -52,7 +52,7 @@ export interface LearnProgressProjection {
       last_practice_source?: "hardware" | "screen" | null;
       last_practice_seq?: number;
       practice_feedback?: {
-        kind: "beatmatch" | "cue_placement";
+        kind: "beatmatch" | "cue_placement" | "control";
         label: string;
         message: string;
         detail?: string;
@@ -272,7 +272,11 @@ function practiceFeedback(
   const label = cleanFeedbackText(feedback.label);
   const message = cleanFeedbackText(feedback.message);
   if (!label || !message) return undefined;
-  if (feedback.kind !== "beatmatch" && feedback.kind !== "cue_placement") {
+  if (
+    feedback.kind !== "beatmatch" &&
+    feedback.kind !== "cue_placement" &&
+    feedback.kind !== "control"
+  ) {
     return undefined;
   }
   const detail = cleanFeedbackText(feedback.detail);

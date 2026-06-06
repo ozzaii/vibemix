@@ -88,7 +88,7 @@ _SKILL_IDS: tuple[str, ...] = (
     "phrasing_performance",
 )
 _PRACTICE_SOURCE_KEYS: tuple[str, ...] = ("hardware", "screen")
-_PRACTICE_FEEDBACK_KINDS: tuple[str, ...] = ("beatmatch", "cue_placement")
+_PRACTICE_FEEDBACK_KINDS: tuple[str, ...] = ("beatmatch", "cue_placement", "control")
 
 
 def _practice_source_key(source: str | None) -> str | None:

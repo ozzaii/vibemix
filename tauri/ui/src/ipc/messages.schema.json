@@ -3613,7 +3613,7 @@
                         "additionalProperties": false,
                         "required": ["kind", "label", "message"],
                         "properties": {
-                          "kind": {"type": "string", "enum": ["beatmatch", "cue_placement"]},
+                          "kind": {"type": "string", "enum": ["beatmatch", "cue_placement", "control"]},
                           "label": {"type": "string", "maxLength": 48},
                           "message": {"type": "string", "maxLength": 180},
                           "detail": {"type": "string", "maxLength": 120}

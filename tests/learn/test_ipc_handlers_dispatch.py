@@ -1041,6 +1041,17 @@ def test_wrong_action_ack_emits_adaptive_hint_without_advancing() -> None:
         "screen": 1,
     }
     assert progress.lessons["L1.03"]["last_practice_source"] == "screen"
+    assert progress.lessons["L1.03"]["practice_feedback"] == {
+        "kind": "control",
+        "label": "wrong control",
+        "message": "that was deck A mid EQ. use deck A high EQ.",
+        "detail": "used deck A mid EQ; target deck A high EQ",
+    }
+    mission = progress.snapshot(active_lesson_id="L1.03")["next_practice_mission"]
+    assert mission["lesson_id"] == "L1.03"
+    assert mission["focus"] == "recovery"
+    assert mission["focus_label"] == "wrong control"
+    assert mission["meter_caption"] == "used deck A mid EQ; target deck A high EQ"
 
 
 def test_wrong_deck_ack_points_back_to_expected_deck() -> None:

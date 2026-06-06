@@ -1533,6 +1533,7 @@ class LessonRuntime(StateMachine):
             return None
         if result.event is None:
             return result
+        feedback_cleared = self._clear_progress_practice_feedback()
         self._emit_live_control_practice_grade(result)
         if result.credited:
             self._emit_mastered_unlocks(
@@ -1554,6 +1555,8 @@ class LessonRuntime(StateMachine):
                     f"[learn.runtime] control practice progress save failed: {exc!r}",
                     file=sys.stderr,
                 )
+            self._emit_progress_snapshot()
+        elif feedback_cleared:
             self._emit_progress_snapshot()
         self._emit_control_practice_feedback(result, before_mastered=before_mastered)
         self._log_session_event(
@@ -1612,6 +1615,7 @@ class LessonRuntime(StateMachine):
             return None
         if result.event is None:
             return result
+        feedback_cleared = self._clear_progress_practice_feedback()
         self._emit_live_harmonic_practice_grade(result)
         if result.credited:
             citation = f"[ev:{HARMONIC_PRACTICE_GRADED_EVENT}@{result.t_session:.3f}]"
@@ -1632,6 +1636,8 @@ class LessonRuntime(StateMachine):
                     f"[learn.runtime] harmonic practice progress save failed: {exc!r}",
                     file=sys.stderr,
                 )
+            self._emit_progress_snapshot()
+        elif feedback_cleared:
             self._emit_progress_snapshot()
         self._emit_harmonic_practice_feedback(result, before_mastered=before_mastered)
         pair = result.pair
@@ -4316,6 +4322,13 @@ class LessonRuntime(StateMachine):
             midi=midi,
             evidence_time=evidence_time,
         )
+        feedback = self._mismatch_recovery_feedback(
+            expected=expected,
+            midi=midi,
+            hint_text=hint.text,
+        )
+        if feedback is not None and self._mark_progress_practice_feedback(**feedback):
+            self._emit_progress_snapshot()
         step = self._active_step()
         turn = None
         if step is not None:
@@ -4347,6 +4360,50 @@ class LessonRuntime(StateMachine):
                 f"[learn.runtime] adaptive mismatch hint emit failed: {exc!r}",
                 file=sys.stderr,
             )
+
+    def _mismatch_recovery_feedback(
+        self,
+        *,
+        expected: dict[str, Any],
+        midi: dict[str, Any],
+        hint_text: str,
+    ) -> dict[str, str] | None:
+        """Turn a wrong control into the next mission's recovery target."""
+        expected_control, expected_deck = _control_and_deck(expected)
+        midi_control, midi_deck = _control_and_deck(midi)
+        expected_label = _format_control_label(expected_control, expected_deck)
+        if not expected_label:
+            return None
+
+        message = hint_text.strip() or f"use {expected_label}."
+        same_control = midi_control == expected_control
+        same_deck = not expected_deck or midi_deck == expected_deck
+        detail = f"target {expected_label}"
+        if same_control and same_deck:
+            label = "move farther"
+            if expected.get("type") == "cc":
+                cur = _int_field(midi, "value", 0)
+                prev = _int_field(midi, "prev_value", cur)
+                delta = abs(cur - prev)
+                min_delta = _int_field(expected, "min_delta", _CC_DEFAULT_MIN_DELTA)
+                detail = f"{delta}/{min_delta} CC movement"
+        elif same_control:
+            label = "wrong deck"
+            observed_label = _format_control_label(midi_control, midi_deck)
+            if observed_label:
+                detail = f"used {observed_label}; target {expected_label}"
+        else:
+            label = "wrong control"
+            observed_label = _format_control_label(midi_control, midi_deck)
+            if observed_label:
+                detail = f"used {observed_label}; target {expected_label}"
+
+        return {
+            "kind": "control",
+            "label": label,
+            "message": message,
+            "detail": detail,
+        }
 
     # ------------------------------------------------------------------
     # Fast grade loop + 1 Hz strike escalation timer

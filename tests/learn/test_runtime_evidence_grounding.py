@@ -416,6 +416,14 @@ def test_matched_eq_lesson_action_writes_control_receipt_and_progress(monkeypatc
     monkeypatch.setattr("vibemix.learn.progress.save_progress", saved.append)
     progress = LearnProgress()
     _make_skill_competent(progress, "eq_mixing")
+    progress.mark_practice_feedback(
+        "course_2_transitions",
+        "L2.04",
+        kind="control",
+        label="wrong control",
+        message="that was deck A mid EQ. use deck A low EQ.",
+        detail="used deck A mid EQ; target deck A low EQ",
+    )
     registry = EvidenceRegistry()
     ipc = MagicMock(name="ipc_router")
     events: list[tuple[str, dict]] = []
@@ -451,6 +459,7 @@ def test_matched_eq_lesson_action_writes_control_receipt_and_progress(monkeypatc
 
     assert registry.has("ev", CONTROL_PRACTICE_GRADED_EVENT, 58.25, tol=1.0)
     assert progress.skills["eq_mixing"]["live_proof_count"] == 1
+    assert "practice_feedback" not in progress.lessons["L2.04"]
     assert progress in saved
     assert any(
         call.args[0].get("type") == "ipc.learn.progress_state"

@@ -56,7 +56,7 @@ export interface ProgressListEntry {
   last_practice_seq?: number;
   /** Measured miss that should send the learner into a repair rep. */
   practice_feedback?: {
-    kind: "beatmatch" | "cue_placement";
+    kind: "beatmatch" | "cue_placement" | "control";
     label: string;
     message: string;
     detail?: string;
