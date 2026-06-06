@@ -148,6 +148,12 @@ def render_curriculum_meta_ts() -> str:
         "      strikes_used?: number;\n"
         "      practice_sources?: { hardware?: number; screen?: number };\n"
         '      last_practice_source?: "hardware" | "screen" | null;\n'
+        "      practice_feedback?: {\n"
+        '        kind: "beatmatch" | "cue_placement";\n'
+        "        label: string;\n"
+        "        message: string;\n"
+        "        detail?: string;\n"
+        "      };\n"
         "    } | undefined\n"
         "  >;\n"
         f"{progress_gate_rows}"
@@ -168,7 +174,7 @@ def render_curriculum_meta_ts() -> str:
         "  proof: string;\n"
         "  why: string;\n"
         "  estimated_minutes: number;\n"
-        '  focus: "first_rep" | "retry" | "proof" | "replay" | "hardware" | "lock" | "mastery";\n'
+        '  focus: "first_rep" | "retry" | "proof" | "replay" | "hardware" | "lock" | "mastery" | "recovery";\n'
         "  focus_label: string;\n"
         "  challenge: string;\n"
         "  chain?: LearnPracticeChainStep[];\n"

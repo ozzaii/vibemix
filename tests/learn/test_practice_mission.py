@@ -201,6 +201,39 @@ def test_active_competent_lesson_becomes_the_current_proof_mission() -> None:
     assert mission["meter_caption"] == "1 proof left to Mastery"
 
 
+def test_measured_miss_turns_current_proof_mission_into_recovery_target() -> None:
+    progress = LearnProgress(course_2_unlocked=True)
+    _make_skill_competent(progress, "beatmatching")
+    progress.skills["beatmatching"]["live_proof_count"] = 1
+    progress.mark_practice_feedback(
+        "course_2_transitions",
+        "L2.01",
+        kind="beatmatch",
+        label="phase drift",
+        message="Deck B is late; nudge it forward before chasing proof.",
+        detail="0.05 beats from lock",
+    )
+
+    mission = next_practice_mission(progress, active_lesson_id="L2.01")
+
+    assert mission["lesson_id"] == "L2.01"
+    assert mission["mode"] == "prove"
+    assert mission["focus"] == "recovery"
+    assert mission["focus_label"] == "phase drift"
+    assert mission["command"] == (
+        "Fix phase drift on beatmatching by ear; "
+        "Deck B is late; nudge it forward before chasing proof."
+    )
+    assert mission["proof"] == "last measured miss: phase drift"
+    assert mission["why"] == "fix the measured miss before chasing the next proof"
+    assert mission["challenge"] == "Deck B is late; nudge it forward before chasing proof."
+    assert mission["meter_label"] == "recovery target"
+    assert mission["meter_value"] == 0
+    assert mission["meter_max"] == 1
+    assert mission["meter_state"] == "retry"
+    assert mission["meter_caption"] == "0.05 beats from lock"
+
+
 def test_active_mastered_lesson_becomes_the_current_mastery_mission() -> None:
     progress = LearnProgress()
     _make_skill_competent(progress, "deck_control")

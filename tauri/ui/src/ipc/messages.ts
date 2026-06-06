@@ -1770,6 +1770,12 @@ export interface LearnProgressState {
             screen?: number;
           };
           last_practice_source?: "hardware" | "screen" | null;
+          practice_feedback?: {
+            kind: "beatmatch" | "cue_placement";
+            label: string;
+            message: string;
+            detail?: string;
+          };
         };
       };
       course_2_unlocked?: boolean;
@@ -1804,7 +1810,7 @@ export interface LearnProgressState {
         proof: string;
         why: string;
         estimated_minutes: number;
-        focus: "first_rep" | "retry" | "proof" | "replay" | "hardware" | "lock" | "mastery";
+        focus: "first_rep" | "retry" | "proof" | "replay" | "hardware" | "lock" | "mastery" | "recovery";
         focus_label: string;
         challenge: string;
         /**

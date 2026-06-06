@@ -50,6 +50,12 @@ export interface LearnProgressProjection {
       strikes_used?: number;
       practice_sources?: { hardware?: number; screen?: number };
       last_practice_source?: "hardware" | "screen" | null;
+      practice_feedback?: {
+        kind: "beatmatch" | "cue_placement";
+        label: string;
+        message: string;
+        detail?: string;
+      };
     } | undefined
   >;
   course_2_unlocked?: boolean;
@@ -71,7 +77,7 @@ export interface LearnPracticeMission {
   proof: string;
   why: string;
   estimated_minutes: number;
-  focus: "first_rep" | "retry" | "proof" | "replay" | "hardware" | "lock" | "mastery";
+  focus: "first_rep" | "retry" | "proof" | "replay" | "hardware" | "lock" | "mastery" | "recovery";
   focus_label: string;
   challenge: string;
   chain?: LearnPracticeChainStep[];

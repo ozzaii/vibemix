@@ -216,6 +216,43 @@ def test_hint_and_completion_preserve_practice_source_memory() -> None:
     assert progress.lessons["L1.03"]["last_practice_source"] == "hardware"
 
 
+def test_practice_feedback_is_bounded_and_cleared_by_completion() -> None:
+    """Measured misses can steer retry missions without becoming progress."""
+    progress = LearnProgress()
+
+    changed = progress.mark_practice_feedback(
+        "course_2_transitions",
+        "L2.01",
+        kind="beatmatch",
+        label="phase drift",
+        message="Deck B is late; nudge it forward before chasing proof.",
+        detail="0.05 beats from lock",
+    )
+    progress.mark_hint_strike("course_2_transitions", "L2.01", 1)
+
+    assert changed is True
+    assert progress.lessons["L2.01"]["practice_feedback"] == {
+        "kind": "beatmatch",
+        "label": "phase drift",
+        "message": "Deck B is late; nudge it forward before chasing proof.",
+        "detail": "0.05 beats from lock",
+    }
+    assert progress.lessons["L2.01"]["strikes_used"] == 1
+    assert progress.clear_practice_feedback("L2.01") is True
+    assert "practice_feedback" not in progress.lessons["L2.01"]
+
+    progress.mark_practice_feedback(
+        "course_2_transitions",
+        "L2.01",
+        kind="beatmatch",
+        label="phase drift",
+        message="Deck B is late; nudge it forward before chasing proof.",
+    )
+    progress.mark_completed("course_2_transitions", "L2.01")
+
+    assert "practice_feedback" not in progress.lessons["L2.01"]
+
+
 def test_mark_started_does_not_erase_completed_replay() -> None:
     """Replaying a completed lesson must not demote the completed row."""
     progress = LearnProgress()

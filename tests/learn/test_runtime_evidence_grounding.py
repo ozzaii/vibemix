@@ -613,6 +613,64 @@ def test_beatmatch_practice_tick_writes_receipt_and_credits_once(monkeypatch) ->
     assert progress.skills["beatmatching"]["live_proof_count"] == 1
 
 
+def test_beatmatch_miss_updates_mission_then_locked_grade_clears_it(monkeypatch) -> None:
+    saved: list[LearnProgress] = []
+    monkeypatch.setattr("vibemix.learn.progress.save_progress", saved.append)
+    progress = LearnProgress(course_2_unlocked=True)
+    _make_beatmatching_competent(progress)
+    registry = EvidenceRegistry()
+    ipc = MagicMock(name="ipc_router")
+    snapshots = iter((_sliding_beatmatch_snapshot(), _locked_beatmatch_snapshot()))
+    runtime = LessonRuntime(
+        learn_state=LearnState(),
+        midi_mirror=MagicMock(name="midi_mirror"),
+        controller_state=MagicMock(name="controller_state"),
+        ipc_router=ipc,
+        progress_store=progress,
+        evidence_registry=registry,
+        evidence_clock=lambda: 42.4,
+        beatmatch_practice_loader=lambda: next(snapshots),
+    )
+    runtime.send(
+        "load",
+        lesson_id="L2.01",
+        course_id="course_2_transitions",
+        controller_id="pioneer_ddj_flx4",
+    )
+    saved.clear()
+
+    miss = runtime._grade_beatmatch_practice_tick()
+
+    assert miss is not None
+    assert miss.grade.verdict == "drifting"
+    assert miss.event is None
+    assert miss.credited == ()
+    assert progress.skills["beatmatching"]["live_proof_count"] == 0
+    assert not registry.has("ev", "BEATMATCH_GRADED", 42.4, tol=1.0)
+    mission = _progress_snapshots(ipc)[-1]["next_practice_mission"]
+    assert mission["lesson_id"] == "L2.01"
+    assert mission["mode"] == "prove"
+    assert mission["focus"] == "recovery"
+    assert mission["focus_label"] == "phase drift"
+    assert mission["proof"] == "last measured miss: phase drift"
+    assert mission["meter_label"] == "recovery target"
+    assert mission["meter_caption"] == "0.05 beats from lock"
+    assert progress.lessons["L2.01"]["practice_feedback"]["kind"] == "beatmatch"
+    assert saved == [progress]
+
+    locked = runtime._grade_beatmatch_practice_tick()
+
+    assert locked is not None
+    assert locked.grade.verdict == "locked"
+    assert locked.event is not None
+    assert locked.credited == ("beatmatching",)
+    assert "practice_feedback" not in progress.lessons["L2.01"]
+    assert progress.skills["beatmatching"]["live_proof_count"] == 1
+    mission = _progress_snapshots(ipc)[-1]["next_practice_mission"]
+    assert mission["focus"] == "proof"
+    assert mission["proof"] == "1 cited proof banked; 2 left"
+
+
 def test_live_beatmatch_grade_voices_locked_with_resolving_citation(monkeypatch) -> None:
     """Q3: a credited locked grade becomes an authored cited tutor line."""
     monkeypatch.setattr("vibemix.learn.progress.save_progress", lambda _progress: None)
@@ -1627,6 +1685,60 @@ def test_cue_placement_practice_rearms_after_wrong_drop(monkeypatch) -> None:
     assert wrong_drop is not None and wrong_drop.grade.verdict == "wrong_drop"
     assert relock is not None and relock.credited == ("phrasing_performance",)
     assert progress.skills["phrasing_performance"]["live_proof_count"] == 2
+
+
+def test_cue_placement_wrong_drop_updates_recovery_mission(monkeypatch) -> None:
+    saved: list[LearnProgress] = []
+    monkeypatch.setattr("vibemix.learn.progress.save_progress", saved.append)
+    progress = LearnProgress(course_2_unlocked=True)
+    _make_phrasing_competent(progress)
+    grid = _beat_grid()
+    target = grid.beat_at(16)
+    registry = EvidenceRegistry()
+    ipc = MagicMock(name="ipc_router")
+    runtime = LessonRuntime(
+        learn_state=LearnState(),
+        midi_mirror=MagicMock(name="midi_mirror"),
+        controller_state=MagicMock(name="controller_state"),
+        ipc_router=ipc,
+        progress_store=progress,
+        evidence_registry=registry,
+        evidence_clock=lambda: 90.0,
+        cue_placement_practice_loader=lambda: CuePlacementPracticeSnapshot(
+            grid=grid,
+            cue_frame=grid.beat_at(17),
+            target_frame=target,
+        ),
+    )
+    runtime.send(
+        "load",
+        lesson_id="L2.10",
+        course_id="course_2_transitions",
+        controller_id="pioneer_ddj_flx4",
+    )
+    saved.clear()
+
+    result = runtime._grade_cue_placement_practice_tick()
+
+    assert result is not None
+    assert result.event is None
+    assert result.grade.verdict == "wrong_drop"
+    assert not registry.has("ev", "CUE_PLACEMENT_GRADED", 90.0, tol=1.0)
+    assert progress.skills["phrasing_performance"]["live_proof_count"] == 0
+    assert progress.lessons["L2.10"]["practice_feedback"] == {
+        "kind": "cue_placement",
+        "label": "drop timing",
+        "message": "on beat, but 1 beat late - aim at the drop.",
+        "detail": "1 beat from the target drop",
+    }
+    mission = _progress_snapshots(ipc)[-1]["next_practice_mission"]
+    assert mission["lesson_id"] == "L2.10"
+    assert mission["mode"] == "prove"
+    assert mission["focus"] == "recovery"
+    assert mission["focus_label"] == "drop timing"
+    assert mission["proof"] == "last measured miss: drop timing"
+    assert mission["meter_caption"] == "1 beat from the target drop"
+    assert saved == [progress]
 
 
 def test_cue_placement_wrong_drop_speaks_uncited_correction() -> None:

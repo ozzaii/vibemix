@@ -88,6 +88,7 @@ _SKILL_IDS: tuple[str, ...] = (
     "phrasing_performance",
 )
 _PRACTICE_SOURCE_KEYS: tuple[str, ...] = ("hardware", "screen")
+_PRACTICE_FEEDBACK_KINDS: tuple[str, ...] = ("beatmatch", "cue_placement")
 
 
 def _practice_source_key(source: str | None) -> str | None:
@@ -126,6 +127,38 @@ def _carry_practice_source_fields(
     last_source = _practice_source_key(existing.get("last_practice_source"))
     if last_source is not None:
         target["last_practice_source"] = last_source
+
+
+def _practice_feedback(raw: Any) -> dict[str, str] | None:
+    """Return one bounded recovery target from a persisted lesson row."""
+    if not isinstance(raw, dict):
+        return None
+    kind = str(raw.get("kind") or "").strip()
+    label = str(raw.get("label") or "").strip()
+    message = str(raw.get("message") or "").strip()
+    if kind not in _PRACTICE_FEEDBACK_KINDS or not label or not message:
+        return None
+    feedback = {
+        "kind": kind,
+        "label": label[:48],
+        "message": message[:180],
+    }
+    detail = str(raw.get("detail") or "").strip()
+    if detail:
+        feedback["detail"] = detail[:120]
+    return feedback
+
+
+def _carry_practice_feedback_field(
+    target: dict[str, Any],
+    existing: dict[str, Any] | None,
+) -> None:
+    """Preserve the latest unfinished recovery target across row rewrites."""
+    if not isinstance(existing, dict):
+        return
+    feedback = _practice_feedback(existing.get("practice_feedback"))
+    if feedback is not None:
+        target["practice_feedback"] = feedback
 
 
 def _fresh_skills_block() -> dict[str, dict[str, Any]]:
@@ -254,6 +287,8 @@ class LearnProgress:
             row,
             existing if isinstance(existing, dict) else None,
         )
+        # A completed lesson should not keep pointing at an old miss; the
+        # recovery target is for the next unfinished rep only.
         self.lessons[lesson_id] = row
 
     def mark_started(self, course_id: str, lesson_id: str) -> None:
@@ -281,6 +316,10 @@ class LearnProgress:
             "strikes_used": strikes,
         }
         _carry_practice_source_fields(
+            row,
+            existing if isinstance(existing, dict) else None,
+        )
+        _carry_practice_feedback_field(
             row,
             existing if isinstance(existing, dict) else None,
         )
@@ -323,6 +362,49 @@ class LearnProgress:
         if not isinstance(row, dict) or row.get("completed") is True:
             return
         row["strikes_used"] = max(0, min(3, int(strikes_used)))
+
+    def mark_practice_feedback(
+        self,
+        course_id: str,
+        lesson_id: str,
+        *,
+        kind: str,
+        label: str,
+        message: str,
+        detail: str | None = None,
+    ) -> bool:
+        """Persist the latest measured miss as a recovery target.
+
+        This does not affect lesson completion or Mastery credit. It is a small
+        learner-facing hint for the next practice mission, fed only by owned
+        practice judges that can measure the miss directly.
+        """
+        payload = _practice_feedback(
+            {
+                "kind": kind,
+                "label": label,
+                "message": message,
+                "detail": detail,
+            }
+        )
+        if payload is None:
+            return False
+        self.mark_started(course_id, lesson_id)
+        row = self.lessons.get(lesson_id)
+        if not isinstance(row, dict):
+            return False
+        if row.get("practice_feedback") == payload:
+            return False
+        row["practice_feedback"] = payload
+        return True
+
+    def clear_practice_feedback(self, lesson_id: str) -> bool:
+        """Remove a stale recovery target after a measured clean rep."""
+        row = self.lessons.get(lesson_id)
+        if not isinstance(row, dict) or "practice_feedback" not in row:
+            return False
+        del row["practice_feedback"]
+        return True
 
     def snapshot(self, *, active_lesson_id: str | None = None) -> dict[str, Any]:
         """The ``LearnProgressState`` envelope payload — the file shape PLUS the

@@ -2434,6 +2434,84 @@ class LessonRuntime(StateMachine):
                 file=sys.stderr,
             )
 
+    def _save_progress_quietly(self, context: str) -> bool:
+        try:
+            from vibemix.learn.progress import LearnProgress, save_progress
+
+            if not isinstance(self._progress, LearnProgress):
+                return False
+            save_progress(self._progress)
+            return True
+        except Exception as exc:  # pragma: no cover — defensive
+            import sys
+
+            print(
+                f"[learn.runtime] {context} progress save failed: {exc!r}",
+                file=sys.stderr,
+            )
+            return False
+
+    def _mark_progress_practice_feedback(
+        self,
+        *,
+        kind: str,
+        label: str,
+        message: str,
+        detail: str | None = None,
+    ) -> bool:
+        """Persist one measured miss as the next mission's recovery target."""
+        lesson_id = self._learn.current_lesson_id
+        course_id = self._learn.current_course_id
+        if not lesson_id or not course_id:
+            return False
+        try:
+            from vibemix.learn.progress import LearnProgress
+
+            if not isinstance(self._progress, LearnProgress):
+                return False
+            changed = self._progress.mark_practice_feedback(
+                course_id,
+                lesson_id,
+                kind=kind,
+                label=label,
+                message=message,
+                detail=detail,
+            )
+        except Exception as exc:  # pragma: no cover — defensive
+            import sys
+
+            print(
+                f"[learn.runtime] mark_practice_feedback failed: {exc!r}",
+                file=sys.stderr,
+            )
+            return False
+        if not changed:
+            return False
+        return self._save_progress_quietly("practice feedback")
+
+    def _clear_progress_practice_feedback(self) -> bool:
+        """Clear stale miss feedback after a clean measured rep."""
+        lesson_id = self._learn.current_lesson_id
+        if not lesson_id:
+            return False
+        try:
+            from vibemix.learn.progress import LearnProgress
+
+            if not isinstance(self._progress, LearnProgress):
+                return False
+            changed = self._progress.clear_practice_feedback(lesson_id)
+        except Exception as exc:  # pragma: no cover — defensive
+            import sys
+
+            print(
+                f"[learn.runtime] clear_practice_feedback failed: {exc!r}",
+                file=sys.stderr,
+            )
+            return False
+        if not changed:
+            return False
+        return self._save_progress_quietly("practice feedback clear")
+
     def _record_free_practice_receipt(self, midi: dict[str, Any]) -> None:
         """Persist one sandbox practice receipt without completing a lesson."""
         control, deck = _control_and_deck(midi)
@@ -2713,13 +2791,19 @@ class LessonRuntime(StateMachine):
         )
         if not is_creditable_locked_grade(grade):
             self._beatmatch_practice_lock_active = False
+            feedback = self._beatmatch_recovery_feedback(grade)
+            if feedback is not None and self._mark_progress_practice_feedback(**feedback):
+                self._emit_progress_snapshot()
             return BeatmatchPracticeResult(
                 grade=grade,
                 event=None,
                 credited=(),
                 t_session=t_session,
             )
+        feedback_cleared = self._clear_progress_practice_feedback()
         if self._beatmatch_practice_lock_active:
+            if feedback_cleared:
+                self._emit_progress_snapshot()
             return BeatmatchPracticeResult(
                 grade=grade,
                 event=None,
@@ -2759,6 +2843,8 @@ class LessonRuntime(StateMachine):
                     f"[learn.runtime] beatmatch practice progress save failed: {exc!r}",
                     file=sys.stderr,
                 )
+            self._emit_progress_snapshot()
+        elif feedback_cleared:
             self._emit_progress_snapshot()
         self._log_session_event(
             "learn_beatmatch_practice_graded",
@@ -2897,6 +2983,51 @@ class LessonRuntime(StateMachine):
             )
         return None
 
+    def _beatmatch_recovery_feedback(self, grade) -> dict[str, str] | None:
+        """Return a durable mission target for a measured beatmatch miss."""
+        verdict = getattr(grade, "verdict", "")
+        if verdict == "tempo_off":
+            try:
+                tempo_error = float(getattr(grade, "tempo_error", 0.0) or 0.0)
+            except (TypeError, ValueError):
+                tempo_error = 0.0
+            detail = ""
+            if math.isfinite(tempo_error) and tempo_error > 0:
+                detail = f"tempo is {round(tempo_error * 100)}% off"
+            return {
+                "kind": "beatmatch",
+                "label": "tempo miss",
+                "message": "Match tempo first; ease deck B's pitch until the drift stops.",
+                "detail": detail,
+            }
+        if verdict in {"drifting", "trainwreck"}:
+            try:
+                phase_error = float(getattr(grade, "phase_error_beats", 0.0) or 0.0)
+            except (TypeError, ValueError):
+                phase_error = 0.0
+            if not math.isfinite(phase_error):
+                phase_error = 0.0
+            if verdict == "drifting":
+                if phase_error > 0:
+                    message = "Deck B is late; nudge it forward before chasing proof."
+                elif phase_error < 0:
+                    message = "Deck B is early; drag it back before chasing proof."
+                else:
+                    message = "The phase is drifting; nudge the jog until the kicks lock."
+                return {
+                    "kind": "beatmatch",
+                    "label": "phase drift",
+                    "message": message,
+                    "detail": f"{abs(phase_error):.2f} beats from lock",
+                }
+            return {
+                "kind": "beatmatch",
+                "label": "lost the one",
+                "message": "Restart on the downbeat, then lock phase before you blend.",
+                "detail": f"{abs(phase_error):.2f} beats from lock",
+            }
+        return None
+
     def _emit_live_beatmatch_grade_tick(self) -> None:
         """Emit the Learn-owned beatmatch HUD tick only while the lesson is active."""
         lesson_playing = (
@@ -2960,6 +3091,43 @@ class LessonRuntime(StateMachine):
                 file=sys.stderr,
             )
 
+    def _cue_placement_recovery_feedback(self, grade) -> dict[str, str] | None:
+        """Return a durable mission target for a measured cue-placement miss."""
+        text = self._cue_placement_miss_text(grade)
+        if text is None:
+            return None
+        verdict = getattr(grade, "verdict", "")
+        if verdict == "off_beat":
+            beat_error = float(getattr(grade, "beat_error_beats", 0.0) or 0.0)
+            if beat_error > 0:
+                label = "late cue"
+            elif beat_error < 0:
+                label = "early cue"
+            else:
+                label = "off-beat cue"
+            detail = f"{abs(beat_error):.2f} beats from the grid"
+        elif verdict == "wrong_drop":
+            label = "drop timing"
+            target_error = getattr(grade, "target_error_beats", None)
+            detail = ""
+            if target_error is not None:
+                try:
+                    beats = float(target_error)
+                except (TypeError, ValueError):
+                    beats = 0.0
+                if math.isfinite(beats):
+                    distance = max(1, round(abs(beats)))
+                    unit = "beat" if distance == 1 else "beats"
+                    detail = f"{distance} {unit} from the target drop"
+        else:
+            return None
+        return {
+            "kind": "cue_placement",
+            "label": label,
+            "message": text,
+            "detail": detail,
+        }
+
     def _cue_placement_miss_text(self, grade) -> str | None:
         """Return short, measured cue-placement correction copy for misses."""
 
@@ -3019,13 +3187,19 @@ class LessonRuntime(StateMachine):
         )
         if not is_creditable_cue_placement_grade(grade):
             self._cue_placement_practice_lock_active = False
+            feedback = self._cue_placement_recovery_feedback(grade)
+            if feedback is not None and self._mark_progress_practice_feedback(**feedback):
+                self._emit_progress_snapshot()
             return CuePlacementPracticeResult(
                 grade=grade,
                 event=None,
                 credited=(),
                 t_session=t_session,
             )
+        feedback_cleared = self._clear_progress_practice_feedback()
         if self._cue_placement_practice_lock_active:
+            if feedback_cleared:
+                self._emit_progress_snapshot()
             return CuePlacementPracticeResult(
                 grade=grade,
                 event=None,
@@ -3065,6 +3239,8 @@ class LessonRuntime(StateMachine):
                     f"[learn.runtime] cue placement practice progress save failed: {exc!r}",
                     file=sys.stderr,
                 )
+            self._emit_progress_snapshot()
+        elif feedback_cleared:
             self._emit_progress_snapshot()
         self._log_session_event(
             "learn_cue_placement_practice_graded",

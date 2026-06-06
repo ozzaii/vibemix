@@ -235,6 +235,12 @@ interface ProgressStatePayload {
       strikes_used?: number;
       practice_sources?: { hardware?: number; screen?: number };
       last_practice_source?: "hardware" | "screen" | null;
+      practice_feedback?: {
+        kind: "beatmatch" | "cue_placement";
+        label: string;
+        message: string;
+        detail?: string;
+      };
     }>;
     course_2_unlocked?: boolean;
     course_3_unlocked?: boolean;

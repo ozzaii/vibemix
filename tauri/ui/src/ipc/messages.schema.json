@@ -3444,6 +3444,17 @@
                       "last_practice_source": {
                         "type": ["string", "null"],
                         "enum": ["hardware", "screen", null]
+                      },
+                      "practice_feedback": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["kind", "label", "message"],
+                        "properties": {
+                          "kind": {"type": "string", "enum": ["beatmatch", "cue_placement"]},
+                          "label": {"type": "string", "maxLength": 48},
+                          "message": {"type": "string", "maxLength": 180},
+                          "detail": {"type": "string", "maxLength": 120}
+                        }
                       }
                     }
                   }
@@ -3500,7 +3511,7 @@
                     "proof": {"type": "string"},
                     "why": {"type": "string"},
                     "estimated_minutes": {"type": "integer", "minimum": 1},
-                    "focus": {"type": "string", "enum": ["first_rep", "retry", "proof", "replay", "hardware", "lock", "mastery"]},
+                    "focus": {"type": "string", "enum": ["first_rep", "retry", "proof", "replay", "hardware", "lock", "mastery", "recovery"]},
                     "focus_label": {"type": "string"},
                     "challenge": {"type": "string"},
                     "chain": {

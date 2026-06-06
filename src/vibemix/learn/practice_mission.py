@@ -66,17 +66,18 @@ def next_practice_mission(
     title = meta.title
     row = _lesson_row(progress, lesson_id)
     skill_row = _skill_row(wall, skill_id)
-    command = _command_for(mode, title, skill_label, wall, skill_id, row)
+    feedback = _feedback_for(row)
+    command = _command_for(mode, title, skill_label, wall, skill_id, row, feedback)
     payoff = _SKILL_PAYOFFS.get(
         skill_id,
         "You turn one abstract lesson into a move you can repeat.",
     )
-    proof = _proof_for(progress, lesson_id, skill_label, skill_row)
-    why = _why_for(mode, skill_label, wall, skill_id)
-    focus = _focus_for(mode, row, skill_id, skill_row)
-    focus_label = _focus_label_for(focus, row, skill_id, skill_row)
-    challenge = _challenge_for(mode, row, skill_label, skill_row)
-    meter = _meter_for(mode, focus, row, skill_id, skill_label, skill_row)
+    proof = _proof_for(progress, lesson_id, skill_label, skill_row, feedback)
+    why = _why_for(mode, skill_label, wall, skill_id, feedback)
+    focus = _focus_for(mode, row, skill_id, skill_row, feedback)
+    focus_label = _focus_label_for(focus, row, skill_id, skill_row, feedback)
+    challenge = _challenge_for(mode, row, skill_label, skill_row, feedback)
+    meter = _meter_for(mode, focus, row, skill_id, skill_label, skill_row, feedback)
     chain = _practice_chain_for(
         progress,
         lesson_id=lesson_id,
@@ -274,8 +275,11 @@ def _command_for(
     wall: list[dict[str, Any]],
     skill_id: str,
     row: dict[str, Any] | None,
+    feedback: dict[str, str] | None,
 ) -> str:
     clean_title = title.strip() or "the next lesson"
+    if feedback is not None and mode != "mastered":
+        return f"Fix {feedback['label']} on {clean_title}; {feedback['message']}"
     if mode == "finish":
         if _strike_count(row) > 0:
             return f"Retry {clean_title}; no hints, one clean move is the checkpoint."
@@ -297,7 +301,10 @@ def _proof_for(
     lesson_id: str,
     skill_label: str,
     skill_row: dict[str, Any] | None,
+    feedback: dict[str, str] | None,
 ) -> str:
+    if feedback is not None:
+        return f"last measured miss: {feedback['label']}"
     if skill_row and skill_row.get("stage") == "competent":
         skill_id = str(skill_row.get("skill_id") or "")
         spec = SKILL_MANIFEST.get(skill_id)
@@ -326,7 +333,10 @@ def _why_for(
     skill_label: str,
     wall: list[dict[str, Any]],
     skill_id: str,
+    feedback: dict[str, str] | None,
 ) -> str:
+    if feedback is not None and mode != "mastered":
+        return "fix the measured miss before chasing the next proof"
     if mode == "mastered":
         return "Mastery earned from cited live proof"
     if mode == "replay":
@@ -350,12 +360,15 @@ def _focus_for(
     row: dict[str, Any] | None,
     skill_id: str,
     skill_row: dict[str, Any] | None,
+    feedback: dict[str, str] | None,
 ) -> str:
     if mode == "mastered" or (
         skill_row is not None
         and (skill_row.get("stage") == "mastered" or skill_row.get("mastered") is True)
     ):
         return "mastery"
+    if feedback is not None:
+        return "recovery"
     if mode == "prove" or (skill_row is not None and skill_row.get("stage") == "competent"):
         return "proof"
     if mode == "finish" and _strike_count(row) > 0:
@@ -374,9 +387,12 @@ def _focus_label_for(
     row: dict[str, Any] | None,
     skill_id: str,
     skill_row: dict[str, Any] | None,
+    feedback: dict[str, str] | None,
 ) -> str:
     if focus == "mastery":
         return "mastered"
+    if focus == "recovery" and feedback is not None:
+        return feedback["label"]
     if focus == "retry":
         return f"retry {_strike_count(row)}/3"
     if focus == "proof":
@@ -402,12 +418,15 @@ def _challenge_for(
     row: dict[str, Any] | None,
     skill_label: str,
     skill_row: dict[str, Any] | None,
+    feedback: dict[str, str] | None,
 ) -> str:
     if mode == "mastered" or (
         skill_row is not None
         and (skill_row.get("stage") == "mastered" or skill_row.get("mastered") is True)
     ):
         return "Carry it into a real set while it is fresh."
+    if feedback is not None:
+        return feedback["message"]
     if mode == "prove" or (skill_row is not None and skill_row.get("stage") == "competent"):
         return "Only cited live proof moves Mastery."
     if mode == "finish" and _strike_count(row) > 0:
@@ -428,6 +447,7 @@ def _meter_for(
     skill_id: str,
     skill_label: str,
     skill_row: dict[str, Any] | None,
+    feedback: dict[str, str] | None,
 ) -> dict[str, Any]:
     if focus == "mastery":
         spec = SKILL_MANIFEST.get(skill_id)
@@ -438,6 +458,14 @@ def _meter_for(
             "meter_max": threshold,
             "meter_state": "mastered",
             "meter_caption": "Mastery earned",
+        }
+    if focus == "recovery" and feedback is not None:
+        return {
+            "meter_label": "recovery target",
+            "meter_value": 0,
+            "meter_max": 1,
+            "meter_state": "retry",
+            "meter_caption": feedback.get("detail") or feedback["message"],
         }
     if focus == "proof":
         spec = SKILL_MANIFEST.get(skill_id)
@@ -611,6 +639,28 @@ def _skill_row(wall: list[dict[str, Any]], skill_id: str) -> dict[str, Any] | No
 def _lesson_row(progress: Any, lesson_id: str) -> dict[str, Any] | None:
     row = (getattr(progress, "lessons", {}) or {}).get(lesson_id)
     return row if isinstance(row, dict) else None
+
+
+def _feedback_for(row: dict[str, Any] | None) -> dict[str, str] | None:
+    if row is None:
+        return None
+    raw = row.get("practice_feedback")
+    if not isinstance(raw, dict):
+        return None
+    kind = str(raw.get("kind") or "").strip()
+    label = str(raw.get("label") or "").strip()
+    message = str(raw.get("message") or "").strip()
+    if kind not in {"beatmatch", "cue_placement"} or not label or not message:
+        return None
+    feedback = {
+        "kind": kind,
+        "label": label[:48],
+        "message": message[:180],
+    }
+    detail = str(raw.get("detail") or "").strip()
+    if detail:
+        feedback["detail"] = detail[:120]
+    return feedback
 
 
 def _strike_count(row: dict[str, Any] | None) -> int:

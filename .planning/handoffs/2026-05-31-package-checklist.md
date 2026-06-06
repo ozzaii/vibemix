@@ -10978,3 +10978,49 @@ Proof before staging:
 - `uv run ruff check src/vibemix/__main__.py tests/learn/test_tutor_voice_callback.py`
 - `uv run python -m compileall -q src/vibemix/__main__.py tests/learn/test_tutor_voice_callback.py`
 - `git diff --check -- src/vibemix/__main__.py tests/learn/test_tutor_voice_callback.py .planning/handoffs/2026-05-31-package-checklist.md`
+
+## Package 97 - Learn Practice Recovery Targets
+
+Suggested commit: `feat(learn): route measured misses into recovery missions`
+
+Include:
+
+- `src/vibemix/learn/progress.py`
+- `src/vibemix/learn/practice_mission.py`
+- `src/vibemix/learn/runtime.py`
+- `src/vibemix/learn/curriculum_projection.py`
+- `tauri/ui/src/ipc/messages.schema.json`
+- `tauri/ui/src/ipc/messages.ts`
+- `tauri/ui/src/ipc/validator.generated.mjs`
+- `tauri/ui/src/learn/learn-window.ts`
+- `tauri/ui/src/learn/lesson/curriculum-meta.ts`
+- `tests/learn/test_progress_persistence.py`
+- `tests/learn/test_practice_mission.py`
+- `tests/learn/test_runtime_evidence_grounding.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- New Mastery credit signals, Viber/library transition-score promotion, tutor
+  prompt rewrites, and frontend layout redesign. This package only persists
+  measured owned-practice misses as next-mission recovery targets; cited
+  successful events remain the only Mastery-credit path.
+
+Reason:
+
+- Beatmatch and cue-placement practice already measure useful misses, but that
+  correction vanished after the spoken grade. Persist one bounded
+  `practice_feedback` target per lesson, derive the next mission as a recovery
+  rep, and clear the target after a measured clean rep.
+
+Proof before staging:
+
+- `uv run pytest -q tests/learn/test_progress_persistence.py::test_practice_feedback_is_bounded_and_cleared_by_completion tests/learn/test_practice_mission.py::test_measured_miss_turns_current_proof_mission_into_recovery_target tests/learn/test_runtime_evidence_grounding.py::test_beatmatch_miss_updates_mission_then_locked_grade_clears_it tests/learn/test_runtime_evidence_grounding.py::test_cue_placement_wrong_drop_updates_recovery_mission`
+- `uv run pytest -q tests/learn/test_practice_mission.py tests/learn/test_progress_persistence.py tests/learn/test_progress_snapshot_skill_wall.py tests/learn/test_runtime_evidence_grounding.py tests/learn/test_practice_loop.py tests/learn/test_cue_practice.py`
+- `uv run ruff check src/vibemix/learn/progress.py src/vibemix/learn/practice_mission.py src/vibemix/learn/runtime.py src/vibemix/learn/curriculum_projection.py tests/learn/test_progress_persistence.py tests/learn/test_practice_mission.py tests/learn/test_runtime_evidence_grounding.py`
+- `uv run python -m compileall -q src/vibemix/learn/progress.py src/vibemix/learn/practice_mission.py src/vibemix/learn/runtime.py src/vibemix/learn/curriculum_projection.py tests/learn/test_progress_persistence.py tests/learn/test_practice_mission.py tests/learn/test_runtime_evidence_grounding.py`
+- `uv run python scripts/check_ipc_schema.py`
+- `npm --prefix tauri/ui run check:ipc`
+- `npm --prefix tauri/ui test -- tests/learn/test_practice_booth_shell.spec.ts`
+- `npm --prefix tauri/ui run build`
+- `git diff --check -- src/vibemix/learn/progress.py src/vibemix/learn/practice_mission.py src/vibemix/learn/runtime.py src/vibemix/learn/curriculum_projection.py tests/learn/test_progress_persistence.py tests/learn/test_practice_mission.py tests/learn/test_runtime_evidence_grounding.py tauri/ui/src/ipc/messages.schema.json tauri/ui/src/ipc/messages.ts tauri/ui/src/ipc/validator.generated.mjs tauri/ui/src/learn/learn-window.ts tauri/ui/src/learn/lesson/curriculum-meta.ts .planning/handoffs/2026-05-31-package-checklist.md`
