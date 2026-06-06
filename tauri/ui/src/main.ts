@@ -201,7 +201,7 @@ async function boot(): Promise<void> {
       // eslint-disable-next-line no-console
       console.log(
         "[boot] DEV mode — window.__vibemixDev exposed:",
-        "advanceTo / currentStep / getState / setState / fakeMidiEvent / setStatusBar",
+        "advanceTo / currentStep / getState / setState / setStatusBar",
       );
     }
     return;

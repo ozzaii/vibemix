@@ -12,8 +12,6 @@
  *   - Wizard step0 intro CTA — armed Let's-go button.
  *   - Wizard step1 Continue + Back CTAs + Grant + DENIED · open
  *     Settings affordance (the permissions-card role="button" chip).
- *   - Wizard step2 output-device picker + Continue CTA.
- *   - Wizard step3 controller-probe Listen Again + Skip.
  *   - Wizard profile-consent + telemetry-consent toggle rows + CTAs.
  *   - Settings drawer __close + __btn + interactive-union safety net.
  *
@@ -97,42 +95,6 @@ test.describe("VIS-02 hover-glow — wizard step1 permissions (Plan 43-03)", () 
     await denied.waitFor({ state: "attached" });
     await denied.focus();
     const shadow = await denied.evaluate(
-      (el) => getComputedStyle(el).boxShadow,
-    );
-    expect(shadow).toMatch(GLOW_FAINT_BOX_SHADOW);
-  });
-});
-
-test.describe("VIS-02 hover-glow — wizard step2 output-device (Plan 43-03)", () => {
-  test.beforeEach(async ({ page }) => {
-    await page.goto("/?step=2");
-    await page.locator(".wizard-step--output-device").waitFor();
-  });
-
-  test("Continue CTA carries --glow-faint on hover", async ({ page }) => {
-    const cta = page
-      .locator(".wizard-step--output-device .cmp-btn")
-      .last();
-    await cta.hover();
-    const shadow = await cta.evaluate(
-      (el) => getComputedStyle(el).boxShadow,
-    );
-    expect(shadow).toMatch(GLOW_FAINT_BOX_SHADOW);
-  });
-});
-
-test.describe("VIS-02 hover-glow — wizard step3 controller-probe (Plan 43-03)", () => {
-  test.beforeEach(async ({ page }) => {
-    await page.goto("/?step=3");
-    await page.locator(".wizard-step--controller").waitFor();
-  });
-
-  test("Listen Again CTA carries --glow-faint on hover", async ({ page }) => {
-    const cta = page
-      .locator(".wizard-step--controller button")
-      .first();
-    await cta.hover();
-    const shadow = await cta.evaluate(
       (el) => getComputedStyle(el).boxShadow,
     );
     expect(shadow).toMatch(GLOW_FAINT_BOX_SHADOW);

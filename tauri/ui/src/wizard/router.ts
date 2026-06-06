@@ -9,8 +9,6 @@
  *   - Step 1 permission cards poll ipc.permission.check @1Hz.
  *   - Step 1 [ Grant ] buttons invoke Tauri commands open_*_settings /
  *     request_microphone_permission.
- *   - Step 2 mount -> ipc.calibration.list_devices.
- *   - Step 3 "Listen now" -> ipc.calibration.start_midi_listen (timeout 10s).
  *   - Launch mount -> library_setup_candidates + ipc.library.import.
  *   - Legacy smoke-test mount -> ipc.calibration.smoke_test (timeout 30s).
  *   - Wizard done → emitIpc ipc.wizard.done + invoke write_first_run_state.
@@ -34,8 +32,6 @@ import { StepIndicator } from "./components/step-indicator.js";
 import { renderSmokeTest, type SmokeTestState } from "./smoke-test.js";
 import { renderStep0Intro } from "./step0-intro.js";
 import { renderStep1, type Step1State } from "./step1-permissions.js";
-import { renderStep2, type Step2State } from "./step2-output-device.js";
-import { renderStep3, type Step3State } from "./step3-controller.js";
 import {
   renderStepProfileConsent,
   type ProfileConsentState,
@@ -56,9 +52,7 @@ import {
 export type WizardStep =
   | "intro"
   | "permissions"
-  | "audio"
   | "library-feed"
-  | "controller"
   | "skill-level"
   // Phase 49 — new step types for the one-click install chain.
   // Registered as types here; the render-switch below routes them.
@@ -75,8 +69,6 @@ export type WizardStep =
 export interface WizardState {
   currentStep: WizardStep;
   step1: Step1State;
-  step2: Step2State;
-  step3: Step3State;
   skillLevel: SkillLevelState;
   libraryFeed: LibraryFeedState;
   profileConsent: ProfileConsentState;
@@ -95,18 +87,6 @@ const DEFAULT_STATE: WizardState = {
     screenRecording: "pending",
     microphone: "pending",
     screenSettingsOpened: false,
-  },
-  step2: {
-    blackHolePresent: false, // sidecar replies fill this in
-    blackHoleBannerPostClick: false,
-    devices: [],
-    selectedDeviceId: "",
-  },
-  step3: {
-    detectedController: undefined,
-    probeState: "idle",
-    secondsLeft: 0,
-    caughtLabel: undefined,
   },
   skillLevel: {
     // Quick 260529-ifq — pre-select "intermediate" (the runtime default
@@ -172,14 +152,12 @@ function setState(
 
 const STEP_ORDER: WizardStep[] = [
   "permissions",
-  "audio",
   "library-feed",
 ];
 
 const KNOWN_STEPS: WizardStep[] = [
   "intro",
   ...STEP_ORDER,
-  "controller",
   "skill-level",
   "profile-consent",
   "telemetry-consent",
@@ -195,7 +173,6 @@ function stepStripFor(current: WizardStep): HTMLElement {
   const idx = indexOf(current);
   const stepsConfig: Array<{ id: WizardStep; label: string }> = [
     { id: "permissions", label: "permissions" },
-    { id: "audio", label: "device" },
     { id: "library-feed", label: "music" },
   ];
   return StepIndicator({
@@ -241,8 +218,9 @@ export function advanceTo(next: WizardStep): void {
 }
 
 /** Walk the wizard one step backward. Intro has no back (it's the first
- *  surface a user sees). Library-feed goes back to audio. Wired to the
- *  per-step `[ ← Back ]` button + the `esc` / `cmd+[` shortcut.
+ *  surface a user sees). Library-feed goes back to permissions (the
+ *  collapsed forward path is intro → permissions → library-feed). Wired to
+ *  the per-step `[ ← Back ]` button + the `esc` / `cmd+[` shortcut.
  *
  *  Impeccable Wave 5.A — closes the Heuristic 3 (User Control & Freedom)
  *  gap from the 2026-05-14 critique: previously the wizard was strictly
@@ -256,17 +234,13 @@ export function back(): void {
       // Permissions is the first wizard step proper; back returns to intro.
       advanceTo("intro");
       return;
-    case "audio":
+    case "library-feed":
       advanceTo("permissions");
       return;
-    case "library-feed":
-      advanceTo("audio");
-      return;
-    case "controller":
-      advanceTo("audio");
-      return;
     case "skill-level":
-      advanceTo("controller");
+      // skill-level is no longer in the forward path (folded into
+      // library-feed); only reachable via ?step=. Back returns to launch.
+      advanceTo("library-feed");
       return;
     case "profile-consent":
       advanceTo("skill-level");
@@ -325,7 +299,7 @@ function ensureWizardShortcuts(): void {
     "cmd+[": () => back(),
     "ctrl+[": () => back(),
     // `esc` from a wizard step walks back one. The intro returns no-op
-    // via back(), and launch returns to the audio-picker step.
+    // via back(), and launch returns to permissions.
     escape: () => back(),
   });
 }
@@ -363,7 +337,7 @@ export function renderCurrentStep(): void {
     case "permissions":
       primary = renderStep1(wizardState.step1, {
         platform: wizardState.platform,
-        onContinue: () => advanceTo("audio"),
+        onContinue: () => advanceTo("library-feed"),
         onBack: () => back(),
         onGrantScreen: () => {
           void invoke("open_screen_recording_settings").catch((err) => {
@@ -400,31 +374,6 @@ export function renderCurrentStep(): void {
         startStep1PermissionPoll();
       }
       break;
-    case "audio":
-      if (!step2BootStarted) {
-        step2BootStarted = true;
-        void boostrapStep2();
-      }
-      primary = renderStep2(wizardState.step2, {
-        platform: wizardState.platform,
-        onContinue: () => advanceTo("library-feed"),
-        onBack: () => back(),
-        onSelectDevice: (id) =>
-          setState({ step2: { ...wizardState.step2, selectedDeviceId: id } }),
-        onOpenInstall: () => {
-          // Capability allowlist (11-03) permits this single URL.
-          void invoke("plugin:shell|open", {
-            path: "https://existential.audio/blackhole",
-          }).catch(() => {});
-          setState({
-            step2: { ...wizardState.step2, blackHoleBannerPostClick: true },
-          });
-        },
-        onRecheckBlackHole: () => {
-          void recheckBlackHole();
-        },
-      });
-      break;
     case "library-feed":
       if (!libraryFeedBootStarted) {
         libraryFeedBootStarted = true;
@@ -455,32 +404,6 @@ export function renderCurrentStep(): void {
         onOpenVibemix: () => void finishLaunchStep(),
         onBack: () => back(),
       });
-      break;
-    case "controller":
-      primary = renderStep3(wizardState.step3, {
-        onContinue: () => advanceTo("skill-level"),
-        onBack: () => back(),
-        onListenAgain: () => {
-          if (step3ListenStarted) return;
-          step3ListenStarted = true;
-          setState({
-            step3: {
-              ...wizardState.step3,
-              probeState: "listening",
-              secondsLeft: 10,
-              caughtLabel: undefined,
-            },
-          });
-          void runMidiListen();
-        },
-        onSkip: () => advanceTo("skill-level"),
-      });
-      if (
-        wizardState.step3.probeState === "listening" &&
-        (wizardState.step3.secondsLeft ?? 10) > 0
-      ) {
-        scheduleCountdownTick();
-      }
       break;
     case "skill-level":
       primary = renderStepSkillLevel(wizardState.skillLevel, {
@@ -582,40 +505,6 @@ export function renderCurrentStep(): void {
   statusMount.replaceChildren(StatusBar(wizardState.statusBar));
 }
 
-let countdownTimer: number | null = null;
-
-function scheduleCountdownTick(): void {
-  if (countdownTimer != null) return;
-  countdownTimer = window.setInterval(() => {
-    const s3 = wizardState.step3;
-    if (s3.probeState !== "listening") {
-      if (countdownTimer != null) {
-        clearInterval(countdownTimer);
-        countdownTimer = null;
-      }
-      return;
-    }
-    const next = (s3.secondsLeft ?? 10) - 1;
-    if (next <= 0) {
-      if (countdownTimer != null) {
-        clearInterval(countdownTimer);
-        countdownTimer = null;
-      }
-      setState({
-        step3: { ...s3, secondsLeft: 0, probeState: "timeout" },
-      });
-    } else {
-      wizardState = { ...wizardState, step3: { ...s3, secondsLeft: next } };
-      const lcd = document.querySelector(".cmp-ctrl-probe__lcd");
-      if (lcd) {
-        const mm = "00";
-        const ss = next.toString().padStart(2, "0");
-        lcd.textContent = `${mm}:${ss}`;
-      }
-    }
-  }, 1000);
-}
-
 // ---------------------------------------------------------------------------
 // Wave 4 — real ipc.* request bodies replacing Wave 3 mocks.
 // ---------------------------------------------------------------------------
@@ -624,9 +513,7 @@ let step1PollerStarted = false;
 let step1PollTimer: number | null = null;
 let hasTriedScreenRestart = false;
 let screenRestartFocusHandler: (() => void) | null = null;
-let step2BootStarted = false;
 let libraryFeedBootStarted = false;
-let step3ListenStarted = false;
 let smokeTestStarted = false;
 
 /** Poll ipc.permission.check @1Hz for both kinds while Step 1 is active. */
@@ -705,53 +592,6 @@ function startStep1PermissionPoll(): void {
   // Initial poll, then every 1s.
   void poll();
   step1PollTimer = window.setInterval(() => void poll(), 1000);
-}
-
-/** Step 2 bootstrap — request the output-device list. */
-async function boostrapStep2(): Promise<void> {
-  await refreshDeviceList();
-}
-
-async function refreshDeviceList(): Promise<void> {
-  try {
-    const resp = await sendIpcRequest(
-      "ipc.calibration.list_devices",
-      {},
-      "ipc.calibration.device_list",
-    );
-    const payload = (resp as { payload: { devices: Array<{ id: string; name: string; is_blackhole: boolean; variant: string | null }>; blackhole_present: boolean } }).payload;
-    // Convert sidecar wire shape to UI shape (DropdownDeviceItem).
-    // BlackHole entries render as speakers so the picker shows them in
-    // the dropdown; auto-select skips them in favor of a real output.
-    const devices = payload.devices.map((d) => ({
-      id: d.id,
-      name: d.name,
-      isHeadphones: false,
-      isSpeaker: true,
-      isAuto: false,
-    }));
-    // Auto-pick the first non-BlackHole output device as the default
-    // selection (matches the UI-SPEC §5 AUTO pill behavior).
-    const defaultSelection =
-      payload.devices.find((d) => !d.is_blackhole)?.id ?? payload.devices[0]?.id ?? "";
-    setState({
-      step2: {
-        ...wizardState.step2,
-        devices,
-        blackHolePresent: payload.blackhole_present,
-        selectedDeviceId: wizardState.step2.selectedDeviceId || defaultSelection,
-      },
-    });
-  } catch (err) {
-    console.warn("[step2] list_devices failed:", err);
-  }
-}
-
-async function recheckBlackHole(): Promise<void> {
-  setState({
-    step2: { ...wizardState.step2, blackHoleBannerPostClick: false },
-  });
-  await refreshDeviceList();
 }
 
 function libraryFeedStatus(
@@ -896,51 +736,6 @@ async function pickLaunchFolder(): Promise<void> {
   });
 }
 
-async function runMidiListen(): Promise<void> {
-  // Race the event handler against the timeout subscription so either
-  // outcome resolves the listen.
-  let resolved = false;
-  let timeoutUnlisten: (() => void) | null = null;
-  try {
-    timeoutUnlisten = await subscribeIpc("ipc.calibration.midi_timeout", () => {
-      if (resolved) return;
-      resolved = true;
-      setState({
-        step3: { ...wizardState.step3, probeState: "timeout", secondsLeft: 0 },
-      });
-    });
-    const ev = await sendIpcRequest(
-      "ipc.calibration.start_midi_listen",
-      { timeout_s: 10 },
-      "ipc.calibration.midi_event",
-      12_000, // 10s timeout + 2s buffer
-    );
-    if (resolved) return;
-    resolved = true;
-    const label = (ev as { payload: { control_label: string } }).payload.control_label;
-    setState({
-      step3: {
-        ...wizardState.step3,
-        probeState: "caught",
-        caughtLabel: label,
-      },
-    });
-    // Auto-advance after 1s per UI-SPEC §10. The collapsed wizard returns
-    // legacy direct controller probes to the launch step.
-    setTimeout(() => advanceTo("library-feed"), 1000);
-  } catch (err) {
-    if (!resolved) {
-      console.warn("[step3] midi listen failed:", err);
-      setState({
-        step3: { ...wizardState.step3, probeState: "timeout", secondsLeft: 0 },
-      });
-    }
-  } finally {
-    if (timeoutUnlisten) timeoutUnlisten();
-    step3ListenStarted = false;
-  }
-}
-
 async function runSmokeTest(): Promise<void> {
   // Subscribe to the started event for the loading state; await the
   // done event with a longer timeout (cascade greeting ~5-8s).
@@ -990,10 +785,14 @@ async function finishLaunchStep(): Promise<void> {
 }
 
 async function completeWizard(): Promise<void> {
+  // The collapsed wizard no longer carries a device/controller step; output
+  // device stays "auto" (empty id) and is set on the deck Settings drawer,
+  // and the controller profile defaults to generic (live MIDI auto-detect
+  // handles real controllers). FirstRunState.output_device_id is Option<String>
+  // so "" deserializes cleanly (config.rs:70).
   const payload = {
-    output_device_id: wizardState.step2.selectedDeviceId,
-    controller_profile:
-      wizardState.step3.detectedController?.name ?? "generic",
+    output_device_id: "",
+    controller_profile: "generic",
     target_window_id: null as string | null,
   };
   try {
@@ -1006,7 +805,7 @@ async function completeWizard(): Promise<void> {
         controller_profile: payload.controller_profile,
         target_dj_app_hint: null,
         target_window_id: payload.target_window_id,
-        blackhole_install_seen: wizardState.step2.blackHoleBannerPostClick,
+        blackhole_install_seen: false,
       },
     });
   } catch (err) {
@@ -1070,7 +869,6 @@ export interface DevSurface {
   currentStep: () => WizardStep;
   getState: () => Readonly<WizardState>;
   setState: (patch: Partial<WizardState>) => void;
-  fakeMidiEvent: (ev: { label: string }) => void;
   setStatusBar: (status: StatusBarProps) => void;
 }
 
@@ -1080,16 +878,6 @@ export function getDevSurface(): DevSurface {
     currentStep,
     getState,
     setState: (patch) => setState(patch),
-    fakeMidiEvent: (ev) => {
-      setState({
-        step3: {
-          ...wizardState.step3,
-          probeState: "caught",
-          caughtLabel: ev.label,
-        },
-      });
-      setTimeout(() => advanceTo("library-feed"), 1000);
-    },
     setStatusBar: (status) => setState({ statusBar: status }),
   };
 }
