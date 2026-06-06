@@ -1523,6 +1523,7 @@ class LessonRuntime(StateMachine):
             return None
         if result.event is None:
             return result
+        self._emit_live_control_practice_grade(result)
         if result.credited:
             self._emit_mastered_unlocks(
                 result.credited,
@@ -1601,6 +1602,7 @@ class LessonRuntime(StateMachine):
             return None
         if result.event is None:
             return result
+        self._emit_live_harmonic_practice_grade(result)
         if result.credited:
             citation = f"[ev:{HARMONIC_PRACTICE_GRADED_EVENT}@{result.t_session:.3f}]"
             self._emit_mastered_unlocks(
@@ -1635,6 +1637,50 @@ class LessonRuntime(StateMachine):
             credited=list(result.credited),
         )
         return result
+
+    def _emit_live_control_practice_grade(self, result: ControlPracticeResult) -> None:
+        """Emit a live-grade HUD tick for a grounded matched control action."""
+
+        if result.event is None:
+            return
+        citation = f"[ev:{CONTROL_PRACTICE_GRADED_EVENT}@{result.t_session:.3f}]"
+        try:
+            live_grade = LearnLiveGrade.make(
+                verdict="locked",
+                phase_error_beats=0.0,
+                score=1.0,
+                citation=citation,
+            ).to_dict()
+            self._ipc.emit(live_grade)
+        except Exception as exc:  # pragma: no cover - defensive
+            import sys
+
+            print(
+                f"[learn.runtime] control practice live grade emit failed: {exc!r}",
+                file=sys.stderr,
+            )
+
+    def _emit_live_harmonic_practice_grade(self, result: HarmonicPracticeResult) -> None:
+        """Emit a live-grade HUD tick for a grounded compatible-key receipt."""
+
+        if result.event is None:
+            return
+        citation = f"[ev:{HARMONIC_PRACTICE_GRADED_EVENT}@{result.t_session:.3f}]"
+        try:
+            live_grade = LearnLiveGrade.make(
+                verdict="locked",
+                phase_error_beats=0.0,
+                score=1.0,
+                citation=citation,
+            ).to_dict()
+            self._ipc.emit(live_grade)
+        except Exception as exc:  # pragma: no cover - defensive
+            import sys
+
+            print(
+                f"[learn.runtime] harmonic practice live grade emit failed: {exc!r}",
+                file=sys.stderr,
+            )
 
     def _apply_beatmatch_practice_action(self, midi: dict[str, Any]) -> bool | None:
         """Apply one practice action to the owned deck without grading it."""

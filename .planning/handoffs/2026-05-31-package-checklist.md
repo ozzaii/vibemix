@@ -11948,3 +11948,37 @@ Proof before staging:
 - `uv run python -m compileall -q src/vibemix/learn/exemplar.py src/vibemix/runtime/session_loop.py src/vibemix/__main__.py tests/learn/test_exemplar_finder.py tests/library/test_folder_ingest_band_shares.py tests/runtime/test_session_loop.py`
 - `git diff --check -- src/vibemix/learn/exemplar.py src/vibemix/runtime/session_loop.py src/vibemix/__main__.py tests/learn/test_exemplar_finder.py tests/library/test_folder_ingest_band_shares.py tests/runtime/test_session_loop.py .planning/handoffs/2026-05-31-package-checklist.md`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+
+## Package 123 - Learn Control Live Grade Parity
+
+Suggested commit: `feat(learn): emit live grades for practice receipts`
+
+Include:
+
+- `src/vibemix/learn/runtime.py`
+- `tests/learn/test_runtime_evidence_grounding.py`
+- `tests/learn/test_harmonic_practice_runtime.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- New IPC schema, new lesson copy, UI meter changes, generative tutor text,
+  and beatmatch/cue placement behavior. This package only mirrors existing
+  cited control and harmonic practice receipts onto the existing
+  `ipc.learn.live_grade` payload.
+
+Reason:
+
+- Beatmatch and cue-placement practice already move the live-grade stream,
+  but matched EQ/control actions and the L2.11 compatible-key receipt only
+  wrote/speaker receipts. Emit a minimal `locked` live-grade tick with
+  `score=1.0`, `phase_error_beats=0.0`, and the existing `ev` citation so
+  the Learn meter is not blind to non-beatmatch practice success.
+
+Proof before staging:
+
+- `uv run pytest -q tests/learn/test_runtime_evidence_grounding.py tests/learn/test_harmonic_practice_runtime.py`
+- `uv run ruff check src/vibemix/learn/runtime.py tests/learn/test_runtime_evidence_grounding.py tests/learn/test_harmonic_practice_runtime.py`
+- `uv run python -m compileall -q src/vibemix/learn/runtime.py tests/learn/test_runtime_evidence_grounding.py tests/learn/test_harmonic_practice_runtime.py`
+- `git diff --check -- src/vibemix/learn/runtime.py tests/learn/test_runtime_evidence_grounding.py tests/learn/test_harmonic_practice_runtime.py .planning/handoffs/2026-05-31-package-checklist.md`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`

@@ -538,6 +538,14 @@ def test_matched_control_mastered_flip_speaks_factual_proof_once(monkeypatch) ->
             "data_state": "hint",
         }
     ]
+    live_grades = _live_grade_payloads(ipc)
+    assert [payload["citation"] for payload in live_grades] == [
+        "[ev:LEARN_CONTROL_GRADED@58.250]",
+        "[ev:LEARN_CONTROL_GRADED@59.250]",
+    ]
+    assert all(payload["verdict"] == "locked" for payload in live_grades)
+    assert all(payload["score"] == 1.0 for payload in live_grades)
+    assert all(payload["phase_error_beats"] == 0.0 for payload in live_grades)
 
 
 def test_observer_ack_writes_control_receipt_before_lesson_cycle_ack(monkeypatch) -> None:

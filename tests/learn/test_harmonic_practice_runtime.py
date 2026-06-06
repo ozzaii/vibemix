@@ -53,6 +53,14 @@ def _tutor_payloads(ipc: MagicMock) -> list[dict]:
     ]
 
 
+def _live_grade_payloads(ipc: MagicMock) -> list[dict]:
+    return [
+        call.args[0]["payload"]
+        for call in ipc.emit.call_args_list
+        if call.args and call.args[0].get("type") == "ipc.learn.live_grade"
+    ]
+
+
 def test_l211_emits_library_grounded_harmonic_pair_prompt() -> None:
     pair = _pair()
     registry = EvidenceRegistry()
@@ -167,6 +175,11 @@ def test_l211_final_continue_writes_cited_harmonic_practice_receipt(monkeypatch)
             "data_state": "hint",
         }
     ]
+    live_grades = _live_grade_payloads(ipc)
+    assert live_grades[-1]["verdict"] == "locked"
+    assert live_grades[-1]["phase_error_beats"] == 0.0
+    assert live_grades[-1]["score"] == 1.0
+    assert live_grades[-1]["citation"] == "[ev:HARMONIC_PRACTICE_GRADED@91.250]"
 
 
 def _pair() -> HarmonicPracticePair:
