@@ -16,7 +16,7 @@
   </head>
   <body data-mode="chat">
     <div id="app">
-      <div class="vmx-lib-app" data-wire="library.shell" data-auto-build-on-landing="true">
+      <div class="vmx-lib-app" data-wire="library.shell">
         <!-- titlebar -->
         <div class="vmx-lib-titlebar" data-tauri-drag-region data-wire="library.titlebar">
           <div class="vmx-lib-brand" data-tauri-drag-region>
@@ -33,19 +33,12 @@
           <aside class="vmx-lib-panel" data-wire="library.console">
             <div class="vmx-lib-panel-hd"><span class="vmx-lib-label">Console</span></div>
             <div class="vmx-lib-panel-bd" style="display: flex; flex-direction: column">
-              <!-- Conversation-first, with two power tools kept as direct tabs.
-                   Viber is the home — one agent you talk to that searches, finds
-                   similar, curates and builds, showing each tool it fires live.
-                   Build stays a direct tab because set-prep wants its instrument:
-                   the energy-curve segmented picker, hot-cue export, and per-run
-                   tag consent a chat prompt can't express. Music is setup.
-                   Search/Similar/Curate fold into the conversation.
-                   The `data-mode` contract (+ `.vmx-lib-modeswitch button`) is
-                   unchanged — only the hierarchy is. -->
+              <!-- Just a chat. Viber is the only home: one agent you talk to
+                   that searches, finds similar, curates, builds, and indexes.
+                   Build/Music controls stay in the DOM for NL/starters/specs,
+                   but the visible surface is no longer a tab console. -->
               <div class="vmx-lib-modeswitch" role="tablist" data-wire="library.mode-tabs">
                 <button role="tab" aria-selected="true" data-mode="chat">Viber</button>
-                <button role="tab" aria-selected="false" data-mode="build">Build</button>
-                <button role="tab" aria-selected="false" data-mode="ingest">Music</button>
               </div>
 
               <!-- search / similar field -->
@@ -173,7 +166,16 @@
 
               <!-- Viber composer, backed by library_chat. The home surface:
                    one prompt that searches, finds similar, curates and builds
-                   (the tool tabs above are the same actions). -->
+                   (the hidden tool surfaces are the same actions). -->
+              <button id="vmx-lib-chat-folder" type="button" class="vmx-lib-chat-folder"
+                      data-for="chat" data-wire="library.chat-folder"
+                      title="Index a music folder" aria-label="Index a music folder"
+                      style="display: none">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+                     stroke="currentColor" stroke-width="2">
+                  <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+                </svg>
+              </button>
               <div class="vmx-lib-field" data-for="chat" data-wire="library.chat-field">
                 <div class="vmx-lib-qbox vmx-lib-chatbox">
                   <textarea id="vmx-lib-chat"

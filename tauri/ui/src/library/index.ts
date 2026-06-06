@@ -123,6 +123,17 @@ function $all<E extends HTMLElement = HTMLElement>(selector: string): NodeListOf
   return libraryRoot.querySelectorAll<E>(selector);
 }
 
+function firstDialogPath(selection: unknown): string | null {
+  if (typeof selection === "string" && selection.length > 0) return selection;
+  if (Array.isArray(selection)) {
+    const first = selection.find(
+      (item): item is string => typeof item === "string" && item.length > 0,
+    );
+    return first ?? null;
+  }
+  return null;
+}
+
 // ── Render helpers ──────────────────────────────────────────────────────────
 
 function meterMarkup(score: number, mode: LibraryMode): string {
@@ -2532,6 +2543,7 @@ export function mountLibrary(root: ParentNode = document): void {
   const installModelsBtn = $("vmx-lib-install-models") as HTMLButtonElement;
   const buildTagsToggle = $maybe("vmx-lib-build-tags") as HTMLButtonElement | null;
   const exportOpenBtn = $maybe("vmx-lib-export-open") as HTMLButtonElement | null;
+  const chatFolderBtn = $maybe("vmx-lib-chat-folder") as HTMLButtonElement | null;
   const echoEl = $("vmx-lib-echo");
   const qlabelEl = $("vmx-lib-qlabel");
   const seedNameEl = $("vmx-lib-seed-name");
@@ -3005,6 +3017,35 @@ export function mountLibrary(root: ParentNode = document): void {
     }
   }
 
+  async function pickChatFolder(): Promise<void> {
+    let sourcePath: string | null = null;
+    try {
+      const { open } = await import("@tauri-apps/plugin-dialog");
+      const selection = await open({
+        title: "Choose music folder",
+        directory: true,
+        multiple: false,
+      });
+      sourcePath = firstDialogPath(selection);
+    } catch (e) {
+      appendChatTurn(
+        chatThread,
+        "viber",
+        `Couldn't open the folder picker: ${(e as Error).message ?? String(e)}`,
+      );
+      return;
+    }
+    if (!sourcePath) return;
+    folderInput.value = sourcePath;
+    state = setFolder(state, sourcePath);
+    appendChatTurn(
+      chatThread,
+      "viber",
+      `Indexing ${sourcePath}. Embedding locally on this machine; it stays on your device.`,
+    );
+    void libraryImport(sourcePath);
+  }
+
   // ── event wiring ───────────────────────────────────────────────────────────
 
   runBtn.addEventListener("click", () => {
@@ -3015,6 +3056,9 @@ export function mountLibrary(root: ParentNode = document): void {
     }
     void run();
   });
+  if (chatFolderBtn) {
+    chatFolderBtn.addEventListener("click", () => void pickChatFolder());
+  }
   cueRunBtn?.addEventListener("click", () => void runBuildCueExport());
   exportOpenBtn?.addEventListener("click", () => void revealExportFromButton(exportOpenBtn));
   installModelsBtn.addEventListener("click", () => void installLocalModels());

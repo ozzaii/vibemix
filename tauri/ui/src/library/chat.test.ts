@@ -84,6 +84,14 @@ const embedFolderMock =
   vi.fn<(path: string, strategy: "mean_excerpt" | "cue_anchored") => Promise<boolean>>();
 const importMock = vi.fn<(path: string) => Promise<boolean>>();
 const cancelImportMock = vi.fn<() => Promise<void>>();
+const dialogMocks = vi.hoisted(() => ({
+  open: vi.fn<(opts: unknown) => Promise<string | string[] | null>>(),
+}));
+const dialogOpenMock = dialogMocks.open;
+
+vi.mock("@tauri-apps/plugin-dialog", () => ({
+  open: dialogMocks.open,
+}));
 
 const STATS_READY: LibraryStats = {
   indexed: 12,
@@ -502,6 +510,7 @@ function mountSkeleton(): void {
     <button data-cue-export="both" aria-pressed="false">Both</button>
     <button id="vmx-lib-cue-run">Export hot cues</button>
     <span id="vmx-lib-seed-name"></span>
+    <button id="vmx-lib-chat-folder"></button>
     <button id="vmx-lib-runbtn"></button>
     <span id="vmx-lib-center-label"></span>
     <span id="vmx-lib-echo"></span>
@@ -583,8 +592,31 @@ describe("chat - real runChat path", () => {
     importMock.mockResolvedValue(true);
     cancelImportMock.mockReset();
     cancelImportMock.mockResolvedValue(undefined);
+    dialogOpenMock.mockReset();
+    dialogOpenMock.mockResolvedValue(null);
     vi.resetModules();
     document.body.innerHTML = "";
+  });
+
+  it("chat folder button opens the native directory picker and indexes the chosen tree", async () => {
+    const picked = "/Users/ozai/Music/PSYMIND";
+    dialogOpenMock.mockResolvedValue(picked);
+
+    await mountChat();
+    const button = document.getElementById("vmx-lib-chat-folder") as HTMLButtonElement;
+    button.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(dialogOpenMock).toHaveBeenCalledWith(
+      expect.objectContaining({ directory: true, multiple: false }),
+    );
+    expect(
+      (document.getElementById("vmx-lib-folder") as HTMLInputElement).value,
+    ).toBe(picked);
+    expect(importMock).toHaveBeenCalledWith(picked);
+    const threadText =
+      document.getElementById("vmx-lib-chat-thread")?.textContent ?? "";
+    expect(threadText).toContain(picked);
   });
 
   it("opens Viber chat with real starter missions instead of a blank console", async () => {

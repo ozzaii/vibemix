@@ -1155,7 +1155,7 @@ body {
 }
 :is(body, .vmx-lib-app)[data-mode="chat"] .vmx-lib-panel:first-child .vmx-lib-panel-bd {
   display: grid !important;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: end;
   gap: 12px;
   padding: 12px;
@@ -1222,6 +1222,27 @@ body {
   margin: 0;
   align-self: stretch;
 }
+/* Quiet native-folder affordance at the left of the chat composer. */
+:is(body, .vmx-lib-app)[data-mode="chat"] #vmx-lib-chat-folder {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  align-self: stretch;
+  width: 54px;
+  min-height: 54px;
+  padding: 0;
+  margin: 0;
+  color: var(--brand);
+  background: var(--glass-3);
+  border: 1px solid var(--border-default);
+  border-radius: var(--rad-sm);
+  cursor: pointer;
+  transition: filter 0.2s, border-color 0.2s, background 0.2s;
+}
+:is(body, .vmx-lib-app)[data-mode="chat"] #vmx-lib-chat-folder:hover {
+  border-color: var(--brand-40);
+  background: var(--brand-08);
+}
 :is(body, .vmx-lib-app)[data-mode="chat"] .vmx-lib-panel:nth-child(2) {
   grid-column: 1;
   border-left: 0;
@@ -1250,7 +1271,6 @@ body {
   gap: 18px;
   flex: 1;
   min-height: 0;
-  justify-content: flex-end;
   padding: clamp(26px, 4vw, 64px) clamp(20px, 4vw, 48px) clamp(142px, 18vh, 190px);
   /* A lit recessed display slab (the deck's .vmx-voice material), NOT a flat
      dark box. A soft rose key-light pools at the bottom where Viber's newest
@@ -1270,7 +1290,14 @@ body {
     inset 0 -28px 60px -28px var(--brand-06);
   position: relative;
   z-index: 1;
-  overflow: hidden;
+  /* The message list scrolls inside the lit slab; the whole panel stays put.
+     Bottom anchoring is handled by the margin-top:auto rule below. */
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+/* Short threads rest at the slab floor, long threads scroll normally. */
+:is(body, .vmx-lib-app)[data-mode="chat"] .vmx-lib-chat-thread > :first-child {
+  margin-top: auto;
 }
 /* The conversation is a centered column inside the full-width slab. The slab
    keeps its lit material edge-to-edge; the turns and starters cap to a reading
