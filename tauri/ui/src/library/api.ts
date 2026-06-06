@@ -108,12 +108,13 @@ export interface LibrarySetupCandidate {
 export type LibraryModelInstallTarget =
   | "required"
   | "clap"
+  | "chatterbox"
   | "moss"
   | "cue"
   | "all";
 
 export interface LibraryModelAsset {
-  id: "clap" | "moss-tts" | "cue-detr" | string;
+  id: "clap" | "chatterbox-voice" | "moss-tts" | "cue-detr" | string;
   label: string;
   role: string;
   required: boolean;
@@ -151,7 +152,7 @@ export interface LibraryModelInstallSummary {
 
 export interface LibraryModelProgress {
   target: LibraryModelInstallTarget;
-  id: "clap" | "moss-tts" | "cue-detr" | string;
+  id: "clap" | "chatterbox-voice" | "moss-tts" | "cue-detr" | string;
   n: number;
   total: number;
   status: "downloading" | "downloaded" | "verified" | "error" | string;
@@ -2197,6 +2198,7 @@ function normalizeInstallTarget(
   if (
     target === "required" ||
     target === "clap" ||
+    target === "chatterbox" ||
     target === "moss" ||
     target === "cue" ||
     target === "all"
@@ -2486,14 +2488,14 @@ const DEV_MODELS: LibraryModelsResult = {
       mismatched: [],
     },
     {
-      id: "moss-tts",
-      label: "MOSS TTS ONNX",
+      id: "chatterbox-voice",
+      label: "Chatterbox voice",
       role: "local co-host voice",
       required: true,
       installable: false,
-      env: "VIBEMIX_MOSS_TTS_DIR",
+      env: "VIBEMIX_CHATTERBOX_REF",
       installed: true,
-      path: "~/.cache/vibemix/moss-tts-onnx/MOSS-TTS-Nano-100M-ONNX",
+      path: "~/.cache/vibemix/voice/cohost_voice_ref.wav",
       missing: [],
       mismatched: [],
     },
@@ -2780,7 +2782,7 @@ export async function libraryStats(): Promise<LibraryStats> {
 }
 
 /** Local model asset status/install seam. With `install="required"` the backend
- *  downloads/verifies first-run required assets (CLAP + MOSS voice);
+ *  downloads/verifies first-run required assets (CLAP + local voice);
  *  `install="cue"` reports/verifies the manual CUE target until hosting exists.
  *  Real backend errors propagate. */
 export async function libraryModels(
@@ -2794,7 +2796,9 @@ export async function libraryModels(
       if (install === "all") return true;
       if (install === "required") return model.required;
       if (install === "clap") return model.id === "clap";
-      if (install === "moss") return model.id === "moss-tts";
+      if (install === "chatterbox" || install === "moss") {
+        return model.id === "chatterbox-voice" || model.id === "moss-tts";
+      }
       return model.id === "cue-detr";
     });
     return {

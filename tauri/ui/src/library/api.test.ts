@@ -103,7 +103,11 @@ describe("dev fallback (no Tauri bridge)", () => {
     const r = await libraryModels();
     expect(r.required_ready).toBe(true);
     expect(r.all_ready).toBe(true);
-    expect(r.models.map((m) => m.id)).toEqual(["clap", "moss-tts", "cue-detr"]);
+    expect(r.models.map((m) => m.id)).toEqual([
+      "clap",
+      "chatterbox-voice",
+      "cue-detr",
+    ]);
     expect(r.models[0]?.installed).toBe(true);
     expect(r.models[1]?.required).toBe(true);
   });
@@ -121,15 +125,22 @@ describe("dev fallback (no Tauri bridge)", () => {
     expect(r.install?.ok).toBe(true);
     expect(r.install?.results.map((item) => item.id)).toEqual([
       "clap",
-      "moss-tts",
+      "chatterbox-voice",
     ]);
   });
 
-  it("libraryModels moss install fallback keeps the voice target shape", async () => {
+  it("libraryModels chatterbox install fallback keeps the voice target shape", async () => {
+    const r = await libraryModels("chatterbox");
+    expect(r.install?.target).toBe("chatterbox");
+    expect(r.install?.ok).toBe(true);
+    expect(r.install?.results[0]?.id).toBe("chatterbox-voice");
+  });
+
+  it("libraryModels moss install fallback stays as a legacy voice alias", async () => {
     const r = await libraryModels("moss");
     expect(r.install?.target).toBe("moss");
     expect(r.install?.ok).toBe(true);
-    expect(r.install?.results[0]?.id).toBe("moss-tts");
+    expect(r.install?.results[0]?.id).toBe("chatterbox-voice");
   });
 
   it("libraryModels cue install fallback keeps the cue target shape", async () => {
@@ -145,7 +156,7 @@ describe("dev fallback (no Tauri bridge)", () => {
     expect(r.install?.ok).toBe(true);
     expect(r.install?.results.map((item) => item.id)).toEqual([
       "clap",
-      "moss-tts",
+      "chatterbox-voice",
       "cue-detr",
     ]);
   });

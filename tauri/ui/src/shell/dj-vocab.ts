@@ -21,7 +21,7 @@ export const DJ_VOCAB = {
   soundMatch: "Sound match",
   /** The CUE-DETR cue model, by what it does. */
   cueFinder: "Cue finder",
-  /** The MOSS speech model, by what it does. */
+  /** The local speech model, by what it does. */
   voiceModel: "Voice",
   /** A debrief citation: the evidence behind a call. */
   whyReview: "the why",

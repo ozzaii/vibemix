@@ -87,7 +87,7 @@ function createSurfaceRegion(def: SurfaceDef): HTMLElement {
 }
 
 const SURFACE_ALIASES: Readonly<Record<SurfaceId, readonly string[]>> = {
-  deck: ["live", "sven", "cohost", "voice", "moss", "play"],
+  deck: ["live", "sven", "cohost", "voice", "chatterbox", "moss", "play"],
   viber: ["library", "viber", "set prep", "search", "tracks", "transitions"],
   learn: ["lesson", "practice", "controller", "hands"],
   debrief: ["review", "timeline", "receipts", "proof", "set review"],

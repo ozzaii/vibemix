@@ -396,9 +396,10 @@ fn normalize_model_install_target(raw: Option<String>) -> Result<Option<String>,
     let value = raw.trim().to_ascii_lowercase();
     match value.as_str() {
         "" => Ok(None),
-        "required" | "clap" | "moss" | "cue" | "all" => Ok(Some(value)),
+        "required" | "clap" | "chatterbox" | "cue" | "all" => Ok(Some(value)),
+        "moss" => Ok(Some("chatterbox".to_string())),
         _ => Err(format!(
-            "invalid model install target {value:?} (expected required | clap | moss | cue | all)"
+            "invalid model install target {value:?} (expected required | clap | chatterbox | cue | all)"
         )),
     }
 }
@@ -2435,8 +2436,8 @@ mod tests {
             vec!["library", "models", "--json", "--install", "cue", "--force"]
         );
         assert_eq!(
-            model_library_args(Some("moss"), false),
-            vec!["library", "models", "--json", "--install", "moss"]
+            model_library_args(Some("chatterbox"), false),
+            vec!["library", "models", "--json", "--install", "chatterbox"]
         );
     }
 
@@ -2588,12 +2589,16 @@ mod tests {
             Some("cue".to_string())
         );
         assert_eq!(
+            normalize_model_install_target(Some("chatterbox".to_string())).unwrap(),
+            Some("chatterbox".to_string())
+        );
+        assert_eq!(
             normalize_model_install_target(Some("moss".to_string())).unwrap(),
-            Some("moss".to_string())
+            Some("chatterbox".to_string())
         );
         let err = normalize_model_install_target(Some("gpt".to_string()))
             .expect_err("unknown target should fail");
-        assert!(err.contains("required | clap | moss | cue | all"));
+        assert!(err.contains("required | clap | chatterbox | cue | all"));
     }
 
     #[test]

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// Compact shell readout for the local MOSS voice model. The real install/check
+// Compact shell readout for the local voice model. The real install/check
 // surface already lives in Viber; this badge only makes the fresh-machine truth
 // visible from the live deck and routes the user there.
 
@@ -37,9 +37,24 @@ export interface VoiceReadinessBadgeOptions {
 }
 
 const DEFAULT_POLL_MS = 120_000;
+const VOICE_MODEL_IDS = new Set(["chatterbox-voice", "moss-tts"]);
 
-function mossModel(models: LibraryModelsResult | null): LibraryModelAsset | null {
-  return models?.models.find((model) => model.id === "moss-tts") ?? null;
+function isVoiceModel(model: LibraryModelAsset): boolean {
+  return VOICE_MODEL_IDS.has(model.id);
+}
+
+function voiceModel(models: LibraryModelsResult | null): LibraryModelAsset | null {
+  return models?.models.find(isVoiceModel) ?? null;
+}
+
+function voiceSetupSummary(model: LibraryModelAsset | null): string {
+  if (!model) return "voice setup status is still loading";
+  const mismatched = (model.mismatched?.length ?? 0) > 0;
+  if (model.installed && !mismatched) return "voice setup is ready";
+  const missingCount = model.missing.length;
+  const missing =
+    missingCount > 0 ? `, missing ${missingCount} ${missingCount === 1 ? "item" : "items"}` : "";
+  return mismatched ? `voice setup needs repair${missing}` : `voice setup is missing${missing}`;
 }
 
 export function voiceReadinessBadgeModel(
@@ -48,10 +63,13 @@ export function voiceReadinessBadgeModel(
   runtimeVoice: RuntimeVoiceStatus = null,
 ): VoiceReadinessBadgeModel {
   if (runtimeVoice === "muted") {
+    const voice = voiceModel(models);
     return {
       state: "warn",
       label: "voice muted",
-      title: "Local MOSS voice is muted for this session.",
+      title: `Local voice is muted for this session; ${voiceSetupSummary(
+        voice,
+      )}. Subtitles stay visible.`,
     };
   }
 
@@ -59,31 +77,31 @@ export function voiceReadinessBadgeModel(
     return {
       state: "unknown",
       label: "",
-      title: `MOSS voice status unavailable: ${
+      title: `Local voice status unavailable: ${
         error instanceof Error ? error.message : String(error)
       }`,
     };
   }
 
-  const moss = mossModel(models);
-  if (!moss) {
+  const voice = voiceModel(models);
+  if (!voice) {
     return {
       state: "unknown",
       label: "",
-      title: "MOSS voice status unavailable: model row missing",
+      title: "Local voice status unavailable: model row missing",
     };
   }
 
-  const mismatched = (moss.mismatched?.length ?? 0) > 0;
-  const installable = moss.installable === true;
-  const missing = moss.missing.length > 0 ? `, missing ${moss.missing.length} files` : "";
-  const path = moss.path ? ` (${moss.path})` : "";
+  const mismatched = (voice.mismatched?.length ?? 0) > 0;
+  const installable = voice.installable === true;
+  const missing = voice.missing.length > 0 ? `, missing ${voice.missing.length} files` : "";
+  const path = voice.path ? ` (${voice.path})` : "";
 
-  if (moss.installed && !mismatched) {
+  if (voice.installed && !mismatched) {
     return {
       state: "ok",
       label: "voice ready",
-      title: `MOSS voice ready${path}`,
+      title: `Local voice ready${path}`,
     };
   }
 
@@ -91,14 +109,14 @@ export function voiceReadinessBadgeModel(
     return {
       state: installable ? "warn" : "fault",
       label: installable ? "voice repair" : "voice manual",
-      title: `MOSS voice needs repair${missing}${path}`,
+      title: `Local voice needs repair${missing}${path}`,
     };
   }
 
   return {
     state: installable ? "warn" : "fault",
     label: installable ? "voice missing" : "voice manual",
-    title: `MOSS voice model missing${missing}${path}`,
+    title: `Local voice model missing${missing}${path}`,
   };
 }
 

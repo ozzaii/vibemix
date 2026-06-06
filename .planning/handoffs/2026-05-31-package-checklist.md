@@ -13348,3 +13348,53 @@ Proof before staging:
 - `npm --prefix tauri/ui run build`
 - `git diff --check -- tauri/ui/src/shell/StatusFooter.ts tauri/ui/tests/shell/shell.spec.ts .planning/handoffs/2026-05-31-package-checklist.md`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+
+## Package 160 - First-Run Voice Model Contract
+
+Suggested commit: `fix(voice): align first-run voice setup contract`
+
+Include:
+
+- `src/vibemix/__main__.py`
+- `src/vibemix/library/model_assets.py`
+- `tests/library/test_models_cli.py`
+- `tauri/src-tauri/src/library_cmds.rs`
+- `tauri/ui/src/library/api.ts`
+- `tauri/ui/src/library/api.test.ts`
+- `tauri/ui/src/library/index.ts`
+- `tauri/ui/src/library/model-setup.test.ts`
+- `tauri/ui/src/library/build.test.ts`
+- `tauri/ui/src/shell/VoiceReadinessBadge.ts`
+- `tauri/ui/tests/shell/voice-readiness-badge.spec.ts`
+- `tauri/ui/src/shell/DesktopShell.ts`
+- `tauri/ui/src/shell/dj-vocab.ts`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- TTS synthesis/runtime changes, proxy-mode Gemini behavior, Learn lesson
+  unlock logic, folder ingest algorithms, and broad UI redesign. This package
+  only aligns first-run local voice setup/status wiring around the current
+  Chatterbox model contract while preserving legacy MOSS callers.
+
+Reason:
+
+- The backend `library models` payload now reports the required voice row as
+  `chatterbox-voice`, and Python installs it through the `chatterbox` target.
+  The Tauri bridge and UI still used the legacy `moss` target/id in several
+  setup and shell-readiness paths, so a fresh user could see a vague
+  `voice muted` badge or hit an install target the CLI rejected before JSON.
+  Normalize `moss` to `chatterbox` at the bridge/backend boundary, make Viber
+  model setup recognize both voice IDs, and make the shell badge explain
+  muted voice as session/runtime state with subtitle/setup context.
+
+Proof before staging:
+
+- `uv run pytest -q tests/library/test_models_cli.py::test_install_models_chatterbox_target_routes_to_prefetch tests/library/test_models_cli.py::test_install_models_moss_alias_routes_to_chatterbox_prefetch`
+- `npm --prefix tauri/ui test -- tests/shell/voice-readiness-badge.spec.ts src/library/model-setup.test.ts src/library/api.test.ts src/library/build.test.ts`
+- `cargo test --manifest-path tauri/src-tauri/Cargo.toml library_cmds -- --nocapture`
+- `uv run ruff check src/vibemix/__main__.py src/vibemix/library/model_assets.py tests/library/test_models_cli.py`
+- `uv run python -m compileall -q src/vibemix/__main__.py src/vibemix/library/model_assets.py tests/library/test_models_cli.py`
+- `npm --prefix tauri/ui run build`
+- `git diff --check -- src/vibemix/__main__.py src/vibemix/library/model_assets.py tests/library/test_models_cli.py tauri/src-tauri/src/library_cmds.rs tauri/ui/src/library/api.ts tauri/ui/src/library/api.test.ts tauri/ui/src/library/index.ts tauri/ui/src/library/model-setup.test.ts tauri/ui/src/library/build.test.ts tauri/ui/src/shell/VoiceReadinessBadge.ts tauri/ui/tests/shell/voice-readiness-badge.spec.ts tauri/ui/src/shell/DesktopShell.ts tauri/ui/src/shell/dj-vocab.ts .planning/handoffs/2026-05-31-package-checklist.md`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`

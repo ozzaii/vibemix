@@ -1098,7 +1098,7 @@ function installStatusLine(models: LibraryModelsResult): string | null {
     const prefix =
       install.target === "cue"
         ? "Cue finder setup unavailable"
-        : install.target === "moss"
+        : install.target === "chatterbox" || install.target === "moss"
           ? "Voice setup unavailable"
           : install.target === "clap"
             ? "Sound match setup failed"
@@ -1119,7 +1119,7 @@ function installStatusLine(models: LibraryModelsResult): string | null {
       ? "Sound match and voice ready"
       : install.target === "cue"
         ? "Cue finder checked"
-        : install.target === "moss"
+        : install.target === "chatterbox" || install.target === "moss"
           ? "Voice ready"
         : install.target === "all"
           ? "Local tools ready"
@@ -1132,7 +1132,9 @@ function installStatusLine(models: LibraryModelsResult): string | null {
 
 function modelSetupErrorCopy(error: string): string {
   if (/VIBEMIX_CUE_ONNX/i.test(error)) return "Cue finder setup path is not configured";
-  if (/VIBEMIX_MOSS/i.test(error)) return "Voice setup source is not configured";
+  if (/VIBEMIX_(CHATTERBOX|MOSS)/i.test(error)) {
+    return "Voice setup source is not configured";
+  }
   if (/VIBEMIX_CLAP/i.test(error)) return "Sound match setup source is not configured";
   return error.replace(/[A-Za-z0-9_.-]+\.onnx\b/g, "model file");
 }
@@ -1147,7 +1149,7 @@ export function modelProgressStateText(progress: LibraryModelProgress): string {
   const model =
     progress.id === "cue-detr"
       ? "Cue finder"
-      : progress.id === "moss-tts"
+      : isVoiceModelId(progress.id)
         ? "Voice"
         : "Sound match";
   const count = `${progress.n}/${progress.total}`;
@@ -1178,22 +1180,27 @@ export function modelInstallTargetFromDataset(
   return target === "cue" ||
     target === "all" ||
     target === "required" ||
+    target === "chatterbox" ||
     target === "moss" ||
     target === "clap"
     ? target
     : "required";
 }
 
+function isVoiceModelId(id: string): boolean {
+  return id === "chatterbox-voice" || id === "moss-tts";
+}
+
 export function deriveModelSetupView(
   models: LibraryModelsResult,
 ): ModelSetupView {
   const clap = models.models.find((m) => m.id === "clap");
-  const moss = models.models.find((m) => m.id === "moss-tts");
+  const voice = models.models.find((m) => isVoiceModelId(m.id));
   const cue = models.models.find((m) => m.id === "cue-detr");
   const clapMismatched = (clap?.mismatched?.length ?? 0) > 0;
-  const mossMismatched = (moss?.mismatched?.length ?? 0) > 0;
+  const voiceMismatched = (voice?.mismatched?.length ?? 0) > 0;
   const cueMismatched = (cue?.mismatched?.length ?? 0) > 0;
-  const mossInstallable = moss?.installable === true;
+  const voiceInstallable = voice?.installable === true;
   const cueInstallable = cue?.installable === true;
   const installErrors =
     models.install?.results.flatMap((result) => result.errors) ?? [];
@@ -1204,14 +1211,14 @@ export function deriveModelSetupView(
     : clapMismatched
       ? "Sound match repair"
       : "Sound match missing";
-  const mossLabel = moss
-    ? moss.installed
+  const voiceLabel = voice
+    ? voice.installed
       ? "Voice ready"
-      : mossMismatched
-        ? mossInstallable
+      : voiceMismatched
+        ? voiceInstallable
           ? "Voice repair"
           : "Voice manual repair"
-        : mossInstallable
+        : voiceInstallable
           ? "Voice missing"
           : "Voice manual setup"
     : null;
@@ -1225,8 +1232,8 @@ export function deriveModelSetupView(
   const needsRequired =
     clap?.installed === false ||
     clapMismatched ||
-    moss?.installed === false ||
-    mossMismatched ||
+    voice?.installed === false ||
+    voiceMismatched ||
     models.required_ready === false;
   const needsCue =
     cueInstallable && (cue?.installed === false || cueMismatched);
@@ -1249,7 +1256,7 @@ export function deriveModelSetupView(
         : "Install Sound Match + Voice";
 
   return {
-    stateText: [clapLabel, mossLabel, cueLabel, installStatusLine(models)]
+    stateText: [clapLabel, voiceLabel, cueLabel, installStatusLine(models)]
       .filter(Boolean)
       .join(" · "),
     installTarget,
@@ -2308,7 +2315,9 @@ export function mountLibrary(root: ParentNode = document): void {
     if (target === "required") runningLabel = "Sound match and voice setup running";
     else if (target === "all") runningLabel = "Local setup running";
     else if (target === "cue") runningLabel = "Cue finder check running";
-    else if (target === "moss") runningLabel = "Voice setup running";
+    else if (target === "chatterbox" || target === "moss") {
+      runningLabel = "Voice setup running";
+    }
     $("vmx-lib-model-state").textContent = runningLabel;
     try {
       renderModelSetup(await libraryModels(target));
@@ -2326,7 +2335,7 @@ export function mountLibrary(root: ParentNode = document): void {
       if (target === "all") retryLabel = "Retry Local Tools";
       else if (target === "required") retryLabel = "Retry Sound Match + Voice";
       else if (target === "cue") retryLabel = "Retry Cue Finder";
-      else if (target === "moss") retryLabel = "Retry Voice";
+      else if (target === "chatterbox" || target === "moss") retryLabel = "Retry Voice";
       installModelsBtn.textContent = retryLabel;
     }
   }

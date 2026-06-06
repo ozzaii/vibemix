@@ -153,13 +153,13 @@ const MODELS_READY: LibraryModelsResult = {
       mismatched: [],
     },
     {
-      id: "moss-tts",
-      label: "MOSS TTS ONNX",
+      id: "chatterbox-voice",
+      label: "Chatterbox voice",
       role: "local co-host voice",
       required: true,
-      env: "VIBEMIX_MOSS_TTS_DIR",
+      env: "VIBEMIX_CHATTERBOX_REF",
       installed: true,
-      path: "~/.cache/vibemix/moss-tts-onnx/MOSS-TTS-Nano-100M-ONNX",
+      path: "~/.cache/vibemix/voice/cohost_voice_ref.wav",
       missing: [],
       mismatched: [],
     },
@@ -203,7 +203,7 @@ const MODELS_FRESH_MISSING: LibraryModelsResult = {
           installed: false,
           missing: ["onnx/audio_model.onnx", "onnx/text_model.onnx"],
         }
-      : model.id === "moss-tts"
+      : model.id === "chatterbox-voice" || model.id === "moss-tts"
         ? {
             ...model,
             installed: false,
@@ -218,7 +218,7 @@ const MODELS_FRESH_MISSING: LibraryModelsResult = {
 const MODELS_REQUIRED_INSTALL_OK: LibraryModelsResult = {
   ...MODELS_FRESH_MISSING,
   models: MODELS_FRESH_MISSING.models.map((model) =>
-    model.id === "clap" || model.id === "moss-tts"
+    model.id === "clap" || model.id === "chatterbox-voice"
       ? {
           ...model,
           installed: true,
@@ -256,17 +256,17 @@ const MODELS_REQUIRED_INSTALL_OK: LibraryModelsResult = {
         errors: [],
       },
       {
-        id: "moss-tts",
+        id: "chatterbox-voice",
         installed: true,
-        path: "~/.cache/vibemix/moss-tts-onnx/MOSS-TTS-Nano-100M-ONNX",
+        path: "~/.cache/vibemix/voice/cohost_voice_ref.wav",
         files: [
           {
-            rel_path: "MOSS-TTS-Nano-100M-ONNX/encoder_model.onnx",
-            path: "~/.cache/vibemix/moss-tts-onnx/MOSS-TTS-Nano-100M-ONNX/encoder_model.onnx",
+            rel_path: "cohost_voice_ref.wav",
+            path: "~/.cache/vibemix/voice/cohost_voice_ref.wav",
             status: "skipped",
             size: 104857600,
-            sha256: "sha-moss",
-            url: "https://example.test/moss-tts.tar.gz",
+            sha256: "sha-chatterbox",
+            url: "https://example.test/chatterbox-ref.wav",
           },
         ],
         errors: [],

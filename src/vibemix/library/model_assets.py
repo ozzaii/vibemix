@@ -832,13 +832,19 @@ def install_models(
     """Install supported local model assets.
 
     ``target`` is ``"required"``, ``"clap"``, ``"chatterbox"``, ``"cue"``, or
-    ``"all"``. ``"required"`` installs the first-run required CLAP snapshot plus
-    the Chatterbox voice model. CUE-DETR downloads only when a release/ops build
-    provides an HTTPS artifact URL plus size/SHA pins. Otherwise that target
-    reports an actionable manual setup error.
+    ``"all"``. The legacy ``"moss"`` spelling is accepted as a Chatterbox alias
+    so older GUI builds do not dead-end first-run voice setup. ``"required"``
+    installs the first-run required CLAP snapshot plus the Chatterbox voice
+    model. CUE-DETR downloads only when a release/ops build provides an HTTPS
+    artifact URL plus size/SHA pins. Otherwise that target reports an actionable
+    manual setup error.
     """
+    if target == "moss":
+        target = "chatterbox"
     if target not in {"required", "clap", "chatterbox", "cue", "all"}:
-        raise ValueError("target must be 'required', 'clap', 'chatterbox', 'cue', or 'all'")
+        raise ValueError(
+            "target must be 'required', 'clap', 'chatterbox', 'cue', 'all', or legacy 'moss'"
+        )
 
     results: list[dict[str, object]] = []
     target_progress: ModelProgress | None = None

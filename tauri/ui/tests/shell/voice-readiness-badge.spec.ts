@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
  *
- * The shell voice badge is the live-deck receipt for the MOSS-only voice
+ * The shell voice badge is the live-deck receipt for the local voice
  * requirement: a clean machine must not look fully ready when Sven cannot speak.
  */
 
@@ -20,14 +20,14 @@ function model(
   overrides: Partial<LibraryModelAsset> = {},
 ): LibraryModelAsset {
   return {
-    id: "moss-tts",
-    label: "MOSS TTS ONNX",
+    id: "chatterbox-voice",
+    label: "Chatterbox voice",
     role: "local co-host voice",
     required: true,
-    env: "VIBEMIX_MOSS_TTS_DIR",
+    env: "VIBEMIX_CHATTERBOX_REF",
     installed: true,
     installable: true,
-    path: "~/.cache/vibemix/moss-tts-onnx/MOSS-TTS-Nano-100M-ONNX",
+    path: "~/.cache/vibemix/voice/cohost_voice_ref.wav",
     missing: [],
     mismatched: [],
     ...overrides,
@@ -46,21 +46,43 @@ function payload(
 }
 
 describe("voice readiness badge", () => {
-  it("maps the installed MOSS model into a terse ready state", () => {
+  it("maps the installed Chatterbox voice model into a terse ready state", () => {
     expect(voiceReadinessBadgeModel(payload())).toMatchObject({
       state: "ok",
       label: "voice ready",
     });
   });
 
-  it("lets the live runtime muted state override installed model readiness", () => {
-    expect(voiceReadinessBadgeModel(payload(), undefined, "muted")).toMatchObject({
-      state: "warn",
-      label: "voice muted",
+  it("keeps legacy MOSS rows readable for older payloads", () => {
+    expect(
+      voiceReadinessBadgeModel(
+        payload({
+          models: [
+            model({
+              id: "moss-tts",
+              label: "MOSS TTS ONNX",
+              env: "VIBEMIX_MOSS_TTS_DIR",
+              path: "~/.cache/vibemix/moss-tts-onnx/MOSS-TTS-Nano-100M-ONNX",
+            }),
+          ],
+        }),
+      ),
+    ).toMatchObject({
+      state: "ok",
+      label: "voice ready",
     });
   });
 
-  it("keeps missing installable MOSS visible without claiming readiness", () => {
+  it("lets the live runtime muted state explain subtitles and setup readiness", () => {
+    expect(voiceReadinessBadgeModel(payload(), undefined, "muted")).toMatchObject({
+      state: "warn",
+      label: "voice muted",
+      title:
+        "Local voice is muted for this session; voice setup is ready. Subtitles stay visible.",
+    });
+  });
+
+  it("keeps missing installable voice setup visible without claiming readiness", () => {
     expect(
       voiceReadinessBadgeModel(
         payload({
@@ -68,7 +90,7 @@ describe("voice readiness badge", () => {
             model({
               installed: false,
               installable: true,
-              missing: ["MOSS-TTS-Nano-100M-ONNX/encoder_model.onnx"],
+              missing: ["cohost_voice_ref.wav"],
             }),
           ],
           required_ready: false,
@@ -81,7 +103,7 @@ describe("voice readiness badge", () => {
     });
   });
 
-  it("marks non-installable MOSS as manual setup instead of a dead button", () => {
+  it("marks non-installable voice setup as manual setup instead of a dead button", () => {
     expect(
       voiceReadinessBadgeModel(
         payload({
@@ -99,6 +121,31 @@ describe("voice readiness badge", () => {
     ).toMatchObject({
       state: "fault",
       label: "voice manual",
+    });
+  });
+
+  it("keeps runtime muted honest when local voice setup is missing too", () => {
+    expect(
+      voiceReadinessBadgeModel(
+        payload({
+          models: [
+            model({
+              installed: false,
+              installable: false,
+              missing: ["cohost_voice_ref.wav"],
+            }),
+          ],
+          required_ready: false,
+          all_ready: false,
+        }),
+        undefined,
+        "muted",
+      ),
+    ).toMatchObject({
+      state: "warn",
+      label: "voice muted",
+      title:
+        "Local voice is muted for this session; voice setup is missing, missing 1 item. Subtitles stay visible.",
     });
   });
 

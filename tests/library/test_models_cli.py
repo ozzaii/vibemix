@@ -233,6 +233,68 @@ def test_models_install_clap_target_routes_through_cli(
     assert payload["install"]["results"][0]["id"] == "clap"
 
 
+def test_models_install_chatterbox_target_routes_through_cli(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture,
+) -> None:
+    import vibemix.library.model_assets as model_assets
+
+    monkeypatch.setattr(
+        model_assets,
+        "install_models",
+        lambda target, force=False: {
+            "target": target,
+            "ok": True,
+            "results": [
+                {
+                    "id": "chatterbox",
+                    "installed": True,
+                    "path": "/tmp/vibemix-test/chatterbox",
+                    "files": [],
+                    "errors": [],
+                }
+            ],
+        },
+    )
+
+    rc = m._run_library_cli(["models", "--install", "chatterbox", "--json"])
+    assert rc == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["install"]["target"] == "chatterbox"
+    assert payload["install"]["results"][0]["id"] == "chatterbox"
+
+
+def test_models_install_moss_alias_is_still_accepted_by_cli(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture,
+) -> None:
+    import vibemix.library.model_assets as model_assets
+
+    monkeypatch.setattr(
+        model_assets,
+        "install_models",
+        lambda target, force=False: {
+            "target": target,
+            "ok": True,
+            "results": [
+                {
+                    "id": "chatterbox",
+                    "installed": True,
+                    "path": "/tmp/vibemix-test/chatterbox",
+                    "files": [],
+                    "errors": [],
+                }
+            ],
+        },
+    )
+
+    rc = m._run_library_cli(["models", "--install", "moss", "--json"])
+    assert rc == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["install"]["target"] == "moss"
+    assert payload["install"]["results"][0]["id"] == "chatterbox"
+
+
 def test_models_install_progress_keeps_stdout_json_pure(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture,
@@ -336,6 +398,34 @@ def test_install_models_chatterbox_target_routes_to_prefetch(
     )
 
     payload = model_assets.install_models("chatterbox", force=True)
+
+    assert payload["target"] == "chatterbox"
+    assert payload["ok"] is True
+    assert payload["results"][0]["id"] == "chatterbox"
+    assert payload["results"][0]["force"] is True
+
+
+def test_install_models_moss_alias_routes_to_chatterbox_prefetch(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import vibemix.library.model_assets as model_assets
+
+    monkeypatch.setattr(
+        model_assets,
+        "install_chatterbox_model",
+        lambda force=False: {
+            "id": "chatterbox",
+            "installed": True,
+            "path": "/tmp/vibemix-test/chatterbox",
+            "repo": model_assets.CHATTERBOX_MODEL_REPO,
+            "revision": model_assets.CHATTERBOX_MODEL_REVISION,
+            "files": [],
+            "errors": [],
+            "force": force,
+        },
+    )
+
+    payload = model_assets.install_models("moss", force=True)
 
     assert payload["target"] == "chatterbox"
     assert payload["ok"] is True

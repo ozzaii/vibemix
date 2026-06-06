@@ -3694,12 +3694,13 @@ def _build_library_subparsers(parser: argparse.ArgumentParser) -> None:
     sp_models.add_argument("--json", action="store_true")
     sp_models.add_argument(
         "--install",
-        choices=("clap", "chatterbox", "required", "cue", "all"),
+        choices=("clap", "chatterbox", "moss", "required", "cue", "all"),
         default=None,
         help=(
             "download/install supported local model assets. 'clap' installs "
-            "the Hugging Face CLAP ONNX snapshot; 'cue' reports/verifies the "
-            "manual CUE-DETR ONNX target until hosting exists."
+            "the Hugging Face CLAP ONNX snapshot; 'chatterbox' installs the "
+            "local voice model; 'moss' is a legacy alias; 'cue' reports/verifies "
+            "the manual CUE-DETR ONNX target until hosting exists."
         ),
     )
     sp_models.add_argument(

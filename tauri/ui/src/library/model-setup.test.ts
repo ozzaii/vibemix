@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 /* Vibe Engine — local model setup view spec.
  *
- * Pins the first-run setup contract: CLAP + MOSS are required, and CUE-DETR
+ * Pins the first-run setup contract: CLAP + local voice are required, and CUE-DETR
  * is optional unless the user explicitly checks/repairs it.
  */
 
@@ -19,7 +19,7 @@ import {
 } from "./index.js";
 
 function model(
-  id: "clap" | "moss-tts" | "cue-detr",
+  id: "clap" | "chatterbox-voice" | "moss-tts" | "cue-detr",
   overrides: Partial<LibraryModelAsset> = {},
 ): LibraryModelAsset {
   const defaults = {
@@ -29,6 +29,13 @@ function model(
       required: true,
       env: "VIBEMIX_CLAP_ONNX_DIR",
       installable: true,
+    },
+    "chatterbox-voice": {
+      label: "Chatterbox voice",
+      role: "local co-host voice",
+      required: true,
+      env: "VIBEMIX_CHATTERBOX_REF",
+      installable: false,
     },
     "moss-tts": {
       label: "MOSS TTS ONNX",
@@ -64,7 +71,7 @@ function payload(
   overrides: Partial<LibraryModelsResult> = {},
 ): LibraryModelsResult {
   return {
-    models: [model("clap"), model("moss-tts"), model("cue-detr")],
+    models: [model("clap"), model("chatterbox-voice"), model("cue-detr")],
     required_ready: true,
     all_ready: true,
     ...overrides,
@@ -72,7 +79,7 @@ function payload(
 }
 
 describe("deriveModelSetupView", () => {
-  it("hides the install button when CLAP, MOSS, and CUE are ready", () => {
+  it("hides the install button when CLAP, voice, and CUE are ready", () => {
     const view = deriveModelSetupView(payload());
 
     expect(view.stateText).toBe("Sound match ready · Voice ready · Cue finder ready");
@@ -85,7 +92,7 @@ describe("deriveModelSetupView", () => {
       payload({
         models: [
           model("clap", { installed: false, missing: ["model.onnx"] }),
-          model("moss-tts"),
+          model("chatterbox-voice"),
           model("cue-detr", { installed: false, missing: ["cuedetr.fp32.onnx"] }),
         ],
         required_ready: false,
@@ -99,12 +106,12 @@ describe("deriveModelSetupView", () => {
     expect(view.installButtonText).toBe("Install Sound Match + Voice");
   });
 
-  it("routes missing MOSS through required setup without pretending it is CLAP", () => {
+  it("routes missing local voice through required setup without pretending it is CLAP", () => {
     const view = deriveModelSetupView(
       payload({
         models: [
           model("clap"),
-          model("moss-tts", {
+          model("chatterbox-voice", {
             installed: false,
             installable: false,
             missing: ["encoder_model.onnx"],
@@ -122,12 +129,12 @@ describe("deriveModelSetupView", () => {
     expect(view.installButtonText).toBe("Install Sound Match + Voice");
   });
 
-  it("labels an operator-hosted MOSS install as missing when pins are configured", () => {
+  it("labels an operator-hosted voice install as missing when pins are configured", () => {
     const view = deriveModelSetupView(
       payload({
         models: [
           model("clap"),
-          model("moss-tts", {
+          model("chatterbox-voice", {
             installed: false,
             installable: true,
             missing: ["encoder_model.onnx"],
@@ -148,7 +155,7 @@ describe("deriveModelSetupView", () => {
       payload({
         models: [
           model("clap"),
-          model("moss-tts"),
+          model("chatterbox-voice"),
           model("cue-detr", { installed: false, missing: ["cuedetr.fp32.onnx"] }),
         ],
         all_ready: false,
@@ -165,7 +172,7 @@ describe("deriveModelSetupView", () => {
       payload({
         models: [
           model("clap"),
-          model("moss-tts"),
+          model("chatterbox-voice"),
           model("cue-detr", {
             installed: false,
             installable: true,
@@ -186,7 +193,7 @@ describe("deriveModelSetupView", () => {
       payload({
         models: [
           model("clap"),
-          model("moss-tts"),
+          model("chatterbox-voice"),
           model("cue-detr", {
             installed: false,
             installable: true,
@@ -208,7 +215,7 @@ describe("deriveModelSetupView", () => {
       payload({
         models: [
           model("clap"),
-          model("moss-tts"),
+          model("chatterbox-voice"),
           model("cue-detr", {
             installed: false,
             installable: false,
@@ -230,7 +237,7 @@ describe("deriveModelSetupView", () => {
       payload({
         models: [
           model("clap", { installed: false, missing: ["model.onnx"] }),
-          model("moss-tts"),
+          model("chatterbox-voice"),
           model("cue-detr"),
         ],
         required_ready: false,
@@ -261,7 +268,7 @@ describe("deriveModelSetupView", () => {
       payload({
         models: [
           model("clap"),
-          model("moss-tts"),
+          model("chatterbox-voice"),
           model("cue-detr", { installed: false, missing: ["cuedetr.fp32.onnx"] }),
         ],
         all_ready: false,
@@ -286,12 +293,12 @@ describe("deriveModelSetupView", () => {
     expect(view.installButtonHidden).toBe(true);
   });
 
-  it("uses MOSS-specific install error copy for direct MOSS checks", () => {
+  it("uses voice-specific install error copy for direct Chatterbox checks", () => {
     const view = deriveModelSetupView(
       payload({
         models: [
           model("clap"),
-          model("moss-tts", {
+          model("chatterbox-voice", {
             installed: false,
             installable: true,
             missing: ["encoder_model.onnx"],
@@ -301,15 +308,15 @@ describe("deriveModelSetupView", () => {
         required_ready: false,
         all_ready: false,
         install: {
-          target: "moss",
+          target: "chatterbox",
           ok: false,
           results: [
             {
-              id: "moss-tts",
+              id: "chatterbox-voice",
               installed: false,
-              path: "/tmp/vibemix-test/moss-tts",
+              path: "/tmp/vibemix-test/chatterbox-voice",
               files: [],
-              errors: ["set VIBEMIX_MOSS_TTS_ARCHIVE_URL"],
+              errors: ["set VIBEMIX_CHATTERBOX_MODEL"],
             },
           ],
         },
@@ -326,6 +333,7 @@ describe("modelInstallTargetFromDataset", () => {
     const targets: LibraryModelInstallTarget[] = [
       "required",
       "clap",
+      "chatterbox",
       "moss",
       "cue",
       "all",
@@ -371,6 +379,19 @@ describe("modelProgressStateText", () => {
         size: 281_749_092,
       }),
     ).toBe("Sound match verified 1/6");
+
+    expect(
+      modelProgressStateText({
+        target: "chatterbox",
+        id: "chatterbox-voice",
+        n: 1,
+        total: 1,
+        status: "verified",
+        rel_path: "cohost_voice_ref.wav",
+        downloaded: 1_024_000,
+        size: 1_024_000,
+      }),
+    ).toBe("Voice verified 1/1");
 
     expect(
       modelProgressStateText({
