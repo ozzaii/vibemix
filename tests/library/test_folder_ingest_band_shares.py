@@ -294,3 +294,56 @@ def test_embed_folder_cli_enables_band_shares_by_default(
     assert calls["folder"] == folder
     assert calls["compute_band_shares"] is True
     assert calls["closed"] is True
+
+
+def test_embed_folder_cli_expands_default_music_tilde(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The desktop first-run field defaults to ~/Music; keep that path valid."""
+    import vibemix.library as library_mod
+    from vibemix import __main__ as main_mod
+
+    home = tmp_path / "home"
+    folder = home / "Music"
+    folder.mkdir(parents=True)
+    calls: dict[str, object] = {}
+
+    class FakeStore:
+        def close(self) -> None:
+            calls["closed"] = True
+
+    def fake_ingest_folder(folder_arg, embedder, store, **kwargs):
+        calls["folder"] = folder_arg
+        return SimpleNamespace(
+            embedded=0,
+            skipped_cached=0,
+            failed=0,
+            total=0,
+            cost_estimate_eur=0.0,
+            as_dict=lambda: {
+                "embedded": 0,
+                "skipped_cached": 0,
+                "failed": 0,
+                "total": 0,
+            },
+        )
+
+    monkeypatch.setenv("HOME", str(home))
+    monkeypatch.setattr(library_mod, "build_embedder", lambda *a, **k: object())
+    monkeypatch.setattr(library_mod, "open_store", lambda *a, **k: FakeStore())
+    monkeypatch.setattr(library_mod, "ingest_folder", fake_ingest_folder)
+
+    rc = main_mod._cmd_library_embed_folder(
+        argparse.Namespace(
+            path="~/Music",
+            strategy="mean_excerpt",
+            compute_key=False,
+            compute_bpm=False,
+            json=True,
+        )
+    )
+
+    assert rc == 0
+    assert calls["folder"] == folder
+    assert calls["closed"] is True

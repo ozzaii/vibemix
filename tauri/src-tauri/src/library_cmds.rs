@@ -1512,9 +1512,51 @@ fn push_embed_stderr_tail(tail: &mut Vec<String>, chunk: &str) {
     }
 }
 
+fn expand_embed_folder_path(raw: &str, home: Option<&str>) -> Result<PathBuf, String> {
+    let trimmed = raw.trim();
+    if trimmed.is_empty() {
+        return Err("Pick a music folder before indexing.".to_string());
+    }
+    if trimmed == "~" || trimmed.starts_with("~/") {
+        let home = home.filter(|h| !h.trim().is_empty()).ok_or_else(|| {
+            format!(
+                "embed-folder path {trimmed:?} uses '~' but HOME is not set; pick an absolute music folder."
+            )
+        })?;
+        let mut path = PathBuf::from(home);
+        if let Some(rest) = trimmed.strip_prefix("~/") {
+            path.push(rest);
+        }
+        return Ok(path);
+    }
+    if trimmed.starts_with('~') {
+        return Err(format!(
+            "embed-folder path {trimmed:?} uses an unsupported '~user' form; pick an absolute music folder."
+        ));
+    }
+    Ok(PathBuf::from(trimmed))
+}
+
+fn preflight_embed_folder_path(raw: &str, home: Option<&str>) -> Result<PathBuf, String> {
+    let path = expand_embed_folder_path(raw, home)?;
+    match fs::metadata(&path) {
+        Ok(meta) if meta.is_dir() => Ok(path),
+        Ok(_) => Err(format!(
+            "embed-folder: '{}' is not a directory. Pick an existing music folder, then index again.",
+            path.display()
+        )),
+        Err(e) => Err(format!(
+            "embed-folder: '{}' is unavailable ({e}). Pick an existing music folder, then index again.",
+            path.display()
+        )),
+    }
+}
+
 fn embed_folder_exit_error(code: i32, stderr_tail: &[String]) -> String {
     if stderr_tail.is_empty() {
-        return format!("embed-folder exited {code}");
+        return format!(
+            "embed-folder exited {code} before reporting diagnostics. Check the selected folder and local CLAP setup, then index again."
+        );
     }
     format!("embed-folder exited {code}: {}", stderr_tail.join(" | "))
 }
@@ -1550,10 +1592,18 @@ pub async fn library_embed_folder(
             "invalid strategy {strategy:?} (expected mean_excerpt | cue_anchored)"
         ));
     }
+    let folder_path = preflight_embed_folder_path(&path, std::env::var("HOME").ok().as_deref())?;
+    let folder_arg = folder_path.to_string_lossy().into_owned();
 
     let cmd = build_library_command(
         &app,
-        &["library", "embed-folder", &path, "--strategy", &strategy],
+        &[
+            "library",
+            "embed-folder",
+            &folder_arg,
+            "--strategy",
+            &strategy,
+        ],
     )?;
     let (mut rx, _child) = cmd
         .spawn()
@@ -1758,7 +1808,24 @@ mod tests {
 
     #[test]
     fn embed_folder_exit_error_without_stderr_stays_code_only() {
-        assert_eq!(embed_folder_exit_error(2, &[]), "embed-folder exited 2");
+        let err = embed_folder_exit_error(2, &[]);
+        assert!(err.starts_with("embed-folder exited 2"));
+        assert!(err.contains("before reporting diagnostics"));
+    }
+
+    #[test]
+    fn embed_folder_path_expands_default_music_tilde() {
+        let path = expand_embed_folder_path("~/Music/bois", Some("/Users/ozai"))
+            .expect("tilde path expands");
+        assert_eq!(path, PathBuf::from("/Users/ozai/Music/bois"));
+    }
+
+    #[test]
+    fn embed_folder_path_rejects_empty_and_tilde_user_forms() {
+        assert!(expand_embed_folder_path(" ", Some("/Users/ozai")).is_err());
+        let err = expand_embed_folder_path("~someone/Music", Some("/Users/ozai"))
+            .expect_err("unsupported tilde user path");
+        assert!(err.contains("unsupported"));
     }
 
     #[test]

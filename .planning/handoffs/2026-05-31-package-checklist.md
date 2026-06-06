@@ -13277,3 +13277,42 @@ Proof before staging:
 - `npm --prefix tauri/ui run build`
 - `git diff --check -- tauri/ui/src/learn/lesson/tutor-dock.ts tauri/ui/src/learn/learn-window.ts tauri/ui/tests/learn/test_tutor_speak_sr_announcement.spec.ts .planning/handoffs/2026-05-31-package-checklist.md`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+
+## Package 158 - Library First-Run Folder Preflight
+
+Suggested commit: `fix(library): preflight first-run folder imports`
+
+Include:
+
+- `src/vibemix/__main__.py`
+- `tauri/src-tauri/src/library_cmds.rs`
+- `tauri/ui/src/library/chat.test.ts`
+- `tests/library/test_folder_ingest_band_shares.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- CLAP embedding algorithm changes, model download UX, Viber chat behavior,
+  settings redesign, and live co-host/Sven runtime changes. This package only
+  makes the first-run folder import path resolve the UI default and fail
+  actionably before the user falls into a bare subprocess exit.
+
+Reason:
+
+- The Library first-run field defaults to `~/Music`, but the Python
+  `embed-folder` command did not expand `~`, and the Tauri bridge spawned the
+  CLI before checking whether the selected folder was usable. A fresh user
+  could therefore click the default or a stale folder and only see
+  `embed-folder exited 1`. Expand the CLI path, preflight the Tauri folder
+  argument, and keep code-only exits actionable with a local setup hint.
+
+Proof before staging:
+
+- `uv run pytest -q tests/library/test_folder_ingest_band_shares.py::test_embed_folder_cli_expands_default_music_tilde tests/library/test_folder_ingest_band_shares.py::test_embed_folder_cli_enables_band_shares_by_default`
+- `npm --prefix tauri/ui test -- src/library/chat.test.ts`
+- `cargo test --manifest-path tauri/src-tauri/Cargo.toml library_cmds -- --nocapture`
+- `uv run ruff check src/vibemix/__main__.py tests/library/test_folder_ingest_band_shares.py`
+- `uv run python -m compileall -q src/vibemix/__main__.py tests/library/test_folder_ingest_band_shares.py`
+- `npm --prefix tauri/ui run build`
+- `git diff --check -- src/vibemix/__main__.py tauri/src-tauri/src/library_cmds.rs tauri/ui/src/library/chat.test.ts tests/library/test_folder_ingest_band_shares.py .planning/handoffs/2026-05-31-package-checklist.md`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`

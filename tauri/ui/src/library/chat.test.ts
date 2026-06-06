@@ -705,6 +705,30 @@ describe("chat - real runChat path", () => {
     );
   });
 
+  it("turns code-only folder indexing exits into a setup hint", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    embedFolderMock.mockRejectedValueOnce(
+      new Error(
+        "embed-folder exited 1 before reporting diagnostics. Check the selected folder and local CLAP setup, then index again.",
+      ),
+    );
+    await mountChat();
+
+    document.querySelector<HTMLButtonElement>('[data-mode-jump="ingest"]')?.click();
+    for (let i = 0; i < 4; i++) await Promise.resolve();
+    (document.getElementById("vmx-lib-runbtn") as HTMLButtonElement).click();
+    for (let i = 0; i < 8; i++) await Promise.resolve();
+
+    const error = document.getElementById("vmx-lib-ingest-error") as HTMLElement;
+    expect(error.hidden).toBe(false);
+    expect(error.textContent).toContain("embed-folder exited 1");
+    expect(error.textContent).toContain("Install local model setup");
+    expect(errorSpy).toHaveBeenCalledWith(
+      "[vmx-lib] run failed:",
+      expect.any(Error),
+    );
+  });
+
   it("surfaces a cached folder-index receipt instead of a vague done state", async () => {
     embedFolderMock.mockResolvedValueOnce(true);
     await mountChat();

@@ -7557,7 +7557,15 @@ def _cmd_library_embed_folder(args: argparse.Namespace) -> int:
         open_store,
     )
 
-    folder = _Path(args.path)
+    try:
+        folder = _Path(args.path).expanduser()
+    except RuntimeError:
+        print(
+            f"[FATAL] embed-folder: {args.path!r} uses '~' but no home directory is available.",
+            file=sys.stderr,
+            flush=True,
+        )
+        return 1
     if not folder.is_dir():
         print(
             f"[FATAL] embed-folder: {args.path!r} is not a directory.",
