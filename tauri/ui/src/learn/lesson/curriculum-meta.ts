@@ -88,6 +88,10 @@ export interface LearnPracticeMission {
   meter_max: number;
   meter_state: "armed" | "retry" | "proof" | "mastered" | "replay";
   meter_caption: string;
+  momentum_label: string;
+  momentum_value: number;
+  momentum_max: number;
+  momentum_caption: string;
 }
 
 export interface LearnPracticeChainStep {

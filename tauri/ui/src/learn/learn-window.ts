@@ -904,7 +904,7 @@ function mountLearnWindow(root: HTMLElement): {
       return;
     }
     const label = cleanMissionText(mission.meter_label) ?? "progress";
-    const caption = cleanMissionText(mission.meter_caption) ?? "keep going";
+    const caption = missionRewardCaption(mission) ?? "keep going";
     const value = missionMeterValue(mission);
     const max = missionMeterMax(mission);
     boothReward.dataset.visible = "true";
@@ -2224,7 +2224,7 @@ function missionBoothCue(
   const proof = cleanMissionText(mission.proof) ??
     missionProofPhraseForMission(mission, readiness, controllerName);
   const challenge = cleanMissionText(mission.challenge);
-  const reward = cleanMissionText(mission.meter_caption);
+  const reward = missionRewardCaption(mission);
   const label = [action, why, challenge, payoff, proof, reward]
     .filter((part): part is string => Boolean(part))
     .join(". ");
@@ -2326,7 +2326,7 @@ function snapshotMissionFeedback(mission: LearnPracticeMission): {
   const challenge = cleanMissionText(mission.challenge);
   const proof = cleanMissionText(mission.proof);
   const why = cleanMissionText(mission.why);
-  const reward = cleanMissionText(mission.meter_caption);
+  const reward = missionRewardCaption(mission);
   const ariaLabel = [focusLabel, challenge, proof, why, reward]
     .filter((part): part is string => Boolean(part))
     .join(". ");
@@ -2335,6 +2335,16 @@ function snapshotMissionFeedback(mission: LearnPracticeMission): {
     ariaLabel,
     tone: mission.meter_state === "mastered" ? "mastered" : mission.focus,
   };
+}
+
+function missionRewardCaption(mission: LearnPracticeMission): string | null {
+  const caption = cleanMissionText(mission.meter_caption);
+  const momentum = cleanMissionText(mission.momentum_caption);
+  if (!caption) return momentum;
+  if (!momentum || caption.toLowerCase() === momentum.toLowerCase()) {
+    return caption;
+  }
+  return `${caption} · ${momentum}`;
 }
 
 function liveGradePhaseLine(phaseErrorBeats: number): string {

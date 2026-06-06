@@ -206,6 +206,24 @@ def test_progress_state_accepts_current_progress_schema() -> None:
     _VALIDATOR.validate(wire)
 
 
+def test_progress_state_accepts_current_snapshot_mission_contract() -> None:
+    """The closed IPC schema must accept the derived practice mission packet."""
+    progress = LearnProgress()
+    progress.mark_practice_source("course_1_anatomy", "L1.03", "click")
+    env = LearnProgressState.make(
+        action="snapshot",
+        progress=progress.snapshot(),
+    )
+    wire = json.loads(env.to_json())
+
+    mission = wire["payload"]["progress"]["next_practice_mission"]
+    assert mission["lesson_id"] == "L1.03"
+    assert mission["practice_surface"] == "screen_deck"
+    assert mission["momentum_label"] == "streak 1/3"
+    assert mission["momentum_caption"] == "2 clean reps to fill the bank"
+    _VALIDATOR.validate(wire)
+
+
 # ---------------------------------------------------------------------------
 # Schema-side count parity: 13 Learn refs in the shared oneOf list
 # ---------------------------------------------------------------------------

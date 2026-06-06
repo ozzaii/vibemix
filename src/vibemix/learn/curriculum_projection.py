@@ -185,6 +185,10 @@ def render_curriculum_meta_ts() -> str:
         "  meter_max: number;\n"
         '  meter_state: "armed" | "retry" | "proof" | "mastered" | "replay";\n'
         "  meter_caption: string;\n"
+        "  momentum_label: string;\n"
+        "  momentum_value: number;\n"
+        "  momentum_max: number;\n"
+        "  momentum_caption: string;\n"
         "}\n"
         "\n"
         "export interface LearnPracticeChainStep {\n"

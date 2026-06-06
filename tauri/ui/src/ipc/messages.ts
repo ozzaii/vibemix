@@ -1862,6 +1862,7 @@ export interface LearnProgressState {
         focus: "first_rep" | "retry" | "proof" | "replay" | "hardware" | "lock" | "mastery" | "recovery";
         focus_label: string;
         challenge: string;
+        practice_surface: "screen_deck" | "controller" | "live_proof";
         /**
          * @minItems 1
          * @maxItems 3
@@ -1932,6 +1933,10 @@ export interface LearnProgressState {
         meter_max: number;
         meter_state: "armed" | "retry" | "proof" | "mastered" | "replay";
         meter_caption: string;
+        momentum_label: string;
+        momentum_value: number;
+        momentum_max: number;
+        momentum_caption: string;
       };
     };
   };

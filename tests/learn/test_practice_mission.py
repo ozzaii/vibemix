@@ -34,6 +34,10 @@ def test_fresh_mission_starts_with_useful_controller_practice() -> None:
     assert mission["meter_max"] == 1
     assert mission["meter_state"] == "armed"
     assert mission["meter_caption"] == "touch the control to begin"
+    assert mission["momentum_label"] == "streak 0/3"
+    assert mission["momentum_value"] == 0
+    assert mission["momentum_max"] == 3
+    assert mission["momentum_caption"] == "one clean move starts the streak"
     assert [step["lesson_id"] for step in mission["chain"]] == ["L1.02", "L1.03", "L1.04"]
     assert mission["chain"][0]["state"] == "now"
     assert mission["chain"][0]["label"] == "first rep"
@@ -80,6 +84,8 @@ def test_screen_free_practice_receipt_becomes_banked_finish_mission() -> None:
     assert mission["meter_max"] == 3
     assert mission["meter_state"] == "armed"
     assert mission["meter_caption"] == "1 screen rep banked"
+    assert mission["momentum_label"] == "streak 1/3"
+    assert mission["momentum_caption"] == "2 clean reps to fill the bank"
 
 
 def test_hardware_free_practice_receipt_becomes_controller_finish_mission() -> None:
@@ -129,6 +135,8 @@ def test_mixed_free_practice_receipts_build_a_three_rep_bank() -> None:
     assert mission["meter_value"] == 3
     assert mission["meter_max"] == 3
     assert mission["meter_caption"] == "3 reps banked: screen + hardware"
+    assert mission["momentum_label"] == "streak 3/3"
+    assert mission["momentum_caption"] == "streak full; finish the lesson now"
 
 
 def test_screen_only_practice_bank_escalates_to_controller_checkpoint() -> None:
@@ -155,6 +163,8 @@ def test_screen_only_practice_bank_escalates_to_controller_checkpoint() -> None:
     assert mission["meter_value"] == 0
     assert mission["meter_max"] == 1
     assert mission["meter_caption"] == "3 screen reps banked; controller rep next"
+    assert mission["momentum_label"] == "streak 3/3"
+    assert mission["momentum_caption"] == "streak armed; controller checkpoint next"
 
 
 def test_practice_chain_labels_later_banked_steps() -> None:
@@ -208,6 +218,8 @@ def test_cleared_competent_skill_turns_into_cited_proof_mission() -> None:
     assert mission["meter_max"] == 3
     assert mission["meter_state"] == "proof"
     assert mission["meter_caption"] == "2 proofs left to Mastery"
+    assert mission["momentum_label"] == "proof streak 1/3"
+    assert mission["momentum_caption"] == "2 cited proofs left to Mastery"
 
 
 def test_zpd_frontier_proof_mission_beats_linear_empty_lesson() -> None:
@@ -275,6 +287,8 @@ def test_measured_miss_turns_current_proof_mission_into_recovery_target() -> Non
     assert mission["meter_max"] == 1
     assert mission["meter_state"] == "retry"
     assert mission["meter_caption"] == "0.05 beats from lock"
+    assert mission["momentum_label"] == "fix loop"
+    assert mission["momentum_caption"] == "fix the miss before chasing proof"
 
 
 def test_active_mastered_lesson_becomes_the_current_mastery_mission() -> None:
@@ -305,3 +319,5 @@ def test_active_mastered_lesson_becomes_the_current_mastery_mission() -> None:
     assert mission["meter_max"] == 3
     assert mission["meter_state"] == "mastered"
     assert mission["meter_caption"] == "Mastery earned"
+    assert mission["momentum_label"] == "proof streak 3/3"
+    assert mission["momentum_caption"] == "Mastery earned; carry it into a set"

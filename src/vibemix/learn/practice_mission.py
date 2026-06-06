@@ -80,6 +80,7 @@ def next_practice_mission(
     challenge = _challenge_for(mode, row, skill_label, skill_row, feedback)
     practice_surface = _practice_surface_for(mode, focus, row, feedback)
     meter = _meter_for(mode, focus, row, skill_id, skill_label, skill_row, feedback)
+    momentum = _momentum_for(mode, focus, row, skill_id, skill_row, feedback)
     chain = _practice_chain_for(
         progress,
         lesson_id=lesson_id,
@@ -105,6 +106,7 @@ def next_practice_mission(
         "practice_surface": practice_surface,
         "chain": chain,
         **meter,
+        **momentum,
     }
 
 
@@ -589,6 +591,93 @@ def _meter_for(
         "meter_max": 1,
         "meter_state": "armed",
         "meter_caption": "touch the control to begin",
+    }
+
+
+def _momentum_for(
+    mode: str,
+    focus: str,
+    row: dict[str, Any] | None,
+    skill_id: str,
+    skill_row: dict[str, Any] | None,
+    feedback: dict[str, str] | None,
+) -> dict[str, Any]:
+    """Return a short streak loop grounded in persisted practice receipts."""
+    if focus == "mastery":
+        spec = SKILL_MANIFEST.get(skill_id)
+        threshold = max(1, spec.mastered_threshold if spec is not None else 3)
+        return {
+            "momentum_label": f"proof streak {threshold}/{threshold}",
+            "momentum_value": threshold,
+            "momentum_max": threshold,
+            "momentum_caption": "Mastery earned; carry it into a set",
+        }
+    if focus == "recovery" and feedback is not None:
+        return {
+            "momentum_label": "fix loop",
+            "momentum_value": 0,
+            "momentum_max": 1,
+            "momentum_caption": "fix the miss before chasing proof",
+        }
+    if focus == "proof":
+        spec = SKILL_MANIFEST.get(skill_id)
+        threshold = max(1, spec.mastered_threshold if spec is not None else 3)
+        count = 0
+        if skill_row is not None:
+            count = max(0, _safe_int(skill_row.get("live_proof_count"), default=0))
+        shown_count = min(count, threshold)
+        remaining = max(0, threshold - count)
+        caption = (
+            "Mastery earned; review it while fresh"
+            if remaining == 0
+            else _plural_left(remaining, "cited proof", "Mastery")
+        )
+        return {
+            "momentum_label": f"proof streak {shown_count}/{threshold}",
+            "momentum_value": shown_count,
+            "momentum_max": threshold,
+            "momentum_caption": caption,
+        }
+    if focus == "retry":
+        return {
+            "momentum_label": "clean rep 0/1",
+            "momentum_value": 0,
+            "momentum_max": 1,
+            "momentum_caption": "one clean rep clears the retry loop",
+        }
+    if mode == "replay":
+        return {
+            "momentum_label": "replay streak 1/1",
+            "momentum_value": 1,
+            "momentum_max": 1,
+            "momentum_caption": "keep it automatic while it is warm",
+        }
+    if _screen_warmup_needs_hardware(row):
+        return {
+            "momentum_label": "streak 3/3",
+            "momentum_value": 3,
+            "momentum_max": 3,
+            "momentum_caption": "streak armed; controller checkpoint next",
+        }
+    count = _practice_bank_count(row)
+    if count > 0:
+        remaining = max(0, 3 - count)
+        if remaining == 0:
+            caption = "streak full; finish the lesson now"
+        else:
+            unit = "rep" if remaining == 1 else "reps"
+            caption = f"{remaining} clean {unit} to fill the bank"
+        return {
+            "momentum_label": f"streak {count}/3",
+            "momentum_value": count,
+            "momentum_max": 3,
+            "momentum_caption": caption,
+        }
+    return {
+        "momentum_label": "streak 0/3",
+        "momentum_value": 0,
+        "momentum_max": 3,
+        "momentum_caption": "one clean move starts the streak",
     }
 
 

@@ -12779,3 +12779,50 @@ Proof before staging:
 - `npm --prefix tauri/ui run build`
 - `git diff --check -- tauri/ui/src/learn/learn-window.ts tauri/ui/tests/learn/test_practice_booth_shell.spec.ts .planning/handoffs/2026-05-31-package-checklist.md`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+
+## Package 145 - Learn Mission Momentum Streaks
+
+Suggested commit: `feat(learn): surface practice momentum streaks`
+
+Include:
+
+- `src/vibemix/learn/practice_mission.py`
+- `src/vibemix/learn/curriculum_projection.py`
+- `tauri/ui/src/learn/lesson/curriculum-meta.ts`
+- `tauri/ui/src/learn/learn-window.ts`
+- `tauri/ui/src/ipc/messages.schema.json`
+- `tauri/ui/src/ipc/messages.ts`
+- `tauri/ui/src/ipc/validator.generated.mjs`
+- `tests/learn/test_practice_mission.py`
+- `tauri/ui/tests/learn/test_practice_booth_shell.spec.ts`
+- `tests/ipc/test_learn_envelope_parity_p92.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- New progress persistence fields, lesson FSM timing, live grading algorithms,
+  shell layout, controller detection, beginner-path suites, and Sven/Viber
+  prompt behavior. This package only derives a momentum/streak line from
+  already-persisted practice receipts and keeps the closed IPC mission contract
+  aligned.
+
+Reason:
+
+- The Learn booth already rewards a banked rep, but it does not make the next
+  repetition feel sticky. Add `momentum_*` fields to the derived
+  `next_practice_mission` packet so a learner sees "streak 2/3" and the exact
+  next unlock ("one more clean rep fills the bank", "controller checkpoint
+  next", "proof streak 2/3") from real `practice_sources` /
+  `last_practice_seq` data. Update the JSON schema/codegen too, including the
+  already-landed `practice_surface` field, so full progress snapshots validate
+  through the real closed IPC envelope.
+
+Proof before staging:
+
+- `uv run pytest -q tests/learn/test_practice_mission.py tests/ipc/test_learn_envelope_parity_p92.py`
+- `uv run python scripts/export_learn_curriculum_meta.py --check`
+- `npm --prefix tauri/ui run codegen:ipc`
+- `npm --prefix tauri/ui test -- tests/learn/test_practice_booth_shell.spec.ts`
+- `npm --prefix tauri/ui run build`
+- `git diff --check -- src/vibemix/learn/practice_mission.py src/vibemix/learn/curriculum_projection.py tauri/ui/src/learn/lesson/curriculum-meta.ts tauri/ui/src/learn/learn-window.ts tauri/ui/src/ipc/messages.schema.json tauri/ui/src/ipc/messages.ts tauri/ui/src/ipc/validator.generated.mjs tests/learn/test_practice_mission.py tauri/ui/tests/learn/test_practice_booth_shell.spec.ts tests/ipc/test_learn_envelope_parity_p92.py .planning/handoffs/2026-05-31-package-checklist.md`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`

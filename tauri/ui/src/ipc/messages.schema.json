@@ -3660,7 +3660,7 @@
                   "$comment": "IPC-only derived Learn booth mission. Deterministic next move built from curriculum/progress/skill wall; never persisted to learn-progress.json.",
                   "type": "object",
                   "additionalProperties": false,
-                  "required": ["lesson_id", "course_id", "course_label", "skill_id", "skill_label", "title", "mode", "command", "payoff", "proof", "why", "estimated_minutes", "focus", "focus_label", "challenge", "meter_label", "meter_value", "meter_max", "meter_state", "meter_caption"],
+                  "required": ["lesson_id", "course_id", "course_label", "skill_id", "skill_label", "title", "mode", "command", "payoff", "proof", "why", "estimated_minutes", "focus", "focus_label", "challenge", "practice_surface", "meter_label", "meter_value", "meter_max", "meter_state", "meter_caption", "momentum_label", "momentum_value", "momentum_max", "momentum_caption"],
                   "properties": {
                     "lesson_id": {"type": "string"},
                     "course_id": {"type": "string"},
@@ -3677,6 +3677,7 @@
                     "focus": {"type": "string", "enum": ["first_rep", "retry", "proof", "replay", "hardware", "lock", "mastery", "recovery"]},
                     "focus_label": {"type": "string"},
                     "challenge": {"type": "string"},
+                    "practice_surface": {"type": "string", "enum": ["screen_deck", "controller", "live_proof"]},
                     "chain": {
                       "type": "array",
                       "minItems": 1,
@@ -3700,7 +3701,11 @@
                     "meter_value": {"type": "integer", "minimum": 0},
                     "meter_max": {"type": "integer", "minimum": 1},
                     "meter_state": {"type": "string", "enum": ["armed", "retry", "proof", "mastered", "replay"]},
-                    "meter_caption": {"type": "string"}
+                    "meter_caption": {"type": "string"},
+                    "momentum_label": {"type": "string"},
+                    "momentum_value": {"type": "integer", "minimum": 0},
+                    "momentum_max": {"type": "integer", "minimum": 1},
+                    "momentum_caption": {"type": "string"}
                   }
                 }
               }

@@ -2464,11 +2464,16 @@ describe("practice booth shell", () => {
                 focus: "hardware",
                 focus_label: "practice bank 3/3",
                 challenge: "Repeat a banked move inside the lesson.",
+                practice_surface: "controller",
                 meter_label: "practice bank",
                 meter_value: 3,
                 meter_max: 3,
                 meter_state: "armed",
                 meter_caption: "3 reps banked: screen + hardware",
+                momentum_label: "streak 3/3",
+                momentum_value: 3,
+                momentum_max: 3,
+                momentum_caption: "streak full; finish the lesson now",
               },
             },
           },
@@ -2482,14 +2487,14 @@ describe("practice booth shell", () => {
       expect(reward.dataset.visible).toBe("true");
       expect(reward.dataset.state).toBe("armed");
       expect(reward.getAttribute("aria-label")).toBe(
-        "practice bank 3 of 3. 3 reps banked: screen + hardware",
+        "practice bank 3 of 3. 3 reps banked: screen + hardware · streak full; finish the lesson now",
       );
       expect(
         root.querySelector<HTMLElement>("#learn-booth-reward-label")?.textContent,
       ).toBe("practice bank 3/3");
       expect(
         root.querySelector<HTMLElement>("#learn-booth-reward-caption")?.textContent,
-      ).toBe("3 reps banked: screen + hardware");
+      ).toBe("3 reps banked: screen + hardware · streak full; finish the lesson now");
       expect(
         root.querySelector<HTMLElement>("#learn-booth-reward-fill")?.style.width,
       ).toBe("100%");
