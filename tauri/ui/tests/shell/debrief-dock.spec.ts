@@ -23,6 +23,18 @@ vi.mock("../../src/tauri-runtime.js", () => ({
 
 import { mountDebriefDock } from "../../src/shell/DebriefDock.js";
 
+function styleText(scope: string): string {
+  return document.head.querySelector<HTMLStyleElement>(`style[data-scope="${scope}"]`)
+    ?.textContent ?? "";
+}
+
+function cssBlock(css: string, selector: string): string {
+  const start = css.indexOf(`\n  ${selector} {`);
+  if (start === -1) return "";
+  const end = css.indexOf("\n  }", start);
+  return end === -1 ? css.slice(start) : css.slice(start + 3, end + 4);
+}
+
 function sessionsPayload() {
   return {
     type: "ipc.recordings.list_result",
@@ -84,6 +96,23 @@ describe("DebriefDock", () => {
       "ipc.recordings.list_result",
     );
     expect(host.textContent).toContain("2 sessions");
+  });
+
+  it("uses material depth instead of stroked empty boxes", () => {
+    const host = document.createElement("div");
+    mountDebriefDock(host, { autoRefresh: false });
+    const css = styleText("shell-debrief-dock");
+    const dock = cssBlock(css, ".debrief-dock");
+    const mast = cssBlock(css, ".debrief-dock__mast");
+    const readiness = cssBlock(css, ".debrief-dock__readiness");
+    const empty = cssBlock(css, ".debrief-dock__empty");
+
+    expect(dock).toContain("border: 0");
+    expect(dock).toContain("var(--bevel-raised)");
+    expect(mast).toContain("var(--bevel-raised)");
+    expect(readiness).toContain("var(--bevel-raised)");
+    expect(empty).not.toContain("border: 1px");
+    expect(css).not.toContain("border: 1px dashed var(--border-default)");
   });
 
   it("lists recent recordings and opens the real debrief window for ready sessions", async () => {

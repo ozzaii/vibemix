@@ -38,11 +38,15 @@ const CSS = `
     padding: var(--sp-5);
     color: var(--text-secondary);
     background:
-      linear-gradient(135deg, var(--brand-04), transparent 32%),
-      linear-gradient(180deg, var(--void-10), var(--void-2));
-    border: 1px solid var(--border-default);
+      linear-gradient(135deg, var(--brand-08), transparent 34%),
+      linear-gradient(180deg, rgba(255, 222, 242, 0.034), transparent 22%, rgba(0, 0, 0, 0.22) 100%),
+      rgba(34, 29, 32, 0.76);
+    border: 0;
     border-radius: var(--rad-md);
-    box-shadow: var(--chrome-highlight), inset 0 -1px 0 rgba(0, 0, 0, 0.58);
+    box-shadow:
+      var(--bevel-raised),
+      0 24px 80px rgba(0, 0, 0, 0.38),
+      0 0 96px -40px var(--brand-22);
     overflow: hidden;
   }
   .debrief-dock::before {
@@ -50,12 +54,15 @@ const CSS = `
     position: absolute;
     inset: 14px;
     pointer-events: none;
-    border: 1px solid var(--border-subtle);
     border-radius: var(--rad-sm);
     background:
-      repeating-linear-gradient(90deg, transparent 0 80px, rgba(255, 222, 242, 0.022) 80px 81px),
-      linear-gradient(90deg, transparent 0 34%, var(--brand-04) 34.2%, transparent 34.6% 100%);
-    opacity: 0.7;
+      repeating-linear-gradient(90deg, transparent 0 80px, rgba(255, 222, 242, 0.020) 80px 81px),
+      linear-gradient(90deg, transparent 0 34%, var(--brand-04) 34.2%, transparent 34.6% 100%),
+      linear-gradient(180deg, rgba(255, 222, 242, 0.026), transparent 18%);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 210, 240, 0.045),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.32);
+    opacity: 0.72;
   }
   .debrief-dock > * {
     position: relative;
@@ -69,12 +76,13 @@ const CSS = `
     justify-content: space-between;
     gap: var(--sp-5);
     padding: var(--sp-4);
-    border: 1px solid var(--border-subtle);
     border-radius: var(--rad-sm);
     background:
-      linear-gradient(180deg, rgba(255, 222, 242, 0.022), transparent 28%),
-      rgba(0, 0, 0, 0.18);
-    box-shadow: inset 0 1px 0 var(--glass-top);
+      linear-gradient(180deg, rgba(255, 222, 242, 0.028), transparent 30%, rgba(0, 0, 0, 0.16) 100%),
+      rgba(48, 42, 46, 0.42);
+    box-shadow:
+      var(--bevel-raised),
+      0 14px 38px rgba(0, 0, 0, 0.22);
   }
   .debrief-dock__kicker,
   .debrief-dock__status,
@@ -128,7 +136,7 @@ const CSS = `
     grid-template-columns: 86px minmax(0, 1fr);
     gap: var(--sp-3);
     padding-top: var(--sp-2);
-    border-top: 1px solid var(--border-subtle);
+    box-shadow: inset 0 1px 0 rgba(255, 222, 242, 0.046);
   }
   .debrief-dock__proof-row dt {
     margin: 0;
@@ -184,15 +192,15 @@ const CSS = `
     gap: var(--sp-3);
     align-items: start;
     padding: var(--sp-3);
-    border: 1px solid var(--border-default);
     border-radius: var(--rad-sm);
     background:
       linear-gradient(180deg, rgba(255, 222, 242, 0.026), transparent 52%),
       rgba(0, 0, 0, 0.22);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035);
+    box-shadow:
+      var(--bevel-raised),
+      0 12px 34px rgba(0, 0, 0, 0.20);
   }
   .debrief-dock__readiness[data-state="ready"] {
-    border-color: var(--brand-22);
     background:
       linear-gradient(180deg, var(--brand-08), transparent 60%),
       rgba(0, 0, 0, 0.22);
@@ -224,11 +232,13 @@ const CSS = `
   .debrief-dock__payback-cell {
     min-width: 0;
     padding: 8px 9px;
-    border: 1px solid var(--border-subtle);
     border-radius: var(--rad-sm);
     background:
       linear-gradient(180deg, rgba(255, 222, 242, 0.018), transparent 62%),
       rgba(0, 0, 0, 0.18);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 222, 242, 0.040),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.34);
   }
   .debrief-dock__payback-label {
     display: block;
@@ -260,9 +270,11 @@ const CSS = `
   .debrief-dock__readiness-metric {
     min-width: 0;
     padding: 7px 8px;
-    border: 1px solid var(--border-subtle);
     border-radius: var(--rad-sm);
     background: rgba(0, 0, 0, 0.18);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 222, 242, 0.036),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.30);
   }
   .debrief-dock__readiness-metric dt {
     margin: 0;
@@ -289,8 +301,13 @@ const CSS = `
     place-items: center;
     min-height: 260px;
     padding: var(--sp-5);
-    border: 1px dashed var(--border-default);
     border-radius: var(--rad-sm);
+    background:
+      linear-gradient(180deg, rgba(255, 222, 242, 0.020), transparent 48%),
+      rgba(0, 0, 0, 0.14);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 222, 242, 0.040),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.34);
     color: var(--text-muted);
     text-align: center;
   }
@@ -300,15 +317,15 @@ const CSS = `
     gap: var(--sp-4);
     align-items: center;
     padding: var(--sp-3);
-    border: 1px solid var(--border-subtle);
     border-radius: var(--rad-sm);
     background:
       linear-gradient(180deg, rgba(255, 222, 242, 0.018), transparent 50%),
       rgba(0, 0, 0, 0.20);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035);
+    box-shadow:
+      var(--bevel-raised),
+      0 10px 28px rgba(0, 0, 0, 0.20);
   }
   .debrief-dock__row[data-ready="true"] {
-    border-color: var(--brand-22);
     background:
       linear-gradient(180deg, var(--brand-08), transparent 58%),
       rgba(0, 0, 0, 0.20);
