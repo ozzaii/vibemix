@@ -626,6 +626,17 @@ function mountLearnWindow(root: HTMLElement): {
       tone: feedback.tone,
     });
   };
+  const shouldShowLiveGradeMeter = (): boolean => {
+    if (currentLessonId === null) return true;
+    if (currentLessonId.startsWith("L2.") || currentLessonId.startsWith("L3.")) {
+      return true;
+    }
+    const mission = latestProgress?.next_practice_mission;
+    return (
+      mission?.lesson_id === currentLessonId &&
+      missionPracticeSurface(mission) === "live_proof"
+    );
+  };
   const clearExemplarTimer = (): void => {
     if (exemplarHideTimer !== null) {
       clearTimeout(exemplarHideTimer);
@@ -1516,6 +1527,9 @@ function mountLearnWindow(root: HTMLElement): {
   addWindowListener("ipc.learn.live_grade", (ev: Event) => {
     const payload = (ev as CustomEvent<LiveGradeWirePayload>).detail;
     if (!payload) return;
+    if (!shouldShowLiveGradeMeter()) {
+      return;
+    }
     if (!liveMeter) {
       liveMeter = LiveGradeMeter(liveMeterHost);
     }

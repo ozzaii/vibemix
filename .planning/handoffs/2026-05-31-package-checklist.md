@@ -12746,3 +12746,36 @@ Proof before staging:
 - `npm --prefix tauri/ui run build`
 - `git diff --check -- src/vibemix/learn/practice_mission.py src/vibemix/learn/curriculum_projection.py tauri/ui/src/learn/lesson/curriculum-meta.ts tauri/ui/src/learn/learn-window.ts tests/learn/test_practice_mission.py tauri/ui/tests/learn/test_practice_booth_shell.spec.ts .planning/handoffs/2026-05-31-package-checklist.md`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+
+## Package 144 - Learn Anatomy Ignores Beatmatch Proof Meter
+
+Suggested commit: `fix(learn-ui): keep beatmatch meter off anatomy lessons`
+
+Include:
+
+- `tauri/ui/src/learn/learn-window.ts`
+- `tauri/ui/tests/learn/test_practice_booth_shell.spec.ts`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Beatmatch judge math, Course 2/3 live grading, free-practice sandbox
+  feedback, mission ranking, and footer activation state. This package only
+  stops irrelevant beatmatch grades from painting the proof meter during Course
+  1 controller-anatomy lessons.
+
+Reason:
+
+- The live grade meter's idle DOM says `waiting for decks` / `no proof yet`.
+  That is correct for beatmatch/live-proof contexts, but confusing on lessons
+  like pitch fader where the next useful move is a controller/screen action.
+  Gate `ipc.learn.live_grade` so free practice, Course 2/3, and explicit
+  live-proof missions still render the meter, while ordinary Course 1 anatomy
+  lessons ignore unrelated beatmatch grades entirely.
+
+Proof before staging:
+
+- `npm --prefix tauri/ui test -- tests/learn/test_practice_booth_shell.spec.ts`
+- `npm --prefix tauri/ui run build`
+- `git diff --check -- tauri/ui/src/learn/learn-window.ts tauri/ui/tests/learn/test_practice_booth_shell.spec.ts .planning/handoffs/2026-05-31-package-checklist.md`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`

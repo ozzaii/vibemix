@@ -187,12 +187,23 @@ describe("practice booth shell", () => {
     }
   });
 
-  it("keeps the live proof meter hidden on anatomy lessons until grading arrives", async () => {
+  it("keeps the beatmatch live proof meter off controller anatomy lessons", async () => {
     const root = document.getElementById("learn-root") as HTMLElement;
     const { ws } = mountLearnWindow(root);
     try {
       await waitForMountedControl(root, "eq_hi:A");
-      dispatchLessonLoaded("L1.03", "course_1_anatomy");
+      dispatchLessonLoaded("L1.05", "course_1_anatomy");
+
+      window.dispatchEvent(
+        new CustomEvent("ipc.learn.live_grade", {
+          detail: {
+            verdict: "abstain",
+            phase_error_beats: 0,
+            score: 0,
+            citation: null,
+          },
+        }),
+      );
 
       const meterHost = root.querySelector<HTMLElement>("#learn-live-meter-host")!;
       expect(meterHost.hidden).toBe(true);
