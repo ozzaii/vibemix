@@ -22,6 +22,7 @@ from vibemix.audio.grid import BeatGrid
 from vibemix.audio.miniplayer import MiniDeck
 from vibemix.audio.waveform_peaks import compute_three_band_peaks
 from vibemix.learn.runtime import BeatmatchPracticeSnapshot
+from vibemix.learn.save_mode_loader import PracticeDeckSource, PracticeDeckSources
 
 _SAMPLE_RATE = 44_100
 _PRACTICE_BPM = 128.0
@@ -218,44 +219,75 @@ def _demo_cues() -> list[dict[str, float | str]]:
     ]
 
 
+def _demo_waveform_deck(samples: np.ndarray, *, bpm: float, deck: str) -> dict[str, Any]:
+    return {
+        "track_id": f"learn-demo-{deck.lower()}",
+        "title": f"Practice Loop {deck.upper()}",
+        "artist": "Vibemix",
+        "source": "bundled_demo",
+        "bpm": bpm,
+        "duration_s": float(samples.shape[0]) / float(_SAMPLE_RATE),
+        "peaks": compute_three_band_peaks(samples, sample_rate=_SAMPLE_RATE),
+        "cues": _demo_cues(),
+    }
+
+
+def _source_waveform_deck(source: PracticeDeckSource) -> dict[str, Any]:
+    return {
+        "track_id": source.track_id,
+        "title": source.title,
+        "artist": source.artist,
+        "source": "library_save_mode",
+        "bpm": source.bpm,
+        "duration_s": float(source.samples.shape[0]) / float(source.sample_rate),
+        "peaks": compute_three_band_peaks(source.samples, sample_rate=source.sample_rate),
+        "cues": list(source.cues),
+        "source_start_s": source.source_start_s,
+    }
+
+
 class BeatmatchPracticeDriver:
     """Convert authored Learn beatmatch actions into owned-deck snapshots."""
 
-    def __init__(self) -> None:
-        src_a = _packaged_demo_loop(bass_hz=82.0, deck="A")
-        src_b = _packaged_demo_loop(bass_hz=98.0, deck="B")
+    def __init__(self, sources: PracticeDeckSources | None = None) -> None:
+        if sources is None:
+            src_a = _packaged_demo_loop(bass_hz=82.0, deck="A")
+            src_b = _packaged_demo_loop(bass_hz=98.0, deck="B")
+            self._sample_rate = _SAMPLE_RATE
+            self._grid_a = BeatGrid(
+                anchor_frame=0.0,
+                bpm=_PRACTICE_BPM,
+                sample_rate=_SAMPLE_RATE,
+            )
+            self._grid_b = BeatGrid(
+                anchor_frame=0.0,
+                bpm=_PRACTICE_BPM,
+                sample_rate=_SAMPLE_RATE,
+            )
+            initial_rate_b = 0.97
+            self._waveform_decks = {
+                "A": _demo_waveform_deck(src_a, bpm=_PRACTICE_BPM, deck="A"),
+                "B": _demo_waveform_deck(src_b, bpm=_PRACTICE_BPM, deck="B"),
+            }
+        else:
+            src_a = sources.deck_a.samples.astype(np.float32, copy=False)
+            src_b = sources.deck_b.samples.astype(np.float32, copy=False)
+            self._sample_rate = int(sources.sample_rate)
+            self._grid_a = sources.deck_a.grid
+            self._grid_b = sources.deck_b.grid
+            initial_rate_b = self._rate_b_for_lock() * 0.97
+            self._waveform_decks = {
+                "A": _source_waveform_deck(sources.deck_a),
+                "B": _source_waveform_deck(sources.deck_b),
+            }
         self._deck = MiniDeck(
             src_a,
             src_b,
             rate_a=1.0,
-            rate_b=0.97,
+            rate_b=initial_rate_b,
             xfader=0.5,
-            sample_rate=_SAMPLE_RATE,
+            sample_rate=self._sample_rate,
             loop=True,
-        )
-        self._waveform_decks = {
-            "A": {
-                "bpm": _PRACTICE_BPM,
-                "duration_s": float(src_a.shape[0]) / float(_SAMPLE_RATE),
-                "peaks": compute_three_band_peaks(src_a, sample_rate=_SAMPLE_RATE),
-                "cues": _demo_cues(),
-            },
-            "B": {
-                "bpm": _PRACTICE_BPM,
-                "duration_s": float(src_b.shape[0]) / float(_SAMPLE_RATE),
-                "peaks": compute_three_band_peaks(src_b, sample_rate=_SAMPLE_RATE),
-                "cues": _demo_cues(),
-            },
-        }
-        self._grid_a = BeatGrid(
-            anchor_frame=0.0,
-            bpm=_PRACTICE_BPM,
-            sample_rate=_SAMPLE_RATE,
-        )
-        self._grid_b = BeatGrid(
-            anchor_frame=0.0,
-            bpm=_PRACTICE_BPM,
-            sample_rate=_SAMPLE_RATE,
         )
         self._armed = False
         self._sandbox_active = False
@@ -328,13 +360,13 @@ class BeatmatchPracticeDriver:
         if lesson_id == "L2.01" and control == "tempo":
             self._deck.set_rates(
                 rate_a=1.0,
-                rate_b=_tempo_rate_from_cc(midi.get("value")),
+                rate_b=self._tempo_rate_for_deck("B", midi.get("value")),
                 smooth=False,
             )
             self._armed = True
             return True
         if lesson_id == "L2.02" and control == "sync":
-            self._deck.set_rates(rate_a=1.0, rate_b=1.0, smooth=False)
+            self._deck.set_rates(rate_a=1.0, rate_b=self._rate_b_for_lock(), smooth=False)
             self._armed = True
             return True
         return False
@@ -352,7 +384,7 @@ class BeatmatchPracticeDriver:
         if deck not in {"A", "B"}:
             deck = "B"
         if control == "tempo":
-            rate = _tempo_rate_from_cc(midi.get("value"))
+            rate = self._tempo_rate_for_deck(deck, midi.get("value"))
             if deck == "A":
                 self._deck.set_rates(rate_a=rate, smooth=True)
             else:
@@ -362,9 +394,9 @@ class BeatmatchPracticeDriver:
         if control == "sync":
             state = self._deck.state()
             if deck == "A":
-                self._deck.set_rates(rate_a=state.rate_b, smooth=False)
+                self._deck.set_rates(rate_a=self._rate_a_for_lock(state.rate_b), smooth=False)
             else:
-                self._deck.set_rates(rate_b=state.rate_a, smooth=False)
+                self._deck.set_rates(rate_b=self._rate_b_for_lock(state.rate_a), smooth=False)
             self._sandbox_active = True
             return
         if control in {"jog", "jog_touch", "jog_touched"}:
@@ -376,7 +408,7 @@ class BeatmatchPracticeDriver:
                 delta = 1.0 if direction != "up" else -1.0
             self._deck.offset_playhead(
                 deck,
-                _beat_frames() * _SANDBOX_JOG_BEATS * (delta / 64.0),
+                self._beat_frames_for(deck) * _SANDBOX_JOG_BEATS * (delta / 64.0),
             )
             self._sandbox_active = True
 
@@ -385,11 +417,11 @@ class BeatmatchPracticeDriver:
 
         deck = _deck_from_midi(midi).upper() or "B"
         drill = str(midi.get("drill", "") or "").strip()
-        self._deck.set_rates(rate_a=1.0, rate_b=1.0, smooth=False)
+        self._deck.set_rates(rate_a=1.0, rate_b=self._rate_b_for_lock(), smooth=False)
         if drill == "key_clash":
-            self._deck.set_rates(rate_a=1.0, rate_b=1.08, smooth=False)
+            self._deck.set_rates(rate_a=1.0, rate_b=self._rate_b_for_lock() * 1.08, smooth=False)
         else:
-            self._deck.offset_playhead(deck, _beat_frames() * 0.25)
+            self._deck.offset_playhead(deck, self._beat_frames_for(deck) * 0.25)
         self._armed = True
 
     def snapshot(self) -> BeatmatchPracticeSnapshot | None:
@@ -413,12 +445,28 @@ class BeatmatchPracticeDriver:
             deck_state=self._deck.state(),
         )
 
+    def _tempo_rate_for_deck(self, deck: str, value: Any) -> float:
+        rate = _tempo_rate_from_cc(value)
+        if deck == "B":
+            return self._rate_b_for_lock() * rate
+        return rate
+
+    def _rate_b_for_lock(self, rate_a: float = 1.0) -> float:
+        return float(rate_a) * self._grid_a.bpm / self._grid_b.bpm
+
+    def _rate_a_for_lock(self, rate_b: float = 1.0) -> float:
+        return float(rate_b) * self._grid_b.bpm / self._grid_a.bpm
+
+    def _beat_frames_for(self, deck: str) -> int:
+        grid = self._grid_b if deck == "B" else self._grid_a
+        return round(grid.beat_len_frames)
+
     def waveform_payload(self) -> dict[str, Any]:
         """Return compact two-deck waveform payload for Learn Canvas rendering."""
 
         return {
-            "sample_rate": _SAMPLE_RATE,
-            "beat_interval_s": 60.0 / _PRACTICE_BPM,
+            "sample_rate": self._sample_rate,
+            "beat_interval_s": 60.0 / self._grid_a.bpm,
             "decks": self._waveform_decks,
         }
 
@@ -428,20 +476,20 @@ class BeatmatchPracticeDriver:
         state = self._deck.state()
         duration_a = float(self._waveform_decks["A"]["duration_s"])
         duration_b = float(self._waveform_decks["B"]["duration_s"])
-        frame_a = float(state.a_frame % max(1.0, duration_a * _SAMPLE_RATE))
-        frame_b = float(state.b_frame % max(1.0, duration_b * _SAMPLE_RATE))
+        frame_a = float(state.a_frame % max(1.0, duration_a * self._sample_rate))
+        frame_b = float(state.b_frame % max(1.0, duration_b * self._sample_rate))
         return {
-            "sample_rate": _SAMPLE_RATE,
+            "sample_rate": self._sample_rate,
             "decks": {
                 "A": {
                     "frame": frame_a,
-                    "position_s": frame_a / float(_SAMPLE_RATE),
-                    "bpm": _PRACTICE_BPM * state.rate_a,
+                    "position_s": frame_a / float(self._sample_rate),
+                    "bpm": self._grid_a.bpm * state.rate_a,
                 },
                 "B": {
                     "frame": frame_b,
-                    "position_s": frame_b / float(_SAMPLE_RATE),
-                    "bpm": _PRACTICE_BPM * state.rate_b,
+                    "position_s": frame_b / float(self._sample_rate),
+                    "bpm": self._grid_b.bpm * state.rate_b,
                 },
             },
         }

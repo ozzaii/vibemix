@@ -11403,3 +11403,38 @@ Proof before staging:
 - `uv run python -m compileall -q src/vibemix/debrief/drills.py src/vibemix/debrief/main.py src/vibemix/debrief/ws_server.py tests/debrief/test_drill_citations_resolve.py tests/debrief/test_transition_judged_critique.py tests/debrief/test_ws_server_progressive_emit.py`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
 - `git diff --check -- src/vibemix/debrief/drills.py src/vibemix/debrief/main.py src/vibemix/debrief/ws_server.py tests/debrief/test_drill_citations_resolve.py tests/debrief/test_transition_judged_critique.py tests/debrief/test_ws_server_progressive_emit.py .planning/handoffs/2026-05-31-package-checklist.md`
+
+## Package 109 - Learn Save-Mode Own-Track Loader
+
+Suggested commit: `feat(learn): load save mode from own tracks`
+
+Include:
+
+- `src/vibemix/learn/save_mode_loader.py`
+- `src/vibemix/learn/beatmatch_practice_driver.py`
+- `tests/learn/test_save_mode_loader.py`
+- `tests/learn/test_beatmatch_practice_driver.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Tauri/UI changes, app-start eager decoding, new IPC schemas, and save-landed
+  animation signals. This package only creates the grounded own-track source
+  loader and teaches the existing owned-deck driver how to grade different-BPM
+  real sources.
+
+Reason:
+
+- Save mode should practice on the user's own library when the library can
+  honestly provide two decoded, ANLZ-gridded tracks. Filter to Save-ready
+  entries before calling the grounded next-suggestion engine, decode bounded
+  audio slabs, build real `BeatGrid.from_anlz` grids, and fall back with an
+  explicit reason instead of fabricating a practice grid.
+
+Proof before staging:
+
+- `uv run pytest -q tests/learn/test_save_mode_loader.py tests/learn/test_beatmatch_practice_driver.py`
+- `uv run ruff check src/vibemix/learn/save_mode_loader.py src/vibemix/learn/beatmatch_practice_driver.py tests/learn/test_save_mode_loader.py tests/learn/test_beatmatch_practice_driver.py`
+- `uv run python -m compileall -q src/vibemix/learn/save_mode_loader.py src/vibemix/learn/beatmatch_practice_driver.py tests/learn/test_save_mode_loader.py tests/learn/test_beatmatch_practice_driver.py`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+- `git diff --check -- src/vibemix/learn/save_mode_loader.py src/vibemix/learn/beatmatch_practice_driver.py tests/learn/test_save_mode_loader.py tests/learn/test_beatmatch_practice_driver.py .planning/handoffs/2026-05-31-package-checklist.md`

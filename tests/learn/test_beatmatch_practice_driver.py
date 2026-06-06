@@ -4,9 +4,12 @@
 from __future__ import annotations
 
 import numpy as np
+import pytest
 
+from vibemix.audio.grid import BeatGrid
 from vibemix.learn.beatmatch_practice_driver import BeatmatchPracticeDriver
 from vibemix.learn.practice_loop import grade_owned_beatmatch_state
+from vibemix.learn.save_mode_loader import PracticeDeckSource, PracticeDeckSources
 
 
 def _grade(driver: BeatmatchPracticeDriver):
@@ -16,6 +19,35 @@ def _grade(driver: BeatmatchPracticeDriver):
         snapshot.grid_a,
         snapshot.grid_b,
         snapshot.deck_state,
+    )
+
+
+def _source(track_id: str, *, bpm: float, freq: float) -> PracticeDeckSource:
+    sr = 44_100
+    t = np.arange(sr * 8, dtype=np.float32) / float(sr)
+    mono = 0.2 * np.sin(2.0 * np.pi * freq * t)
+    samples = np.column_stack([mono, mono]).astype(np.float32)
+    return PracticeDeckSource(
+        track_id=track_id,
+        title=f"Track {track_id}",
+        artist="Library Artist",
+        bpm=bpm,
+        sample_rate=sr,
+        samples=samples,
+        grid=BeatGrid(anchor_frame=0.0, bpm=bpm, sample_rate=sr),
+        cues=({"label": "save window", "start_s": 0.0, "end_s": 8.0, "source": "test"},),
+        filepath=f"/tmp/{track_id}.wav",
+        source_start_s=0.0,
+    )
+
+
+def _own_track_sources() -> PracticeDeckSources:
+    return PracticeDeckSources(
+        deck_a=_source("seed", bpm=128.0, freq=220.0),
+        deck_b=_source("target", bpm=124.0, freq=330.0),
+        sample_rate=44_100,
+        seed_track_id="seed",
+        suggested_track_id="target",
     )
 
 
@@ -81,6 +113,23 @@ def test_driver_waveform_payload_uses_bundled_demo_sections() -> None:
             "breakdown",
             "outro",
         }
+
+
+def test_driver_accepts_own_track_sources_and_centers_pitch_to_real_bpm_lock() -> None:
+    driver = BeatmatchPracticeDriver(_own_track_sources())
+
+    payload = driver.waveform_payload()
+    assert payload["decks"]["A"]["track_id"] == "seed"
+    assert payload["decks"]["B"]["track_id"] == "target"
+    assert payload["decks"]["B"]["bpm"] == pytest.approx(124.0)
+
+    assert driver.record_action("L2.01", {"control": "tempo", "deck": "B", "value": 64}) is True
+    grade = _grade(driver)
+
+    assert grade.verdict == "locked"
+    playheads = driver.playhead_payload()
+    assert playheads["decks"]["A"]["bpm"] == pytest.approx(128.0)
+    assert playheads["decks"]["B"]["bpm"] == pytest.approx(128.0)
 
 
 def test_eq_swap_action_filters_audio_without_arming_beatmatch_grade() -> None:
