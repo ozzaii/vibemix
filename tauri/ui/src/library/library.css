@@ -2064,6 +2064,29 @@ body {
 .vmx-lib-proghead .n small { font-size: 13px; color: var(--silk-40); }
 .vmx-lib-proghead .cost { font-family: var(--type-mono); font-size: 13px; color: var(--amber); }
 
+.vmx-lib-ingest-error {
+  border: 1px solid color-mix(in srgb, var(--danger, #ff6b6b) 42%, transparent);
+  border-radius: var(--radius-sm, 8px);
+  padding: 12px 13px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.025), transparent),
+    color-mix(in srgb, var(--danger, #ff6b6b) 8%, transparent);
+  color: var(--silk);
+  font-size: 12px;
+  line-height: 1.45;
+}
+.vmx-lib-ingest-error[hidden] { display: none; }
+.vmx-lib-ingest-error .title {
+  margin-bottom: 5px;
+  font-family: var(--type-mono);
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--danger, #ff6b6b);
+}
+.vmx-lib-ingest-error .msg { color: var(--silk); }
+.vmx-lib-ingest-error .hint { margin-top: 7px; color: var(--silk-55); }
+
 /* staggered result settle — set inline initial opacity/transform in JS, then
    add this class on the next frame to animate in. */
 .vmx-lib-row {

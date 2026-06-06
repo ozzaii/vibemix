@@ -12510,3 +12510,37 @@ Proof before staging:
 - `npm --prefix tauri/ui run build`
 - `git diff --check -- tauri/ui/src/learn/SkillWall.ts tauri/ui/tests/learn/test_skill_wall.spec.ts tauri/ui/tests/learn/test_practice_booth_shell.spec.ts .planning/handoffs/2026-05-31-package-checklist.md`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+
+## Package 138 - Viber Ingest Error Is Visible
+
+Suggested commit: `fix(library-ui): show folder ingest failures in panel`
+
+Include:
+
+- `tauri/ui/library.html`
+- `tauri/ui/src/library/index.ts`
+- `tauri/ui/src/library/library.css`
+- `tauri/ui/src/library/chat.test.ts`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Rust command resolution, CLAP model install behavior, Python folder ingest
+  algorithms, Settings drawer import UI, and fake replay semantics. This
+  package only makes real Viber ingest failures visible and retryable.
+
+Reason:
+
+- In Viber's ingest mode, backend failures were routed through `renderError()`,
+  which writes to `.vmx-lib-results`; ingest mode hides that panel. A failed
+  `library_embed_folder` therefore showed up mainly as the DevTools
+  `[vmx-lib] run failed: embed-folder exited 1` log, while the user-facing
+  ingest panel stayed ambiguous. Add a visible ingest error slot, preserve the
+  backend message, show an actionable hint, and re-enable retry.
+
+Proof before staging:
+
+- `npm --prefix tauri/ui test -- src/library/chat.test.ts`
+- `npm --prefix tauri/ui run build`
+- `git diff --check -- tauri/ui/library.html tauri/ui/src/library/index.ts tauri/ui/src/library/library.css tauri/ui/src/library/chat.test.ts .planning/handoffs/2026-05-31-package-checklist.md`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`

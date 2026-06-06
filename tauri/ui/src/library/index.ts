@@ -937,6 +937,47 @@ function errorMessage(err: unknown): string {
       : String(err);
 }
 
+function ingestErrorHint(message: string): string {
+  const lower = message.toLowerCase();
+  if (lower.includes("is not a directory") || lower.includes("no such file")) {
+    return "Pick an existing music folder, then index again.";
+  }
+  if (lower.includes("clap") || lower.includes("model")) {
+    return "Install local model setup, then retry indexing.";
+  }
+  return "Check the folder path and local setup, then retry indexing.";
+}
+
+function clearIngestError(): void {
+  const el = $maybe("vmx-lib-ingest-error");
+  if (!el) return;
+  el.hidden = true;
+  el.replaceChildren();
+  el.removeAttribute("title");
+}
+
+function renderIngestError(err: unknown): void {
+  const msg = errorMessage(err);
+  const el = $maybe("vmx-lib-ingest-error");
+  if (el) {
+    const title = document.createElement("div");
+    title.className = "title";
+    title.textContent = "index failed";
+    const body = document.createElement("div");
+    body.className = "msg";
+    body.textContent = msg;
+    const hint = document.createElement("div");
+    hint.className = "hint";
+    hint.textContent = ingestErrorHint(msg);
+    el.replaceChildren(title, body, hint);
+    el.hidden = false;
+    el.title = msg;
+  }
+  setProgress(0, 0, 0, "index failed");
+  $("vmx-lib-rcount").textContent = "failed";
+  $("vmx-lib-scope-state").textContent = "index failed";
+}
+
 function embeddingLabel(stats: LibraryStats): string {
   const backend = (stats.embedding_backend ?? "clap").toLowerCase();
   const model =
@@ -1210,7 +1251,7 @@ function setProgress(
   $("vmx-lib-prog-n").innerHTML =
     total > 0
       ? `${n}<small> / ${total}${note ? ` · ${esc(note)}` : ""}</small>`
-      : `<small>Ready to index</small>`;
+      : `<small>${esc(note || "Ready to index")}</small>`;
   $("vmx-lib-prog-cost").textContent = total > 0 ? `~€${costEur.toFixed(2)}` : "";
 }
 
@@ -2158,6 +2199,7 @@ export function mountLibrary(root: ParentNode = document): void {
       // Idle ingest view: show the ready state and focus the source path. The
       // user still has to click Index folder, so this never starts indexing by
       // surprise from the Viber home surface.
+      clearIngestError();
       setProgress(0, 0, 0, "");
       folderInput.focus();
     } else if (mode === "chat") {
@@ -2331,6 +2373,7 @@ export function mountLibrary(root: ParentNode = document): void {
    *  replay the real subset-run log so the surface is demoable. */
   async function runIngest(runId: number): Promise<void> {
     state = setFolder(state, folderInput.value.trim() || state.folder);
+    clearIngestError();
     setProgress(0, 0, 0, "");
 
     const accepted = await libraryEmbedFolder(state.folder, state.strategy);
@@ -2397,7 +2440,11 @@ export function mountLibrary(root: ParentNode = document): void {
       // busy/disabled lifecycle here rather than leaving the button wedged.
       // eslint-disable-next-line no-console
       console.error("[vmx-lib] run failed:", err);
-      renderError(err);
+      if (modeAtStart === "ingest") {
+        renderIngestError(err);
+      } else {
+        renderError(err);
+      }
       if (modeAtStart === "ingest") {
         busy = false;
         runBtn.disabled = false;
@@ -2578,6 +2625,7 @@ export function mountLibrary(root: ParentNode = document): void {
   // ingest progress from the real bridge (no-op listeners in dev)
   void onEmbedProgress((p: EmbedProgress) => {
     if (!busy || state.mode !== "ingest") return;
+    clearIngestError();
     setProgress(
       p.n,
       p.total,
@@ -2587,6 +2635,7 @@ export function mountLibrary(root: ParentNode = document): void {
   });
   void onEmbedDone((d: EmbedDone) => {
     if (!busy || state.mode !== "ingest") return;
+    clearIngestError();
     setProgress(d.total, d.total, d.cost_eur, "done");
     busy = false;
     runBtn.disabled = false;

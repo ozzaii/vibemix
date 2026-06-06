@@ -503,6 +503,7 @@ function mountSkeleton(): void {
     <div id="vmx-lib-prog-n"></div>
     <div id="vmx-lib-prog-cost"></div>
     <i id="vmx-lib-progress-fill"></i>
+    <div id="vmx-lib-ingest-error" hidden></div>
     <span id="vmx-lib-side-label"></span>
     <span id="vmx-lib-scope-state"></span>
     <div id="vmx-lib-chat-tools"></div>
@@ -658,6 +659,38 @@ describe("chat - real runChat path", () => {
     );
     expect(embedFolderMock).not.toHaveBeenCalled();
     expect(document.activeElement).toBe(document.getElementById("vmx-lib-folder"));
+  });
+
+  it("surfaces folder indexing failures inside the visible ingest panel", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    embedFolderMock.mockRejectedValueOnce(
+      new Error(
+        "embed-folder exited 1: [FATAL] embed-folder: '/missing' is not a directory.",
+      ),
+    );
+    await mountChat();
+
+    document.querySelector<HTMLButtonElement>('[data-mode-jump="ingest"]')?.click();
+    for (let i = 0; i < 4; i++) await Promise.resolve();
+    (document.getElementById("vmx-lib-runbtn") as HTMLButtonElement).click();
+    for (let i = 0; i < 8; i++) await Promise.resolve();
+
+    const error = document.getElementById("vmx-lib-ingest-error") as HTMLElement;
+    const runButton = document.getElementById("vmx-lib-runbtn") as HTMLButtonElement;
+    expect(embedFolderMock).toHaveBeenCalledWith("~/Music", "cue_anchored");
+    expect(error.hidden).toBe(false);
+    expect(error.textContent).toContain("index failed");
+    expect(error.textContent).toContain("embed-folder exited 1");
+    expect(error.textContent).toContain("Pick an existing music folder");
+    expect(document.getElementById("vmx-lib-prog-n")?.textContent).toBe("index failed");
+    expect(document.getElementById("vmx-lib-scope-state")?.textContent).toBe(
+      "index failed",
+    );
+    expect(runButton.disabled).toBe(false);
+    expect(errorSpy).toHaveBeenCalledWith(
+      "[vmx-lib] run failed:",
+      expect.any(Error),
+    );
   });
 
   it("does not surface catalog-database setup candidates as actionable", async () => {
