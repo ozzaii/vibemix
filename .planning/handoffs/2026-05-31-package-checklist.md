@@ -12617,3 +12617,61 @@ Proof before staging:
 - `uv run python -m compileall -q src/vibemix/runtime/session_loop.py tests/profile/test_profile_ipc.py`
 - `git diff --check -- src/vibemix/runtime/session_loop.py tests/profile/test_profile_ipc.py .planning/handoffs/2026-05-31-package-checklist.md`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+
+## Package 141 - Learn Booth Shows Practice Mission Stakes
+
+Suggested commit: `feat(learn-ui): surface practice mission stakes`
+
+Include:
+
+- `tauri/ui/src/learn/learn-window.ts`
+- `tauri/ui/src/learn/styles/learn.css`
+- `tauri/ui/tests/learn/test_practice_booth_shell.spec.ts`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Learn lesson FSMs, beginner-path suites, Python mission ranking, controller SVG
+  assets, live grading algorithms, and Sven/Viber prompt behavior. This package
+  only renders the existing backend `next_practice_mission` stakes in the Learn
+  booth.
+
+Reason:
+
+- `next_practice_mission` already carries the utility loop (`why`, `payoff`,
+  `challenge`, reward meter, and route chain), but the practice booth mostly
+  showed command/proof. Surface those mission stakes as a compact frontstage
+  strip so the next rep feels useful, finishable, and worth starting instead of
+  looking like another static lesson row.
+
+Proof before staging:
+
+- `npm --prefix tauri/ui test -- tests/learn/test_practice_booth_shell.spec.ts`
+- `npm --prefix tauri/ui run build`
+- `git diff --check -- tauri/ui/src/learn/learn-window.ts tauri/ui/src/learn/styles/learn.css tauri/ui/tests/learn/test_practice_booth_shell.spec.ts .planning/handoffs/2026-05-31-package-checklist.md`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+
+## Hold Lane - 2026-06-06 Untriaged Drift
+
+Hold:
+
+- `.trivyignore`
+- `learn-no-empty-waveforms.png`
+- `.planning/handbooks/liquid-glass/`
+- `.planning/packets/2026-06-02/`
+- `.planning/packets/2026-06-03/`
+- `.planning/packets/2026-06-04/`
+- `.planning/packets/2026-06-05/`
+- `proxy/uv.lock`
+- `tauri/ui/src/mascot/__tests__/v2-1-no-animation-cycle-warning.spec.ts`
+- `tauri/ui/src/mascot/focus-layer.test.ts`
+- `tauri/ui/tsconfig.json`
+- `tauri/ui/vitest.config.ts`
+
+Reason:
+
+- These paths are currently dirty but unrelated to Package 141. Track them as
+  hold-lane drift so the strict dirty-tree guard stays honest while this Learn
+  booth package stages only its source, test, style, and checklist paths. The
+  packet and handbook directories are broad tokens by design: they are planning
+  artifacts, not source files for the Learn booth package.

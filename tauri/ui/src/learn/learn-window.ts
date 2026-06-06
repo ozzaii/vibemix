@@ -397,7 +397,7 @@ function mountLearnWindow(root: HTMLElement): {
     <div id="learn-titlebar"></div>
     <div id="learn-stage" class="learn-stage"></div>
     <section id="learn-booth-panel" class="learn-booth-panel" data-visible="true">
-      <div class="learn-booth-kicker">ready to practice</div>
+      <div id="learn-booth-kicker" class="learn-booth-kicker">ready to practice</div>
       <div id="learn-booth-next" class="learn-booth-next">
         <span id="learn-booth-course" class="learn-booth-course">Course 1</span>
         <strong id="learn-booth-title" class="learn-booth-title">next lesson</strong>
@@ -416,6 +416,20 @@ function mountLearnWindow(root: HTMLElement): {
           do one clean move and I'll confirm it.
         </strong>
       </div>
+      <dl id="learn-booth-mission" class="learn-booth-mission" data-visible="false" aria-label="next practice details">
+        <div>
+          <dt>why</dt>
+          <dd id="learn-booth-mission-why">move one skill forward</dd>
+        </div>
+        <div>
+          <dt>win</dt>
+          <dd id="learn-booth-mission-payoff">one useful rep</dd>
+        </div>
+        <div>
+          <dt>challenge</dt>
+          <dd id="learn-booth-mission-challenge">one clean move</dd>
+        </div>
+      </dl>
       <dl id="learn-booth-brief" class="learn-booth-brief" aria-label="practice readiness">
         <div>
           <dt>input</dt>
@@ -501,6 +515,7 @@ function mountLearnWindow(root: HTMLElement): {
     "#learn-progress-list-body",
   ) as HTMLElement;
   const boothPanel = root.querySelector("#learn-booth-panel") as HTMLElement;
+  const boothKicker = root.querySelector("#learn-booth-kicker") as HTMLElement;
   const boothCourse = root.querySelector("#learn-booth-course") as HTMLElement;
   const boothTitle = root.querySelector("#learn-booth-title") as HTMLElement;
   const boothProof = root.querySelector("#learn-booth-proof") as HTMLElement;
@@ -509,6 +524,14 @@ function mountLearnWindow(root: HTMLElement): {
   const boothRewardFill = root.querySelector("#learn-booth-reward-fill") as HTMLElement;
   const boothRewardCaption = root.querySelector("#learn-booth-reward-caption") as HTMLElement;
   const boothCommandText = root.querySelector("#learn-booth-command-text") as HTMLElement;
+  const boothMission = root.querySelector("#learn-booth-mission") as HTMLElement;
+  const boothMissionWhy = root.querySelector("#learn-booth-mission-why") as HTMLElement;
+  const boothMissionPayoff = root.querySelector(
+    "#learn-booth-mission-payoff",
+  ) as HTMLElement;
+  const boothMissionChallenge = root.querySelector(
+    "#learn-booth-mission-challenge",
+  ) as HTMLElement;
   const boothInput = root.querySelector("#learn-booth-input") as HTMLElement;
   const boothCredit = root.querySelector("#learn-booth-credit") as HTMLElement;
   const boothVoice = root.querySelector("#learn-booth-voice") as HTMLElement;
@@ -807,6 +830,8 @@ function mountLearnWindow(root: HTMLElement): {
         ? "midi"
         : "screen";
     boothPanel.dataset.readiness = readiness;
+    boothKicker.textContent = cleanMissionText(mission?.focus_label) ??
+      "ready to practice";
     boothCourse.textContent = recommended
       ? recommended.course_label
       : "Next lesson";
@@ -820,6 +845,7 @@ function mountLearnWindow(root: HTMLElement): {
     boothInput.textContent = readinessInputLine(readiness, controllerDisplayName);
     boothCredit.textContent = readinessCreditLine(readiness);
     boothVoice.textContent = voiceReadinessLine(latestVoiceStatus);
+    renderBoothMission(mission);
     renderBoothChain(mission, recommended, lessons);
     if (mission) {
       renderBoothReward(mission);
@@ -833,6 +859,27 @@ function mountLearnWindow(root: HTMLElement): {
       ariaLabel: cue.ariaLabel,
       title: cue.title,
     });
+  };
+  const renderBoothMission = (mission?: LearnPracticeMission): void => {
+    if (!mission) {
+      boothMission.dataset.visible = "false";
+      boothMission.removeAttribute("aria-label");
+      return;
+    }
+    const why = cleanMissionText(mission.why) ?? `move ${mission.skill_label} forward`;
+    const payoff = cleanMissionText(mission.payoff) ??
+      `${Math.max(1, Math.round(mission.estimated_minutes))} min drill`;
+    const challenge = cleanMissionText(mission.challenge) ??
+      cleanMissionText(mission.proof) ??
+      "one clean move";
+    boothMission.dataset.visible = "true";
+    boothMissionWhy.textContent = why;
+    boothMissionPayoff.textContent = payoff;
+    boothMissionChallenge.textContent = challenge;
+    boothMission.setAttribute(
+      "aria-label",
+      `next practice details. why: ${why}. win: ${payoff}. challenge: ${challenge}.`,
+    );
   };
   const renderBoothReward = (mission?: LearnPracticeMission): void => {
     if (!mission) {

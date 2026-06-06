@@ -505,6 +505,7 @@
     "next next"
     "reward reward"
     "command command"
+    "mission mission"
     "brief brief"
     "chain chain"
     "pulse pulse"
@@ -684,6 +685,57 @@
   font-size: 13px;
   line-height: 1.25;
   overflow-wrap: anywhere;
+}
+
+.learn-booth-mission {
+  grid-area: mission;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--sp-3);
+  width: min(560px, calc(100vw - var(--sp-8)));
+  margin: 0;
+  padding: var(--sp-1) 0;
+}
+
+.learn-booth-mission[data-visible="false"] {
+  display: none;
+}
+
+.learn-booth-mission div {
+  min-width: 0;
+  display: grid;
+  align-content: start;
+  gap: 3px;
+  padding-left: var(--sp-2);
+  border-left: 1px solid var(--border-subtle);
+}
+
+.learn-booth-mission dt,
+.learn-booth-mission dd {
+  min-width: 0;
+  margin: 0;
+}
+
+.learn-booth-mission dt {
+  color: var(--brand);
+  font-family: var(--type-mono);
+  font-size: 8px;
+  letter-spacing: 0.16em;
+  line-height: 1;
+  text-shadow: var(--text-emboss);
+  text-transform: uppercase;
+}
+
+.learn-booth-mission dd {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--text-secondary);
+  font-family: var(--type-body);
+  font-variation-settings: "wdth" 100, "wght" 480;
+  font-size: 11px;
+  line-height: 1.18;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .learn-booth-brief {
@@ -873,6 +925,12 @@
   }
 
   .learn-booth-command {
+    width: 100%;
+    grid-template-columns: 1fr;
+    gap: var(--sp-1);
+  }
+
+  .learn-booth-mission {
     width: 100%;
     grid-template-columns: 1fr;
     gap: var(--sp-1);

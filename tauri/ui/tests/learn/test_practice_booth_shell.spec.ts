@@ -249,6 +249,123 @@ describe("practice booth shell", () => {
     }
   });
 
+  it("turns backend practice missions into a playable booth loop", () => {
+    const root = document.getElementById("learn-root") as HTMLElement;
+    const { ws } = mountLearnWindow(root);
+    try {
+      window.dispatchEvent(
+        new CustomEvent("ipc.learn.progress_state", {
+          detail: {
+            action: "snapshot",
+            progress: {
+              schema_version: 2,
+              courses: {},
+              lessons: completedRows(COURSE_1_LESSON_IDS),
+              course_2_unlocked: true,
+              next_practice_mission: {
+                lesson_id: "L2.01",
+                course_id: "course_2_transitions",
+                course_label: "Course 2 · Transitions",
+                skill_id: "beatmatching",
+                skill_label: "beatmatching",
+                title: "beatmatching by ear",
+                mode: "prove",
+                command: "Prove beatmatching; earn the next cited proof.",
+                payoff: "You hear drift tighten into lock instead of reading about it.",
+                proof: "1 cited proof banked; 2 left",
+                why: "2 more cited proofs to Master",
+                estimated_minutes: 6,
+                focus: "proof",
+                focus_label: "proof 1/3",
+                challenge: "Only cited live proof moves Mastery.",
+                chain: [
+                  {
+                    lesson_id: "L2.01",
+                    course_id: "course_2_transitions",
+                    course_label: "Course 2 · Transitions",
+                    title: "beatmatching by ear",
+                    state: "now",
+                    mode: "prove",
+                    label: "proof 1/3",
+                  },
+                  {
+                    lesson_id: "L2.02",
+                    course_id: "course_2_transitions",
+                    course_label: "Course 2 · Transitions",
+                    title: "beatmatching with sync",
+                    state: "next",
+                    mode: "start",
+                    label: "next route",
+                  },
+                ],
+                meter_label: "proof bank",
+                meter_value: 1,
+                meter_max: 3,
+                meter_state: "proof",
+                meter_caption: "2 proofs left to Mastery",
+              },
+            },
+          },
+        }),
+      );
+
+      const mission = root.querySelector<HTMLElement>("#learn-booth-mission")!;
+      const reward = root.querySelector<HTMLElement>("#learn-booth-reward")!;
+      const rewardFill = root.querySelector<HTMLElement>(
+        "#learn-booth-reward-fill",
+      )!;
+      const chain = root.querySelector<HTMLElement>("#learn-booth-chain")!;
+      const start = root.querySelector<HTMLButtonElement>(
+        "#learn-start-recommended",
+      )!;
+
+      expect(root.querySelector<HTMLElement>("#learn-booth-kicker")?.textContent).toBe(
+        "proof 1/3",
+      );
+      expect(root.querySelector<HTMLElement>("#learn-booth-title")?.textContent).toBe(
+        "beatmatching by ear",
+      );
+      expect(root.querySelector<HTMLElement>("#learn-booth-proof")?.textContent).toBe(
+        "1 cited proof banked; 2 left",
+      );
+      expect(root.querySelector<HTMLElement>("#learn-booth-command-text")?.textContent)
+        .toContain("Prove beatmatching");
+      expect(mission.dataset.visible).toBe("true");
+      expect(root.querySelector("#learn-booth-mission-why")?.textContent).toBe(
+        "2 more cited proofs to Master",
+      );
+      expect(root.querySelector("#learn-booth-mission-payoff")?.textContent).toBe(
+        "You hear drift tighten into lock instead of reading about it.",
+      );
+      expect(root.querySelector("#learn-booth-mission-challenge")?.textContent).toBe(
+        "Only cited live proof moves Mastery.",
+      );
+      expect(mission.getAttribute("aria-label")).toContain(
+        "why: 2 more cited proofs to Master",
+      );
+      expect(reward.dataset.visible).toBe("true");
+      expect(reward.dataset.state).toBe("proof");
+      expect(reward.textContent).toContain("proof bank 1/3");
+      expect(reward.textContent).toContain("2 proofs left to Mastery");
+      expect(rewardFill.style.width).toBe("33%");
+      expect(chain.dataset.visible).toBe("true");
+      expect(
+        Array.from(chain.querySelectorAll<HTMLElement>(".learn-booth-chain__label"))
+          .map((el) => el.textContent),
+      ).toEqual(["proof 1/3", "next route"]);
+      expect(start.textContent).toBe("prove beatmatching by ear");
+
+      mocks.emitIpc.mockClear();
+      start.click();
+      expect(mocks.emitIpc).toHaveBeenCalledWith("ipc.learn.start_lesson", {
+        lesson_id: "L2.01",
+        level: "replay",
+      });
+    } finally {
+      ws.close();
+    }
+  });
+
   it("does not cover fresh lessons with six all-locked skill tiles", () => {
     const root = document.getElementById("learn-root") as HTMLElement;
     const { ws } = mountLearnWindow(root);
