@@ -235,6 +235,11 @@ def _kick_correlation(samples: np.ndarray, sr: int) -> float:
 # fallback ("≤3 tracks" → strictly less than 3 = floor of 3).
 _LIBRARY_FLOOR: int = 3
 
+# Query extra rows so stale/unplayable cache entries do not force a packaged
+# fallback when the library still has enough playable examples just below the
+# top of the band-share ranking.
+_LIBRARY_RESOLVE_HEADROOM: int = 9
+
 # Plan 93-02 ships this threshold via ``band_share_store.top_for_band(...,
 # max_kick_corr=0.8)``; keep the constant local to ``exemplar.py`` so a future
 # §EXEMPLAR-KICK-GUARD-EAR ear-pass tunes one place (the ranking layer caller
@@ -313,11 +318,9 @@ class ExemplarPick:
     Fields:
         track_id: Real Rekordbox / folder-ingest id (``library`` reason)
             OR synthetic ``_packaged:<band>:<stem>`` (``packaged`` reason).
-        file_path: Filesystem path to the audio. May be ``""`` for a
-            library pick whose original file is unresolvable (the
-            ingest-side decided the id was good; the file might have
-            moved). ExemplarPlayer downstream handles missing-file
-            gracefully.
+        file_path: Filesystem path to the audio. Library picks are only
+            returned when this is a real, playable file path; packaged
+            fallback picks carry the bundled bank path.
         band_score: The track's ``band_share`` scalar for the picked
             band — top-of-distribution for library picks; ``0.0`` for
             packaged-fallback picks (no library score to assign).
@@ -412,12 +415,13 @@ class ExemplarFinder:
     def _resolve_library_path(self, lib, track_id: str) -> str:
         """Map ``track_id`` → filesystem path via the library cache.
 
-        Returns ``""`` (empty string) when the library is absent OR when
-        the track_id is not in the library's ``tracks`` mapping OR the
-        entry has no ``.path`` attribute. Empty string lets the ExemplarPick
-        construct cleanly; the downstream player is responsible for
-        gracefully handling un-resolvable paths (e.g. file moved since
-        ingest).
+        Returns ``""`` (empty string) when the library is absent, when the
+        track_id is not in the library's ``tracks`` mapping, or when the
+        entry's audio path cannot be resolved to an existing file.
+
+        Folder ingest writes real ``TrackEntry(filepath=...)`` rows into the
+        Rekordbox-compatible cache, while a few historical tests/fakes used
+        ``.path``. Accept both, with ``filepath`` as the production field.
         """
         if lib is None:
             return ""
@@ -427,10 +431,18 @@ class ExemplarFinder:
         entry = tracks_map.get(track_id)
         if entry is None:
             return ""
-        path = getattr(entry, "path", None)
+        path = getattr(entry, "filepath", None)
+        if not isinstance(path, str) or not path:
+            path = getattr(entry, "path", None)
         if not isinstance(path, str):
             return ""
-        return path
+        try:
+            candidate = Path(path).expanduser()
+        except (TypeError, ValueError):
+            return ""
+        if not candidate.is_file():
+            return ""
+        return str(candidate)
 
     def find(
         self,
@@ -441,11 +453,11 @@ class ExemplarFinder:
         """Pick up to ``k`` exemplar tracks for ``band``.
 
         Library path is tried first; if ≥ ``_LIBRARY_FLOOR`` rows pass the
-        ``band_share_store.top_for_band(..., max_kick_corr=0.8)`` filter,
-        the top-K library rows are returned. Otherwise the packaged
-        CC-BY bank fallback fires with the honest-null reason. If BOTH
-        library and bank are empty, returns ``[]`` (degraded-install
-        contract from RESEARCH §Code Example 1).
+        ``band_share_store.top_for_band(..., max_kick_corr=0.8)`` filter
+        AND resolve to playable local files, the top-K library rows are
+        returned. Otherwise the packaged CC-BY bank fallback fires with the
+        honest-null reason. If BOTH library and bank are empty, returns
+        ``[]`` (degraded-install contract from RESEARCH §Code Example 1).
 
         For every returned pick, the engine calls
         ``registry.write("exemplar", track_id, t_session)`` BEFORE
@@ -468,7 +480,7 @@ class ExemplarFinder:
             with open_default_db() as conn:
                 rows = top_for_band(
                     conn, band,
-                    k=max(k, _LIBRARY_FLOOR),
+                    k=max(k, _LIBRARY_FLOOR) + _LIBRARY_RESOLVE_HEADROOM,
                     max_kick_corr=_KICK_GUARD_R_FILTER,
                 )
         except Exception:
@@ -476,28 +488,35 @@ class ExemplarFinder:
 
         picks: list[ExemplarPick] = []
         if len(rows) >= _LIBRARY_FLOOR:
-            # Library has enough rows — return library picks. Resolve
-            # file_path via the Rekordbox cache when possible; empty
-            # string when not (file_path resolution is best-effort, the
-            # library row itself is the contract).
+            # Library has enough band-share rows; now require enough
+            # playable cache entries too. A stale band_shares row whose
+            # source file moved must not become a silent "from your library"
+            # exemplar with no audio.
             lib = self._load_library()
-            for track_id, score, _kick in rows[:k]:
+            playable_rows: list[tuple[str, float, str]] = []
+            for track_id, score, _kick in rows:
                 file_path = self._resolve_library_path(lib, track_id)
-                if self._registry is not None:
-                    self._registry.write("exemplar", track_id, t_session)
-                picks.append(
-                    ExemplarPick(
-                        track_id=track_id,
-                        file_path=file_path,
-                        band_score=score,
-                        reason=f"from your library — strongest {band}-band track",
+                if not file_path:
+                    continue
+                playable_rows.append((track_id, score, file_path))
+            if len(playable_rows) >= _LIBRARY_FLOOR:
+                for track_id, score, file_path in playable_rows[:k]:
+                    if self._registry is not None:
+                        self._registry.write("exemplar", track_id, t_session)
+                    picks.append(
+                        ExemplarPick(
+                            track_id=track_id,
+                            file_path=file_path,
+                            band_score=score,
+                            reason=f"from your library — strongest {band}-band track",
+                        )
                     )
-                )
 
         if picks:
             return picks
 
-        # Packaged-fallback path — fires when library has 0 OR < floor rows.
+        # Packaged-fallback path — fires when library has 0, fewer than
+        # floor rows, or fewer than floor playable file paths.
         fb = _fallback_for_band(band)
         if fb is None:
             # Degraded install — neither library nor bank has anything to say.

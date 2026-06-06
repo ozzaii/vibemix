@@ -21,14 +21,37 @@ REQ-ID: EXEMPLAR-01 + EXEMPLAR-02 (engine + kick-guard wiring + grounding).
 """
 from __future__ import annotations
 
+from pathlib import Path
+from types import SimpleNamespace
+
 import pytest
 
 from vibemix.learn.exemplar import ExemplarFinder, ExemplarPick
 from vibemix.state.evidence_registry import EvidenceRegistry
 
 
+def _touch(path: Path) -> str:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(b"audio")
+    return str(path)
+
+
+def _patch_library_paths(
+    monkeypatch: pytest.MonkeyPatch,
+    paths: dict[str, str],
+) -> None:
+    lib = SimpleNamespace(
+        tracks={
+            track_id: SimpleNamespace(filepath=file_path)
+            for track_id, file_path in paths.items()
+        }
+    )
+    monkeypatch.setattr(ExemplarFinder, "_load_library", lambda self: lib)
+
+
 def test_find_returns_top_k_from_library_when_floor_met(
     monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
 ) -> None:
     """4 synthetic library rows ≥ _LIBRARY_FLOOR=3 → ``find('low', k=2)``
     returns 2 ExemplarPick instances in deterministic DESC band-share order.
@@ -42,6 +65,13 @@ def test_find_returns_top_k_from_library_when_floor_met(
     monkeypatch.setattr(
         "vibemix.learn.exemplar.top_for_band",
         lambda conn, band, k=3, max_kick_corr=0.8: fake_rows[: k],
+    )
+    _patch_library_paths(
+        monkeypatch,
+        {
+            track_id: _touch(tmp_path / f"{track_id.removeprefix('track:')}.wav")
+            for track_id, _score, _kick in fake_rows
+        },
     )
 
     finder = ExemplarFinder()
@@ -80,6 +110,7 @@ def test_find_falls_back_when_under_library_floor(
 
 def test_find_writes_to_evidence_registry(
     monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
 ) -> None:
     """For every picked track, ``find()`` must call
     ``registry.write("exemplar", track_id, t_session)``.
@@ -96,6 +127,14 @@ def test_find_writes_to_evidence_registry(
             ("track:gamma", 0.30, 0.30),
         ],
     )
+    _patch_library_paths(
+        monkeypatch,
+        {
+            "track:alpha": _touch(tmp_path / "alpha.wav"),
+            "track:beta": _touch(tmp_path / "beta.wav"),
+            "track:gamma": _touch(tmp_path / "gamma.wav"),
+        },
+    )
 
     registry = EvidenceRegistry()
     finder = ExemplarFinder(registry=registry)
@@ -107,6 +146,85 @@ def test_find_writes_to_evidence_registry(
         "the grounding contract for Invariant #2 — without this write, the "
         "LLM's [exemplar:<id>] cite gets stripped as un-grounded."
     )
+
+
+def test_find_resolves_folder_ingest_filepath_for_library_pick(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Folder ingest writes ``TrackEntry(filepath=...)`` cache rows.
+
+    ``ExemplarFinder`` must return that playable path so the Learn tutor can
+    actually play the user's own track, not just paint a citation chip.
+    """
+    rows = [
+        ("folder:alpha", 0.91, 0.10),
+        ("folder:beta", 0.82, 0.20),
+        ("folder:gamma", 0.74, 0.30),
+    ]
+    expected_path = _touch(tmp_path / "alpha.mp3")
+    _patch_library_paths(
+        monkeypatch,
+        {
+            "folder:alpha": expected_path,
+            "folder:beta": _touch(tmp_path / "beta.mp3"),
+            "folder:gamma": _touch(tmp_path / "gamma.mp3"),
+        },
+    )
+    monkeypatch.setattr(
+        "vibemix.learn.exemplar.top_for_band",
+        lambda conn, band, k=3, max_kick_corr=0.8: rows[:k],
+    )
+
+    picks = ExemplarFinder().find("low", k=1)
+
+    assert len(picks) == 1
+    assert picks[0].track_id == "folder:alpha"
+    assert picks[0].file_path == expected_path
+    assert "from your library" in picks[0].reason
+
+
+def test_find_falls_back_when_library_rows_are_not_playable(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Stale band-share rows must not claim a user's library exemplar.
+
+    If the cache cannot resolve enough playable files, the honest packaged
+    fallback is better than a silent ``file_path=""`` own-library pick.
+    """
+    rows = [
+        ("track:missing1", 0.91, 0.10),
+        ("track:missing2", 0.82, 0.20),
+        ("track:missing3", 0.74, 0.30),
+    ]
+    _patch_library_paths(
+        monkeypatch,
+        {
+            track_id: str(tmp_path / f"{track_id}.wav")
+            for track_id, _score, _kick in rows
+        },
+    )
+    monkeypatch.setattr(
+        "vibemix.learn.exemplar.top_for_band",
+        lambda conn, band, k=3, max_kick_corr=0.8: rows[:k],
+    )
+    packaged = _touch(tmp_path / "packaged.wav")
+    monkeypatch.setattr(
+        "vibemix.learn.exemplar._fallback_for_band",
+        lambda band: (
+            f"_packaged:{band}:packaged",
+            packaged,
+            "Your library doesn't have a great example of this — listen to this one we packaged",
+        ),
+    )
+
+    picks = ExemplarFinder().find("low", k=1)
+
+    assert len(picks) == 1
+    assert picks[0].track_id == "_packaged:low:packaged"
+    assert picks[0].file_path == packaged
+    assert "Your library doesn't have a great example" in picks[0].reason
 
 
 def test_find_synthetic_id_format_for_packaged_pick(

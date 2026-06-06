@@ -24,8 +24,10 @@ REQ-IDs: EXEMPLAR-01.
 """
 from __future__ import annotations
 
+import argparse
 import sqlite3
 from pathlib import Path
+from types import SimpleNamespace
 
 import numpy as np
 import pytest
@@ -239,3 +241,56 @@ def test_ingest_with_flag_swallows_band_share_errors(
     assert any(
         "[band-share err]" in record.getMessage() for record in caplog.records
     ), f"expected [band-share err] log entry; got {[r.getMessage() for r in caplog.records]}"
+
+
+def test_embed_folder_cli_enables_band_shares_by_default(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The operator fallback path should feed Learn's own-track exemplars too."""
+    import vibemix.library as library_mod
+    from vibemix import __main__ as main_mod
+
+    folder = tmp_path / "tracks"
+    folder.mkdir()
+    calls: dict[str, object] = {}
+
+    class FakeStore:
+        def close(self) -> None:
+            calls["closed"] = True
+
+    def fake_ingest_folder(folder_arg, embedder, store, **kwargs):
+        calls["folder"] = folder_arg
+        calls["compute_band_shares"] = kwargs.get("compute_band_shares")
+        return SimpleNamespace(
+            embedded=0,
+            skipped_cached=0,
+            failed=0,
+            total=0,
+            cost_estimate_eur=0.0,
+            as_dict=lambda: {
+                "embedded": 0,
+                "skipped_cached": 0,
+                "failed": 0,
+                "total": 0,
+            },
+        )
+
+    monkeypatch.setattr(library_mod, "build_embedder", lambda *a, **k: object())
+    monkeypatch.setattr(library_mod, "open_store", lambda *a, **k: FakeStore())
+    monkeypatch.setattr(library_mod, "ingest_folder", fake_ingest_folder)
+
+    rc = main_mod._cmd_library_embed_folder(
+        argparse.Namespace(
+            path=str(folder),
+            strategy="mean_excerpt",
+            compute_key=False,
+            compute_bpm=False,
+            json=True,
+        )
+    )
+
+    assert rc == 0
+    assert calls["folder"] == folder
+    assert calls["compute_band_shares"] is True
+    assert calls["closed"] is True

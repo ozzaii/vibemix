@@ -11909,3 +11909,42 @@ Proof before staging:
 - `npm --prefix tauri/ui run build`
 - `git diff --check -- src/vibemix/intel/feedback.py src/vibemix/ui_bus/schemas/debrief.py src/vibemix/ui_bus/messages.py src/vibemix/ui_bus/__init__.py src/vibemix/debrief/ws_server.py tests/intel/test_feedback.py tests/ui_bus/test_debrief_new_wrappers_roundtrip.py tests/ui_bus/test_messages_schema.py tests/debrief/test_ws_server_progressive_emit.py scripts/check_ipc_schema.py tauri/ui/src/ipc/messages.schema.json tauri/ui/src/ipc/messages.ts tauri/ui/src/ipc/validator.generated.mjs tauri/ui/src/debrief/ws-client.ts tauri/ui/src/debrief/components/drills-panel.ts tauri/ui/src/debrief/debrief-window.ts tauri/ui/src/debrief/styles/debrief.css tauri/ui/src/debrief/__tests__/drills-panel-shape.spec.ts tauri/ui/src/debrief/__tests__/ws-client-near-miss.spec.ts .planning/handoffs/2026-05-31-package-checklist.md`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+
+## Package 122 - Learn Own-Track Exemplar Import
+
+Suggested commit: `feat(learn): resolve own-track exemplars`
+
+Include:
+
+- `src/vibemix/learn/exemplar.py`
+- `src/vibemix/runtime/session_loop.py`
+- `src/vibemix/__main__.py`
+- `tests/learn/test_exemplar_finder.py`
+- `tests/runtime/test_session_loop.py`
+- `tests/library/test_folder_ingest_band_shares.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- New lesson copy, UI redesign, exemplar-bank retuning, and any change to
+  CLAP vector search. This package only makes first-user folder import feed
+  Learn's band-share table and prevents unplayable library rows from being
+  announced as own-track exemplars.
+
+Reason:
+
+- Learn already has the own-library moat on paper: folder ingest can compute
+  band shares and `ExemplarFinder` can pick the strongest band track. The
+  running app did not actually turn that on for GUI/CLI folder import, and
+  the finder read `.path` while real `TrackEntry` rows carry `.filepath`.
+  Enable band-share accrual on folder imports and require enough playable
+  resolved files before returning a "from your library" exemplar; stale rows
+  fall back to the packaged honest-null bank instead of emitting silent audio.
+
+Proof before staging:
+
+- `uv run pytest -q tests/learn/test_exemplar_finder.py tests/library/test_folder_ingest_band_shares.py tests/runtime/test_session_loop.py`
+- `uv run ruff check src/vibemix/learn/exemplar.py src/vibemix/runtime/session_loop.py src/vibemix/__main__.py tests/learn/test_exemplar_finder.py tests/library/test_folder_ingest_band_shares.py tests/runtime/test_session_loop.py`
+- `uv run python -m compileall -q src/vibemix/learn/exemplar.py src/vibemix/runtime/session_loop.py src/vibemix/__main__.py tests/learn/test_exemplar_finder.py tests/library/test_folder_ingest_band_shares.py tests/runtime/test_session_loop.py`
+- `git diff --check -- src/vibemix/learn/exemplar.py src/vibemix/runtime/session_loop.py src/vibemix/__main__.py tests/learn/test_exemplar_finder.py tests/library/test_folder_ingest_band_shares.py tests/runtime/test_session_loop.py .planning/handoffs/2026-05-31-package-checklist.md`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`

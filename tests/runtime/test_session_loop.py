@@ -209,6 +209,7 @@ def test_library_import_routes_folder_to_ingest(
     def fake_ingest_folder(folder_arg, embedder, store, **kwargs):
         calls["folder"] = folder_arg
         calls["persist_library"] = kwargs.get("persist_library")
+        calls["compute_band_shares"] = kwargs.get("compute_band_shares")
         progress = kwargs["progress"]
         progress("[1/2] ok first.mp3  ~€0.0000")
         progress("[2/2] skip second.mp3  ~€0.0000")
@@ -235,6 +236,7 @@ def test_library_import_routes_folder_to_ingest(
 
     assert calls["folder"] == folder
     assert calls["persist_library"] is True
+    assert calls["compute_band_shares"] is True
     assert calls["closed"] is True
     progress = fake_bus.emitted_by_type("ipc.library.import_progress")
     assert [p["payload"]["done"] for p in progress] == [1, 2, 2]

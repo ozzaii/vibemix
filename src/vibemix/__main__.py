@@ -7534,6 +7534,7 @@ def _cmd_library_embed_folder(args: argparse.Namespace) -> int:
             persist_library=True,
             progress=_progress,
             embed_strategy=strategy,
+            compute_band_shares=True,
             compute_key=compute_key,
             compute_bpm=compute_bpm,
         )

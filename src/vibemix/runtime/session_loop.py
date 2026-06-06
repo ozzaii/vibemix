@@ -835,6 +835,7 @@ class SessionLoop:
                     store,
                     persist_library=True,
                     progress=_progress,
+                    compute_band_shares=True,
                 )
             finally:
                 store.close()
