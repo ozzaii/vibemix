@@ -809,6 +809,12 @@ class LearnLiveGradePayload:
     save_from_verdict: Literal["drifting", "trainwreck"] | None = None
     save_from_phase_error_beats: float | None = None
     save_recovery_delta_beats: float | None = None
+    save_attempt_active: bool = False
+    save_floor_seconds_total: float | None = None
+    save_floor_seconds_remaining: float | None = None
+    save_floor_expired: bool = False
+    save_difficulty_level: int = 1
+    save_streak: int = 0
 
 
 @dataclass(frozen=True, slots=True)
@@ -831,6 +837,12 @@ class LearnLiveGrade:
         save_from_verdict: str | None = None,
         save_from_phase_error_beats: float | None = None,
         save_recovery_delta_beats: float | None = None,
+        save_attempt_active: bool = False,
+        save_floor_seconds_total: float | None = None,
+        save_floor_seconds_remaining: float | None = None,
+        save_floor_expired: bool = False,
+        save_difficulty_level: int = 1,
+        save_streak: int = 0,
     ) -> LearnLiveGrade:
         return cls(
             type="ipc.learn.live_grade",
@@ -844,6 +856,12 @@ class LearnLiveGrade:
                 save_from_verdict=save_from_verdict,  # type: ignore[arg-type]
                 save_from_phase_error_beats=save_from_phase_error_beats,
                 save_recovery_delta_beats=save_recovery_delta_beats,
+                save_attempt_active=bool(save_attempt_active),
+                save_floor_seconds_total=save_floor_seconds_total,
+                save_floor_seconds_remaining=save_floor_seconds_remaining,
+                save_floor_expired=bool(save_floor_expired),
+                save_difficulty_level=max(1, min(5, int(save_difficulty_level))),
+                save_streak=max(0, int(save_streak)),
             ),
         )
 

@@ -3263,11 +3263,27 @@
                 {"type": "number", "minimum": 0, "maximum": 0.5},
                 {"type": "null"}
               ]
+            },
+            "save_attempt_active": {"type": "boolean"},
+            "save_floor_seconds_total": {
+              "anyOf": [
+                {"type": "number", "minimum": 0, "maximum": 60},
+                {"type": "null"}
+              ]
+            },
+            "save_floor_seconds_remaining": {
+              "anyOf": [
+                {"type": "number", "minimum": 0, "maximum": 60},
+                {"type": "null"}
+              ]
+            },
+            "save_floor_expired": {"type": "boolean"},
+            "save_difficulty_level": {"type": "integer", "minimum": 1, "maximum": 5},
+            "save_streak": {"type": "integer", "minimum": 0}
             }
           }
         }
-      }
-    },
+      },
     "LearnWaveformReady": {
       "$comment": "Sidecar → shell. Compact two-deck Learn practice waveform peaks.",
       "type": "object",

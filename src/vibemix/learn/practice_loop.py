@@ -53,6 +53,12 @@ class BeatmatchPracticeResult:
     save_from_verdict: str | None = None
     save_from_phase_error_beats: float | None = None
     save_recovery_delta_beats: float | None = None
+    save_attempt_active: bool = False
+    save_floor_seconds_total: float | None = None
+    save_floor_seconds_remaining: float | None = None
+    save_floor_expired: bool = False
+    save_difficulty_level: int = 1
+    save_streak: int = 0
 
 
 def grade_owned_beatmatch_attempt(

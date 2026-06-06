@@ -291,12 +291,33 @@ class BeatmatchPracticeDriver:
         )
         self._armed = False
         self._sandbox_active = False
+        self._save_difficulty_level = 1
 
     @property
     def deck(self) -> MiniDeck:
         """Return the exact owned deck that snapshots grade."""
 
         return self._deck
+
+    @property
+    def save_difficulty_level(self) -> int:
+        """Return the current Save challenge level used by recovery drills."""
+
+        return self._save_difficulty_level
+
+    def set_save_difficulty(self, level: int) -> None:
+        """Set the bounded Save-mode challenge level.
+
+        Runtime owns escalation. The driver owns what that level means for the
+        audible owned deck: a larger tempo shove for key-clash drills and a
+        larger phase shove for phrase-miss drills.
+        """
+
+        try:
+            raw = int(level)
+        except (TypeError, ValueError):
+            raw = 1
+        self._save_difficulty_level = max(1, min(5, raw))
 
     def record_action(self, lesson_id: str | None, midi: dict[str, Any]) -> bool:
         """Record one matched Learn action.
@@ -419,9 +440,15 @@ class BeatmatchPracticeDriver:
         drill = str(midi.get("drill", "") or "").strip()
         self._deck.set_rates(rate_a=1.0, rate_b=self._rate_b_for_lock(), smooth=False)
         if drill == "key_clash":
-            self._deck.set_rates(rate_a=1.0, rate_b=self._rate_b_for_lock() * 1.08, smooth=False)
+            rate_shove = min(0.12, 0.065 + (self._save_difficulty_level * 0.015))
+            self._deck.set_rates(
+                rate_a=1.0,
+                rate_b=self._rate_b_for_lock() * (1.0 + rate_shove),
+                smooth=False,
+            )
         else:
-            self._deck.offset_playhead(deck, self._beat_frames_for(deck) * 0.25)
+            phase_shove = min(0.38, 0.20 + (self._save_difficulty_level * 0.05))
+            self._deck.offset_playhead(deck, self._beat_frames_for(deck) * phase_shove)
         self._armed = True
 
     def snapshot(self) -> BeatmatchPracticeSnapshot | None:

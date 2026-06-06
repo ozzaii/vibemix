@@ -11514,3 +11514,47 @@ Proof before staging:
 - `uv run python -m compileall -q src/vibemix/__main__.py src/vibemix/learn/runtime.py src/vibemix/learn/two_deck_player.py tests/learn/test_beatmatch_practice_audio_lifecycle.py tests/learn/test_observer_boot_wiring.py tests/learn/test_two_deck_player.py`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
 - `git diff --check -- src/vibemix/__main__.py src/vibemix/learn/runtime.py src/vibemix/learn/two_deck_player.py tests/learn/test_beatmatch_practice_audio_lifecycle.py tests/learn/test_observer_boot_wiring.py tests/learn/test_two_deck_player.py .planning/handoffs/2026-05-31-package-checklist.md`
+
+## Package 112 - Learn Save-Mode Escalation Timer
+
+Suggested commit: `feat(learn): add save mode escalation timer`
+
+Include:
+
+- `src/vibemix/__main__.py`
+- `src/vibemix/learn/beatmatch_practice_driver.py`
+- `src/vibemix/learn/practice_loop.py`
+- `src/vibemix/learn/runtime.py`
+- `src/vibemix/ui_bus/learn_messages.py`
+- `tauri/ui/src/ipc/messages.schema.json`
+- `tauri/ui/src/ipc/messages.ts`
+- `tauri/ui/src/ipc/validator.generated.mjs`
+- `tests/ui_bus/test_learn_live_grade_message.py`
+- `tests/learn/test_beatmatch_practice_driver.py`
+- `tests/learn/test_runtime_evidence_grounding.py`
+- `tests/learn/test_observer_boot_wiring.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- UX rendering for the dare HUD, persistence across cold boots, and unrelated
+  Learn lesson rewrites. This package only adds the backend attempt state,
+  countdown fields, and driver difficulty hook that UX can render.
+
+Reason:
+
+- B2 needs stakes. Start a Save attempt only from a real owned-deck
+  `drifting`/`trainwreck` grade, carry a bounded floor-dies countdown on
+  `ipc.learn.live_grade`, expire the attempt before a late lock can fake
+  `save_landed`, and escalate successful saves by shrinking the next window
+  while pushing the level into the owned-deck recovery drill magnitude.
+
+Proof before staging:
+
+- `uv run pytest -q tests/ui_bus/test_learn_live_grade_message.py tests/learn/test_beatmatch_practice_driver.py tests/learn/test_runtime_evidence_grounding.py tests/learn/test_beatmatch_practice_audio_lifecycle.py tests/learn/test_observer_boot_wiring.py`
+- `uv run python scripts/check_ipc_schema.py`
+- `npm --prefix tauri/ui run check:ipc`
+- `uv run ruff check src/vibemix/learn/practice_loop.py src/vibemix/learn/beatmatch_practice_driver.py src/vibemix/learn/runtime.py src/vibemix/ui_bus/learn_messages.py src/vibemix/__main__.py tests/ui_bus/test_learn_live_grade_message.py tests/learn/test_runtime_evidence_grounding.py tests/learn/test_beatmatch_practice_driver.py tests/learn/test_observer_boot_wiring.py`
+- `uv run python -m compileall -q src/vibemix/learn/practice_loop.py src/vibemix/learn/beatmatch_practice_driver.py src/vibemix/learn/runtime.py src/vibemix/ui_bus/learn_messages.py src/vibemix/__main__.py tests/ui_bus/test_learn_live_grade_message.py tests/learn/test_runtime_evidence_grounding.py tests/learn/test_beatmatch_practice_driver.py tests/learn/test_observer_boot_wiring.py`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+- `git diff --check -- src/vibemix/learn/practice_loop.py src/vibemix/learn/beatmatch_practice_driver.py src/vibemix/learn/runtime.py src/vibemix/ui_bus/learn_messages.py src/vibemix/__main__.py tauri/ui/src/ipc/messages.schema.json tauri/ui/src/ipc/messages.ts tauri/ui/src/ipc/validator.generated.mjs tests/ui_bus/test_learn_live_grade_message.py tests/learn/test_runtime_evidence_grounding.py tests/learn/test_beatmatch_practice_driver.py tests/learn/test_observer_boot_wiring.py .planning/handoffs/2026-05-31-package-checklist.md`

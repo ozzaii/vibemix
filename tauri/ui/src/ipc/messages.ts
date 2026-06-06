@@ -992,6 +992,12 @@ export interface LearnLiveGrade {
     save_from_verdict?: ("drifting" | "trainwreck") | null;
     save_from_phase_error_beats?: number | null;
     save_recovery_delta_beats?: number | null;
+    save_attempt_active?: boolean;
+    save_floor_seconds_total?: number | null;
+    save_floor_seconds_remaining?: number | null;
+    save_floor_expired?: boolean;
+    save_difficulty_level?: number;
+    save_streak?: number;
   };
 }
 export interface LearnWaveformReady {

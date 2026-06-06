@@ -265,3 +265,33 @@ def test_recovery_drills_arm_real_owned_deck_misses() -> None:
     assert phrase_miss.verdict == "trainwreck"
     assert phrase_miss.tempo_matched is True
     assert phrase_miss.phase_locked is False
+
+
+def test_save_difficulty_escalates_recovery_drill_magnitude() -> None:
+    easy = BeatmatchPracticeDriver()
+    hard = BeatmatchPracticeDriver()
+    hard.set_save_difficulty(5)
+
+    assert (
+        easy.record_action(
+            "L3.05",
+            {"control": "recovery_drill", "deck": "B", "drill": "misaligned_phrase"},
+        )
+        is True
+    )
+    assert (
+        hard.record_action(
+            "L3.05",
+            {"control": "recovery_drill", "deck": "B", "drill": "misaligned_phrase"},
+        )
+        is True
+    )
+
+    easy_grade = _grade(easy)
+    hard_grade = _grade(hard)
+
+    assert easy.save_difficulty_level == 1
+    assert hard.save_difficulty_level == 5
+    assert easy_grade.verdict == "trainwreck"
+    assert hard_grade.verdict == "trainwreck"
+    assert abs(hard_grade.phase_error_beats) > abs(easy_grade.phase_error_beats)

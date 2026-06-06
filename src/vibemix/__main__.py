@@ -2683,6 +2683,13 @@ async def main() -> None:
             return None
         return beatmatch_practice_driver.record_action(lesson_id, midi)
 
+    def _beatmatch_practice_set_difficulty(level: int) -> None:
+        if beatmatch_practice_driver is None:
+            return
+        setter = getattr(beatmatch_practice_driver, "set_save_difficulty", None)
+        if callable(setter):
+            setter(level)
+
     def _beatmatch_practice_waveform_payload() -> dict[str, Any] | None:
         return (
             beatmatch_practice_driver.waveform_payload()
@@ -2729,6 +2736,7 @@ async def main() -> None:
         beatmatch_practice_sandbox_loader=_beatmatch_practice_sandbox_snapshot,
         beatmatch_practice_action_recorder=_beatmatch_practice_record_action,
         beatmatch_practice_prepare=_prepare_learn_save_mode_sources,
+        beatmatch_practice_difficulty_setter=_beatmatch_practice_set_difficulty,
         waveform_payload_loader=_beatmatch_practice_waveform_payload,
         playhead_payload_loader=_beatmatch_practice_playhead_payload,
         cue_placement_practice_loader=(

@@ -173,6 +173,11 @@ _RECOVERY_BAILOUT_MIN_DELTA = 8
 _RECOVERY_FILTER_CENTER_MIN_DELTA = 18
 _RECOVERY_CHANNEL_CUT_CC = 32
 _RECOVERY_XFADER_CUT_CC = 38
+_BEATMATCH_SAVE_DIFFICULTY_MIN = 1
+_BEATMATCH_SAVE_DIFFICULTY_MAX = 5
+_BEATMATCH_SAVE_FLOOR_BASE_S = 14.0
+_BEATMATCH_SAVE_FLOOR_STEP_S = 2.0
+_BEATMATCH_SAVE_FLOOR_MIN_S = 6.0
 _PRACTICE_AUDIO_CONTROLS = frozenset(
     {
         "cue",
@@ -630,6 +635,7 @@ class LessonRuntime(StateMachine):
         beatmatch_practice_action_recorder: Callable[[str | None, dict[str, Any]], bool | None]
         | None = None,
         beatmatch_practice_prepare: Callable[[], None] | None = None,
+        beatmatch_practice_difficulty_setter: Callable[[int], None] | None = None,
         waveform_payload_loader: Callable[[], dict[str, Any] | None] | None = None,
         playhead_payload_loader: Callable[[], dict[str, Any] | None] | None = None,
         cue_placement_practice_loader: Callable[[], CuePlacementPracticeSnapshot | None] | None = None,
@@ -688,6 +694,9 @@ class LessonRuntime(StateMachine):
                 owned-deck beatmatch snapshot and immediately grade that attempt
                 through the same evidence path, rather than waiting for the next
                 1 Hz tick after the lesson may have advanced.
+            beatmatch_practice_difficulty_setter: Optional hook that lets the
+                runtime push Save-mode escalation back into the owned-deck
+                driver. None keeps fixture-only and sandbox tests unchanged.
             cue_placement_practice_loader: Optional owned-deck hot-cue lesson
                 hook. When it returns a :class:`CuePlacementPracticeSnapshot`,
                 the 1 Hz loop grades cue timing against the owned beatgrid and
@@ -721,6 +730,7 @@ class LessonRuntime(StateMachine):
         self._beatmatch_practice_sandbox_loader = beatmatch_practice_sandbox_loader
         self._beatmatch_practice_action_recorder = beatmatch_practice_action_recorder
         self._beatmatch_practice_prepare = beatmatch_practice_prepare
+        self._beatmatch_practice_difficulty_setter = beatmatch_practice_difficulty_setter
         self._waveform_payload_loader = waveform_payload_loader
         self._playhead_payload_loader = playhead_payload_loader
         self._cue_placement_practice_loader = cue_placement_practice_loader
@@ -759,10 +769,12 @@ class LessonRuntime(StateMachine):
         self._last_mismatch_hint_signature: tuple[str, str, str] | None = None
         self._beatmatch_practice_lock_active = False
         self._last_beatmatch_live_grade_verdict: str | None = None
-        self._last_beatmatch_live_grade_signature: tuple[str, float, float, str | None] | None = (
-            None
-        )
+        self._last_beatmatch_live_grade_signature: tuple[Any, ...] | None = None
         self._last_beatmatch_save_candidate: tuple[str, float] | None = None
+        self._beatmatch_save_attempt_started_at: float | None = None
+        self._beatmatch_save_attempt_window_s: float | None = None
+        self._beatmatch_save_difficulty_level = _BEATMATCH_SAVE_DIFFICULTY_MIN
+        self._beatmatch_save_streak = 0
         self._beatmatch_practice_ack_prehandled = False
         self._beatmatch_practice_player: Any | None = None
         self._beatmatch_practice_player_active = False
@@ -2902,6 +2914,7 @@ class LessonRuntime(StateMachine):
             self._last_beatmatch_live_grade_verdict = None
             self._last_beatmatch_live_grade_signature = None
             self._last_beatmatch_save_candidate = None
+            self._reset_beatmatch_save_attempt(reset_streak=True)
             return None
         try:
             snapshot = self._beatmatch_practice_loader()
@@ -2913,12 +2926,14 @@ class LessonRuntime(StateMachine):
                 file=sys.stderr,
             )
             self._last_beatmatch_save_candidate = None
+            self._reset_beatmatch_save_attempt()
             return None
         if snapshot is None:
             self._beatmatch_practice_lock_active = False
             self._last_beatmatch_live_grade_verdict = None
             self._last_beatmatch_live_grade_signature = None
             self._last_beatmatch_save_candidate = None
+            self._reset_beatmatch_save_attempt()
             return None
 
         t_session = self._evidence_time()
@@ -2929,7 +2944,11 @@ class LessonRuntime(StateMachine):
         )
         if not is_creditable_locked_grade(grade):
             self._beatmatch_practice_lock_active = False
-            self._remember_beatmatch_save_candidate(grade.verdict, grade.phase_error_beats)
+            save_state = self._beatmatch_save_state_for_miss(grade, t_session)
+            if save_state["save_floor_expired"]:
+                self._last_beatmatch_save_candidate = None
+            else:
+                self._remember_beatmatch_save_candidate(grade.verdict, grade.phase_error_beats)
             feedback = self._beatmatch_recovery_feedback(grade)
             if feedback is not None and self._mark_progress_practice_feedback(**feedback):
                 self._emit_progress_snapshot()
@@ -2938,6 +2957,7 @@ class LessonRuntime(StateMachine):
                 event=None,
                 credited=(),
                 t_session=t_session,
+                **save_state,
             )
         feedback_cleared = self._clear_progress_practice_feedback()
         if self._beatmatch_practice_lock_active:
@@ -2949,6 +2969,7 @@ class LessonRuntime(StateMachine):
                 event=None,
                 credited=(),
                 t_session=t_session,
+                **self._beatmatch_save_payload(),
             )
 
         self._beatmatch_practice_lock_active = True
@@ -2964,13 +2985,21 @@ class LessonRuntime(StateMachine):
             progress=self._progress,
             now=datetime.now(UTC).isoformat(),
         )
+        result = replace(result, **self._beatmatch_save_payload())
         if save_edge is not None:
+            landed_payload = self._beatmatch_save_landed_payload(
+                t_session=t_session,
+                from_verdict=str(save_edge["from_verdict"]),
+                from_phase_error_beats=float(save_edge["from_phase_error_beats"]),
+                recovery_delta_beats=float(save_edge["recovery_delta_beats"]),
+            )
             result = replace(
                 result,
                 save_landed=True,
                 save_from_verdict=save_edge["from_verdict"],
                 save_from_phase_error_beats=save_edge["from_phase_error_beats"],
                 save_recovery_delta_beats=save_edge["recovery_delta_beats"],
+                **landed_payload,
             )
         if result.credited:
             self._emit_mastered_unlocks(
@@ -3036,6 +3065,164 @@ class LessonRuntime(StateMachine):
             "from_phase_error_beats": from_phase,
             "recovery_delta_beats": max(0.0, min(0.5, abs(from_phase) - abs(phase))),
         }
+
+    def _beatmatch_save_window_seconds(self) -> float:
+        level = max(
+            _BEATMATCH_SAVE_DIFFICULTY_MIN,
+            min(_BEATMATCH_SAVE_DIFFICULTY_MAX, self._beatmatch_save_difficulty_level),
+        )
+        return max(
+            _BEATMATCH_SAVE_FLOOR_MIN_S,
+            _BEATMATCH_SAVE_FLOOR_BASE_S - ((level - 1) * _BEATMATCH_SAVE_FLOOR_STEP_S),
+        )
+
+    def _set_beatmatch_save_difficulty(self, level: int) -> None:
+        bounded = max(
+            _BEATMATCH_SAVE_DIFFICULTY_MIN,
+            min(_BEATMATCH_SAVE_DIFFICULTY_MAX, int(level)),
+        )
+        self._beatmatch_save_difficulty_level = bounded
+        if self._beatmatch_practice_difficulty_setter is None:
+            return
+        try:
+            self._beatmatch_practice_difficulty_setter(bounded)
+        except Exception as exc:  # pragma: no cover - defensive
+            import sys
+
+            print(
+                f"[learn.runtime] beatmatch save difficulty setter failed: {exc!r}",
+                file=sys.stderr,
+            )
+
+    def _reset_beatmatch_save_attempt(self, *, reset_streak: bool = False) -> None:
+        self._beatmatch_save_attempt_started_at = None
+        self._beatmatch_save_attempt_window_s = None
+        if reset_streak:
+            self._beatmatch_save_streak = 0
+
+    def _beatmatch_save_payload(
+        self,
+        *,
+        active: bool | None = None,
+        total_s: float | None = None,
+        remaining_s: float | None = None,
+        expired: bool = False,
+        difficulty_level: int | None = None,
+        streak: int | None = None,
+    ) -> dict[str, object]:
+        if active is None:
+            active = self._beatmatch_save_attempt_started_at is not None
+        if total_s is None:
+            total_s = self._beatmatch_save_attempt_window_s
+        if remaining_s is None and active and total_s is not None:
+            remaining_s = total_s
+        if remaining_s is not None:
+            remaining_s = max(0.0, round(float(remaining_s), 2))
+        if total_s is not None:
+            total_s = max(0.0, round(float(total_s), 2))
+        return {
+            "save_attempt_active": bool(active),
+            "save_floor_seconds_total": total_s,
+            "save_floor_seconds_remaining": remaining_s,
+            "save_floor_expired": bool(expired),
+            "save_difficulty_level": int(
+                self._beatmatch_save_difficulty_level
+                if difficulty_level is None
+                else difficulty_level
+            ),
+            "save_streak": int(self._beatmatch_save_streak if streak is None else streak),
+        }
+
+    def _beatmatch_save_state_for_miss(
+        self,
+        grade,
+        t_session: float,
+    ) -> dict[str, object]:
+        verdict = getattr(grade, "verdict", "")
+        if verdict not in {"drifting", "trainwreck"}:
+            self._reset_beatmatch_save_attempt()
+            return self._beatmatch_save_payload(active=False)
+
+        if (
+            self._beatmatch_save_attempt_started_at is None
+            or self._beatmatch_save_attempt_window_s is None
+        ):
+            self._beatmatch_save_attempt_started_at = float(t_session)
+            self._beatmatch_save_attempt_window_s = self._beatmatch_save_window_seconds()
+
+        started_at = self._beatmatch_save_attempt_started_at
+        total_s = self._beatmatch_save_attempt_window_s
+        elapsed_s = max(0.0, float(t_session) - started_at)
+        remaining_s = max(0.0, total_s - elapsed_s)
+        if remaining_s > 0.0:
+            return self._beatmatch_save_payload(
+                active=True,
+                total_s=total_s,
+                remaining_s=remaining_s,
+            )
+
+        level = self._beatmatch_save_difficulty_level
+        self._beatmatch_save_streak = 0
+        self._log_session_event(
+            "learn_beatmatch_save_floor_expired",
+            lesson_id=self._learn.current_lesson_id or "",
+            course_id=self._learn.current_course_id or "",
+            step_id=self._current_step_id(),
+            evidence_time=float(t_session),
+            verdict=verdict,
+            difficulty_level=level,
+            floor_seconds_total=total_s,
+        )
+        self._reset_beatmatch_save_attempt()
+        return self._beatmatch_save_payload(
+            active=False,
+            total_s=total_s,
+            remaining_s=0.0,
+            expired=True,
+            difficulty_level=level,
+            streak=0,
+        )
+
+    def _beatmatch_save_landed_payload(
+        self,
+        *,
+        t_session: float,
+        from_verdict: str,
+        from_phase_error_beats: float,
+        recovery_delta_beats: float,
+    ) -> dict[str, object]:
+        level_won = self._beatmatch_save_difficulty_level
+        total_s = self._beatmatch_save_attempt_window_s
+        remaining_s: float | None = None
+        if (
+            total_s is not None
+            and self._beatmatch_save_attempt_started_at is not None
+        ):
+            elapsed_s = max(0.0, float(t_session) - self._beatmatch_save_attempt_started_at)
+            remaining_s = max(0.0, total_s - elapsed_s)
+        next_streak = self._beatmatch_save_streak + 1
+        self._beatmatch_save_streak = next_streak
+        self._log_session_event(
+            "learn_beatmatch_save_landed",
+            lesson_id=self._learn.current_lesson_id or "",
+            course_id=self._learn.current_course_id or "",
+            step_id=self._current_step_id(),
+            evidence_time=float(t_session),
+            from_verdict=from_verdict,
+            from_phase_error_beats=from_phase_error_beats,
+            recovery_delta_beats=recovery_delta_beats,
+            difficulty_level=level_won,
+            streak=next_streak,
+        )
+        self._reset_beatmatch_save_attempt()
+        self._set_beatmatch_save_difficulty(level_won + 1)
+        return self._beatmatch_save_payload(
+            active=False,
+            total_s=total_s,
+            remaining_s=remaining_s,
+            difficulty_level=level_won,
+            streak=next_streak,
+        )
 
     def _grade_beatmatch_sandbox_tick(self) -> BeatmatchPracticeResult | None:
         """Grade free practice for feedback only, never evidence or progress."""
@@ -3103,7 +3290,22 @@ class LessonRuntime(StateMachine):
         if not math.isfinite(score):
             score = 0.0
         score = max(0.0, min(1.0, score))
-        signature = (verdict, round(phase_error, 3), round(score, 3), citation)
+        signature = (
+            verdict,
+            round(phase_error, 3),
+            round(score, 3),
+            citation,
+            result.save_landed,
+            result.save_floor_expired,
+            result.save_attempt_active,
+            (
+                None
+                if result.save_floor_seconds_remaining is None
+                else round(float(result.save_floor_seconds_remaining), 1)
+            ),
+            result.save_difficulty_level,
+            result.save_streak,
+        )
 
         lesson_id = self._learn.current_lesson_id or "learn"
         try:
@@ -3118,6 +3320,12 @@ class LessonRuntime(StateMachine):
                     save_from_verdict=result.save_from_verdict,
                     save_from_phase_error_beats=result.save_from_phase_error_beats,
                     save_recovery_delta_beats=result.save_recovery_delta_beats,
+                    save_attempt_active=result.save_attempt_active,
+                    save_floor_seconds_total=result.save_floor_seconds_total,
+                    save_floor_seconds_remaining=result.save_floor_seconds_remaining,
+                    save_floor_expired=result.save_floor_expired,
+                    save_difficulty_level=result.save_difficulty_level,
+                    save_streak=result.save_streak,
                 ).to_dict()
                 self._ipc.emit(live_grade)
 
@@ -3270,6 +3478,8 @@ class LessonRuntime(StateMachine):
         self._beatmatch_practice_lock_active = False
         self._last_beatmatch_live_grade_verdict = None
         self._last_beatmatch_live_grade_signature = None
+        self._last_beatmatch_save_candidate = None
+        self._reset_beatmatch_save_attempt()
 
     def _emit_live_cue_placement_grade(
         self, result: CuePlacementPracticeResult | None

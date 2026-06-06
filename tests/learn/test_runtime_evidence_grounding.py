@@ -760,6 +760,12 @@ def test_live_beatmatch_grade_voices_locked_with_resolving_citation(monkeypatch)
         "save_from_verdict": None,
         "save_from_phase_error_beats": None,
         "save_recovery_delta_beats": None,
+        "save_attempt_active": False,
+        "save_floor_seconds_total": None,
+        "save_floor_seconds_remaining": None,
+        "save_floor_expired": False,
+        "save_difficulty_level": 1,
+        "save_streak": 0,
     }
     result = CitationLinter().check(" ".join(payload["citations"]), registry.snapshot())
     assert result.valid is True
@@ -1298,6 +1304,82 @@ def test_live_beatmatch_save_landed_ignores_tempo_off_interruption(monkeypatch) 
     assert [grade["verdict"] for grade in grades] == ["drifting", "tempo_off", "locked"]
     assert grades[-1]["save_landed"] is False
     assert grades[-1]["save_from_verdict"] is None
+
+
+def test_live_beatmatch_save_floor_expires_before_late_lock(monkeypatch) -> None:
+    """B2: the floor timer ends the Save attempt instead of faking a late save."""
+
+    monkeypatch.setattr("vibemix.learn.progress.save_progress", lambda _progress: None)
+    snapshots = [
+        _sliding_beatmatch_snapshot(),
+        _sliding_beatmatch_snapshot(),
+        _locked_beatmatch_snapshot(),
+    ]
+    clock_values = [100.0, 115.0, 116.0]
+    ipc = MagicMock(name="ipc_router")
+    runtime = LessonRuntime(
+        learn_state=LearnState(),
+        midi_mirror=MagicMock(name="midi_mirror"),
+        controller_state=MagicMock(name="controller_state"),
+        ipc_router=ipc,
+        progress_store=LearnProgress(),
+        evidence_registry=EvidenceRegistry(),
+        evidence_clock=lambda: clock_values.pop(0),
+        beatmatch_practice_loader=lambda: snapshots.pop(0) if snapshots else None,
+    )
+
+    for _ in range(3):
+        runtime._emit_live_beatmatch_grade(runtime._grade_beatmatch_practice_tick())
+
+    grades = _live_grade_payloads(ipc)
+    assert [grade["verdict"] for grade in grades] == ["drifting", "drifting", "locked"]
+    assert grades[0]["save_attempt_active"] is True
+    assert grades[0]["save_floor_seconds_total"] == pytest.approx(14.0)
+    assert grades[0]["save_floor_seconds_remaining"] == pytest.approx(14.0)
+    assert grades[1]["save_floor_expired"] is True
+    assert grades[1]["save_attempt_active"] is False
+    assert grades[1]["save_floor_seconds_remaining"] == pytest.approx(0.0)
+    assert grades[2]["save_landed"] is False
+    assert grades[2]["save_from_verdict"] is None
+
+
+def test_live_beatmatch_save_landed_escalates_next_floor_window(monkeypatch) -> None:
+    """A real save shrinks the next attempt window and pushes level to the deck."""
+
+    monkeypatch.setattr("vibemix.learn.progress.save_progress", lambda _progress: None)
+    progress = LearnProgress()
+    _make_beatmatching_competent(progress)
+    snapshots = [
+        _sliding_beatmatch_snapshot(),
+        _locked_beatmatch_snapshot(),
+        _sliding_beatmatch_snapshot(),
+    ]
+    clock_values = [10.0, 12.0, 20.0]
+    difficulty_updates: list[int] = []
+    ipc = MagicMock(name="ipc_router")
+    runtime = LessonRuntime(
+        learn_state=LearnState(),
+        midi_mirror=MagicMock(name="midi_mirror"),
+        controller_state=MagicMock(name="controller_state"),
+        ipc_router=ipc,
+        progress_store=progress,
+        evidence_registry=EvidenceRegistry(),
+        evidence_clock=lambda: clock_values.pop(0),
+        beatmatch_practice_loader=lambda: snapshots.pop(0) if snapshots else None,
+        beatmatch_practice_difficulty_setter=difficulty_updates.append,
+    )
+
+    for _ in range(3):
+        runtime._emit_live_beatmatch_grade(runtime._grade_beatmatch_practice_tick())
+
+    grades = _live_grade_payloads(ipc)
+    assert grades[1]["save_landed"] is True
+    assert grades[1]["save_difficulty_level"] == 1
+    assert grades[1]["save_streak"] == 1
+    assert difficulty_updates == [2]
+    assert grades[2]["save_attempt_active"] is True
+    assert grades[2]["save_difficulty_level"] == 2
+    assert grades[2]["save_floor_seconds_total"] == pytest.approx(12.0)
 
 
 def test_live_beatmatch_grade_tick_stops_after_completion(monkeypatch) -> None:
