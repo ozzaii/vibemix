@@ -2611,6 +2611,92 @@ async def main() -> None:
         )
         beatmatch_practice_driver = None
 
+    beatmatch_practice_player: Any | None = None
+    _learn_save_mode_sources_ready = False
+    _LEARN_SAVE_MODE_SOURCE_LESSONS = frozenset({"L2.01", "L2.02", "L3.05"})
+
+    def _prepare_learn_save_mode_sources() -> None:
+        """Lazily replace bundled practice loops with own tracks for Save mode."""
+
+        nonlocal beatmatch_practice_driver, beatmatch_practice_player
+        nonlocal _learn_save_mode_sources_ready
+        if beatmatch_practice_driver is None or _learn_save_mode_sources_ready:
+            return
+        lesson_id = _learn_state.current_lesson_id
+        if lesson_id is not None and lesson_id not in _LEARN_SAVE_MODE_SOURCE_LESSONS:
+            return
+        try:
+            from vibemix.learn.save_mode_loader import load_save_mode_sources
+            from vibemix.library.rekordbox import RekordboxLibrary as _RBLibrary
+            from vibemix.library.store import open_store as _open_library_store
+
+            lib = _RBLibrary()
+            if not lib.try_load_cache():
+                return
+            store = _open_library_store()
+            try:
+                outcome = load_save_mode_sources(lib, store)
+            finally:
+                try:
+                    store.close()
+                except Exception:
+                    pass
+            if outcome.sources is None:
+                print(
+                    "-> learn save mode using bundled practice loops: "
+                    f"{outcome.fallback_reason or 'own-track sources unavailable'}",
+                    file=sys.stderr,
+                )
+                return
+            beatmatch_practice_driver = BeatmatchPracticeDriver(outcome.sources)
+            _learn_save_mode_sources_ready = True
+            if beatmatch_practice_player is not None:
+                set_deck = getattr(beatmatch_practice_player, "set_deck", None)
+                if callable(set_deck):
+                    set_deck(
+                        beatmatch_practice_driver.deck,
+                        sample_rate=outcome.sources.sample_rate,
+                    )
+            print(
+                "-> learn save mode using own tracks: "
+                f"{outcome.sources.seed_track_id} -> {outcome.sources.suggested_track_id}",
+                file=sys.stderr,
+            )
+        except Exception as _save_mode_exc:  # pragma: no cover - defensive boot path
+            print(
+                f"[learn boot] save-mode own-track load failed: {_save_mode_exc!r}",
+                file=sys.stderr,
+            )
+
+    def _beatmatch_practice_snapshot() -> Any | None:
+        return beatmatch_practice_driver.snapshot() if beatmatch_practice_driver is not None else None
+
+    def _beatmatch_practice_sandbox_snapshot() -> Any | None:
+        return (
+            beatmatch_practice_driver.sandbox_snapshot()
+            if beatmatch_practice_driver is not None
+            else None
+        )
+
+    def _beatmatch_practice_record_action(lesson_id: str | None, midi: dict[str, Any]) -> Any:
+        if beatmatch_practice_driver is None:
+            return None
+        return beatmatch_practice_driver.record_action(lesson_id, midi)
+
+    def _beatmatch_practice_waveform_payload() -> dict[str, Any] | None:
+        return (
+            beatmatch_practice_driver.waveform_payload()
+            if beatmatch_practice_driver is not None
+            else None
+        )
+
+    def _beatmatch_practice_playhead_payload() -> dict[str, Any] | None:
+        return (
+            beatmatch_practice_driver.playhead_payload()
+            if beatmatch_practice_driver is not None
+            else None
+        )
+
     try:
         from vibemix.learn.cue_placement_practice_driver import CuePlacementPracticeDriver
 
@@ -2639,31 +2725,12 @@ async def main() -> None:
         evidence_clock=lambda: state.set_seconds,
         prepared_pool_loader=_load_latest_prepared_pool,
         harmonic_pair_loader=_load_learn_harmonic_pair,
-        beatmatch_practice_loader=(
-            beatmatch_practice_driver.snapshot
-            if beatmatch_practice_driver is not None
-            else None
-        ),
-        beatmatch_practice_sandbox_loader=(
-            beatmatch_practice_driver.sandbox_snapshot
-            if beatmatch_practice_driver is not None
-            else None
-        ),
-        beatmatch_practice_action_recorder=(
-            beatmatch_practice_driver.record_action
-            if beatmatch_practice_driver is not None
-            else None
-        ),
-        waveform_payload_loader=(
-            beatmatch_practice_driver.waveform_payload
-            if beatmatch_practice_driver is not None
-            else None
-        ),
-        playhead_payload_loader=(
-            beatmatch_practice_driver.playhead_payload
-            if beatmatch_practice_driver is not None
-            else None
-        ),
+        beatmatch_practice_loader=_beatmatch_practice_snapshot,
+        beatmatch_practice_sandbox_loader=_beatmatch_practice_sandbox_snapshot,
+        beatmatch_practice_action_recorder=_beatmatch_practice_record_action,
+        beatmatch_practice_prepare=_prepare_learn_save_mode_sources,
+        waveform_payload_loader=_beatmatch_practice_waveform_payload,
+        playhead_payload_loader=_beatmatch_practice_playhead_payload,
         cue_placement_practice_loader=(
             cue_placement_practice_driver.snapshot
             if cue_placement_practice_driver is not None
@@ -2783,7 +2850,7 @@ async def main() -> None:
 
         output_device = _learn_output_device_index()
         exemplar_player: Any = _NoopLearnExemplarPlayer()
-        beatmatch_practice_player: Any | None = None
+        beatmatch_practice_player = None
         if output_device is not None:
             try:
                 from vibemix.learn.audio_cue import ExemplarPlayer

@@ -113,6 +113,28 @@ def test_beatmatch_lesson_starts_and_stops_practice_player(monkeypatch) -> None:
     assert player.stops == 1
 
 
+def test_beatmatch_practice_prepare_runs_before_waveform_emit() -> None:
+    calls: list[str] = []
+    ipc = MagicMock(name="ipc_router")
+    runtime = LessonRuntime(
+        learn_state=LearnState(),
+        midi_mirror=MagicMock(name="midi_mirror"),
+        controller_state=MagicMock(name="controller_state"),
+        ipc_router=ipc,
+        progress_store=LearnProgress(),
+        beatmatch_practice_prepare=lambda: calls.append("prepare"),
+        waveform_payload_loader=lambda: calls.append("waveform")
+        or {"sample_rate": 44_100, "decks": {}},
+    )
+    player = _FakePracticePlayer()
+
+    runtime.set_beatmatch_practice_player(player)
+    _load_begin(runtime, lesson_id="L2.01")
+
+    assert player.starts == 1
+    assert calls == ["prepare", "waveform"]
+
+
 def test_non_beatmatch_lesson_does_not_start_practice_player() -> None:
     runtime = _runtime()
     player = _FakePracticePlayer()

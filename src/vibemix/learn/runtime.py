@@ -629,6 +629,7 @@ class LessonRuntime(StateMachine):
         | None = None,
         beatmatch_practice_action_recorder: Callable[[str | None, dict[str, Any]], bool | None]
         | None = None,
+        beatmatch_practice_prepare: Callable[[], None] | None = None,
         waveform_payload_loader: Callable[[], dict[str, Any] | None] | None = None,
         playhead_payload_loader: Callable[[], dict[str, Any] | None] | None = None,
         cue_placement_practice_loader: Callable[[], CuePlacementPracticeSnapshot | None] | None = None,
@@ -719,6 +720,7 @@ class LessonRuntime(StateMachine):
         self._beatmatch_practice_loader = beatmatch_practice_loader
         self._beatmatch_practice_sandbox_loader = beatmatch_practice_sandbox_loader
         self._beatmatch_practice_action_recorder = beatmatch_practice_action_recorder
+        self._beatmatch_practice_prepare = beatmatch_practice_prepare
         self._waveform_payload_loader = waveform_payload_loader
         self._playhead_payload_loader = playhead_payload_loader
         self._cue_placement_practice_loader = cue_placement_practice_loader
@@ -948,12 +950,14 @@ class LessonRuntime(StateMachine):
 
     def _start_beatmatch_practice_player(self) -> None:
         if (
-            self._beatmatch_practice_player is None
-            or not self._is_beatmatch_practice_audio_lesson()
+            not self._is_beatmatch_practice_audio_lesson()
             or self._beatmatch_practice_player_active
         ):
             return
         try:
+            self._prepare_beatmatch_practice_audio()
+            if self._beatmatch_practice_player is None:
+                return
             self._emit_waveform_ready()
             self._beatmatch_practice_player.start()
             self._beatmatch_practice_player_active = True
@@ -962,6 +966,19 @@ class LessonRuntime(StateMachine):
 
             print(
                 f"[learn.runtime] beatmatch practice player start failed: {exc!r}",
+                file=sys.stderr,
+            )
+
+    def _prepare_beatmatch_practice_audio(self) -> None:
+        if self._beatmatch_practice_prepare is None:
+            return
+        try:
+            self._beatmatch_practice_prepare()
+        except Exception as exc:  # pragma: no cover - defensive
+            import sys
+
+            print(
+                f"[learn.runtime] beatmatch practice prepare failed: {exc!r}",
                 file=sys.stderr,
             )
 
@@ -1207,9 +1224,12 @@ class LessonRuntime(StateMachine):
     def _start_practice_sandbox_player(self) -> None:
         """Start the Learn-owned deck for free practice outside a lesson."""
 
-        if self._beatmatch_practice_player is None or self._beatmatch_practice_player_active:
+        if self._beatmatch_practice_player_active:
             return
         try:
+            self._prepare_beatmatch_practice_audio()
+            if self._beatmatch_practice_player is None:
+                return
             self._emit_waveform_ready("sandbox")
             self._beatmatch_practice_player.start()
             self._beatmatch_practice_player_active = True

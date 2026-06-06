@@ -11477,3 +11477,40 @@ Proof before staging:
 - `uv run python -m compileall -q src/vibemix/learn/practice_loop.py src/vibemix/learn/runtime.py src/vibemix/ui_bus/learn_messages.py tests/ui_bus/test_learn_live_grade_message.py tests/learn/test_runtime_evidence_grounding.py`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
 - `git diff --check -- src/vibemix/learn/practice_loop.py src/vibemix/learn/runtime.py src/vibemix/ui_bus/learn_messages.py tests/ui_bus/test_learn_live_grade_message.py tests/learn/test_runtime_evidence_grounding.py tauri/ui/src/ipc/messages.schema.json tauri/ui/src/ipc/messages.ts tauri/ui/src/ipc/validator.generated.mjs .planning/handoffs/2026-05-31-package-checklist.md`
+
+## Package 111 - Learn Save-Mode Lazy Own-Track Activation
+
+Suggested commit: `feat(learn): activate own-track save mode lazily`
+
+Include:
+
+- `src/vibemix/__main__.py`
+- `src/vibemix/learn/runtime.py`
+- `src/vibemix/learn/two_deck_player.py`
+- `tests/learn/test_beatmatch_practice_audio_lifecycle.py`
+- `tests/learn/test_observer_boot_wiring.py`
+- `tests/learn/test_two_deck_player.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- App-start eager audio decode, UI animation work, and Save-mode difficulty
+  escalation. This package only makes the own-track loader reachable at the
+  moment Learn is about to start Save-mode practice audio.
+
+Reason:
+
+- Package 109 built the real own-track loader, but boot still bound runtime to
+  the initial bundled-loop driver. Use wrapper callbacks so a later driver swap
+  is visible, add a `beatmatch_practice_prepare` runtime hook, and let
+  `TwoDeckPlayer` swap to the new `MiniDeck` without opening an extra audio
+  path. Gate lazy loading to Save-mode lessons so basic deck-anatomy practice
+  stays on stable bundled loops.
+
+Proof before staging:
+
+- `uv run pytest -q tests/learn/test_beatmatch_practice_audio_lifecycle.py::test_beatmatch_practice_prepare_runs_before_waveform_emit tests/learn/test_observer_boot_wiring.py::test_beatmatch_practice_audio_uses_shared_learn_output_device tests/learn/test_two_deck_player.py`
+- `uv run ruff check src/vibemix/__main__.py src/vibemix/learn/runtime.py src/vibemix/learn/two_deck_player.py tests/learn/test_beatmatch_practice_audio_lifecycle.py tests/learn/test_observer_boot_wiring.py tests/learn/test_two_deck_player.py`
+- `uv run python -m compileall -q src/vibemix/__main__.py src/vibemix/learn/runtime.py src/vibemix/learn/two_deck_player.py tests/learn/test_beatmatch_practice_audio_lifecycle.py tests/learn/test_observer_boot_wiring.py tests/learn/test_two_deck_player.py`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+- `git diff --check -- src/vibemix/__main__.py src/vibemix/learn/runtime.py src/vibemix/learn/two_deck_player.py tests/learn/test_beatmatch_practice_audio_lifecycle.py tests/learn/test_observer_boot_wiring.py tests/learn/test_two_deck_player.py .planning/handoffs/2026-05-31-package-checklist.md`

@@ -47,6 +47,18 @@ class TwoDeckPlayer:
         audible_deck = getattr(self._state, "audible_deck", "none")
         return not (session_active and audible_deck != "none")
 
+    def set_deck(self, mini_deck: MiniDeck, *, sample_rate: int | None = None) -> None:
+        """Swap the owned practice deck, restarting playback if needed."""
+
+        was_active = self._stream is not None
+        self.stop()
+        with self._lock:
+            self._deck = mini_deck
+            if sample_rate is not None:
+                self._sample_rate = int(sample_rate)
+        if was_active:
+            self.start()
+
     def start(self) -> None:
         """Start rendering the practice deck. Idempotent."""
 

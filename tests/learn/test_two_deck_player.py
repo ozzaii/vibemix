@@ -141,6 +141,17 @@ def test_two_deck_player_refuses_playback_during_audible_live_set(
     mock_stream_cls.assert_not_called()
 
 
+def test_two_deck_player_set_deck_swaps_source_without_open_stream() -> None:
+    player = TwoDeckPlayer(0, _deck(), state=_cold_state(), sample_rate=44_100)
+    replacement = _deck()
+
+    player.set_deck(replacement, sample_rate=48_000)
+
+    assert player._deck is replacement
+    assert player._sample_rate == 48_000
+    assert player._stream is None
+
+
 def test_two_deck_player_does_not_touch_playback_queue() -> None:
     src = inspect.getsource(two_deck_player)
 
