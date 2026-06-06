@@ -1125,6 +1125,7 @@ class SessionLoop:
             payload = msg.get("payload", {})
             consent = bool(payload.get("consent", False))
             save_consent(consent)
+            self.memory_ingest_enabled = consent
             log.info("profile_consent persisted from session panel: %s", consent)
             await self.bus.emit(json.loads(ProfileConsentState.make(consent=consent).to_json()))
         except Exception as e:

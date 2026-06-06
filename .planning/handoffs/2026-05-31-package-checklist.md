@@ -12583,3 +12583,37 @@ Proof before staging:
 - `uv run python - <<'PY' ... LibraryToolset(...).retrieve_dj_knowledge({"query": "EQ bass while blending", "k": 1}) ... PY`
 - `git diff --check -- src/vibemix/library/dj_knowledge.py src/vibemix/library/toolset.py src/vibemix/library/doctor.py tests/library/test_toolset.py tests/library/test_doctor.py .planning/handoffs/2026-05-31-package-checklist.md`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+
+## Package 140 - Memory Consent Updates Live Ingest Gate
+
+Suggested commit: `fix(memory): update ingest gate on consent changes`
+
+Include:
+
+- `src/vibemix/runtime/session_loop.py`
+- `tests/profile/test_profile_ipc.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Memory schema changes, recall prompt behavior, retention budget changes,
+  CLAP ingest algorithms, and Wizard onboarding UI. This package only keeps the
+  live session-loop ingest gate synchronized with the Settings profile-consent
+  toggle.
+
+Reason:
+
+- `main()` resolves `memory_ingest_enabled` at boot from profile consent, but a
+  fresh user can grant or revoke profile consent later through
+  `ipc.profile.set_consent`. The handler persisted the new value and acked the
+  renderer, but left `SessionLoop.memory_ingest_enabled` stale. That means a
+  user who granted consent after boot could still skip close-path memory
+  accrual, while a user who revoked consent could leave accrual enabled until
+  relaunch. Update the live flag only after `save_consent()` succeeds.
+
+Proof before staging:
+
+- `uv run pytest -q tests/profile/test_profile_ipc.py tests/memory/test_ingest_wiring.py`
+- `uv run python -m compileall -q src/vibemix/runtime/session_loop.py tests/profile/test_profile_ipc.py`
+- `git diff --check -- src/vibemix/runtime/session_loop.py tests/profile/test_profile_ipc.py .planning/handoffs/2026-05-31-package-checklist.md`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`

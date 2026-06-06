@@ -361,3 +361,37 @@ def test_session_set_consent_persists_and_acks(fake_bus: FakeBus) -> None:
     acks = fake_bus.emitted_by_type("ipc.profile.consent_state")
     assert len(acks) == 1
     assert acks[0]["payload"] == {"consent": True}
+
+
+def test_session_set_consent_enables_memory_ingest_live(fake_bus: FakeBus) -> None:
+    """Fresh-user consent granted after boot must enable close-path accrual."""
+    loop = SessionLoop(fake_bus, memory_ingest_enabled=False)
+    loop.register_handlers()
+    _drive(
+        fake_bus,
+        {
+            "type": "ipc.profile.set_consent",
+            "ts": "2026-05-15T00:00:00+00:00",
+            "payload": {"consent": True},
+        },
+    )
+
+    assert loop.memory_ingest_enabled is True
+
+
+def test_session_set_consent_revocation_disables_memory_ingest_live(
+    fake_bus: FakeBus,
+) -> None:
+    """Revoking consent during a session must stop later close-path accrual."""
+    loop = SessionLoop(fake_bus, memory_ingest_enabled=True)
+    loop.register_handlers()
+    _drive(
+        fake_bus,
+        {
+            "type": "ipc.profile.set_consent",
+            "ts": "2026-05-15T00:00:00+00:00",
+            "payload": {"consent": False},
+        },
+    )
+
+    assert loop.memory_ingest_enabled is False
