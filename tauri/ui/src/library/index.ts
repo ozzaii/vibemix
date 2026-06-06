@@ -1016,6 +1016,32 @@ function renderIngestDone(d: EmbedDone): void {
   $("vmx-lib-scope-state").textContent = "library indexed";
 }
 
+type LibrarySetupUnlisten = () => void | Promise<void>;
+
+async function cleanupLibrarySetupImport(
+  unlisteners: LibrarySetupUnlisten[],
+): Promise<void> {
+  const pending = unlisteners.splice(0);
+  for (const unlisten of pending) {
+    try {
+      await unlisten();
+    } catch {
+      // Tauri event unlisten failures should never strand the first-run setup row.
+    }
+  }
+}
+
+function setupEmbedProgressNote(p: EmbedProgress): string {
+  const total = p.total > 0 ? `${Math.min(p.n, p.total)}/${p.total}` : String(p.n);
+  const name = p.filename.replace(/\.[a-z0-9]+$/i, "");
+  return name ? `${total} ${name}` : `${total} indexed`;
+}
+
+function setupEmbedDoneNote(d: EmbedDone): string {
+  const note = embedDoneNote(d);
+  return d.failed > 0 ? `index partial · ${note}` : `indexed · ${note}`;
+}
+
 function embeddingLabel(stats: LibraryStats): string {
   const backend = (stats.embedding_backend ?? "clap").toLowerCase();
   const model =
@@ -1916,16 +1942,43 @@ async function runLibrarySetupImport(
   candidate: LibrarySetupCandidate,
   els: { button: HTMLButtonElement; status: HTMLElement },
 ): Promise<void> {
+  const unlisteners: LibrarySetupUnlisten[] = [];
+  let finished = false;
+  const finish = (status: string, scope: string): void => {
+    if (finished) return;
+    finished = true;
+    els.status.textContent = status;
+    els.button.disabled = false;
+    $("vmx-lib-scope-state").textContent = scope;
+    void cleanupLibrarySetupImport(unlisteners);
+  };
   els.button.disabled = true;
   els.status.textContent = "indexing queued";
   $("vmx-lib-scope-state").textContent = "indexing library";
   try {
-    await libraryEmbedFolder(candidate.path, "mean_excerpt");
-    els.status.textContent = "indexing started";
+    unlisteners.push(
+      await onEmbedProgress((p: EmbedProgress) => {
+        if (finished) return;
+        els.status.textContent = setupEmbedProgressNote(p);
+      }),
+    );
+    unlisteners.push(
+      await onEmbedDone((d: EmbedDone) => {
+        finish(
+          setupEmbedDoneNote(d),
+          d.failed > 0 ? "index partial" : "library indexed",
+        );
+      }),
+    );
+    const accepted = await libraryEmbedFolder(candidate.path, "mean_excerpt");
+    if (!accepted) {
+      finish("setup action unavailable", "setup unavailable");
+      return;
+    }
+    await Promise.resolve();
+    finish("index command finished", "library indexed");
   } catch (err) {
-    els.button.disabled = false;
-    els.status.textContent = "setup action unavailable";
-    $("vmx-lib-scope-state").textContent = "setup unavailable";
+    finish("setup action unavailable", "setup unavailable");
     // eslint-disable-next-line no-console
     console.warn("[library] setup folder embed failed", err);
   }

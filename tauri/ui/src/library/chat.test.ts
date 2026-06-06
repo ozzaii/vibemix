@@ -12,6 +12,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type {
   EmbedDone,
+  EmbedProgress,
   LibraryChatResult,
   LibraryLiveContext,
   LibraryModelInstallTarget,
@@ -29,6 +30,7 @@ const chatMock =
   >();
 let liveContextCallback: ((context: LibraryLiveContext) => void) | null = null;
 let liveMoveCallback: ((moves: string[]) => void) | null = null;
+let embedProgressCallback: ((progress: EmbedProgress) => void) | null = null;
 let embedDoneCallback: ((done: EmbedDone) => void) | null = null;
 let viberToolCallback:
   | ((event: { tool: string; ok: boolean; summary: string }) => void)
@@ -369,6 +371,7 @@ function readyIdentifiedDeckPairLiveContext(): LibraryLiveContext {
 function doMockApi(): void {
   liveContextCallback = null;
   liveMoveCallback = null;
+  embedProgressCallback = null;
   embedDoneCallback = null;
   viberToolCallback = null;
   vi.doMock("../ipc/client.js", () => ({
@@ -411,7 +414,10 @@ function doMockApi(): void {
       libraryModels: (install?: LibraryModelInstallTarget) =>
         modelsMock(install),
       libraryEmbedFolder: embedFolderMock,
-      onEmbedProgress: vi.fn(async () => () => {}),
+      onEmbedProgress: vi.fn(async (cb: (progress: EmbedProgress) => void) => {
+        embedProgressCallback = cb;
+        return () => {};
+      }),
       onEmbedDone: vi.fn(async (cb: (done: EmbedDone) => void) => {
         embedDoneCallback = cb;
         return () => {};
@@ -778,6 +784,13 @@ describe("chat - real runChat path", () => {
   });
 
   it("starts the folder embed only after the user clicks it", async () => {
+    const embedControl: { resolve?: (accepted: boolean) => void } = {};
+    embedFolderMock.mockImplementationOnce(
+      () =>
+        new Promise<boolean>((resolve) => {
+          embedControl.resolve = resolve;
+        }),
+    );
     statsMock.mockResolvedValueOnce(statsWithSetupCandidate());
 
     await mountChat();
@@ -796,12 +809,65 @@ describe("chat - real runChat path", () => {
     );
     expect(emitIpcMock).not.toHaveBeenCalled();
     expect(button?.disabled).toBe(true);
+    embedControl.resolve?.(true);
+    for (let i = 0; i < 4; i++) await Promise.resolve();
+
+    expect(button?.disabled).toBe(false);
     expect(
       document.querySelector('[data-wire="library.setup-candidate"]')?.textContent,
-    ).toContain("indexing started");
+    ).toContain("index command finished");
     expect(document.getElementById("vmx-lib-scope-state")?.textContent).toBe(
-      "indexing library",
+      "library indexed",
     );
+  });
+
+  it("surfaces setup-card folder index receipts while staying in chat mode", async () => {
+    const embedControl: { resolve?: (accepted: boolean) => void } = {};
+    embedFolderMock.mockImplementationOnce(
+      () =>
+        new Promise<boolean>((resolve) => {
+          embedControl.resolve = resolve;
+        }),
+    );
+    statsMock.mockResolvedValueOnce(statsWithSetupCandidate());
+
+    await mountChat();
+
+    const card = document.querySelector<HTMLElement>(
+      '[data-wire="library.setup-candidate"]',
+    );
+    const button = card?.querySelector<HTMLButtonElement>(".vmx-lib-chat-action");
+    const status = card?.querySelector<HTMLElement>(".vmx-lib-chat-actionstate");
+    button?.click();
+    for (let i = 0; i < 8; i++) await Promise.resolve();
+
+    expect(document.body.dataset.mode).toBe("chat");
+    expect(embedProgressCallback).not.toBeNull();
+    expect(embedDoneCallback).not.toBeNull();
+    embedProgressCallback?.({
+      n: 12,
+      total: 49,
+      status: "ok",
+      filename: "Track 12.wav",
+      cost_eur: 0.05,
+    });
+    expect(status?.textContent).toContain("12/49 Track 12");
+
+    embedDoneCallback?.({
+      embedded: 0,
+      skipped: 49,
+      failed: 0,
+      total: 49,
+      cost_eur: 0,
+    });
+    for (let i = 0; i < 4; i++) await Promise.resolve();
+
+    expect(status?.textContent).toContain("indexed · 49 cached");
+    expect(button?.disabled).toBe(false);
+    expect(document.getElementById("vmx-lib-scope-state")?.textContent).toBe(
+      "library indexed",
+    );
+    embedControl.resolve?.(true);
   });
 
   it("passes Deck A/B audio-window part labels into Viber chat", async () => {

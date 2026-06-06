@@ -12896,3 +12896,38 @@ Proof before staging:
 - `npm --prefix tauri/ui run build`
 - `git diff --check -- tauri/ui/src/library/index.ts tauri/ui/src/library/chat.test.ts .planning/handoffs/2026-05-31-package-checklist.md`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+
+## Package 148 - Library Setup Card Import Receipt
+
+Suggested commit: `fix(library-ui): finish setup-card index receipts`
+
+Include:
+
+- `tauri/ui/src/library/index.ts`
+- `tauri/ui/src/library/chat.test.ts`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Python embed-folder behavior, Rust command spawning, chat answer rendering,
+  model installation, ingest-tab replay, Learn runtime, and shell status. This
+  package only fixes the first-user setup-card action that runs folder indexing
+  from chat mode.
+
+Reason:
+
+- The chat setup card was a real first-run path, but it called
+  `libraryEmbedFolder()` while the main embed listeners ignored events outside
+  `state.mode === "ingest"`. A user could approve Viber's discovered music
+  folder, the command could finish, and the card would still read like it only
+  started. The setup action now listens for its own one-shot progress and done
+  events, releases the button on completion, and falls back to a non-stuck
+  command-finished receipt if the bridge accepts the command without a parsed
+  terminal frame.
+
+Proof before staging:
+
+- `npm --prefix tauri/ui test -- src/library/chat.test.ts`
+- `npm --prefix tauri/ui run build`
+- `git diff --check -- tauri/ui/src/library/index.ts tauri/ui/src/library/chat.test.ts .planning/handoffs/2026-05-31-package-checklist.md`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
