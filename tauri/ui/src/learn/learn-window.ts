@@ -1145,11 +1145,12 @@ function mountLearnWindow(root: HTMLElement): {
    * local `learn.start_course` automation hook, and start_lesson via the
    * mode picker (P97) / devtools-invoke demos.
    *
-   * The 3 lesson components (LessonHud / TutorSpeakDock /
-   * LessonSkipButton) mount lazily on the first `ipc.learn.lesson_loaded`
-   * envelope. Without an active lesson, the P91 Learn-window layout
-   * stays untouched. UI-SPEC §Wiring contract lines 354-371 is the
-   * locked map for what each handler paints.
+   * The lesson HUD and skip button mount lazily on the first
+   * `ipc.learn.lesson_loaded` envelope. TutorSpeakDock can also mount
+   * during free practice so sandbox grading does not speak into nowhere.
+   * Without an active lesson, the P91 Learn-window layout stays intact.
+   * UI-SPEC §Wiring contract lines 354-371 is the locked map for what
+   * each handler paints.
    * =================================================================== */
 
   // Lazy-mount handles for the 3 lesson components. Tracked at function
@@ -1163,6 +1164,14 @@ function mountLearnWindow(root: HTMLElement): {
   // Per-controlled-position last-known values (for delta detection in
   // the ack-emit listener). Cleared on lesson_loaded so a fresh lesson
   // doesn't inherit stale deltas.
+
+  function ensureTutorDock(): TutorSpeakHandle {
+    if (!tutorDock) {
+      tutorDock = TutorSpeakDock();
+      stageEl.parentElement?.insertBefore(tutorDock, stageEl.nextSibling);
+    }
+    return tutorDock;
+  }
 
   function hasVisualControl(controlId: string): boolean {
     return visualControlCandidates(controlId).some((candidate) =>
@@ -1231,14 +1240,10 @@ function mountLearnWindow(root: HTMLElement): {
       stageEl.parentElement?.insertBefore(lessonHud, stageEl);
     }
 
-    // Mount the dock after the stage if not already present. Starts
-    // collapsed (data-state="idle") until the first tutor_speak.
-    if (!tutorDock) {
-      tutorDock = TutorSpeakDock();
-      stageEl.parentElement?.insertBefore(tutorDock, stageEl.nextSibling);
-    } else {
-      tutorDock.hide();
-    }
+    // Mount the dock after the stage. Starts collapsed (data-state="idle")
+    // until the first tutor_speak.
+    const dock = ensureTutorDock();
+    dock.hide();
 
     // Mount the skip button inside the dock's receipt-row skip-slot.
     if (!skipButton) {
@@ -1251,7 +1256,7 @@ function mountLearnWindow(root: HTMLElement): {
           });
         },
       });
-      const skipSlot = tutorDock.querySelector(".skip-slot");
+      const skipSlot = dock.querySelector(".skip-slot");
       if (skipSlot) skipSlot.appendChild(skipButton);
     }
     // New lesson → restart the 45 s anti-speedrun lockout fresh.
@@ -1282,8 +1287,8 @@ function mountLearnWindow(root: HTMLElement): {
   addWindowListener("ipc.learn.tutor_speak", (ev: Event) => {
     const payload = (ev as CustomEvent<TutorSpeakWirePayload>).detail;
     if (!payload) return;
-    if (payload.data_state === "hint") lessonUsedHint = true;
-    if (tutorDock) tutorDock.show(payload);
+    if (currentLessonId && payload.data_state === "hint") lessonUsedHint = true;
+    ensureTutorDock().show(payload);
     // Secondary a11y channel — when the dock enters hint state, the
     // currently-lit highlight intensifies (UI-SPEC §Motion line 306).
     setHighlightHintIntensity(stageEl, payload.data_state === "hint");

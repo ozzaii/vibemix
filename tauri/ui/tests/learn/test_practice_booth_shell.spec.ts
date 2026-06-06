@@ -257,6 +257,50 @@ describe("practice booth shell", () => {
     }
   });
 
+  it("shows sandbox tutor feedback before a lesson starts", () => {
+    const root = document.getElementById("learn-root") as HTMLElement;
+    const { ws } = mountLearnWindow(root);
+    try {
+      window.dispatchEvent(
+        new CustomEvent("ipc.learn.live_grade", {
+          detail: {
+            verdict: "drifting",
+            phase_error_beats: 0.25,
+            score: 0.5,
+            citation: "[ev:BEATMATCH_GRADED@12.345]",
+          },
+        }),
+      );
+      window.dispatchEvent(
+        new CustomEvent("ipc.learn.tutor_speak", {
+          detail: {
+            text: "nudge the jog, then hold the downbeat.",
+            tts_marker: "practice.beatmatch.hint.1",
+            citations: ["[ev:BEATMATCH_GRADED@12.345]"],
+            data_state: "hint",
+          },
+        }),
+      );
+
+      const meter = root.querySelector<HTMLElement>("#learn-live-meter");
+      const dock = root.querySelector<HTMLElement>(".tutor-dock");
+      const booth = root.querySelector<HTMLElement>("#learn-booth-panel");
+      expect(root.classList.contains("lesson-mode")).toBe(false);
+      expect(booth?.dataset.visible).toBe("true");
+      expect(meter?.dataset.state).toBe("active");
+      expect(meter?.dataset.verdict).toBe("drifting");
+      expect(dock?.dataset.state).toBe("hint");
+      expect(dock?.textContent).toContain("nudge the jog, then hold the downbeat.");
+      expect(dock?.textContent).toContain("EV BEATMATCH GRADED");
+      expect(root.querySelector(".learn-skip")).toBeNull();
+      expect(root.querySelector<HTMLElement>("#learn-sr-announcement")?.textContent).toBe(
+        "nudge the jog, then hold the downbeat.",
+      );
+    } finally {
+      ws.close();
+    }
+  });
+
   it("free-practice hardware deltas emit acks before a lesson starts", () => {
     const root = document.getElementById("learn-root") as HTMLElement;
     const { ws } = mountLearnWindow(root);
