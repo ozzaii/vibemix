@@ -11438,3 +11438,42 @@ Proof before staging:
 - `uv run python -m compileall -q src/vibemix/learn/save_mode_loader.py src/vibemix/learn/beatmatch_practice_driver.py tests/learn/test_save_mode_loader.py tests/learn/test_beatmatch_practice_driver.py`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
 - `git diff --check -- src/vibemix/learn/save_mode_loader.py src/vibemix/learn/beatmatch_practice_driver.py tests/learn/test_save_mode_loader.py tests/learn/test_beatmatch_practice_driver.py .planning/handoffs/2026-05-31-package-checklist.md`
+
+## Package 110 - Learn Save-Landed Live Grade Signal
+
+Suggested commit: `feat(learn): signal save landed on recovery edge`
+
+Include:
+
+- `src/vibemix/learn/practice_loop.py`
+- `src/vibemix/learn/runtime.py`
+- `src/vibemix/ui_bus/learn_messages.py`
+- `tauri/ui/src/ipc/messages.schema.json`
+- `tauri/ui/src/ipc/messages.ts`
+- `tauri/ui/src/ipc/validator.generated.mjs`
+- `tests/ui_bus/test_learn_live_grade_message.py`
+- `tests/learn/test_runtime_evidence_grounding.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- UX animation/rendering, Save-mode escalation, and own-track runtime boot
+  selection. This package only adds the validated backend signal UX can render.
+
+Reason:
+
+- The Learn live-grade meter can already say locked/drifting, but The Save
+  needs a distinct one-shot moment. Compute it in the owned-deck practice tick
+  only when a measured `drifting`/`trainwreck` grade transitions directly to a
+  cited locked grade. Do not fire it on an initial lock, sustained lock, sandbox
+  grade, or a later lock after tempo went off.
+
+Proof before staging:
+
+- `uv run pytest -q tests/ui_bus/test_learn_live_grade_message.py tests/learn/test_runtime_evidence_grounding.py::test_live_beatmatch_grade_voices_locked_with_resolving_citation tests/learn/test_runtime_evidence_grounding.py::test_live_beatmatch_save_landed_flags_real_recovery_edge tests/learn/test_runtime_evidence_grounding.py::test_live_beatmatch_save_landed_ignores_tempo_off_interruption tests/learn/test_runtime_evidence_grounding.py::test_live_beatmatch_grade_keeps_meter_updates_when_phase_changes`
+- `uv run python scripts/check_ipc_schema.py`
+- `npm --prefix tauri/ui run check:ipc`
+- `uv run ruff check src/vibemix/learn/practice_loop.py src/vibemix/learn/runtime.py src/vibemix/ui_bus/learn_messages.py tests/ui_bus/test_learn_live_grade_message.py tests/learn/test_runtime_evidence_grounding.py`
+- `uv run python -m compileall -q src/vibemix/learn/practice_loop.py src/vibemix/learn/runtime.py src/vibemix/ui_bus/learn_messages.py tests/ui_bus/test_learn_live_grade_message.py tests/learn/test_runtime_evidence_grounding.py`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+- `git diff --check -- src/vibemix/learn/practice_loop.py src/vibemix/learn/runtime.py src/vibemix/ui_bus/learn_messages.py tests/ui_bus/test_learn_live_grade_message.py tests/learn/test_runtime_evidence_grounding.py tauri/ui/src/ipc/messages.schema.json tauri/ui/src/ipc/messages.ts tauri/ui/src/ipc/validator.generated.mjs .planning/handoffs/2026-05-31-package-checklist.md`

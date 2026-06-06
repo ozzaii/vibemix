@@ -3244,6 +3244,25 @@
                 {"type": "string", "pattern": "^\\[(track|exemplar|cue|ev|aud|midi|screen|mix|key|recall):.+\\]$"},
                 {"type": "null"}
               ]
+            },
+            "save_landed": {"type": "boolean"},
+            "save_from_verdict": {
+              "anyOf": [
+                {"type": "string", "enum": ["drifting", "trainwreck"]},
+                {"type": "null"}
+              ]
+            },
+            "save_from_phase_error_beats": {
+              "anyOf": [
+                {"type": "number", "minimum": -0.5, "maximum": 0.5},
+                {"type": "null"}
+              ]
+            },
+            "save_recovery_delta_beats": {
+              "anyOf": [
+                {"type": "number", "minimum": 0, "maximum": 0.5},
+                {"type": "null"}
+              ]
             }
           }
         }

@@ -49,6 +49,10 @@ class BeatmatchPracticeResult:
     event: BeatmatchPracticeEvent | None
     credited: tuple[str, ...]
     t_session: float
+    save_landed: bool = False
+    save_from_verdict: str | None = None
+    save_from_phase_error_beats: float | None = None
+    save_recovery_delta_beats: float | None = None
 
 
 def grade_owned_beatmatch_attempt(

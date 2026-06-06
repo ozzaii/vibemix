@@ -805,6 +805,10 @@ class LearnLiveGradePayload:
     phase_error_beats: float
     score: float
     citation: str | None
+    save_landed: bool = False
+    save_from_verdict: Literal["drifting", "trainwreck"] | None = None
+    save_from_phase_error_beats: float | None = None
+    save_recovery_delta_beats: float | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -823,6 +827,10 @@ class LearnLiveGrade:
         phase_error_beats: float,
         score: float,
         citation: str | None = None,
+        save_landed: bool = False,
+        save_from_verdict: str | None = None,
+        save_from_phase_error_beats: float | None = None,
+        save_recovery_delta_beats: float | None = None,
     ) -> LearnLiveGrade:
         return cls(
             type="ipc.learn.live_grade",
@@ -832,6 +840,10 @@ class LearnLiveGrade:
                 phase_error_beats=float(phase_error_beats),
                 score=float(score),
                 citation=citation,
+                save_landed=bool(save_landed),
+                save_from_verdict=save_from_verdict,  # type: ignore[arg-type]
+                save_from_phase_error_beats=save_from_phase_error_beats,
+                save_recovery_delta_beats=save_recovery_delta_beats,
             ),
         )
 

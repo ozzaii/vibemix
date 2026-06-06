@@ -76,7 +76,7 @@ import asyncio
 import math
 import time
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from types import SimpleNamespace
 from typing import Any
@@ -760,6 +760,7 @@ class LessonRuntime(StateMachine):
         self._last_beatmatch_live_grade_signature: tuple[str, float, float, str | None] | None = (
             None
         )
+        self._last_beatmatch_save_candidate: tuple[str, float] | None = None
         self._beatmatch_practice_ack_prehandled = False
         self._beatmatch_practice_player: Any | None = None
         self._beatmatch_practice_player_active = False
@@ -2880,6 +2881,7 @@ class LessonRuntime(StateMachine):
         if self._beatmatch_practice_loader is None or self._evidence_registry is None:
             self._last_beatmatch_live_grade_verdict = None
             self._last_beatmatch_live_grade_signature = None
+            self._last_beatmatch_save_candidate = None
             return None
         try:
             snapshot = self._beatmatch_practice_loader()
@@ -2890,11 +2892,13 @@ class LessonRuntime(StateMachine):
                 f"[learn.runtime] beatmatch practice loader failed: {exc!r}",
                 file=sys.stderr,
             )
+            self._last_beatmatch_save_candidate = None
             return None
         if snapshot is None:
             self._beatmatch_practice_lock_active = False
             self._last_beatmatch_live_grade_verdict = None
             self._last_beatmatch_live_grade_signature = None
+            self._last_beatmatch_save_candidate = None
             return None
 
         t_session = self._evidence_time()
@@ -2905,6 +2909,7 @@ class LessonRuntime(StateMachine):
         )
         if not is_creditable_locked_grade(grade):
             self._beatmatch_practice_lock_active = False
+            self._remember_beatmatch_save_candidate(grade.verdict, grade.phase_error_beats)
             feedback = self._beatmatch_recovery_feedback(grade)
             if feedback is not None and self._mark_progress_practice_feedback(**feedback):
                 self._emit_progress_snapshot()
@@ -2916,6 +2921,7 @@ class LessonRuntime(StateMachine):
             )
         feedback_cleared = self._clear_progress_practice_feedback()
         if self._beatmatch_practice_lock_active:
+            self._remember_beatmatch_save_candidate(grade.verdict, grade.phase_error_beats)
             if feedback_cleared:
                 self._emit_progress_snapshot()
             return BeatmatchPracticeResult(
@@ -2926,6 +2932,8 @@ class LessonRuntime(StateMachine):
             )
 
         self._beatmatch_practice_lock_active = True
+        save_edge = self._beatmatch_save_edge_for(grade.verdict, grade.phase_error_beats)
+        self._remember_beatmatch_save_candidate(grade.verdict, grade.phase_error_beats)
         before_mastered = self._mastered_flags()
         result = grade_owned_beatmatch_attempt(
             snapshot.grid_a,
@@ -2936,6 +2944,14 @@ class LessonRuntime(StateMachine):
             progress=self._progress,
             now=datetime.now(UTC).isoformat(),
         )
+        if save_edge is not None:
+            result = replace(
+                result,
+                save_landed=True,
+                save_from_verdict=save_edge["from_verdict"],
+                save_from_phase_error_beats=save_edge["from_phase_error_beats"],
+                save_recovery_delta_beats=save_edge["recovery_delta_beats"],
+            )
         if result.credited:
             self._emit_mastered_unlocks(
                 result.credited,
@@ -2970,6 +2986,36 @@ class LessonRuntime(StateMachine):
             credited=list(result.credited),
         )
         return result
+
+    def _remember_beatmatch_save_candidate(self, verdict: str, phase_error_beats: float) -> None:
+        if verdict not in {"drifting", "trainwreck"}:
+            self._last_beatmatch_save_candidate = None
+            return
+        phase = float(phase_error_beats)
+        if not math.isfinite(phase):
+            self._last_beatmatch_save_candidate = None
+            return
+        self._last_beatmatch_save_candidate = (verdict, max(-0.5, min(0.5, phase)))
+
+    def _beatmatch_save_edge_for(
+        self,
+        verdict: str,
+        phase_error_beats: float,
+    ) -> dict[str, float | str] | None:
+        if verdict != "locked" or self._last_beatmatch_save_candidate is None:
+            return None
+        from_verdict, from_phase = self._last_beatmatch_save_candidate
+        if from_verdict not in {"drifting", "trainwreck"}:
+            return None
+        phase = float(phase_error_beats)
+        if not math.isfinite(phase):
+            phase = 0.0
+        phase = max(-0.5, min(0.5, phase))
+        return {
+            "from_verdict": from_verdict,
+            "from_phase_error_beats": from_phase,
+            "recovery_delta_beats": max(0.0, min(0.5, abs(from_phase) - abs(phase))),
+        }
 
     def _grade_beatmatch_sandbox_tick(self) -> BeatmatchPracticeResult | None:
         """Grade free practice for feedback only, never evidence or progress."""
@@ -3048,6 +3094,10 @@ class LessonRuntime(StateMachine):
                     phase_error_beats=phase_error,
                     score=score,
                     citation=citation,
+                    save_landed=result.save_landed,
+                    save_from_verdict=result.save_from_verdict,
+                    save_from_phase_error_beats=result.save_from_phase_error_beats,
+                    save_recovery_delta_beats=result.save_recovery_delta_beats,
                 ).to_dict()
                 self._ipc.emit(live_grade)
 

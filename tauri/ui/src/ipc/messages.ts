@@ -988,6 +988,10 @@ export interface LearnLiveGrade {
     phase_error_beats: number;
     score: number;
     citation: string | null;
+    save_landed?: boolean;
+    save_from_verdict?: ("drifting" | "trainwreck") | null;
+    save_from_phase_error_beats?: number | null;
+    save_recovery_delta_beats?: number | null;
   };
 }
 export interface LearnWaveformReady {

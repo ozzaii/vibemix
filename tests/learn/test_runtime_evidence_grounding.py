@@ -5,6 +5,8 @@ from __future__ import annotations
 import inspect
 from unittest.mock import MagicMock
 
+import pytest
+
 from vibemix.audio.grid import BeatGrid
 from vibemix.audio.miniplayer import DeckState
 from vibemix.coach.citation_linter import CitationLinter
@@ -86,6 +88,21 @@ def _sliding_beatmatch_snapshot() -> BeatmatchPracticeSnapshot:
             b_frame=grid.beat_len_frames * -0.05,
             rate_a=1.0,
             rate_b=1.0,
+            xfader=0.5,
+        ),
+    )
+
+
+def _tempo_off_beatmatch_snapshot() -> BeatmatchPracticeSnapshot:
+    grid = _beat_grid()
+    return BeatmatchPracticeSnapshot(
+        grid_a=grid,
+        grid_b=grid,
+        deck_state=DeckState(
+            a_frame=0.0,
+            b_frame=0.0,
+            rate_a=1.0,
+            rate_b=1.08,
             xfader=0.5,
         ),
     )
@@ -739,6 +756,10 @@ def test_live_beatmatch_grade_voices_locked_with_resolving_citation(monkeypatch)
         "phase_error_beats": 0.0,
         "score": 1.0,
         "citation": "[ev:BEATMATCH_GRADED@42.400]",
+        "save_landed": False,
+        "save_from_verdict": None,
+        "save_from_phase_error_beats": None,
+        "save_recovery_delta_beats": None,
     }
     result = CitationLinter().check(" ".join(payload["citations"]), registry.snapshot())
     assert result.valid is True
@@ -1207,6 +1228,76 @@ def test_live_beatmatch_grade_keeps_meter_updates_when_phase_changes() -> None:
     assert grades[0]["verdict"] == "drifting"
     assert grades[1]["verdict"] == "drifting"
     assert grades[1]["phase_error_beats"] > grades[0]["phase_error_beats"]
+
+
+def test_live_beatmatch_save_landed_flags_real_recovery_edge(monkeypatch) -> None:
+    """B3: Save-mode thunk only rides a measured drift/trainwreck -> lock edge."""
+
+    monkeypatch.setattr("vibemix.learn.progress.save_progress", lambda _progress: None)
+    progress = LearnProgress()
+    _make_beatmatching_competent(progress)
+    snapshots = [_sliding_beatmatch_snapshot(), _locked_beatmatch_snapshot()]
+    registry = EvidenceRegistry()
+    ipc = MagicMock(name="ipc_router")
+    runtime = LessonRuntime(
+        learn_state=LearnState(),
+        midi_mirror=MagicMock(name="midi_mirror"),
+        controller_state=MagicMock(name="controller_state"),
+        ipc_router=ipc,
+        progress_store=progress,
+        evidence_registry=registry,
+        evidence_clock=lambda: 80.0,
+        beatmatch_practice_loader=lambda: snapshots.pop(0) if snapshots else None,
+    )
+
+    runtime._emit_live_beatmatch_grade(runtime._grade_beatmatch_practice_tick())
+    runtime._emit_live_beatmatch_grade(runtime._grade_beatmatch_practice_tick())
+
+    grades = _live_grade_payloads(ipc)
+    assert grades[0]["verdict"] == "drifting"
+    assert grades[0]["save_landed"] is False
+    assert grades[1]["verdict"] == "locked"
+    assert grades[1]["citation"] == "[ev:BEATMATCH_GRADED@80.000]"
+    assert grades[1]["save_landed"] is True
+    assert grades[1]["save_from_verdict"] == "drifting"
+    assert grades[1]["save_from_phase_error_beats"] == pytest.approx(
+        grades[0]["phase_error_beats"]
+    )
+    assert grades[1]["save_recovery_delta_beats"] == pytest.approx(
+        abs(grades[0]["phase_error_beats"])
+    )
+
+
+def test_live_beatmatch_save_landed_ignores_tempo_off_interruption(monkeypatch) -> None:
+    """A tempo-off tick breaks the recovery edge; the later lock is just a lock."""
+
+    monkeypatch.setattr("vibemix.learn.progress.save_progress", lambda _progress: None)
+    progress = LearnProgress()
+    _make_beatmatching_competent(progress)
+    snapshots = [
+        _sliding_beatmatch_snapshot(),
+        _tempo_off_beatmatch_snapshot(),
+        _locked_beatmatch_snapshot(),
+    ]
+    ipc = MagicMock(name="ipc_router")
+    runtime = LessonRuntime(
+        learn_state=LearnState(),
+        midi_mirror=MagicMock(name="midi_mirror"),
+        controller_state=MagicMock(name="controller_state"),
+        ipc_router=ipc,
+        progress_store=progress,
+        evidence_registry=EvidenceRegistry(),
+        evidence_clock=lambda: 81.0,
+        beatmatch_practice_loader=lambda: snapshots.pop(0) if snapshots else None,
+    )
+
+    for _ in range(3):
+        runtime._emit_live_beatmatch_grade(runtime._grade_beatmatch_practice_tick())
+
+    grades = _live_grade_payloads(ipc)
+    assert [grade["verdict"] for grade in grades] == ["drifting", "tempo_off", "locked"]
+    assert grades[-1]["save_landed"] is False
+    assert grades[-1]["save_from_verdict"] is None
 
 
 def test_live_beatmatch_grade_tick_stops_after_completion(monkeypatch) -> None:
