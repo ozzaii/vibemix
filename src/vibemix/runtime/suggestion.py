@@ -243,6 +243,7 @@ class SuggestionService:
         session_id: str | None = None,
         taste_scores: dict[tuple[str, str], float] | None = None,
         prepared_pool_loader: Callable[[], PreparedPool | None] | None = None,
+        voice_prefetch_sink: Callable[[dict], None] | None = None,
     ) -> None:
         self._store = store
         self._library = library
@@ -251,6 +252,7 @@ class SuggestionService:
         self._feedback_session_id = _feedback_token(session_id or "live_session")
         self._taste_scores = dict(taste_scores or {})
         self._prepared_pool_loader = prepared_pool_loader
+        self._voice_prefetch_sink = voice_prefetch_sink
         self._lock = threading.Lock()
         self._played: set[str] = set()
         self._current: dict | None = None
@@ -370,9 +372,11 @@ class SuggestionService:
                     timeout=max(0.0, deadline - loop.time()),
                 )
             except TimeoutError:
+                current = self.refresh_from_state(state, min_interval_s=0.0)
                 break
             except Exception as e:
                 logger.warning("[suggestion] voice wait failed: %s", e)
+                current = self.refresh_from_state(state, min_interval_s=0.0)
                 break
             current = self.refresh_from_state(state, min_interval_s=0.0)
         return current
@@ -702,6 +706,15 @@ class SuggestionService:
             sink(event)
         except Exception as e:
             logger.warning("[suggestion] feedback sink failed: %s", e)
+
+    def _emit_voice_prefetch(self, suggestion: dict) -> None:
+        sink = self._voice_prefetch_sink
+        if sink is None:
+            return
+        try:
+            sink(suggestion)
+        except Exception as e:
+            logger.warning("[suggestion] voice prefetch sink failed: %s", e)
 
     def context_for_state(
         self,
@@ -1096,6 +1109,8 @@ class SuggestionService:
                 }
             self._last_compute_seed_track_id = seed_track_id
             self._last_refresh_at = 0.0
+        if d is not None:
+            self._emit_voice_prefetch(d)
         if outcome_event is not None:
             self._emit_feedback(outcome_event)
         shown_event = self._feedback_event_for_suggestion(

@@ -1539,6 +1539,33 @@ async def main() -> None:
             except Exception as e:
                 print(f"-> pill taste: live update skipped ({e})", file=sys.stderr)
 
+    def _live_next_voice_prefetch_sink(suggestion: dict) -> None:
+        """Warm the exact short spoken next-suggestion line before TRACK_CHANGE."""
+        tts = live_voice_tts
+        prefetch_text = getattr(tts, "prefetch_text", None)
+        if not callable(prefetch_text):
+            return
+        try:
+            from vibemix.agent.tts_sanitizer import model_text_for_tts
+            from vibemix.runtime.suggestion_voice import build_next_suggestion_fast_spoken_text
+
+            spoken = build_next_suggestion_fast_spoken_text(
+                suggestion,
+                event_type="TRACK_CHANGE",
+            )
+            spoken = model_text_for_tts(spoken or "", normalize=True)
+            if not spoken:
+                return
+            queued = bool(prefetch_text(spoken))
+            if queued:
+                recorder.log_event(
+                    "voice_prefetch_started",
+                    reason="next_suggestion",
+                    chars=len(spoken),
+                )
+        except Exception as e:
+            print(f"-> next suggestion voice prefetch skipped: {e!r}", file=sys.stderr)
+
     def _live_sven_feedback_sink(frame: dict[str, object]):
         """Record a fast by-ear label for the latest live Sven decision."""
         from vibemix.runtime.ai_observability import record_session_sven_feedback
@@ -2141,6 +2168,7 @@ async def main() -> None:
                         session_id=recorder.session_dir.name,
                         taste_scores=_load_live_taste_scores(),
                         prepared_pool_loader=_load_latest_prepared_pool,
+                        voice_prefetch_sink=_live_next_voice_prefetch_sink,
                     )
                     print("-> next suggestion: grounded service armed")
                 except Exception as exc:

@@ -51,6 +51,7 @@ _DEFAULT_MODEL = CHATTERBOX_MODEL_REPO
 _DEFAULT_TEMP = 0.4  # Kaan-locked: tags fire as SOUND (not read literally), quality holds
 _DEFAULT_STREAM_INTERVAL = 0.5  # seconds of audio per streamed chunk (low TTFT)
 _DEFAULT_MAX_TOKENS = 96
+_PCM_CACHE_LIMIT = 8
 # Default co-host voice ref = the Kaan-locked "pranker" voice (music-stripped clip,
 # rendered at temp 0.4). Lives in the vibemix cache next to the other model assets.
 _DEV_REF = Path.home() / ".cache" / "vibemix" / "cohost_voice_ref.wav"
@@ -177,10 +178,14 @@ class _ChatterboxWorkerJob:
         *,
         text: str | None = None,
         on_pcm: Callable[[bytes], None] | None = None,
+        cache_key: str | None = None,
+        cache_chunks: list[bytes] | None = None,
     ) -> None:
         self.kind = kind
         self.text = text
         self.on_pcm = on_pcm
+        self.cache_key = cache_key
+        self.cache_chunks = cache_chunks
         self.done = threading.Event()
         self.error: BaseException | None = None
 
@@ -273,6 +278,9 @@ class ChatterboxLocalTTS(agents_tts.TTS):
         self._worker_lock = threading.Lock()
         self._worker_queue: queue.Queue[_ChatterboxWorkerJob] | None = None
         self._worker_thread: threading.Thread | None = None
+        self._cache_lock = threading.Lock()
+        self._pcm_cache: dict[str, tuple[bytes, ...]] = {}
+        self._prefetch_jobs: dict[str, _ChatterboxWorkerJob] = {}
         if engine is not None:
             self._prewarm_done.set()
 
@@ -342,9 +350,27 @@ class ChatterboxLocalTTS(agents_tts.TTS):
                 if job.kind == "prewarm":
                     self._get_engine()
                 elif job.kind == "synth":
-                    if job.text is None or job.on_pcm is None:
-                        raise APIError("Chatterbox synthesis job missing text or callback")
-                    self._get_engine().synthesize(job.text, job.on_pcm)
+                    if job.text is None:
+                        raise APIError("Chatterbox synthesis job missing text")
+                    if job.on_pcm is None and job.cache_key is None:
+                        raise APIError("Chatterbox synthesis job missing callback or cache target")
+                    on_pcm_callback = job.on_pcm
+                    cache_chunks = job.cache_chunks
+
+                    def _on_pcm(
+                        pcm: bytes,
+                        *,
+                        cache_chunks: list[bytes] | None = cache_chunks,
+                        on_pcm_callback: Callable[[bytes], None] | None = on_pcm_callback,
+                    ) -> None:
+                        if cache_chunks is not None:
+                            cache_chunks.append(pcm)
+                        if on_pcm_callback is not None:
+                            on_pcm_callback(pcm)
+
+                    self._get_engine().synthesize(job.text, _on_pcm)
+                    if job.cache_key is not None and cache_chunks:
+                        self._store_pcm_cache(job.cache_key, tuple(cache_chunks))
                 else:
                     raise APIError(f"unknown Chatterbox worker job: {job.kind}")
             except BaseException as exc:
@@ -356,6 +382,8 @@ class ChatterboxLocalTTS(agents_tts.TTS):
                     with self._prewarm_start_lock:
                         self._prewarm_inflight = False
                     self._prewarm_done.set()
+                if job.cache_key is not None:
+                    self._clear_prefetch_job(job.cache_key, job)
                 job.done.set()
 
     def prewarm(self) -> None:
@@ -391,10 +419,84 @@ class ChatterboxLocalTTS(agents_tts.TTS):
             return False
         return self._engine is not None and self._prewarm_error is None
 
+    def _speech_cache_key(self, text: str) -> str:
+        return " ".join((text or "").split())
+
+    def _cached_pcm(self, cache_key: str) -> tuple[bytes, ...] | None:
+        with self._cache_lock:
+            cached = self._pcm_cache.get(cache_key)
+            return tuple(cached) if cached is not None else None
+
+    def _store_pcm_cache(self, cache_key: str, chunks: tuple[bytes, ...]) -> None:
+        if not cache_key or not chunks:
+            return
+        with self._cache_lock:
+            self._pcm_cache[cache_key] = chunks
+            while len(self._pcm_cache) > _PCM_CACHE_LIMIT:
+                oldest = next(iter(self._pcm_cache))
+                self._pcm_cache.pop(oldest, None)
+
+    def _prefetch_job(self, cache_key: str) -> _ChatterboxWorkerJob | None:
+        with self._cache_lock:
+            return self._prefetch_jobs.get(cache_key)
+
+    def _clear_prefetch_job(self, cache_key: str, job: _ChatterboxWorkerJob) -> None:
+        with self._cache_lock:
+            if self._prefetch_jobs.get(cache_key) is job:
+                self._prefetch_jobs.pop(cache_key, None)
+
+    def prefetch_text(self, text: str) -> bool:
+        """Start synthesizing ``text`` into the short PCM cache.
+
+        Returns True only when a new background synth was queued. The method is
+        best-effort and does not wait; callers still pass through the normal
+        linter/LiveKit path before any cached audio can reach speakers.
+        """
+        cache_key = self._speech_cache_key(text)
+        if not cache_key:
+            return False
+        with self._cache_lock:
+            if cache_key in self._pcm_cache or cache_key in self._prefetch_jobs:
+                return False
+            job = _ChatterboxWorkerJob(
+                "synth",
+                text=cache_key,
+                cache_key=cache_key,
+                cache_chunks=[],
+            )
+            self._prefetch_jobs[cache_key] = job
+        self._ensure_worker().put(job)
+        return True
+
     def synthesize_pcm(self, text: str, on_pcm: Callable[[bytes], None]) -> None:
         """Synthesize mono PCM bytes for non-LiveKit sinks."""
         with self._synth_lock:
-            job = _ChatterboxWorkerJob("synth", text=text, on_pcm=on_pcm)
+            cache_key = self._speech_cache_key(text)
+            if cache_key:
+                cached = self._cached_pcm(cache_key)
+                if cached is not None:
+                    for pcm in cached:
+                        on_pcm(pcm)
+                    return
+                prefetch_job = self._prefetch_job(cache_key)
+                if prefetch_job is not None:
+                    prefetch_job.done.wait()
+                    if prefetch_job.error is not None:
+                        raise prefetch_job.error
+                    cached = self._cached_pcm(cache_key)
+                    if cached is not None:
+                        for pcm in cached:
+                            on_pcm(pcm)
+                        return
+
+            cache_chunks: list[bytes] | None = [] if cache_key else None
+            job = _ChatterboxWorkerJob(
+                "synth",
+                text=text,
+                on_pcm=on_pcm,
+                cache_key=cache_key or None,
+                cache_chunks=cache_chunks,
+            )
             self._ensure_worker().put(job)
             job.done.wait()
             if job.error is not None:

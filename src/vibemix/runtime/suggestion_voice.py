@@ -115,10 +115,27 @@ def build_next_suggestion_fast_response(
     evidence_registry.write("track", track_id, 0.0)
     evidence_registry.write("mix", mix_key, 0.0)
 
+    spoken = build_next_suggestion_fast_spoken_text(suggestion, event_type=event_type)
+    if spoken is None:
+        return None
+    return f"{spoken} [track:{track_id}] [mix:{mix_key}]"
+
+
+def build_next_suggestion_fast_spoken_text(
+    suggestion: Mapping[str, Any] | None,
+    *,
+    event_type: str,
+) -> str | None:
+    """Return the citation-free direct spoken text for TTS prefetch."""
+    if event_type not in _VOICE_EVENT_TYPES or suggestion is None:
+        return None
+    track_id = _clean_citation_body(suggestion.get("track_id"))
+    if track_id is None:
+        return None
     title = _short_spoken_title(suggestion.get("title"), fallback="candidate")
     artist = _short_spoken_title(suggestion.get("artist"), fallback="")
     label = f"{artist} - {title}" if artist else title
-    return f"{label} next. [track:{track_id}] [mix:{mix_key}]"
+    return f"{label} next."
 
 
 def _build_cue_lookahead_voice_line(
@@ -250,4 +267,8 @@ def _short_spoken_title(value: object, *, fallback: str) -> str:
     return text or original or fallback
 
 
-__all__ = ["build_next_suggestion_fast_response", "build_next_suggestion_voice_line"]
+__all__ = [
+    "build_next_suggestion_fast_response",
+    "build_next_suggestion_fast_spoken_text",
+    "build_next_suggestion_voice_line",
+]
