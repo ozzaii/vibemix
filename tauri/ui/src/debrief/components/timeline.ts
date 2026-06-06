@@ -25,6 +25,11 @@ export interface TimelineSeekEvent extends CustomEvent {
 
 let activeDeepLinkListener: EventListener | null = null;
 
+export interface TimelineReplayWindow {
+  start: number;
+  end: number;
+}
+
 export function mountTimelinePlaceholder(
   container: HTMLElement,
   chapters: TimelineChapter[],
@@ -255,6 +260,60 @@ export function setTimelinePlayhead(
   const clamped = Math.min(1, Math.max(0, fraction));
   playhead.style.setProperty("--vmx-playhead", `${clamped * 100}%`);
   playhead.dataset.active = "true";
+}
+
+export function setTimelineReplayWindow(
+  container: HTMLElement,
+  replayWindow: TimelineReplayWindow | null,
+  totalDurationS: number,
+): void {
+  const host = container as unknown as { __vmxReplayWindow?: HTMLButtonElement };
+  const existing = host.__vmxReplayWindow;
+  if (!replayWindow || totalDurationS <= 0) {
+    if (existing) existing.remove();
+    host.__vmxReplayWindow = undefined;
+    return;
+  }
+
+  const start = Math.max(0, Math.min(totalDurationS, replayWindow.start));
+  const end = Math.max(start, Math.min(totalDurationS, replayWindow.end));
+  if (end <= start) {
+    if (existing) existing.remove();
+    host.__vmxReplayWindow = undefined;
+    return;
+  }
+
+  let marker = existing;
+  if (!marker) {
+    marker = document.createElement("button");
+    marker.type = "button";
+    marker.className = "vmx-debrief-replay-window";
+    marker.dataset.kind = "near-miss";
+    marker.textContent = "replay";
+    marker.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const clickStart = Number(marker!.dataset.startS ?? 0);
+      const clickEnd = Number(marker!.dataset.endS ?? clickStart);
+      container.dispatchEvent(
+        new CustomEvent("replay-window-clicked", {
+          detail: { time: clickStart, window: [clickStart, clickEnd] },
+          bubbles: true,
+        }),
+      );
+    });
+    container.append(marker);
+    host.__vmxReplayWindow = marker;
+  }
+
+  marker.style.left = `${(start / totalDurationS) * 100}%`;
+  marker.style.width = `${Math.max(1.5, ((end - start) / totalDurationS) * 100)}%`;
+  marker.dataset.startS = String(start);
+  marker.dataset.endS = String(end);
+  marker.setAttribute(
+    "aria-label",
+    `Replay near miss from ${formatTime(start)} to ${formatTime(end)}`,
+  );
+  marker.dataset.active = "true";
 }
 
 function formatTime(s: number): string {

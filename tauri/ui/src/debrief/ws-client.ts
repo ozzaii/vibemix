@@ -13,6 +13,7 @@ import { stripDrillFields } from "./stripper-roundtrip.js";
 export type DebriefFrameKind =
   | "session-loaded"
   | "chapter-list"
+  | "near-miss"
   | "tldr-audio"
   | "drills"
   | "citation-tooltip"
@@ -27,6 +28,7 @@ export interface DebriefFrame {
 const KIND_MAP: Record<string, DebriefFrameKind> = {
   "ipc.debrief.session-loaded": "session-loaded",
   "ipc.debrief.chapter-list": "chapter-list",
+  "ipc.debrief.near-miss": "near-miss",
   "ipc.debrief.tldr-audio": "tldr-audio",
   "ipc.debrief.drills": "drills",
   "ipc.debrief.citation-tooltip": "citation-tooltip",

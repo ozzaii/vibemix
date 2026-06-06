@@ -11721,3 +11721,43 @@ Proof before staging:
 - `npm --prefix tauri/ui run build`
 - `git diff --check -- tauri/ui/src/learn/live-meter.ts tauri/ui/src/learn/styles/learn.css tauri/ui/tests/learn/live-meter.spec.ts .planning/handoffs/2026-05-31-package-checklist.md`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+
+## Package 118 - Debrief Morning Mirror Consumer
+
+Suggested commit: `feat(debrief-ui): show morning mirror replay card`
+
+Include:
+
+- `tauri/ui/debrief.html`
+- `tauri/ui/src/debrief/ws-client.ts`
+- `tauri/ui/src/debrief/debrief-window.ts`
+- `tauri/ui/src/debrief/components/timeline.ts`
+- `tauri/ui/src/debrief/components/morning-mirror.ts`
+- `tauri/ui/src/debrief/styles/debrief.css`
+- `tauri/ui/src/debrief/__tests__/timeline-regions-click-seek.spec.ts`
+- `tauri/ui/src/debrief/__tests__/morning-mirror.spec.ts`
+- `tauri/ui/src/debrief/__tests__/ws-client-near-miss.spec.ts`
+- `tauri/ui/src/mock-transfer/contract.ts`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Backend detector, friend-line generation, schema codegen, and new audio
+  dependencies. This package consumes the already-generated
+  `ipc.debrief.near-miss` frame and renders the first playable replay surface.
+
+Reason:
+
+- Backend was already emitting `ipc.debrief.near-miss`, and the schema already
+  knew the frame, but the debrief WS client dropped it as an unknown kind. Map
+  the frame, render the grounded Last Night card, mount `input.wav`, and mark
+  the near-miss window on the existing timeline so the morning replay is visible
+  instead of silently discarded.
+
+Proof before staging:
+
+- `npm --prefix tauri/ui test -- src/debrief/__tests__/morning-mirror.spec.ts src/debrief/__tests__/ws-client-near-miss.spec.ts src/debrief/__tests__/timeline-regions-click-seek.spec.ts`
+- `npm --prefix tauri/ui test -- tests/mock-transfer-contract.spec.ts`
+- `npm --prefix tauri/ui run build`
+- `git diff --check -- tauri/ui/debrief.html tauri/ui/src/debrief/ws-client.ts tauri/ui/src/debrief/components/timeline.ts tauri/ui/src/debrief/components/morning-mirror.ts tauri/ui/src/debrief/debrief-window.ts tauri/ui/src/debrief/styles/debrief.css tauri/ui/src/mock-transfer/contract.ts tauri/ui/src/debrief/__tests__/timeline-regions-click-seek.spec.ts tauri/ui/src/debrief/__tests__/morning-mirror.spec.ts tauri/ui/src/debrief/__tests__/ws-client-near-miss.spec.ts .planning/handoffs/2026-05-31-package-checklist.md`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`

@@ -3,7 +3,10 @@
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { mountTimelinePlaceholder } from "../components/timeline.js";
+import {
+  mountTimelinePlaceholder,
+  setTimelineReplayWindow,
+} from "../components/timeline.js";
 
 afterEach(() => {
   document.body.replaceChildren();
@@ -114,5 +117,28 @@ describe("timeline placeholder", () => {
     );
 
     expect(div.querySelector(".vmx-debrief-region--highlight")).toBeNull();
+  });
+
+  it("renders and updates the near-miss replay window on the same timeline", () => {
+    const div = document.createElement("div");
+    document.body.append(div);
+    const onReplay = vi.fn();
+    div.addEventListener("replay-window-clicked", (e: Event) => {
+      onReplay((e as CustomEvent).detail);
+    });
+    mountTimelinePlaceholder(div, chapters, 900);
+
+    setTimelineReplayWindow(div, { start: 120, end: 150 }, 900);
+    const marker = div.querySelector<HTMLButtonElement>(".vmx-debrief-replay-window");
+    expect(marker?.dataset.startS).toBe("120");
+    expect(marker?.style.left).toBe("13.333333333333334%");
+
+    setTimelineReplayWindow(div, { start: 300, end: 360 }, 900);
+    expect(div.querySelectorAll(".vmx-debrief-replay-window").length).toBe(1);
+    marker?.click();
+    expect(onReplay).toHaveBeenCalledWith({
+      time: 300,
+      window: [300, 360],
+    });
   });
 });

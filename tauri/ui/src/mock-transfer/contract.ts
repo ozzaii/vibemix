@@ -215,6 +215,7 @@ export const MOCK_TRANSFER_CONTRACT: readonly MockTransferSurface[] = [
       { wire: "debrief.sidebar", purpose: "chapter navigation sidebar" },
       { wire: "debrief.chapters", purpose: "chapter list" },
       { wire: "debrief.main", purpose: "main debrief analysis column" },
+      { wire: "debrief.morning", purpose: "Last Night, Heard replay card" },
       { wire: "debrief.tldr", purpose: "TLDR section" },
       { wire: "debrief.tldr-player", purpose: "voiced TLDR player" },
       { wire: "debrief.timeline", purpose: "timeline section" },
@@ -227,6 +228,7 @@ export const MOCK_TRANSFER_CONTRACT: readonly MockTransferSurface[] = [
     inbound: [
       "ipc.debrief.session-loaded",
       "ipc.debrief.chapter-list",
+      "ipc.debrief.near-miss",
       "ipc.debrief.drills",
       "ipc.debrief.tldr-audio",
       "ipc.debrief.citation-tooltip",
@@ -242,6 +244,7 @@ export const MOCK_TRANSFER_CONTRACT: readonly MockTransferSurface[] = [
     outbound: [
       "ipc.debrief.citation-tooltip-request",
       "open_learn_lesson_window",
+      "open_learn_window",
     ],
   },
   {

@@ -15,8 +15,13 @@ import {
 } from "./components/tldr-player.js";
 import {
   mountTimelinePlaceholder,
+  setTimelineReplayWindow,
   type TimelineChapter,
 } from "./components/timeline.js";
+import {
+  mountMorningMirror,
+  type MorningMirrorPayload,
+} from "./components/morning-mirror.js";
 import {
   showCitationTooltip,
   type CitationTooltipPayload,
@@ -40,6 +45,7 @@ const errorBanner = document.getElementById("vmx-debrief-error-banner");
 const tooltip = document.getElementById("vmx-debrief-tooltip");
 const chaptersEl = document.getElementById("vmx-debrief-chapters");
 const drillsEl = document.getElementById("vmx-debrief-drills-list");
+const morningEl = document.getElementById("vmx-debrief-morning-card");
 const tldrEl = document.getElementById("vmx-debrief-tldr-player");
 // The TL;DR panel host (carries the silk section title) — the verdict
 // headline (P1-a uplift 3) is inserted here, above the player.
@@ -57,6 +63,7 @@ if (isMockMode) {
 
   let chapters: TimelineChapter[] = [];
   let totalDurationS = 0;
+  let morningPayload: MorningMirrorPayload | null = null;
 
   client.addEventListener("session-loaded", (e: Event) => {
     const detail = (e as CustomEvent).detail as {
@@ -81,6 +88,13 @@ if (isMockMode) {
     }));
     if (waveformEl && totalDurationS > 0) {
       mountTimelinePlaceholder(waveformEl, chapters, totalDurationS);
+      if (morningPayload?.window) {
+        setTimelineReplayWindow(
+          waveformEl,
+          { start: morningPayload.window[0], end: morningPayload.window[1] },
+          morningPayload.duration_s || totalDurationS,
+        );
+      }
     }
     // P1-a uplift 3 — the verdict headline. Built from REAL session
     // structure (track count + duration), not invented. Lands as soon
@@ -97,6 +111,16 @@ if (isMockMode) {
   client.addEventListener("drills", (e: Event) => {
     const detail = (e as CustomEvent).detail as { drills: DrillPayload[] };
     if (drillsEl) mountDrillsPanel(drillsEl, detail.drills);
+  });
+
+  client.addEventListener("near-miss", (e: Event) => {
+    morningPayload = (e as CustomEvent).detail as MorningMirrorPayload;
+    totalDurationS = Math.max(totalDurationS, morningPayload.duration_s || 0);
+    if (morningEl) {
+      mountMorningMirror(morningEl, morningPayload, sessionDir, {
+        timelineEl: waveformEl,
+      });
+    }
   });
 
   client.addEventListener("tldr-audio", (e: Event) => {
@@ -263,6 +287,23 @@ function mountMockDebrief(): void {
         kind: c.kind,
       })),
       totalDurationS,
+    );
+  }
+  if (morningEl) {
+    mountMorningMirror(
+      morningEl,
+      {
+        input_wav_relative_path: "input.wav",
+        t_center: 744,
+        window: [736, 752],
+        receipt_text:
+          "the mix recovered by ear at 12:24; clean low end; wall clock 01:42:08 last night.",
+        friend_line_text:
+          "I heard the mix drift, then you pulled it back inside two bars.",
+        duration_s: totalDurationS,
+      },
+      "/recordings/mock",
+      { timelineEl: waveformEl },
     );
   }
   if (tldrPanelEl) {
