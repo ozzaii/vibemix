@@ -10,9 +10,9 @@
  *     until exhausted, RESEARCH Code Example lines ~536-565).
  *
  * Sentinel usage values (Plan 15-04 must_haves):
- *   - bytes_total === -1  → "RECORDINGS · LOADING…"
- *   - bytes_total === -2  → "RECORDINGS · UNAVAILABLE"
- *   - otherwise            → "RECORDINGS · {N} SESSIONS · {SIZE} USED"
+ *   - bytes_total === -1  → "loading..."
+ *   - bytes_total === -2  → "unavailable"
+ *   - otherwise            → "{N} sessions · {SIZE}"
  *
  * Delete UX — IMPECCABLE WAVE 5.A (2026-05-14):
  *   Previously a modal confirm-dialog blocked the drawer with a
@@ -78,17 +78,18 @@ const MB = 1024 * 1024;
 function formatBytes(bytes: number): string {
   if (bytes < GB) {
     const mb = Math.round(bytes / MB);
-    return `${mb} MB USED`;
+    return `${mb} MB`;
   }
   const gb = bytes / GB;
-  return `${gb.toFixed(1)} GB USED`;
+  return `${gb.toFixed(1)} GB`;
 }
 
 /** Build the disk-usage line string per the sentinel + normal formats. */
 function formatUsageLine(usage: RecordingsUsage): string {
-  if (usage.bytes_total === -1) return "RECORDINGS · LOADING…";
-  if (usage.bytes_total === -2) return "RECORDINGS · UNAVAILABLE";
-  return `RECORDINGS · ${usage.sessions} SESSIONS · ${formatBytes(usage.bytes_total)}`;
+  if (usage.bytes_total === -1) return "loading...";
+  if (usage.bytes_total === -2) return "unavailable";
+  const noun = usage.sessions === 1 ? "session" : "sessions";
+  return `${usage.sessions} ${noun} · ${formatBytes(usage.bytes_total)}`;
 }
 
 /** Same slice as recording-row.ts — used for the confirm dialog heading. */
@@ -103,34 +104,34 @@ const CHUNK_SIZE = 12;
 
 const CSS = `
   .vmx-rec-browser {
-    margin-top: var(--sp-4);
+    margin-top: var(--sp-3);
     display: flex;
     flex-direction: column;
     gap: var(--sp-2);
     position: relative;
   }
   .vmx-rec-browser__usage {
-    font-family: var(--type-body);
-    font-size: 9px;
-    font-weight: 500;
-    font-stretch: 85%;
-    letter-spacing: 0.22em;
-    text-transform: uppercase;
+    align-self: flex-end;
+    font-family: var(--type-mono);
+    font-size: 10px;
+    letter-spacing: 0.08em;
     color: var(--silk-40);
-    text-shadow: 0 1px 0 rgba(0, 0, 0, 0.7);
+    font-variant-numeric: tabular-nums;
     user-select: none;
   }
   .vmx-rec-browser__list {
     display: flex;
     flex-direction: column;
+    background: var(--glass-2);
     border-top: 1px solid var(--glass-edge);
+    border-bottom: 1px solid var(--glass-edge);
   }
   .vmx-rec-browser__empty {
-    padding: var(--sp-4) var(--sp-3);
+    padding: var(--sp-5) var(--sp-3);
     text-align: center;
     color: var(--silk-40);
     font-family: var(--type-body);
-    font-size: 14px;
+    font-size: 13px;
   }
   .vmx-rec-browser__sentinel {
     height: 1px;
@@ -202,7 +203,7 @@ const CSS = `
 
 registerStyle("vmx-rec-browser", CSS);
 
-const EMPTY_COPY = "No recordings yet. Sessions appear here after they end.";
+const EMPTY_COPY = "No recordings yet. Start a session to capture one.";
 
 export function renderRecordingBrowser(
   opts: RecordingBrowserProps,
@@ -365,10 +366,16 @@ export function renderRecordingBrowser(
       const handle = renderRecordingRow({
         summary,
         onToggle: () => {
-          opts.onReplay(summary.session_dir);
-          // Toggle by inspecting current data-open state.
           const isOpen = handle.root.dataset.open === "true";
-          handle.setExpanded(!isOpen);
+          if (isOpen) {
+            handle.setExpanded(false);
+            return;
+          }
+          opts.onReplay(summary.session_dir);
+          for (const row of rowHandles) {
+            if (row !== handle) row.setExpanded(false);
+          }
+          handle.setExpanded(true);
         },
         onDelete: () => openDeleteWithUndo(summary),
         absoluteWavPathResolver: opts.absoluteWavPathResolver,

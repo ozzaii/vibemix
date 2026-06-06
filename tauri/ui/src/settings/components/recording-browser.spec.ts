@@ -100,11 +100,11 @@ describe("recording-browser — Test 1: empty state + zero usage", () => {
     document.body.append(root);
 
     const usage = root.querySelector<HTMLElement>(".vmx-rec-browser__usage");
-    expect(usage?.textContent).toBe("RECORDINGS · 0 SESSIONS · 0 MB USED");
+    expect(usage?.textContent).toBe("0 sessions · 0 MB");
 
     const empty = root.querySelector<HTMLElement>(".vmx-rec-browser__empty");
     expect(empty?.textContent).toBe(
-      "No recordings yet. Sessions appear here after they end.",
+      "No recordings yet. Start a session to capture one.",
     );
     expect(empty?.getAttribute("role")).toBe("status");
   });
@@ -124,7 +124,7 @@ describe("recording-browser — Test 2: setUsage formatting", () => {
     const usage = handle.root.querySelector<HTMLElement>(
       ".vmx-rec-browser__usage",
     );
-    expect(usage?.textContent).toBe("RECORDINGS · 12 SESSIONS · 3.4 GB USED");
+    expect(usage?.textContent).toBe("12 sessions · 3.4 GB");
   });
 
   it("formats integer MB for <1GB bytes", () => {
@@ -140,7 +140,7 @@ describe("recording-browser — Test 2: setUsage formatting", () => {
     const usage = handle.root.querySelector<HTMLElement>(
       ".vmx-rec-browser__usage",
     );
-    expect(usage?.textContent).toBe("RECORDINGS · 4 SESSIONS · 500 MB USED");
+    expect(usage?.textContent).toBe("4 sessions · 500 MB");
   });
 
   it("renders LOADING sentinel for bytes_total === -1", () => {
@@ -156,7 +156,7 @@ describe("recording-browser — Test 2: setUsage formatting", () => {
     const usage = handle.root.querySelector<HTMLElement>(
       ".vmx-rec-browser__usage",
     );
-    expect(usage?.textContent).toBe("RECORDINGS · LOADING…");
+    expect(usage?.textContent).toBe("loading...");
   });
 
   it("renders UNAVAILABLE sentinel for bytes_total === -2", () => {
@@ -172,7 +172,7 @@ describe("recording-browser — Test 2: setUsage formatting", () => {
     const usage = handle.root.querySelector<HTMLElement>(
       ".vmx-rec-browser__usage",
     );
-    expect(usage?.textContent).toBe("RECORDINGS · UNAVAILABLE");
+    expect(usage?.textContent).toBe("unavailable");
   });
 });
 

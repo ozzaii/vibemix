@@ -3,7 +3,7 @@
  * Three cases that wedge the SHIPPED columns of the audit table in
  * tests/recording/test_phase15_success_criteria.py into vitest CI:
  *
- *   Test E — disk-usage line is the SINGLE error/loading channel for the
+ *   Test E — disk-usage meta line is the SINGLE error/loading channel for the
  *            recordings surface (covers ROADMAP §1 chronological list +
  *            sentinel-aware status display + UI-SPEC §State Management
  *            no-list-refetch invariant).
@@ -12,10 +12,7 @@
  *            recordings_index.py:296 sort).
  *   Test G — single-row playback discipline (covers ROADMAP §2 — UI-SPEC
  *            §Row replay claims "Single-row guarantee: only one row is
- *            open at a time"). EXPECTED-FAIL: the shipped recording-browser.ts
- *            onToggle handler (lines 362-378) only flips the clicked row;
- *            there is NO close-others discipline. The gap is documented in
- *            15-01-SUMMARY.md for closure in Plan 15-04.
+ *            open at a time").
  *
  * Mocks mirror recording-browser.spec.ts exactly so the success gates run
  * in the same jsdom environment with the same FakeIntersectionObserver +
@@ -50,6 +47,7 @@ function fakeSession(opts: { isoDay: string; sessionDir: string }): RecordingSum
     event_count: 20,
     bytes_total: 1_000_000,
     crashed: false,
+    voice_available: true,
   };
 }
 
@@ -68,6 +66,12 @@ class FakeIntersectionObserver {
 
 beforeEach(() => {
   FakeIntersectionObserver.instances = [];
+  vi.spyOn(window.HTMLMediaElement.prototype, "pause").mockImplementation(
+    () => undefined,
+  );
+  vi.spyOn(window.HTMLMediaElement.prototype, "load").mockImplementation(
+    () => undefined,
+  );
   vi.stubGlobal("IntersectionObserver", FakeIntersectionObserver);
   Object.defineProperty(window, "matchMedia", {
     writable: true,
@@ -88,7 +92,7 @@ beforeEach(() => {
 afterEach(() => {
   vi.unstubAllGlobals();
   document.body.replaceChildren();
-  vi.clearAllMocks();
+  vi.restoreAllMocks();
 });
 
 // ===========================================================================
@@ -120,7 +124,7 @@ describe("recording-browser success-criteria — Test E: disk-usage line is the 
     const usage = handle.root.querySelector<HTMLElement>(
       ".vmx-rec-browser__usage",
     );
-    expect(usage?.textContent).toBe("RECORDINGS · UNAVAILABLE");
+    expect(usage?.textContent).toBe("unavailable");
 
     // 2. Empty-state body STILL renders (single-channel discipline — the
     //    list area is independent of the disk-usage error sentinel).
@@ -128,7 +132,7 @@ describe("recording-browser success-criteria — Test E: disk-usage line is the 
       ".vmx-rec-browser__empty",
     );
     expect(empty?.textContent).toBe(
-      "No recordings yet. Sessions appear here after they end.",
+      "No recordings yet. Start a session to capture one.",
     );
 
     // 3. Push a successful usage update — usage line updates, list does NOT
@@ -137,7 +141,7 @@ describe("recording-browser success-criteria — Test E: disk-usage line is the 
     //    that mutates).
     handle.setUsage({ sessions: 5, bytes_total: 524_288_000 });
     expect(usage?.textContent).toBe(
-      "RECORDINGS · 5 SESSIONS · 500 MB USED",
+      "5 sessions · 500 MB",
     );
 
     // 4. Empty-state body is STILL the same node — no row mount happened
@@ -194,25 +198,16 @@ describe("recording-browser success-criteria — Test F: newest-first chronologi
 });
 
 // ===========================================================================
-// Test G — single-row playback discipline (EXPECTED-FAIL — gap for Plan 15-04)
+// Test G — single-row playback discipline
 //
 // UI-SPEC §Row replay claims: "Single-row guarantee: only one row is open
-// at a time". The CURRENT implementation in recording-browser.ts:362-378
-// does NOT enforce this — onToggle for row N only flips row N's expanded
-// state; there is no iteration over rowHandles to setExpanded(false) on
-// the other rows.
-//
-// This test is `it.fails(...)` so the gap is captured in CI without
-// blocking the build. Plan 15-04 closes the gap by adding a "close-others"
-// step inside the onToggle closure (see 15-01-SUMMARY.md §Found Gaps).
-//
-// When 15-04 lands the close-others fix, flip `it.fails` → `it` and the
-// gate becomes a regression detector.
+// at a time". Opening a second row must tear down the first row's audio
+// and transcript before the new row mounts.
 // ===========================================================================
 
 describe("recording-browser success-criteria — Test G: single-row playback discipline", () => {
-  it.fails(
-    "GAP — opening a second row should tear down the first row's <audio> (UI-SPEC §Row replay)",
+  it(
+    "opening a second row tears down the first row's <audio> (UI-SPEC §Row replay)",
     () => {
       const handle = renderRecordingBrowser({
         initialSessions: [],
@@ -240,17 +235,15 @@ describe("recording-browser success-criteria — Test G: single-row playback dis
       expect(audios.length).toBe(1);
       expect(rows[0]!.dataset.open).toBe("true");
 
-      // Click row[1]'s body — the contract says row[0]'s <audio> should be
-      // torn down (single-row guarantee). The current shipped code does NOT
-      // enforce this — both rows end up with an <audio> mounted.
+      // Click row[1]'s body — row[0]'s <audio> is torn down before row[1]
+      // opens.
       const meta1 = rows[1]!.querySelector<HTMLElement>(".vmx-rec-row__meta");
       meta1!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
 
       audios = document.querySelectorAll("audio");
-      // EXPECTED at contract: 1. ACTUAL on shipped code: 2 — this assertion
-      // FAILS, which is what `it.fails(...)` expects (the test passes
-      // overall when the inner expectation fails).
       expect(audios.length).toBe(1);
+      expect(rows[0]!.dataset.open).toBe("false");
+      expect(rows[1]!.dataset.open).toBe("true");
     },
   );
 });

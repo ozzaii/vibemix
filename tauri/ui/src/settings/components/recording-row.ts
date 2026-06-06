@@ -36,11 +36,11 @@
  *       rgba(214, 207, 199, 0.06)  — row hover bg (silk derivation)
  *       rgba(212, 65, 58, 0.18)    — delete-hover inset shadow
  *
- * Action cluster (Plan 15-03 Task 2 — was 64px, grew to 128px):
- *   4 buttons × 24px icon + 3 gaps × 8px = 120px + 8px breathing room.
+ * Action cluster (Plan 29-06 — was 64px, grew to 152px):
+ *   5 buttons × 24px icon + 4 gaps × 8px = 152px.
  *   Order left→right: replay (info) · reveal (info) · open-external (info)
- *   · delete (destructive). Replay-style hover ink-flip (silk-65→amber)
- *   applies to all three info buttons; delete keeps its own led-fault
+ *   · debrief (info) · delete (destructive). Replay-style hover ink-flip
+ *   (silk-65→amber) applies to all four info buttons; delete keeps its own led-fault
  *   hover discipline.
  *
  * Click handlers fire `revealInOS(session_dir)` / `openInputWav(session_dir)`
@@ -188,6 +188,18 @@ const DELETE_SVG = `
         stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
 </svg>
 `;
+
+const GB = 1024 * 1024 * 1024;
+const MB = 1024 * 1024;
+
+function formatBytesCompact(bytes: number): string {
+  if (bytes < GB) {
+    const mb = Math.round(bytes / MB);
+    return `${mb} MB`;
+  }
+  const gb = bytes / GB;
+  return `${gb.toFixed(1)} GB`;
+}
 // Plan 29-06 — speech bubble + small replay arrow inside, "open debrief".
 const DEBRIEF_SVG = `
 <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false" width="14" height="14">
@@ -203,7 +215,7 @@ const CSS = `
     position: relative;
     display: flex;
     flex-direction: column;
-    background: var(--glass-2);
+    background: transparent;
     border-bottom: 1px solid var(--glass-edge);
     transition: background var(--motion-snap) ease-out;
     cursor: pointer;
@@ -217,25 +229,35 @@ const CSS = `
     align-items: center;
     min-height: 44px;            /* a11y touch target — documented exception */
     padding: 0 var(--sp-3);
-    gap: var(--sp-2);
+    gap: var(--sp-3);
   }
   .vmx-rec-row__ts {
-    flex: 0 0 140px;
+    flex: 0 0 132px;
     font-family: var(--type-mono);
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 500;
     color: var(--silk-65);
+    letter-spacing: 0.04em;
     font-variant-numeric: tabular-nums;
     user-select: none;
   }
   .vmx-rec-row__meta {
     flex: 1 1 auto;
-    font-family: var(--type-body);
-    font-size: 14px;
-    color: var(--silk);
     display: flex;
+    gap: var(--sp-3);
     align-items: center;
+    font-family: var(--type-mono);
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
     user-select: none;
+  }
+  .vmx-rec-row__duration {
+    color: var(--silk-65);
+    white-space: nowrap;
+  }
+  .vmx-rec-row__size {
+    color: var(--silk-40);
+    white-space: nowrap;
   }
   .vmx-rec-row__crashed-led {
     display: inline-block;
@@ -248,10 +270,9 @@ const CSS = `
     box-shadow: 0 0 4px var(--led-warn);
   }
   .vmx-rec-row__actions {
-    /* Plan 15-03 Task 2: was 64px (replay + delete only); grew to 128px to
-       host 4 buttons × 24px + 3 gaps × 8px = 120px + 8px breathing room.
-       Order left→right: replay · reveal · open-external · delete. */
-    flex: 0 0 128px;
+    /* Plan 29-06: 5 buttons × 24px + 4 gaps × 8px = 152px.
+       Order left→right: replay · reveal · open-external · debrief · delete. */
+    flex: 0 0 152px;
     display: flex;
     flex-direction: row;
     justify-content: flex-end;
@@ -407,11 +428,13 @@ export function renderRecordingRow(opts: RecordingRowProps): RecordingRowHandle 
     metaCell.append(led);
   }
 
-  // Center label: "{duration} · {N} events".
-  const metaText = document.createElement("span");
-  metaText.textContent
-    = `${formatDuration(summary.duration_s)} · ${summary.event_count} events`;
-  metaCell.append(metaText);
+  const durationText = document.createElement("span");
+  durationText.className = "vmx-rec-row__duration";
+  durationText.textContent = formatDuration(summary.duration_s);
+  const sizeText = document.createElement("span");
+  sizeText.className = "vmx-rec-row__size";
+  sizeText.textContent = formatBytesCompact(summary.bytes_total);
+  metaCell.append(durationText, sizeText);
 
   head.append(metaCell);
 

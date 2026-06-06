@@ -64,6 +64,12 @@ beforeEach(() => {
   matchMediaReduced = false;
   revealInOSMock.mockClear();
   openInputWavMock.mockClear();
+  vi.spyOn(window.HTMLMediaElement.prototype, "pause").mockImplementation(
+    () => undefined,
+  );
+  vi.spyOn(window.HTMLMediaElement.prototype, "load").mockImplementation(
+    () => undefined,
+  );
   // jsdom does not implement matchMedia by default; stub a controllable one.
   Object.defineProperty(window, "matchMedia", {
     writable: true,
@@ -83,7 +89,7 @@ beforeEach(() => {
 
 afterEach(() => {
   document.body.replaceChildren();
-  vi.clearAllMocks();
+  vi.restoreAllMocks();
 });
 
 async function flushMicrotasks(): Promise<void> {
@@ -110,8 +116,8 @@ describe("recording-row — Test 1: root contract", () => {
   });
 });
 
-describe("recording-row — Test 2: center cell duration format", () => {
-  it("renders '1h 24m · 38 events' for 5040s + 38 events", () => {
+describe("recording-row — Test 2: center cell duration + size format", () => {
+  it("renders duration and size for a long session", () => {
     const { root } = renderRecordingRow({
       summary: baseSummary,
       onToggle: vi.fn(),
@@ -120,10 +126,10 @@ describe("recording-row — Test 2: center cell duration format", () => {
     document.body.append(root);
     const meta = root.querySelector<HTMLElement>(".vmx-rec-row__meta");
     expect(meta?.textContent ?? "").toContain("1h 24m");
-    expect(meta?.textContent ?? "").toContain("38 events");
+    expect(meta?.textContent ?? "").toContain("12 MB");
   });
 
-  it("renders '48m · 22 events' for < 1h sessions", () => {
+  it("renders duration and size for a sub-hour session", () => {
     const { root } = renderRecordingRow({
       summary: { ...baseSummary, duration_s: 2880, event_count: 22 },
       onToggle: vi.fn(),
@@ -132,7 +138,7 @@ describe("recording-row — Test 2: center cell duration format", () => {
     document.body.append(root);
     const meta = root.querySelector<HTMLElement>(".vmx-rec-row__meta");
     expect(meta?.textContent ?? "").toContain("48m");
-    expect(meta?.textContent ?? "").toContain("22 events");
+    expect(meta?.textContent ?? "").toContain("12 MB");
     expect(meta?.textContent ?? "").not.toContain("h");
   });
 
