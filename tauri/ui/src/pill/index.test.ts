@@ -29,6 +29,7 @@ import {
   pillOpenState,
   pillHoverCanOpen,
   pillDemoReactionFrame,
+  pillDemoNextEnabled,
   pillDemoReactionKeyForShortcut,
   pillDemoReturnFrame,
   pillDemoPadHitPulseSlot,
@@ -1427,6 +1428,14 @@ describe("pillShouldClearHandledNextOnNull — demo fallback completion memory",
   it("keeps handled fallback cards consumed in demo mode while production null clears", () => {
     expect(pillShouldClearHandledNextOnNull(false)).toBe(true);
     expect(pillShouldClearHandledNextOnNull(true)).toBe(false);
+  });
+});
+
+describe("pillDemoNextEnabled — dev-only demo fallback", () => {
+  it("keeps fabricated next suggestions out of production even when the env flag is set", () => {
+    expect(pillDemoNextEnabled({ DEV: true, VITE_VIBEMIX_DEMO_NEXT: "1" })).toBe(true);
+    expect(pillDemoNextEnabled({ DEV: false, VITE_VIBEMIX_DEMO_NEXT: "1" })).toBe(false);
+    expect(pillDemoNextEnabled({ DEV: true, VITE_VIBEMIX_DEMO_NEXT: "0" })).toBe(false);
   });
 });
 

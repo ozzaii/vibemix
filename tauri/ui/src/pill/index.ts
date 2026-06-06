@@ -429,10 +429,19 @@ export function pillReactionEchoVisible(
 // of being clipped by the 44px collapsed overlay shell.
 const COLLAPSED_PEEK_ENABLED = true;
 
-// Demo fallback: explicit booth-only opt-in. A real wire suggestion always wins.
-// Default production behavior is honest silence: no grounded suggestion means no
-// card, not a fabricated track.
-const DEMO_NEXT_ENABLED = import.meta.env.VITE_VIBEMIX_DEMO_NEXT === "1";
+// Demo fallback: explicit dev/booth-only opt-in. A real wire suggestion always
+// wins. Default production behavior is honest silence: no grounded suggestion
+// means no card, not a fabricated track.
+type PillDemoNextEnv = Readonly<{
+  DEV?: boolean;
+  VITE_VIBEMIX_DEMO_NEXT?: string;
+}>;
+
+export function pillDemoNextEnabled(env: PillDemoNextEnv): boolean {
+  return env.DEV === true && env.VITE_VIBEMIX_DEMO_NEXT === "1";
+}
+
+const DEMO_NEXT_ENABLED = pillDemoNextEnabled(import.meta.env);
 const DEMO_NEXT_SUGGESTION: NextSuggestionWire = {
   track_id: "demo:velvet-pressure",
   title: "Velvet Pressure",
