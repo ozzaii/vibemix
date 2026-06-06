@@ -842,8 +842,12 @@ function mountLearnWindow(root: HTMLElement): {
     boothCommandText.textContent =
       cleanMissionText(mission?.command) ??
       practiceCommandLine(recommended, readiness, controllerDisplayName);
-    boothInput.textContent = readinessInputLine(readiness, controllerDisplayName);
-    boothCredit.textContent = readinessCreditLine(readiness);
+    boothInput.textContent = mission
+      ? missionInputLine(mission, readiness, controllerDisplayName)
+      : readinessInputLine(readiness, controllerDisplayName);
+    boothCredit.textContent = mission
+      ? missionCreditLine(mission)
+      : readinessCreditLine(readiness);
     boothVoice.textContent = voiceReadinessLine(latestVoiceStatus);
     renderBoothMission(mission);
     renderBoothChain(mission, recommended, lessons);
@@ -2204,7 +2208,7 @@ function missionBoothCue(
   const why = cleanMissionText(mission.why);
   const payoff = cleanMissionText(mission.payoff);
   const proof = cleanMissionText(mission.proof) ??
-    missionProofPhrase(readiness, controllerName);
+    missionProofPhraseForMission(mission, readiness, controllerName);
   const challenge = cleanMissionText(mission.challenge);
   const reward = cleanMissionText(mission.meter_caption);
   const label = [action, why, challenge, payoff, proof, reward]
@@ -2343,6 +2347,62 @@ function missionMeterValue(mission: LearnPracticeMission): number {
 
 function missionMeterPercent(mission: LearnPracticeMission): number {
   return Math.round((missionMeterValue(mission) / missionMeterMax(mission)) * 100);
+}
+
+function missionPracticeSurface(
+  mission: LearnPracticeMission,
+): "screen_deck" | "controller" | "live_proof" {
+  if (
+    mission.practice_surface === "controller" ||
+    mission.practice_surface === "live_proof" ||
+    mission.practice_surface === "screen_deck"
+  ) {
+    return mission.practice_surface;
+  }
+  if (mission.mode === "prove" || mission.focus === "proof" || mission.focus === "mastery") {
+    return "live_proof";
+  }
+  if (mission.focus === "hardware") return "controller";
+  return "screen_deck";
+}
+
+function missionInputLine(
+  mission: LearnPracticeMission,
+  readiness: "hardware" | "midi" | "screen",
+  controllerName: string | null,
+): string {
+  const surface = missionPracticeSurface(mission);
+  if (surface === "live_proof") return "live audio";
+  if (surface === "controller") {
+    return readiness === "screen"
+      ? "controller next"
+      : readinessInputLine(readiness, controllerName);
+  }
+  return "screen deck";
+}
+
+function missionCreditLine(mission: LearnPracticeMission): string {
+  const surface = missionPracticeSurface(mission);
+  if (surface === "live_proof") return "cited proof";
+  if (surface === "controller") return "hardware rep";
+  return "screen rep";
+}
+
+function missionProofPhraseForMission(
+  mission: LearnPracticeMission,
+  readiness: "hardware" | "midi" | "screen",
+  controllerName: string | null,
+): string {
+  const surface = missionPracticeSurface(mission);
+  if (surface === "live_proof") {
+    return "play the move against real deck audio so Learn can cite the proof.";
+  }
+  if (surface === "controller") {
+    return readiness === "screen"
+      ? "connect your controller when ready; the screen deck keeps the drill warm."
+      : missionProofPhrase(readiness, controllerName);
+  }
+  return "use the on-screen controls and I'll confirm the move.";
 }
 
 

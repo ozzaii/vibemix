@@ -150,7 +150,7 @@ def render_curriculum_meta_ts() -> str:
         '      last_practice_source?: "hardware" | "screen" | null;\n'
         "      last_practice_seq?: number;\n"
         "      practice_feedback?: {\n"
-        '        kind: "beatmatch" | "cue_placement";\n'
+        '        kind: "beatmatch" | "cue_placement" | "control";\n'
         "        label: string;\n"
         "        message: string;\n"
         "        detail?: string;\n"
@@ -178,6 +178,7 @@ def render_curriculum_meta_ts() -> str:
         '  focus: "first_rep" | "retry" | "proof" | "replay" | "hardware" | "lock" | "mastery" | "recovery";\n'
         "  focus_label: string;\n"
         "  challenge: string;\n"
+        '  practice_surface: "screen_deck" | "controller" | "live_proof";\n'
         "  chain?: LearnPracticeChainStep[];\n"
         "  meter_label: string;\n"
         "  meter_value: number;\n"
@@ -334,7 +335,7 @@ def render_curriculum_meta_ts() -> str:
         "  const label = cleanFeedbackText(feedback.label);\n"
         "  const message = cleanFeedbackText(feedback.message);\n"
         "  if (!label || !message) return undefined;\n"
-        '  if (feedback.kind !== "beatmatch" && feedback.kind !== "cue_placement") {\n'
+        '  if (feedback.kind !== "beatmatch" && feedback.kind !== "cue_placement" && feedback.kind !== "control") {\n'
         "    return undefined;\n"
         "  }\n"
         "  const detail = cleanFeedbackText(feedback.detail);\n"

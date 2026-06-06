@@ -278,6 +278,7 @@ describe("practice booth shell", () => {
                 focus: "proof",
                 focus_label: "proof 1/3",
                 challenge: "Only cited live proof moves Mastery.",
+                practice_surface: "live_proof",
                 chain: [
                   {
                     lesson_id: "L2.01",
@@ -327,6 +328,12 @@ describe("practice booth shell", () => {
       );
       expect(root.querySelector<HTMLElement>("#learn-booth-proof")?.textContent).toBe(
         "1 cited proof banked; 2 left",
+      );
+      expect(root.querySelector<HTMLElement>("#learn-booth-input")?.textContent).toBe(
+        "live audio",
+      );
+      expect(root.querySelector<HTMLElement>("#learn-booth-credit")?.textContent).toBe(
+        "cited proof",
       );
       expect(root.querySelector<HTMLElement>("#learn-booth-command-text")?.textContent)
         .toContain("Prove beatmatching");

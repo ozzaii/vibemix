@@ -28,6 +28,7 @@ def test_fresh_mission_starts_with_useful_controller_practice() -> None:
     assert mission["focus"] == "first_rep"
     assert mission["focus_label"] == "first rep"
     assert mission["challenge"] == "Touch the control before you read ahead."
+    assert mission["practice_surface"] == "screen_deck"
     assert mission["meter_label"] == "first rep"
     assert mission["meter_value"] == 0
     assert mission["meter_max"] == 1
@@ -91,6 +92,7 @@ def test_hardware_free_practice_receipt_becomes_controller_finish_mission() -> N
     assert mission["mode"] == "finish"
     assert mission["focus"] == "hardware"
     assert mission["focus_label"] == "practice bank 1/3"
+    assert mission["practice_surface"] == "controller"
     assert mission["proof"] == "last pass used hardware; repeat it on the controller"
     assert mission["challenge"] == "Repeat the controller move inside the lesson."
     assert mission["meter_label"] == "practice bank"
@@ -140,6 +142,7 @@ def test_screen_only_practice_bank_escalates_to_controller_checkpoint() -> None:
     assert mission["mode"] == "finish"
     assert mission["focus"] == "hardware"
     assert mission["focus_label"] == "controller rep next"
+    assert mission["practice_surface"] == "controller"
     assert mission["command"] == (
         "Move channel strip onto the controller; screen reps warmed it up, "
         "one hardware touch is the checkpoint."
@@ -197,6 +200,7 @@ def test_cleared_competent_skill_turns_into_cited_proof_mission() -> None:
     assert mission["lesson_id"] == "L1.02"
     assert mission["focus"] == "proof"
     assert mission["focus_label"] == "proof 1/3"
+    assert mission["practice_surface"] == "live_proof"
     assert mission["proof"] == "1 cited proof banked; 2 left"
     assert mission["challenge"] == "Only cited live proof moves Mastery."
     assert mission["meter_label"] == "proof bank"
@@ -258,6 +262,7 @@ def test_measured_miss_turns_current_proof_mission_into_recovery_target() -> Non
     assert mission["mode"] == "prove"
     assert mission["focus"] == "recovery"
     assert mission["focus_label"] == "phase drift"
+    assert mission["practice_surface"] == "live_proof"
     assert mission["command"] == (
         "Fix phase drift on beatmatching by ear; "
         "Deck B is late; nudge it forward before chasing proof."

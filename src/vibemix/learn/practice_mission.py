@@ -78,6 +78,7 @@ def next_practice_mission(
     focus = _focus_for(mode, row, skill_id, skill_row, feedback)
     focus_label = _focus_label_for(focus, row, skill_id, skill_row, feedback)
     challenge = _challenge_for(mode, row, skill_label, skill_row, feedback)
+    practice_surface = _practice_surface_for(mode, focus, row, feedback)
     meter = _meter_for(mode, focus, row, skill_id, skill_label, skill_row, feedback)
     chain = _practice_chain_for(
         progress,
@@ -101,6 +102,7 @@ def next_practice_mission(
         "focus": focus,
         "focus_label": focus_label,
         "challenge": challenge,
+        "practice_surface": practice_surface,
         "chain": chain,
         **meter,
     }
@@ -477,6 +479,22 @@ def _challenge_for(
     if mode == "replay":
         return f"Make {skill_label} feel automatic before moving on."
     return "Touch the control before you read ahead."
+
+
+def _practice_surface_for(
+    mode: str,
+    focus: str,
+    row: dict[str, Any] | None,
+    feedback: dict[str, str] | None,
+) -> str:
+    """Name the physical surface the frontstage should route the learner toward."""
+    if focus == "recovery" and feedback is not None:
+        return "controller" if feedback.get("kind") == "control" else "live_proof"
+    if mode == "prove" or focus in {"proof", "mastery"}:
+        return "live_proof"
+    if _screen_warmup_needs_hardware(row) or _source_total(row, "hardware") > 0:
+        return "controller"
+    return "screen_deck"
 
 
 def _meter_for(

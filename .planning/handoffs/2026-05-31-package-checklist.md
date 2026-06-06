@@ -12707,3 +12707,42 @@ Proof before staging:
 - `npm --prefix tauri/ui run build`
 - `git diff --check -- tauri/ui/src/shell/shell.css tauri/ui/tests/shell/learn-folded-layout.spec.ts .planning/handoffs/2026-05-31-package-checklist.md`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+
+## Package 143 - Learn Mission Practice Surface Routing
+
+Suggested commit: `feat(learn): route missions by practice surface`
+
+Include:
+
+- `src/vibemix/learn/practice_mission.py`
+- `src/vibemix/learn/curriculum_projection.py`
+- `tauri/ui/src/learn/lesson/curriculum-meta.ts`
+- `tauri/ui/src/learn/learn-window.ts`
+- `tests/learn/test_practice_mission.py`
+- `tauri/ui/tests/learn/test_practice_booth_shell.spec.ts`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Live grading algorithms, controller detection, lesson FSM timing, shell
+  activation/footer behavior, and beginner-path suites. This package only adds
+  an explicit mission contract for the surface the learner should use now.
+
+Reason:
+
+- The mission packet already tells the booth what to do, why it matters, and
+  what reward is next, but the shell still inferred input/credit copy from
+  current MIDI readiness. That made proof missions appear as screen reps when
+  the actual next useful move needs live/cited proof, and made controller
+  checkpoints depend on prose. Add `practice_surface` so the backend says
+  `screen_deck`, `controller`, or `live_proof`, then let the booth render
+  honest input/credit labels from that contract.
+
+Proof before staging:
+
+- `uv run pytest -q tests/learn/test_practice_mission.py tests/learn/test_progress_snapshot_skill_wall.py`
+- `uv run python scripts/export_learn_curriculum_meta.py --check`
+- `npm --prefix tauri/ui test -- tests/learn/test_practice_booth_shell.spec.ts`
+- `npm --prefix tauri/ui run build`
+- `git diff --check -- src/vibemix/learn/practice_mission.py src/vibemix/learn/curriculum_projection.py tauri/ui/src/learn/lesson/curriculum-meta.ts tauri/ui/src/learn/learn-window.ts tests/learn/test_practice_mission.py tauri/ui/tests/learn/test_practice_booth_shell.spec.ts .planning/handoffs/2026-05-31-package-checklist.md`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`

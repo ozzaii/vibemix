@@ -81,6 +81,7 @@ export interface LearnPracticeMission {
   focus: "first_rep" | "retry" | "proof" | "replay" | "hardware" | "lock" | "mastery" | "recovery";
   focus_label: string;
   challenge: string;
+  practice_surface: "screen_deck" | "controller" | "live_proof";
   chain?: LearnPracticeChainStep[];
   meter_label: string;
   meter_value: number;
@@ -272,11 +273,7 @@ function practiceFeedback(
   const label = cleanFeedbackText(feedback.label);
   const message = cleanFeedbackText(feedback.message);
   if (!label || !message) return undefined;
-  if (
-    feedback.kind !== "beatmatch" &&
-    feedback.kind !== "cue_placement" &&
-    feedback.kind !== "control"
-  ) {
+  if (feedback.kind !== "beatmatch" && feedback.kind !== "cue_placement" && feedback.kind !== "control") {
     return undefined;
   }
   const detail = cleanFeedbackText(feedback.detail);
