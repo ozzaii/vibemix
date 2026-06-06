@@ -419,10 +419,15 @@ function mountSkeleton(): void {
     <div id="vmx-lib-prog-cost"></div>
     <i id="vmx-lib-progress-fill"></i>
     <span id="vmx-lib-side-label"></span>
+    <div id="vmx-lib-scope-wrap">
     <span id="vmx-lib-scope-state"></span>
     <div id="vmx-lib-chat-tools"></div>
     <div id="vmx-lib-chat-artifact"></div>
     <svg id="vmx-lib-scope"></svg>
+    <span id="vmx-lib-scope-legend-origin"></span>
+    <span id="vmx-lib-scope-legend-near"></span>
+    <span id="vmx-lib-scope-legend-far"></span>
+    <div id="vmx-lib-scope-note"></div>
     </div>`;
 }
 
@@ -504,6 +509,7 @@ describe("build — real renderBuildSet path (jsdom, via mountLibrary)", () => {
   });
 
   afterEach(() => {
+    delete (window as Window & { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__;
     document.body.innerHTML = "";
   });
 
@@ -577,10 +583,21 @@ describe("build — real renderBuildSet path (jsdom, via mountLibrary)", () => {
       "Energy 64",
     );
     expect(document.getElementById("vmx-lib-scope-state")?.textContent).toBe(
-      "sequenced",
+      "sequenced order",
     );
-    expect(document.querySelectorAll("#vmx-lib-scope circle").length).toBeGreaterThan(
-      6,
+    expect(document.querySelectorAll("#vmx-lib-scope .vmx-lib-dot-near")).toHaveLength(0);
+    expect(document.querySelectorAll("#vmx-lib-scope .vmx-lib-dot-far")).toHaveLength(0);
+    expect(
+      document.querySelectorAll("#vmx-lib-scope .vmx-lib-dot-sequence"),
+    ).toHaveLength(6);
+    expect(document.getElementById("vmx-lib-scope")?.getAttribute("aria-label")).toContain(
+      "No vibe-distance score is available",
+    );
+    expect(document.getElementById("vmx-lib-scope-note")?.textContent).toContain(
+      "No cosine score",
+    );
+    expect(document.getElementById("vmx-lib-scope-legend-near")?.textContent).toBe(
+      "Sequence order",
     );
     expect(document.getElementById("vmx-lib-rationale-body")?.textContent).toContain(
       "peak-time",
@@ -598,6 +615,39 @@ describe("build — real renderBuildSet path (jsdom, via mountLibrary)", () => {
       ".xml",
     );
     expect(document.getElementById("vmx-lib-rcount")?.textContent).toBe("6 in set");
+  });
+
+  it("does not use demo track details when a real Tauri runtime is present", async () => {
+    Object.defineProperty(window, "__TAURI_INTERNALS__", {
+      configurable: true,
+      value: {},
+    });
+    const collision: BuildSetResult = {
+      ...DEV_FALLBACK.build,
+      count: 1,
+      tracks: [
+        {
+          track_id: "23381471",
+          title: "23381471",
+          meta: "track 23381471",
+        },
+      ],
+    };
+
+    await runRealBuild(collision);
+
+    const row = document.querySelector(".vmx-lib-row");
+    expect(row?.querySelector(".vmx-lib-track-kicker")?.textContent).toContain(
+      "Local library",
+    );
+    expect(row?.querySelector(".vmx-lib-track-kicker")?.textContent).not.toContain(
+      "Raffertie",
+    );
+    expect(row?.querySelector(".title")?.textContent).toContain("Track 23381471");
+    const chips = row?.querySelector(".vmx-lib-track-chips")?.textContent ?? "";
+    expect(chips).toContain("BPM --");
+    expect(chips).toContain("Key --");
+    expect(chips).toContain("Energy --");
   });
 
   it("renders all-carrier cue landing receipts from AutoCrate", async () => {

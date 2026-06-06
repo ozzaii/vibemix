@@ -181,10 +181,16 @@ function mountSkeleton(): void {
     <div id="vmx-lib-prog-cost"></div>
     <i id="vmx-lib-progress-fill"></i>
     <span id="vmx-lib-side-label"></span>
+    <div id="vmx-lib-scope-wrap">
     <span id="vmx-lib-scope-state"></span>
     <div id="vmx-lib-chat-tools"></div>
     <div id="vmx-lib-chat-artifact"></div>
-    <svg id="vmx-lib-scope"></svg>`;
+    <svg id="vmx-lib-scope"></svg>
+    <span id="vmx-lib-scope-legend-origin"></span>
+    <span id="vmx-lib-scope-legend-near"></span>
+    <span id="vmx-lib-scope-legend-far"></span>
+    <div id="vmx-lib-scope-note"></div>
+    </div>`;
 }
 
 /** Boot the real window, switch to curate mode, and trigger a curate run.
@@ -218,6 +224,7 @@ describe("curate — real renderCurate path (jsdom, via mountLibrary)", () => {
   });
 
   afterEach(() => {
+    delete (window as Window & { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__;
     document.body.innerHTML = "";
   });
 
@@ -233,6 +240,20 @@ describe("curate — real renderCurate path (jsdom, via mountLibrary)", () => {
       "melodic",
     );
     expect(document.getElementById("vmx-lib-rcount")?.textContent).toBe("6 in set");
+    expect(document.getElementById("vmx-lib-scope-state")?.textContent).toBe(
+      "curated order",
+    );
+    expect(document.querySelectorAll("#vmx-lib-scope .vmx-lib-dot-near")).toHaveLength(0);
+    expect(document.querySelectorAll("#vmx-lib-scope .vmx-lib-dot-far")).toHaveLength(0);
+    expect(
+      document.querySelectorAll("#vmx-lib-scope .vmx-lib-dot-sequence"),
+    ).toHaveLength(6);
+    expect(document.getElementById("vmx-lib-scope-note")?.textContent).toContain(
+      "No cosine score",
+    );
+    expect(document.getElementById("vmx-lib-scope")?.getAttribute("aria-label")).toContain(
+      "No vibe-distance score is available",
+    );
   });
 
   it("does not auto-run Codex curation just by opening curate mode", async () => {

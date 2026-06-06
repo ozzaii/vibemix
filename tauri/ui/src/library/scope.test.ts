@@ -9,7 +9,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { SearchResult } from "./api.js";
-import { plotAngle, plotRadius, renderScope } from "./scope.js";
+import { plotAngle, plotRadius, renderScope, renderSequenceScope } from "./scope.js";
 
 const RESULT: SearchResult = {
   centered: true,
@@ -71,5 +71,29 @@ describe("renderScope — structural contract", () => {
     );
     expect(empty).toContain("vmx-lib-dot-origin");
     expect(empty).not.toContain("vmx-lib-dot-near");
+  });
+});
+
+describe("renderSequenceScope — honest set-order map", () => {
+  const svg = renderSequenceScope([
+    { track_id: "a", title: "A", meta: "m" },
+    { track_id: "b", title: "B", meta: "m" },
+    { track_id: "c", title: "C", meta: "m" },
+  ]);
+
+  it("plots sequence points without similarity-only rose near dots", () => {
+    expect(svg).toContain("vmx-lib-dot-sequence");
+    expect(svg).toContain("vmx-lib-sequence-line");
+    expect(svg).not.toContain("vmx-lib-dot-near");
+    expect(svg).not.toContain("vmx-lib-dot-far");
+  });
+
+  it("does not render the query origin or sonar ping for a set", () => {
+    expect(svg).not.toContain("vmx-lib-seed-ping");
+    expect(svg).not.toContain("vmx-lib-dot-origin");
+  });
+
+  it("uses token colors only", () => {
+    expect(svg).not.toMatch(/#[0-9a-fA-F]{3,6}/);
   });
 });

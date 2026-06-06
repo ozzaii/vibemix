@@ -73,7 +73,7 @@ import {
   type SearchResult,
   type TrackResult,
 } from "./api.js";
-import { renderScope } from "./scope.js";
+import { renderScope, renderSequenceScope } from "./scope.js";
 import {
   echoText,
   fieldLabel,
@@ -621,7 +621,14 @@ const DEV_TRACK_DETAILS: Record<
 function devTrackDetail(trackId: string):
   | { artist: string; title: string; bpm: number; key: string; energy: number }
   | undefined {
+  if (!demoTrackDetailsAllowed()) return undefined;
   return DEV_TRACK_DETAILS[trackId.toLowerCase()];
+}
+
+function demoTrackDetailsAllowed(): boolean {
+  if (typeof window === "undefined") return true;
+  const w = window as Window & { __TAURI_INTERNALS__?: unknown };
+  return !(typeof w.__TAURI_INTERNALS__ === "object" && w.__TAURI_INTERNALS__ !== null);
 }
 
 function shortTrackId(trackId: string): string {
@@ -678,10 +685,9 @@ function trackDisplayDetails(track: TrackDisplayInput): TrackDisplayDetails {
   const raw = isRawTrackTitle(rawTitle, track.track_id);
   const named = raw && known ? known : splitArtistTitle(rawTitle);
   const artist = track.artist?.trim() || known?.artist || named.artist || "Local library";
-  const title =
-    raw && known
-      ? known.title
-      : named.title || `Track ${shortTrackId(track.track_id)}`;
+  const title = raw
+    ? known?.title ?? `Track ${shortTrackId(track.track_id)}`
+    : named.title || `Track ${shortTrackId(track.track_id)}`;
   const subtitle =
     rawMeta && !isRawTrackTitle(rawMeta, track.track_id)
       ? rawMeta
@@ -726,46 +732,53 @@ function richTrackRowMarkup(
   </div>`;
 }
 
-function scoreForScope(track: TrackDisplayInput, index: number): number {
-  if (typeof track.score === "number" && Number.isFinite(track.score)) {
-    return Math.max(0, Math.min(1, track.score));
-  }
-  const fallback = DEV_FALLBACK as { search?: SearchResult; stats?: LibraryStats };
-  const searchMatch = (fallback.search?.results ?? []).find(
-    (row) => row.track_id === track.track_id,
-  );
-  if (searchMatch) return searchMatch.score;
-  return Math.max(0.54, 0.79 - index * 0.045);
-}
-
-function scopeResultFromTracks(tracks: TrackDisplayInput[]): SearchResult {
-  const fallback = DEV_FALLBACK as { stats?: LibraryStats };
-  return {
-    centered: true,
-    corpus_size:
-      latestStats?.indexed ?? fallback.stats?.indexed ?? Math.max(tracks.length, 1),
-    results: tracks.map((track, index) => {
-      const d = trackDisplayDetails(track);
-      return {
-        track_id: track.track_id,
-        title: `${d.artist} - ${d.title}`,
-        meta: d.subtitle,
-        score: scoreForScope(track, index),
-      };
-    }),
-  };
-}
-
-function renderScopeFromTracks(
-  tracks: TrackDisplayInput[],
+function renderSetScopeState(
+  tracks: readonly TrackDisplayInput[],
   stateLabel: string,
 ): void {
   if (tracks.length === 0) return;
-  $("vmx-lib-scope-state").textContent = stateLabel;
-  $("vmx-lib-scope").innerHTML = renderScope(
-    scopeResultFromTracks(tracks),
-    "search",
+  setScopeLegend("sequence");
+  $("vmx-lib-scope-state").textContent = `${stateLabel} order`;
+  const scope = $("vmx-lib-scope");
+  scope.innerHTML = renderSequenceScope(
+    tracks.map((track) => {
+      const d = trackDisplayDetails(track);
+      return {
+        track_id: track.track_id,
+        title: d.title,
+        meta: d.subtitle,
+      };
+    }),
   );
+  scope.setAttribute(
+    "aria-label",
+    `${stateLabel} set order. Points show sequence only. No vibe-distance score is available for this set.`,
+  );
+}
+
+type ScopeLegendMode = "similarity" | "sequence";
+
+function setScopeLegend(mode: ScopeLegendMode): void {
+  const wrap = $maybe("vmx-lib-scope-wrap");
+  const origin = $maybe("vmx-lib-scope-legend-origin");
+  const near = $maybe("vmx-lib-scope-legend-near");
+  const far = $maybe("vmx-lib-scope-legend-far");
+  const note = $maybe("vmx-lib-scope-note");
+  wrap?.setAttribute("data-scope-mode", mode);
+  if (mode === "sequence") {
+    if (origin) origin.textContent = "Set start";
+    if (near) near.textContent = "Sequence order";
+    if (far) far.textContent = "Later slots";
+    if (note) {
+      note.textContent =
+        "Points show set order only. No cosine score is available for this set.";
+    }
+    return;
+  }
+  if (origin) origin.textContent = "Your track";
+  if (near) near.textContent = "Mixes cleanly";
+  if (far) far.textContent = "Different vibe";
+  if (note) note.textContent = "Closer to the center mixes more cleanly.";
 }
 
 function renderResults(result: SearchResult, mode: LibraryMode): void {
@@ -790,8 +803,11 @@ function renderResults(result: SearchResult, mode: LibraryMode): void {
 
   $("vmx-lib-rcount").textContent =
     `${result.results.length} of ${result.corpus_size}`;
+  setScopeLegend("similarity");
   $("vmx-lib-scope-state").textContent = result.centered ? "centered" : "raw";
-  $("vmx-lib-scope").innerHTML = renderScope(result, mode);
+  const scope = $("vmx-lib-scope");
+  scope.removeAttribute("aria-label");
+  scope.innerHTML = renderScope(result, mode);
 }
 
 function setRationaleTitle(title: string): void {
@@ -837,7 +853,7 @@ function renderCurate(result: CurateResult, setTitle = ""): void {
       );
     });
     settleRows(el);
-    renderScopeFromTracks(result.tracks, "curated");
+    renderSetScopeState(result.tracks, "curated");
   }
 
   $("vmx-lib-rcount").textContent = `${result.tracks.length} in set`;
@@ -1065,7 +1081,7 @@ function renderBuildSet(result: BuildSetResult, setTitle = ""): void {
     });
     makeBuildRowsOpenExport(el, result);
     settleRows(el);
-    renderScopeFromTracks(result.tracks, "sequenced");
+    renderSetScopeState(result.tracks, "sequenced");
   }
 
   $("vmx-lib-rcount").textContent = `${result.tracks.length} in set`;

@@ -2279,6 +2279,30 @@ body {
 .vmx-lib-dot-near { filter: drop-shadow(0 0 6px var(--brand-40)); }
 .vmx-lib-dot-far { filter: drop-shadow(0 0 4px var(--brand-22)); opacity: 0.78; }
 .vmx-lib-dot-origin { filter: drop-shadow(0 0 8px var(--brand-65)); }
+.vmx-lib-sequence-line {
+  stroke: var(--silk-22);
+  stroke-width: 1.15;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0.76;
+}
+.vmx-lib-dot-sequence {
+  fill: var(--silk-65);
+  stroke: var(--silk-40);
+  stroke-width: 1;
+  filter: drop-shadow(0 2px 5px rgba(0, 0, 0, 0.45));
+}
+.vmx-lib-dot-sequence.is-start {
+  fill: var(--silk);
+  stroke: var(--silk-65);
+}
+.vmx-lib-sequence-label {
+  font-family: var(--type-mono);
+  font-size: 7.5px;
+  font-weight: 600;
+  letter-spacing: 0;
+  fill: var(--void-0);
+}
 
 .vmx-lib-legend {
   margin-top: 12px;
@@ -2300,6 +2324,16 @@ body {
 .vmx-lib-legend .ln .sw.origin { background: var(--amber); box-shadow: var(--glow-soft); }
 .vmx-lib-legend .ln .sw.near { background: var(--amber-pale); }
 .vmx-lib-legend .ln .sw.far { background: var(--silk-40); }
+.vmx-lib-scope-wrap[data-scope-mode="sequence"] .vmx-lib-legend .ln .sw.origin {
+  background: var(--silk);
+  box-shadow: none;
+}
+.vmx-lib-scope-wrap[data-scope-mode="sequence"] .vmx-lib-legend .ln .sw.near {
+  background: var(--silk-65);
+}
+.vmx-lib-scope-wrap[data-scope-mode="sequence"] .vmx-lib-legend .ln .sw.far {
+  background: var(--silk-22);
+}
 .vmx-lib-legend .ln .d {
   margin-left: auto;
   font-family: var(--type-mono);

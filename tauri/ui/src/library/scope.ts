@@ -29,6 +29,12 @@ const RADIUS_MAX = 132;
 /** How many of the nearest plotted tracks get the brightest rose treatment. */
 const NEAR_COUNT = 3;
 
+export interface SequenceScopeTrack {
+  track_id: string;
+  title: string;
+  meta: string;
+}
+
 /** Map a track's score → a plotted radius from the origin.
  *
  * distance = 1 − score (closer = more similar). The two modes occupy different
@@ -84,6 +90,45 @@ export function renderScope(result: SearchResult, mode: LibraryMode): string {
   // Origin (query/seed) with sonar ping.
   h += `<circle class="vmx-lib-seed-ping" cx="${CX}" cy="${CY}" r="3" fill="none" stroke="var(--brand)"/>`;
   h += `<circle cx="${CX}" cy="${CY}" r="4.8" fill="var(--brand)" class="vmx-lib-dot-origin"/>`;
+
+  return h;
+}
+
+/** Build an honest set-order scope for curated/built sets.
+ *
+ * Curate/build tracks do not carry cosine scores, so this renderer plots only
+ * sequence position. It deliberately avoids the origin ping, near-dot class,
+ * and score radius math used by the real similarity dial above.
+ */
+export function renderSequenceScope(rows: readonly SequenceScopeTrack[]): string {
+  let h = "";
+  const points = rows.map((_, i) => {
+    const t = rows.length <= 1 ? 0.5 : i / (rows.length - 1);
+    const angle = -Math.PI * 0.78 + t * Math.PI * 1.56;
+    const r = 104;
+    return {
+      x: CX + Math.cos(angle) * r,
+      y: CY + Math.sin(angle) * r,
+    };
+  });
+
+  for (const rg of RINGS) {
+    h += `<circle cx="${CX}" cy="${CY}" r="${rg.r}" fill="none" stroke="var(--silk-12)"/>`;
+  }
+  h += `<line x1="${CX}" y1="14" x2="${CX}" y2="286" stroke="var(--silk-12)" stroke-opacity="0.35"/>`;
+  h += `<line x1="14" y1="${CY}" x2="286" y2="${CY}" stroke="var(--silk-12)" stroke-opacity="0.35"/>`;
+
+  if (points.length > 1) {
+    const path = points.map((point) => `${point.x.toFixed(2)},${point.y.toFixed(2)}`).join(" ");
+    h += `<polyline class="vmx-lib-sequence-line" points="${path}" fill="none"/>`;
+  }
+
+  points.forEach((point, i) => {
+    h += `<g class="vmx-lib-sequence-point">`;
+    h += `<circle cx="${point.x.toFixed(2)}" cy="${point.y.toFixed(2)}" r="8.8" class="vmx-lib-dot-sequence${i === 0 ? " is-start" : ""}"/>`;
+    h += `<text class="vmx-lib-sequence-label" x="${point.x.toFixed(2)}" y="${(point.y + 0.7).toFixed(2)}" text-anchor="middle" dominant-baseline="middle">${String(i + 1).padStart(2, "0")}</text>`;
+    h += `</g>`;
+  });
 
   return h;
 }
