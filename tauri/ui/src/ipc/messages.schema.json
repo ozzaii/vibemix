@@ -3624,7 +3624,8 @@
                           "message": {"type": "string", "maxLength": 180},
                           "detail": {"type": "string", "maxLength": 120}
                         }
-                      }
+                      },
+                      "last_feedback_seq": {"type": "integer", "minimum": 0}
                     }
                   }
                 },

@@ -1831,6 +1831,7 @@ export interface LearnProgressState {
             message: string;
             detail?: string;
           };
+          last_feedback_seq?: number;
         };
       };
       course_2_unlocked?: boolean;

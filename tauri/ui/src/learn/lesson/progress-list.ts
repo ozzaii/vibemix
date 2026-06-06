@@ -61,6 +61,8 @@ export interface ProgressListEntry {
     message: string;
     detail?: string;
   };
+  /** Monotonic receipt order for the latest measured-miss recovery target. */
+  last_feedback_seq?: number;
   /** Optional short reason for the locked state. */
   lock_reason?: string;
 }

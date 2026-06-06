@@ -57,6 +57,7 @@ export interface LearnProgressProjection {
         message: string;
         detail?: string;
       };
+      last_feedback_seq?: number;
     } | undefined
   >;
   course_2_unlocked?: boolean;
@@ -192,6 +193,7 @@ export function buildProgressEntries(
       practice_bank_count: bankCount,
       last_practice_seq: practiceSequence(entry),
       practice_feedback: practiceFeedback(entry),
+      last_feedback_seq: feedbackSequence(entry),
       lock_reason: locked ? lockReason(meta.course_id) : undefined,
     };
   });
@@ -250,10 +252,13 @@ function momentumEntry(
 
 function practiceMomentumRank(entry: ProgressListEntry): number {
   if (entry.locked || entry.status !== "in-progress") return -1;
-  const hasFix = entry.practice_feedback ? 1 : 0;
-  const hasBank = (entry.practice_bank_count ?? 0) > 0 ? 1 : 0;
-  if (!hasFix && !hasBank) return -1;
-  return hasFix * 1_000_000 + hasBank * 10_000 + practiceSequence(entry);
+  if (entry.practice_feedback) {
+    return 1_000_000 + feedbackSequence(entry) * 10_000 + practiceSequence(entry);
+  }
+  if ((entry.practice_bank_count ?? 0) > 0) {
+    return 10_000 + practiceSequence(entry);
+  }
+  return -1;
 }
 
 function nonNegativeInt(value: unknown): number {
@@ -265,6 +270,14 @@ function practiceSequence(
   entry: NonNullable<LearnProgressProjection["lessons"]>[string] | ProgressListEntry | undefined,
 ): number {
   const value = entry?.last_practice_seq;
+  if (typeof value !== "number" || !Number.isFinite(value)) return 0;
+  return Math.max(0, Math.trunc(value));
+}
+
+function feedbackSequence(
+  entry: NonNullable<LearnProgressProjection["lessons"]>[string] | ProgressListEntry | undefined,
+): number {
+  const value = entry?.last_feedback_seq;
   if (typeof value !== "number" || !Number.isFinite(value)) return 0;
   return Math.max(0, Math.trunc(value));
 }

@@ -167,6 +167,7 @@ describe("curriculum meta projection", () => {
             label: "beatmatch",
             message: "tempo is off",
           },
+          last_feedback_seq: 1,
         },
       },
     };
@@ -177,6 +178,42 @@ describe("curriculum meta projection", () => {
     expect(recovery?.practice_feedback?.message).toBe("tempo is off");
     expect(recovery?.is_recommended).toBe(true);
     expect(firstRecommendedLessonId(progress)).toBe("L1.04");
+  });
+
+  it("recommends the latest measured recovery feedback row", () => {
+    const progress = {
+      course_2_unlocked: true,
+      lessons: {
+        "L2.01": {
+          completed: false,
+          completed_at: null,
+          practice_feedback: {
+            kind: "beatmatch" as const,
+            label: "phase drift",
+            message: "tempo is off",
+          },
+          last_feedback_seq: 1,
+        },
+        "L2.10": {
+          completed: false,
+          completed_at: null,
+          practice_feedback: {
+            kind: "cue_placement" as const,
+            label: "drop timing",
+            message: "aim at the drop",
+          },
+          last_feedback_seq: 2,
+        },
+      },
+    };
+
+    const entries = buildProgressEntries(progress);
+
+    expect(entries.find((entry) => entry.lesson_id === "L2.01")?.is_recommended)
+      .toBeFalsy();
+    expect(entries.find((entry) => entry.lesson_id === "L2.10")?.is_recommended)
+      .toBe(true);
+    expect(firstRecommendedLessonId(progress)).toBe("L2.10");
   });
 
   it("preserves completed locked-course rows for replay orientation", () => {

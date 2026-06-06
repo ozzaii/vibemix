@@ -13057,3 +13057,52 @@ Proof before staging:
 - `npm --prefix tauri/ui run build`
 - `git diff --check -- src/vibemix/runtime/recordings_index.py src/vibemix/ui_bus/messages.py tauri/ui/src/ipc/messages.schema.json tauri/ui/src/ipc/messages.ts tauri/ui/src/ipc/validator.generated.mjs tauri/ui/src/settings/components/recording-row.ts tauri/ui/src/settings/components/recording-row.spec.ts tests/recording/test_recordings_index.py tests/ui_bus/test_recordings_messages.py tests/ui_bus/test_messages_schema.py .planning/handoffs/2026-05-31-package-checklist.md`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+
+## Package 152 - Learn Recovery Mission Recency
+
+Suggested commit: `feat(learn): prioritize fresh recovery missions`
+
+Include:
+
+- `src/vibemix/learn/progress.py`
+- `src/vibemix/learn/practice_mission.py`
+- `src/vibemix/learn/curriculum_projection.py`
+- `tauri/ui/src/learn/lesson/curriculum-meta.ts`
+- `tauri/ui/src/learn/lesson/progress-list.ts`
+- `tauri/ui/tests/learn/test_curriculum_meta.spec.ts`
+- `tauri/ui/src/ipc/messages.schema.json`
+- `tauri/ui/src/ipc/messages.ts`
+- `tauri/ui/src/ipc/validator.generated.mjs`
+- `tests/learn/test_progress_persistence.py`
+- `tests/learn/test_practice_mission.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- New Learn UI layouts, runtime grading behavior, spoken tutor copy, beginner
+  path wiring, controller mapping, lesson content, and live co-host changes. The
+  package only makes already-persisted measured misses carry recency and makes
+  the backend mission plus frontend recommendation choose the freshest recovery
+  target before generic unfinished or banked practice.
+
+Reason:
+
+- Learn already stores measured misses as recovery targets and the UI already
+  ranks a fix above ordinary progress, but the backend next-practice mission
+  could still route a returning user through linear or banked practice unless
+  the missed lesson was active. Persist an additive `last_feedback_seq`, clear
+  it with the stale feedback, and use it to choose the newest recovery mission
+  deterministically after reloads.
+
+Proof before staging:
+
+- `uv run pytest -q tests/learn/test_progress_persistence.py tests/learn/test_practice_mission.py tests/learn/test_curriculum_projection.py tests/ui_bus/test_messages_schema.py`
+- `python scripts/export_learn_curriculum_meta.py`
+- `npm --prefix tauri/ui run codegen:ipc`
+- `npm --prefix tauri/ui test -- tests/learn/test_curriculum_meta.spec.ts`
+- `uv run python scripts/check_ipc_schema.py`
+- `uv run ruff check src/vibemix/learn/progress.py src/vibemix/learn/practice_mission.py src/vibemix/learn/curriculum_projection.py tests/learn/test_progress_persistence.py tests/learn/test_practice_mission.py tests/learn/test_curriculum_projection.py`
+- `uv run python -m compileall -q src/vibemix/learn/progress.py src/vibemix/learn/practice_mission.py src/vibemix/learn/curriculum_projection.py tests/learn/test_progress_persistence.py tests/learn/test_practice_mission.py tests/learn/test_curriculum_projection.py`
+- `npm --prefix tauri/ui run build`
+- `git diff --check -- src/vibemix/learn/progress.py src/vibemix/learn/practice_mission.py src/vibemix/learn/curriculum_projection.py tauri/ui/src/learn/lesson/curriculum-meta.ts tauri/ui/src/learn/lesson/progress-list.ts tauri/ui/tests/learn/test_curriculum_meta.spec.ts tauri/ui/src/ipc/messages.schema.json tauri/ui/src/ipc/messages.ts tauri/ui/src/ipc/validator.generated.mjs tests/learn/test_progress_persistence.py tests/learn/test_practice_mission.py .planning/handoffs/2026-05-31-package-checklist.md`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`

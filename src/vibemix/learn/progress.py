@@ -124,6 +124,16 @@ def _practice_sequence(row: Any) -> int:
         return 0
 
 
+def _feedback_sequence(row: Any) -> int:
+    """Return a bounded measured-miss recency sequence for one lesson row."""
+    if not isinstance(row, dict):
+        return 0
+    try:
+        return max(0, int(row.get("last_feedback_seq", 0)))
+    except (TypeError, ValueError):
+        return 0
+
+
 def _carry_practice_source_fields(
     target: dict[str, Any],
     existing: dict[str, Any] | None,
@@ -172,6 +182,9 @@ def _carry_practice_feedback_field(
     feedback = _practice_feedback(existing.get("practice_feedback"))
     if feedback is not None:
         target["practice_feedback"] = feedback
+        feedback_seq = _feedback_sequence(existing)
+        if feedback_seq > 0:
+            target["last_feedback_seq"] = feedback_seq
 
 
 def _fresh_skills_block() -> dict[str, dict[str, Any]]:
@@ -410,6 +423,7 @@ class LearnProgress:
         if row.get("practice_feedback") == payload:
             return False
         row["practice_feedback"] = payload
+        row["last_feedback_seq"] = self._next_feedback_sequence()
         return True
 
     def clear_practice_feedback(self, lesson_id: str) -> bool:
@@ -418,6 +432,7 @@ class LearnProgress:
         if not isinstance(row, dict) or "practice_feedback" not in row:
             return False
         del row["practice_feedback"]
+        row.pop("last_feedback_seq", None)
         return True
 
     def _next_practice_sequence(self) -> int:
@@ -425,6 +440,13 @@ class LearnProgress:
         highest = 0
         for row in self.lessons.values():
             highest = max(highest, _practice_sequence(row))
+        return highest + 1
+
+    def _next_feedback_sequence(self) -> int:
+        """Return the next monotonic measured-miss recovery sequence."""
+        highest = 0
+        for row in self.lessons.values():
+            highest = max(highest, _feedback_sequence(row))
         return highest + 1
 
     def snapshot(self, *, active_lesson_id: str | None = None) -> dict[str, Any]:

@@ -155,6 +155,7 @@ def render_curriculum_meta_ts() -> str:
         "        message: string;\n"
         "        detail?: string;\n"
         "      };\n"
+        "      last_feedback_seq?: number;\n"
         "    } | undefined\n"
         "  >;\n"
         f"{progress_gate_rows}"
@@ -254,6 +255,7 @@ def render_curriculum_meta_ts() -> str:
         "      practice_bank_count: bankCount,\n"
         "      last_practice_seq: practiceSequence(entry),\n"
         "      practice_feedback: practiceFeedback(entry),\n"
+        "      last_feedback_seq: feedbackSequence(entry),\n"
         "      lock_reason: locked ? lockReason(meta.course_id) : undefined,\n"
         "    };\n"
         "  });\n"
@@ -312,10 +314,13 @@ def render_curriculum_meta_ts() -> str:
         "\n"
         "function practiceMomentumRank(entry: ProgressListEntry): number {\n"
         '  if (entry.locked || entry.status !== "in-progress") return -1;\n'
-        "  const hasFix = entry.practice_feedback ? 1 : 0;\n"
-        "  const hasBank = (entry.practice_bank_count ?? 0) > 0 ? 1 : 0;\n"
-        "  if (!hasFix && !hasBank) return -1;\n"
-        "  return hasFix * 1_000_000 + hasBank * 10_000 + practiceSequence(entry);\n"
+        "  if (entry.practice_feedback) {\n"
+        "    return 1_000_000 + feedbackSequence(entry) * 10_000 + practiceSequence(entry);\n"
+        "  }\n"
+        "  if ((entry.practice_bank_count ?? 0) > 0) {\n"
+        "    return 10_000 + practiceSequence(entry);\n"
+        "  }\n"
+        "  return -1;\n"
         "}\n"
         "\n"
         "function nonNegativeInt(value: unknown): number {\n"
@@ -327,6 +332,14 @@ def render_curriculum_meta_ts() -> str:
         '  entry: NonNullable<LearnProgressProjection["lessons"]>[string] | ProgressListEntry | undefined,\n'
         "): number {\n"
         "  const value = entry?.last_practice_seq;\n"
+        '  if (typeof value !== "number" || !Number.isFinite(value)) return 0;\n'
+        "  return Math.max(0, Math.trunc(value));\n"
+        "}\n"
+        "\n"
+        "function feedbackSequence(\n"
+        '  entry: NonNullable<LearnProgressProjection["lessons"]>[string] | ProgressListEntry | undefined,\n'
+        "): number {\n"
+        "  const value = entry?.last_feedback_seq;\n"
         '  if (typeof value !== "number" || !Number.isFinite(value)) return 0;\n'
         "  return Math.max(0, Math.trunc(value));\n"
         "}\n"

@@ -239,9 +239,11 @@ def test_practice_feedback_is_bounded_and_cleared_by_completion() -> None:
         "message": "Deck B is late; nudge it forward before chasing proof.",
         "detail": "0.05 beats from lock",
     }
+    assert progress.lessons["L2.01"]["last_feedback_seq"] == 1
     assert progress.lessons["L2.01"]["strikes_used"] == 1
     assert progress.clear_practice_feedback("L2.01") is True
     assert "practice_feedback" not in progress.lessons["L2.01"]
+    assert "last_feedback_seq" not in progress.lessons["L2.01"]
 
     progress.mark_practice_feedback(
         "course_2_transitions",
@@ -253,6 +255,30 @@ def test_practice_feedback_is_bounded_and_cleared_by_completion() -> None:
     progress.mark_completed("course_2_transitions", "L2.01")
 
     assert "practice_feedback" not in progress.lessons["L2.01"]
+    assert "last_feedback_seq" not in progress.lessons["L2.01"]
+
+
+def test_practice_feedback_recency_is_monotonic() -> None:
+    """Multiple recovery targets get a deterministic recency receipt."""
+    progress = LearnProgress()
+
+    progress.mark_practice_feedback(
+        "course_2_transitions",
+        "L2.01",
+        kind="beatmatch",
+        label="phase drift",
+        message="Deck B is late.",
+    )
+    progress.mark_practice_feedback(
+        "course_2_transitions",
+        "L2.10",
+        kind="cue_placement",
+        label="drop timing",
+        message="Aim at the drop.",
+    )
+
+    assert progress.lessons["L2.01"]["last_feedback_seq"] == 1
+    assert progress.lessons["L2.10"]["last_feedback_seq"] == 2
 
 
 def test_mark_started_does_not_erase_completed_replay() -> None:

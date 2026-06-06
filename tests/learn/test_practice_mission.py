@@ -120,6 +120,55 @@ def test_latest_free_practice_receipt_beats_older_unfinished_lesson() -> None:
     assert mission["challenge"] == "Repeat a banked move inside the lesson."
 
 
+def test_measured_recovery_target_beats_banked_practice() -> None:
+    progress = LearnProgress(course_2_unlocked=True)
+    progress.mark_practice_source("course_1_anatomy", "L1.03", "screen")
+    progress.mark_practice_feedback(
+        "course_2_transitions",
+        "L2.01",
+        kind="beatmatch",
+        label="phase drift",
+        message="Deck B is late; nudge it forward before chasing proof.",
+        detail="0.05 beats from lock",
+    )
+
+    mission = next_practice_mission(progress)
+
+    assert mission["lesson_id"] == "L2.01"
+    assert mission["focus"] == "recovery"
+    assert mission["focus_label"] == "phase drift"
+    assert mission["proof"] == "last measured miss: phase drift"
+    assert mission["meter_caption"] == "0.05 beats from lock"
+    assert mission["chain"][0]["label"] == "phase drift"
+
+
+def test_latest_measured_recovery_target_beats_older_miss() -> None:
+    progress = LearnProgress(course_2_unlocked=True)
+    progress.mark_practice_feedback(
+        "course_2_transitions",
+        "L2.01",
+        kind="beatmatch",
+        label="phase drift",
+        message="Deck B is late; nudge it forward before chasing proof.",
+    )
+    progress.mark_practice_feedback(
+        "course_2_transitions",
+        "L2.10",
+        kind="cue_placement",
+        label="drop timing",
+        message="on beat, but 1 beat late - aim at the drop.",
+        detail="1 beat from the target drop",
+    )
+
+    mission = next_practice_mission(progress)
+
+    assert mission["lesson_id"] == "L2.10"
+    assert mission["focus"] == "recovery"
+    assert mission["focus_label"] == "drop timing"
+    assert mission["proof"] == "last measured miss: drop timing"
+    assert mission["meter_caption"] == "1 beat from the target drop"
+
+
 def test_mixed_free_practice_receipts_build_a_three_rep_bank() -> None:
     progress = LearnProgress()
     progress.mark_practice_source("course_1_anatomy", "L1.03", "screen")

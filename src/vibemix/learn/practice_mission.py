@@ -123,6 +123,9 @@ def _recommended_lesson(
     active_proof = _active_proof_lesson(progress, wall, active_lesson_id)
     if active_proof is not None:
         return active_proof, "prove"
+    recovery_lesson = _recovery_lesson(progress, wall)
+    if recovery_lesson is not None:
+        return recovery_lesson
     recent_practice = _recent_practice_lesson(progress)
     if recent_practice is not None:
         return recent_practice, "finish"
@@ -228,6 +231,42 @@ def _proof_lesson_for_skill(progress: Any, skill_id: str) -> str | None:
         if meta is not None and _course_unlocked(progress, meta.course_id):
             return lesson_id
     return None
+
+
+def _recovery_lesson(progress: Any, wall: list[dict[str, Any]]) -> tuple[str, str] | None:
+    """Return the freshest unfinished lesson carrying a measured-miss target."""
+    best_lesson_id: str | None = None
+    best_rank: tuple[int, int, int] = (-1, -1, -1)
+    for index, lesson_id in enumerate(CURRICULUM):
+        row = _lesson_row(progress, lesson_id)
+        if row is None or _lesson_status(row) == "completed" or _feedback_for(row) is None:
+            continue
+        meta = CURRICULUM.get(lesson_id)
+        if meta is None or not _course_unlocked(progress, meta.course_id):
+            continue
+        rank = (_feedback_sequence(row), _practice_sequence(row), -index)
+        if rank > best_rank:
+            best_lesson_id = lesson_id
+            best_rank = rank
+    if best_lesson_id is None:
+        return None
+    return best_lesson_id, _recovery_mode_for(progress, wall, best_lesson_id)
+
+
+def _recovery_mode_for(
+    progress: Any,
+    wall: list[dict[str, Any]],
+    lesson_id: str,
+) -> str:
+    skill_id = _LESSON_SKILL_LABELS.get(lesson_id)
+    if skill_id is None:
+        return "finish"
+    skill_row = _skill_row(wall, skill_id)
+    if skill_row is None:
+        return "finish"
+    if skill_row.get("stage") == "competent":
+        return "prove"
+    return "finish"
 
 
 def _recent_practice_lesson(progress: Any) -> str | None:
@@ -772,6 +811,9 @@ def _locked_chain_label(course_id: str) -> str:
 def _chain_label_for(row: dict[str, Any] | None, status: str) -> str:
     if status == "empty":
         return "next rep"
+    feedback = _feedback_for(row)
+    if feedback is not None:
+        return f"fix {feedback['label']}"
     if _screen_warmup_needs_hardware(row):
         return "controller next"
     bank_count = _practice_bank_count(row)
@@ -853,6 +895,15 @@ def _practice_sequence(row: dict[str, Any] | None) -> int:
         return 0
     try:
         return max(0, int(row.get("last_practice_seq", 0)))
+    except (TypeError, ValueError):
+        return 0
+
+
+def _feedback_sequence(row: dict[str, Any] | None) -> int:
+    if row is None:
+        return 0
+    try:
+        return max(0, int(row.get("last_feedback_seq", 0)))
     except (TypeError, ValueError):
         return 0
 
