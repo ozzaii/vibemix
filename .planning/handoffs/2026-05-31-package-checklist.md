@@ -13178,3 +13178,37 @@ Proof before staging:
 - `uv run python -m compileall -q src/vibemix/learn/recital.py tests/learn/test_recital.py`
 - `git diff --check -- src/vibemix/learn/recital.py tests/learn/test_recital.py .planning/handoffs/2026-05-31-package-checklist.md`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+
+## Package 155 - Learn Failed Recitals Stay Uncompleted
+
+Suggested commit: `fix(learn): keep failed recitals uncompleted`
+
+Include:
+
+- `src/vibemix/learn/runtime.py`
+- `tests/learn/test_ipc_handlers_dispatch.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Recital scoring changes, practice mission ranking, regular user-skip
+  persistence semantics, UI layout work, beginner-path suites, and progress
+  schema changes. This package only distinguishes a failed observer-driven gate
+  from a completed or skipped regular lesson at the runtime progress write site.
+
+Reason:
+
+- Observer recitals already report `completed=False` to the canonical
+  `LessonRuntime` bridge on fail, but `on_enter_completed` still called
+  `mark_completed(... demonstrated=False)`, which made the failed recital dot
+  look completed while the course gate stayed locked. Keep regular user-skip
+  behavior unchanged, but suppress the progress completion write for failed
+  observer gates so the user sees the gate still needs a real pass.
+
+Proof before staging:
+
+- `uv run pytest -q tests/learn/test_ipc_handlers_dispatch.py tests/learn/test_recital.py tests/learn/test_course_2_recital.py tests/learn/test_practice_mission.py tests/learn/test_progress_persistence.py`
+- `uv run ruff check src/vibemix/learn/runtime.py tests/learn/test_ipc_handlers_dispatch.py`
+- `uv run python -m compileall -q src/vibemix/learn/runtime.py tests/learn/test_ipc_handlers_dispatch.py`
+- `git diff --check -- src/vibemix/learn/runtime.py tests/learn/test_ipc_handlers_dispatch.py .planning/handoffs/2026-05-31-package-checklist.md`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`

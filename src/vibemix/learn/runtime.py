@@ -768,6 +768,10 @@ class LessonRuntime(StateMachine):
         # ``reason`` field carries the right token.
         self._last_was_match: bool = False
         self._last_completion_can_advance: bool = False
+        # Observer lessons can finish a multi-prompt cycle without awarding
+        # lesson completion (e.g. a failed recital). Regular skip still persists
+        # as completed with demonstrated=False per the existing escape hatch.
+        self._last_completion_should_mark_progress: bool = True
         # WR-04 fix (P92 REVIEW): track the in-flight _finish_when_dwelled
         # task so re-load can cancel it. Without this, a post-completion
         # replay can have a stale finish task wake up ~45 s later and
@@ -1453,6 +1457,7 @@ class LessonRuntime(StateMachine):
     # ------------------------------------------------------------------
     def on_ack_action(self, **kwargs: Any) -> None:
         self._last_was_match = True
+        self._last_completion_should_mark_progress = True
         midi = kwargs.get("midi")
         prehandled_beatmatch_ack = self._beatmatch_practice_ack_prehandled
         self._beatmatch_practice_ack_prehandled = False
@@ -2087,16 +2092,19 @@ class LessonRuntime(StateMachine):
     def on_skip(self, **_kwargs: Any) -> None:
         self._last_was_match = False
         self._last_completion_can_advance = False
+        self._last_completion_should_mark_progress = True
 
     def on_observer_complete(
         self, completed: bool = True, **_kwargs: Any
     ) -> None:
         self._last_was_match = completed
         self._last_completion_can_advance = False
+        self._last_completion_should_mark_progress = completed
 
     def on_recovery_complete(self, **_kwargs: Any) -> None:
         self._last_was_match = True
         self._last_completion_can_advance = True
+        self._last_completion_should_mark_progress = True
 
     # ------------------------------------------------------------------
     # State-entry callbacks — the sole-writer surface for LearnState
@@ -2137,6 +2145,7 @@ class LessonRuntime(StateMachine):
         self._learn.strike_count = 0
         self._learn.lesson_started_at = time.monotonic()
         self._state_entered_at = self._learn.lesson_started_at
+        self._last_completion_should_mark_progress = True
         self._active_flow = None
         self._active_step_index = 0
         self._last_mismatch_hint_signature = None
@@ -2376,25 +2385,26 @@ class LessonRuntime(StateMachine):
         failures without wedging the FSM.
         """
         self._stop_beatmatch_practice_player()
-        try:
-            self._progress.mark_completed(
-                self._learn.current_course_id,
-                self._learn.current_lesson_id,
-                strikes_used=self._learn.strike_count,
-                demonstrated=self._last_was_match,
-            )
-            # CR-02: persist to disk via atomic save (tmp + os.replace).
-            # Skip save when progress_store isn't a real LearnProgress
-            # (unit-test MagicMock path); the live boot in __main__.py
-            # always passes a real LearnProgress instance.
-            from vibemix.learn.progress import LearnProgress, save_progress
+        if self._last_completion_should_mark_progress:
+            try:
+                self._progress.mark_completed(
+                    self._learn.current_course_id,
+                    self._learn.current_lesson_id,
+                    strikes_used=self._learn.strike_count,
+                    demonstrated=self._last_was_match,
+                )
+                # CR-02: persist to disk via atomic save (tmp + os.replace).
+                # Skip save when progress_store isn't a real LearnProgress
+                # (unit-test MagicMock path); the live boot in __main__.py
+                # always passes a real LearnProgress instance.
+                from vibemix.learn.progress import LearnProgress, save_progress
 
-            if isinstance(self._progress, LearnProgress):
-                save_progress(self._progress)
-        except Exception as exc:  # pragma: no cover — defensive
-            import sys
+                if isinstance(self._progress, LearnProgress):
+                    save_progress(self._progress)
+            except Exception as exc:  # pragma: no cover — defensive
+                import sys
 
-            print(f"[learn.runtime] mark_completed failed: {exc!r}", file=sys.stderr)
+                print(f"[learn.runtime] mark_completed failed: {exc!r}", file=sys.stderr)
 
         try:
             done = LearnCompleteLesson.make(
@@ -2433,6 +2443,7 @@ class LessonRuntime(StateMachine):
                     f"[learn.runtime] lesson observer stop failed: {exc!r}",
                     file=sys.stderr,
                 )
+        self._last_completion_should_mark_progress = True
         self._advance_to_next_lesson_if_needed()
 
     # ------------------------------------------------------------------

@@ -697,6 +697,42 @@ def test_ack_dispatch_delegates_to_active_lesson_observer(
     assert progress.lessons["L1.16"]["completed"] is True
 
 
+def test_failed_observer_lesson_does_not_mark_recital_completed(
+    progress_path_in_tmp: Path,
+) -> None:
+    """A failed multi-prompt gate ends the runtime without awarding the dot."""
+    runtime, progress, runtime_emit_sink = _make_runtime()
+    observer = MagicMock(name="lesson_observer")
+    runtime.register_lesson_observer("L1.16", observer)
+
+    runtime.send(
+        "load",
+        lesson_id="L1.16",
+        course_id="course_1_anatomy",
+        controller_id="pioneer_ddj_flx4",
+    )
+    runtime.send("begin")
+    assert progress.lessons["L1.16"]["completed"] is False
+
+    runtime.complete_observer_lesson(completed=False)
+
+    assert runtime.current_state.id == "completed"
+    observer.stop.assert_called_once_with(lesson_id="L1.16")
+    assert progress.lessons["L1.16"]["completed"] is False
+    assert "demonstrated" not in progress.lessons["L1.16"]
+    emitted = [
+        call.args[0]
+        for call in runtime_emit_sink.emit.call_args_list
+        if call.args and isinstance(call.args[0], dict)
+    ]
+    assert any(
+        env.get("type") == "ipc.learn.complete_lesson"
+        and env.get("payload", {}).get("reason") == "user_skip"
+        for env in emitted
+    )
+    assert any(env.get("type") == "ipc.learn.progress_state" for env in emitted)
+
+
 def test_lesson_continue_walks_authored_tutor_beats_before_completion() -> None:
     """Continue-style lessons speak every authored fixture beat."""
     runtime, progress, runtime_emit_sink = _make_runtime()
