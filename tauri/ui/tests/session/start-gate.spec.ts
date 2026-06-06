@@ -45,6 +45,14 @@ function layoutStyle(): string {
   return style?.textContent ?? "";
 }
 
+function cssBlock(css: string, selector: string): string {
+  const needle = `\n  ${selector} {`;
+  const start = css.indexOf(needle);
+  if (start === -1) return "";
+  const end = css.indexOf("\n  }", start);
+  return end === -1 ? css.slice(start) : css.slice(start + 3, end + 4);
+}
+
 afterEach(() => {
   document.body.replaceChildren();
 });
@@ -139,6 +147,19 @@ describe("SHIP-WIRE START-gate", () => {
     expect(css).toMatch(/\[data-runstate="armed"\]\s+\.vmx-voice\s*\{\s*display:\s*none/);
     // Stop is a running-only control; the gate owns the armed deck.
     expect(css).toContain('[data-runstate="running"] .vmx-deck__controls button[data-action="stop"]');
+  });
+
+  it("running voice well uses material depth instead of a 1px outer frame", () => {
+    const css = layoutStyle();
+    const voice = cssBlock(css, ".vmx-voice");
+    const voiceFrame = cssBlock(css, ".vmx-voice::before");
+    const foot = cssBlock(css, ".vmx-deck__foot");
+
+    expect(voice).toContain("border: 0");
+    expect(voice).toContain("var(--bevel-raised)");
+    expect(voiceFrame).not.toContain("border: 1px");
+    expect(foot).toContain("border-top: 0");
+    expect(foot).toContain("box-shadow: inset 0 1px 0");
   });
 
   it("the Start gate is on-brand: zero raw hex in the gate CSS (rose rgba/var only)", () => {

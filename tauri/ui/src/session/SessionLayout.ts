@@ -660,7 +660,7 @@ const LAYOUT_CSS = `
     /* The hero gets the generous air; the rail + foot are thin chrome strips, so
      * the vertical rhythm steps >1.25 from strip to slab (impeccable layout). */
     padding: clamp(28px, 4.5vw, 52px);
-    border: 1px solid var(--glass-edge);
+    border: 0;
     border-radius: var(--rad-md);
     /* The deck display — a lit machined slab, not an empty dark box (2026-05-30
      * level-up). One soft rose key-light pools where the spoken line sits
@@ -672,12 +672,11 @@ const LAYOUT_CSS = `
       linear-gradient(180deg, rgba(255, 251, 244, 0.034), transparent 28%, rgba(0, 0, 0, 0.20)),
       rgba(255, 251, 244, 0.026);
     box-shadow:
-      inset 0 1px 0 rgba(255, 210, 240, 0.07),
-      inset 0 -2px 0 rgba(0, 0, 0, 0.62),
-      inset 0 0 50px rgba(0, 0, 0, 0.18),
+      var(--bevel-raised),
+      inset 0 0 58px rgba(0, 0, 0, 0.18),
       0 2px 0 rgba(0, 0, 0, 0.44),
-      0 22px 56px -14px rgba(0, 0, 0, 0.44),
-      0 0 90px -34px rgba(255, 165, 223, 0.18);
+      0 26px 78px -18px rgba(0, 0, 0, 0.54),
+      0 0 96px -34px rgba(255, 165, 223, 0.18);
     overflow: hidden;
   }
   /* The engraved inner faceplate (2026-05-30 level-up): an inset machined frame
@@ -688,12 +687,13 @@ const LAYOUT_CSS = `
     content: "";
     position: absolute;
     inset: 12px;
-    border: 1px solid var(--border-subtle);
-    border-radius: var(--rad-sm);
+    border-radius: calc(var(--rad-md) - 4px);
     background:
-      repeating-linear-gradient(90deg, transparent 0 46px, rgba(255, 222, 242, 0.034) 46px 47px),
-      linear-gradient(180deg, rgba(255, 251, 244, 0.026) 0%, transparent 16%, transparent 100%);
-    box-shadow: inset 0 0.5px 0 rgba(255, 210, 240, 0.07);
+      repeating-linear-gradient(90deg, transparent 0 46px, rgba(255, 222, 242, 0.028) 46px 47px),
+      linear-gradient(180deg, rgba(255, 251, 244, 0.030) 0%, transparent 18%, transparent 100%);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 210, 240, 0.055),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.36);
     pointer-events: none;
   }
   /* (One-Rose) The hero slab carries a single decorative texture — the ::before
@@ -816,7 +816,8 @@ const LAYOUT_CSS = `
      * the docstring's "single master strip" — not a third bordered+shadowed slab.
      * De-carded so only the voice slab is a lit surface (impeccable layout). */
     padding: 12px 2px 2px;
-    border-top: 1px solid var(--glass-edge);
+    border-top: 0;
+    box-shadow: inset 0 1px 0 rgba(255, 222, 242, 0.052);
   }
   .vmx-read { display: flex; align-items: baseline; gap: var(--sp-2); min-width: 0; overflow: visible; white-space: nowrap; }
   .vmx-read[data-readout="bpm"] { min-width: 12ch; }
