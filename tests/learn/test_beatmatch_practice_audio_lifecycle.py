@@ -5,10 +5,13 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
+from vibemix.audio.grid import BeatGrid
+from vibemix.audio.miniplayer import DeckState
 from vibemix.learn.curriculum import course_lesson_ids
 from vibemix.learn.progress import LearnProgress
-from vibemix.learn.runtime import LessonRuntime
+from vibemix.learn.runtime import BeatmatchPracticeSnapshot, LessonRuntime
 from vibemix.learn.state import LearnState
+from vibemix.state.evidence_registry import EvidenceRegistry
 
 
 class _FakePracticePlayer:
@@ -45,6 +48,39 @@ def _runtime_with_recorder(recorder) -> LessonRuntime:
         progress_store=LearnProgress(),
         beatmatch_practice_action_recorder=recorder,
     )
+
+
+def _drifting_sandbox_snapshot(
+    phase_error_beats: float = -0.08,
+) -> BeatmatchPracticeSnapshot:
+    grid = BeatGrid(anchor_frame=0.0, bpm=128.0, sample_rate=44_100)
+    return BeatmatchPracticeSnapshot(
+        grid_a=grid,
+        grid_b=grid,
+        deck_state=DeckState(
+            a_frame=0.0,
+            b_frame=grid.beat_len_frames * phase_error_beats,
+            rate_a=1.0,
+            rate_b=1.0,
+            xfader=0.5,
+        ),
+    )
+
+
+def _live_grade_payloads(ipc: MagicMock) -> list[dict]:
+    return [
+        call.args[0]["payload"]
+        for call in ipc.emit.call_args_list
+        if call.args and call.args[0].get("type") == "ipc.learn.live_grade"
+    ]
+
+
+def _tutor_speak_payloads(ipc: MagicMock) -> list[dict]:
+    return [
+        call.args[0]["payload"]
+        for call in ipc.emit.call_args_list
+        if call.args and call.args[0].get("type") == "ipc.learn.tutor_speak"
+    ]
 
 
 def _load_begin(
@@ -286,6 +322,95 @@ def test_free_practice_ack_records_practice_receipt_without_completion(
     mission = progress_snapshots[-1]["payload"]["progress"]["next_practice_mission"]
     assert mission["lesson_id"] == "L1.03"
     assert mission["mode"] == "finish"
+
+
+def test_free_practice_ack_emits_non_credit_live_grade(monkeypatch) -> None:
+    saved: list[LearnProgress] = []
+    calls: list[tuple[str | None, dict]] = []
+
+    def recorder(lesson_id: str | None, midi: dict) -> bool:
+        calls.append((lesson_id, dict(midi)))
+        return False
+
+    monkeypatch.setattr("vibemix.learn.progress.save_progress", saved.append)
+    progress = LearnProgress()
+    registry = EvidenceRegistry()
+    ipc = MagicMock(name="ipc_router")
+    runtime = LessonRuntime(
+        learn_state=LearnState(),
+        midi_mirror=MagicMock(name="midi_mirror"),
+        controller_state=MagicMock(name="controller_state"),
+        ipc_router=ipc,
+        progress_store=progress,
+        evidence_registry=registry,
+        evidence_clock=lambda: 21.0,
+        beatmatch_practice_action_recorder=recorder,
+        beatmatch_practice_sandbox_loader=_drifting_sandbox_snapshot,
+        waveform_payload_loader=lambda: {"sample_rate": 44_100, "decks": {}},
+    )
+    player = _FakePracticePlayer()
+    runtime.set_beatmatch_practice_player(player)
+
+    runtime.handle_practice_audio_ack(
+        {
+            "type": "cc",
+            "control": "tempo",
+            "deck": "B",
+            "value": 60,
+            "prev_value": 64,
+            "source": "click",
+        }
+    )
+
+    assert player.starts == 1
+    assert runtime.current_state.id == "idle"
+    assert calls[-1][0] is None
+    live_grade = _live_grade_payloads(ipc)[-1]
+    assert live_grade["verdict"] == "drifting"
+    assert live_grade["citation"] is None
+    tutor = _tutor_speak_payloads(ipc)[-1]
+    assert tutor["text"].startswith("close, you're sliding behind")
+    assert tutor["citations"] == []
+    assert "ev" not in registry.snapshot()
+    assert progress.skills.get("beatmatching", {}).get("live_proof_count", 0) == 0
+    assert len(saved) == 1
+
+
+def test_free_practice_live_grade_tick_keeps_meter_moving() -> None:
+    snapshots = [
+        _drifting_sandbox_snapshot(-0.04),
+        _drifting_sandbox_snapshot(-0.09),
+    ]
+    ipc = MagicMock(name="ipc_router")
+    runtime = LessonRuntime(
+        learn_state=LearnState(),
+        midi_mirror=MagicMock(name="midi_mirror"),
+        controller_state=MagicMock(name="controller_state"),
+        ipc_router=ipc,
+        progress_store=LearnProgress(),
+        beatmatch_practice_action_recorder=lambda _lesson_id, _midi: False,
+        beatmatch_practice_sandbox_loader=lambda: snapshots.pop(0) if snapshots else None,
+        waveform_payload_loader=lambda: {"sample_rate": 44_100, "decks": {}},
+    )
+    runtime.set_beatmatch_practice_player(_FakePracticePlayer())
+
+    runtime.handle_practice_audio_ack(
+        {
+            "type": "cc",
+            "control": "tempo",
+            "deck": "B",
+            "value": 60,
+            "prev_value": 64,
+            "source": "click",
+        }
+    )
+    runtime._emit_live_beatmatch_grade_tick()
+
+    grades = _live_grade_payloads(ipc)
+    assert len(grades) == 2
+    assert grades[0]["verdict"] == "drifting"
+    assert grades[1]["verdict"] == "drifting"
+    assert grades[1]["phase_error_beats"] > grades[0]["phase_error_beats"]
 
 
 def test_free_practice_receipt_dedupes_repeated_drag_frames(monkeypatch) -> None:

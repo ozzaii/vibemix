@@ -64,6 +64,8 @@ def test_beatmatch_practice_audio_uses_shared_learn_output_device() -> None:
     assert "from vibemix.learn.two_deck_player import TwoDeckPlayer" in src
     assert "beatmatch_practice_player = TwoDeckPlayer(" in src
     assert "beatmatch_practice_driver.deck" in src
+    assert "beatmatch_practice_sandbox_loader=(" in src
+    assert "beatmatch_practice_driver.sandbox_snapshot" in src
     assert "lesson_runtime.set_beatmatch_practice_player(beatmatch_practice_player)" in src
     assert "lesson_runtime.set_beatmatch_practice_player(None)" in src
 

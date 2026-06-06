@@ -119,9 +119,17 @@ def test_mixer_actions_route_to_owned_deck_without_arming_grade() -> None:
 def test_sandbox_actions_move_owned_deck_without_arming_grade() -> None:
     driver = BeatmatchPracticeDriver()
 
+    assert driver.sandbox_snapshot() is None
     assert driver.record_action(None, {"control": "tempo", "deck": "B", "value": 64}) is False
     tempo_state = driver.deck.state()
     assert tempo_state.rate_b == 1.0
+    sandbox = driver.sandbox_snapshot()
+    assert sandbox is not None
+    assert grade_owned_beatmatch_state(
+        sandbox.grid_a,
+        sandbox.grid_b,
+        sandbox.deck_state,
+    ).verdict == "locked"
 
     assert (
         driver.record_action(
@@ -149,6 +157,9 @@ def test_sandbox_actions_move_owned_deck_without_arming_grade() -> None:
     )
     assert driver.deck.state().b_frame > before
     assert driver.snapshot() is None
+
+    assert driver.record_action("L1.03", {"control": "tempo", "deck": "B", "value": 64}) is False
+    assert driver.sandbox_snapshot() is None
 
 
 def test_ear_practice_large_pitch_move_does_not_credit_as_locked() -> None:

@@ -2486,6 +2486,11 @@ async def main() -> None:
             if beatmatch_practice_driver is not None
             else None
         ),
+        beatmatch_practice_sandbox_loader=(
+            beatmatch_practice_driver.sandbox_snapshot
+            if beatmatch_practice_driver is not None
+            else None
+        ),
         beatmatch_practice_action_recorder=(
             beatmatch_practice_driver.record_action
             if beatmatch_practice_driver is not None
@@ -2743,6 +2748,10 @@ async def main() -> None:
         await stop_event.wait()
     finally:
         await _stop_live_session()
+        try:
+            lesson_runtime.set_beatmatch_practice_player(None)
+        except Exception as exc:
+            print(f"[learn practice player close err] {exc}", file=sys.stderr)
         for task in (ws_task, parent_watch_task, lesson_tick_task, lesson_live_grade_task):
             task.cancel()
             try:

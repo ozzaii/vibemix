@@ -258,6 +258,7 @@ class BeatmatchPracticeDriver:
             sample_rate=_SAMPLE_RATE,
         )
         self._armed = False
+        self._sandbox_active = False
 
     @property
     def deck(self) -> MiniDeck:
@@ -278,6 +279,9 @@ class BeatmatchPracticeDriver:
         never arms a graded snapshot.
         """
 
+        sandbox = lesson_id is None
+        if not sandbox:
+            self._sandbox_active = False
         deck = _deck_from_midi(midi).upper()
         control = _control_from_midi(midi)
         value = midi.get("value")
@@ -287,6 +291,8 @@ class BeatmatchPracticeDriver:
             except (TypeError, ValueError):
                 cc = _CENTER_CC
             self._deck.xfader = min(1.0, max(0.0, cc / 127.0))
+            if sandbox:
+                self._sandbox_active = True
             return False
         if control in _MIXER_CONTROLS and deck in {"A", "B"}:
             if control == "vol":
@@ -301,9 +307,11 @@ class BeatmatchPracticeDriver:
                     mid=value if band == "mid" else None,
                     high=value if band == "hi" else None,
                 )
+            if sandbox:
+                self._sandbox_active = True
             return False
 
-        if lesson_id is None:
+        if sandbox:
             self._record_sandbox_action(control=control, deck=deck, midi=midi)
             return False
 
@@ -349,6 +357,7 @@ class BeatmatchPracticeDriver:
                 self._deck.set_rates(rate_a=rate, smooth=True)
             else:
                 self._deck.set_rates(rate_b=rate, smooth=True)
+            self._sandbox_active = True
             return
         if control == "sync":
             state = self._deck.state()
@@ -356,6 +365,7 @@ class BeatmatchPracticeDriver:
                 self._deck.set_rates(rate_a=state.rate_b, smooth=False)
             else:
                 self._deck.set_rates(rate_b=state.rate_a, smooth=False)
+            self._sandbox_active = True
             return
         if control in {"jog", "jog_touch", "jog_touched"}:
             direction = str(midi.get("direction", "") or "")
@@ -368,6 +378,7 @@ class BeatmatchPracticeDriver:
                 deck,
                 _beat_frames() * _SANDBOX_JOG_BEATS * (delta / 64.0),
             )
+            self._sandbox_active = True
 
     def _arm_recovery_drill(self, midi: dict[str, Any]) -> None:
         """Introduce one authored L3.05 train-wreck state on the owned deck."""
@@ -386,6 +397,16 @@ class BeatmatchPracticeDriver:
 
         if not self._armed:
             return None
+        return self._snapshot()
+
+    def sandbox_snapshot(self) -> BeatmatchPracticeSnapshot | None:
+        """Return the current free-practice state without arming lesson credit."""
+
+        if not self._sandbox_active:
+            return None
+        return self._snapshot()
+
+    def _snapshot(self) -> BeatmatchPracticeSnapshot:
         return BeatmatchPracticeSnapshot(
             grid_a=self._grid_a,
             grid_b=self._grid_b,

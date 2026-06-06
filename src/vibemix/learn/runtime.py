@@ -625,6 +625,8 @@ class LessonRuntime(StateMachine):
         harmonic_pair_loader: Callable[[], HarmonicPracticePair | None] | None = None,
         graduation_summary_loader: Callable[[Any], GraduationSummary | None] | None = None,
         beatmatch_practice_loader: Callable[[], BeatmatchPracticeSnapshot | None] | None = None,
+        beatmatch_practice_sandbox_loader: Callable[[], BeatmatchPracticeSnapshot | None]
+        | None = None,
         beatmatch_practice_action_recorder: Callable[[str | None, dict[str, Any]], bool | None]
         | None = None,
         waveform_payload_loader: Callable[[], dict[str, Any] | None] | None = None,
@@ -676,6 +678,10 @@ class LessonRuntime(StateMachine):
                 that owned deck through ``learn.practice_loop`` and lets the
                 existing recognizer/progress gate decide whether beatmatching
                 earns a live proof.
+            beatmatch_practice_sandbox_loader: Optional free-practice hook. It
+                returns the same owned-deck shape but is graded as meter/tutor
+                feedback only; it never writes ``BEATMATCH_GRADED`` evidence and
+                never changes progress.
             beatmatch_practice_action_recorder: Optional hook called after a
                 matched Learn action. It lets the live boot driver arm the
                 owned-deck beatmatch snapshot and immediately grade that attempt
@@ -711,6 +717,7 @@ class LessonRuntime(StateMachine):
         self._harmonic_pair_loader = harmonic_pair_loader
         self._graduation_summary_loader = graduation_summary_loader
         self._beatmatch_practice_loader = beatmatch_practice_loader
+        self._beatmatch_practice_sandbox_loader = beatmatch_practice_sandbox_loader
         self._beatmatch_practice_action_recorder = beatmatch_practice_action_recorder
         self._waveform_payload_loader = waveform_payload_loader
         self._playhead_payload_loader = playhead_payload_loader
@@ -1188,6 +1195,8 @@ class LessonRuntime(StateMachine):
         if self._learn.current_lesson_id is None:
             self._start_practice_sandbox_player()
             self._apply_beatmatch_practice_action(midi)
+            if self._beatmatch_practice_player_active:
+                self._emit_live_beatmatch_grade(self._grade_beatmatch_sandbox_tick())
             self._record_free_practice_receipt(midi)
             return
         if not self._is_beatmatch_practice_audio_lesson():
@@ -2762,6 +2771,35 @@ class LessonRuntime(StateMachine):
         )
         return result
 
+    def _grade_beatmatch_sandbox_tick(self) -> BeatmatchPracticeResult | None:
+        """Grade free practice for feedback only, never evidence or progress."""
+
+        if self._beatmatch_practice_sandbox_loader is None:
+            return None
+        try:
+            snapshot = self._beatmatch_practice_sandbox_loader()
+        except Exception as exc:  # pragma: no cover - defensive
+            import sys
+
+            print(
+                f"[learn.runtime] beatmatch sandbox loader failed: {exc!r}",
+                file=sys.stderr,
+            )
+            return None
+        if snapshot is None:
+            return None
+        grade = grade_owned_beatmatch_state(
+            snapshot.grid_a,
+            snapshot.grid_b,
+            snapshot.deck_state,
+        )
+        return BeatmatchPracticeResult(
+            grade=grade,
+            event=None,
+            credited=(),
+            t_session=self._evidence_time(),
+        )
+
     def _emit_live_beatmatch_grade(self, result: BeatmatchPracticeResult | None) -> None:
         """Voice the owned-deck beatmatch grade through the tutor speak channel.
 
@@ -2861,15 +2899,24 @@ class LessonRuntime(StateMachine):
 
     def _emit_live_beatmatch_grade_tick(self) -> None:
         """Emit the Learn-owned beatmatch HUD tick only while the lesson is active."""
-        if (
-            not self._is_beatmatch_practice_audio_lesson()
-            or self.current_state.id not in _BEATMATCH_PRACTICE_GRADE_STATES
-        ):
-            self._beatmatch_practice_lock_active = False
-            self._last_beatmatch_live_grade_verdict = None
-            self._last_beatmatch_live_grade_signature = None
+        lesson_playing = (
+            self._is_beatmatch_practice_audio_lesson()
+            and self.current_state.id in _BEATMATCH_PRACTICE_GRADE_STATES
+        )
+        sandbox_playing = (
+            self._learn.current_lesson_id is None
+            and self._beatmatch_practice_player_active
+        )
+        if lesson_playing:
+            self._emit_live_beatmatch_grade(self._grade_beatmatch_practice_tick())
             return
-        self._emit_live_beatmatch_grade(self._grade_beatmatch_practice_tick())
+        if sandbox_playing:
+            self._beatmatch_practice_lock_active = False
+            self._emit_live_beatmatch_grade(self._grade_beatmatch_sandbox_tick())
+            return
+        self._beatmatch_practice_lock_active = False
+        self._last_beatmatch_live_grade_verdict = None
+        self._last_beatmatch_live_grade_signature = None
 
     def _emit_live_cue_placement_grade(
         self, result: CuePlacementPracticeResult | None
