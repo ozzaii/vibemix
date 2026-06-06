@@ -1950,7 +1950,7 @@ async def main() -> None:
         run_stop_event: asyncio.Event,
         started_event: asyncio.Event,
     ) -> None:
-        nonlocal live_session_active, live_voice_muted, live_voice_tts
+        nonlocal live_session_active, live_voice_muted, live_voice_tts, suggestion_service
         session = None
         tts_inst = None
         agent = None
@@ -2068,9 +2068,32 @@ async def main() -> None:
                     print(f"-> library registration skipped: {exc!r}", file=sys.stderr)
             if deck_library is not None:
                 try:
-                    from vibemix.library import Grounding, build_embedder, open_store
+                    from vibemix.library import open_store
 
                     grounding_store = open_store()
+                except Exception as exc:
+                    grounding_store = None
+                    print(f"-> library vector store skipped: {exc!r}", file=sys.stderr)
+            if deck_library is not None and grounding_store is not None:
+                try:
+                    from vibemix.runtime.suggestion import SuggestionService
+
+                    suggestion_service = SuggestionService(
+                        grounding_store,
+                        deck_library,
+                        feedback_sink=_live_next_feedback_sink,
+                        session_id=recorder.session_dir.name,
+                        taste_scores=_load_live_taste_scores(),
+                        prepared_pool_loader=_load_latest_prepared_pool,
+                    )
+                    print("-> next suggestion: grounded service armed")
+                except Exception as exc:
+                    suggestion_service = None
+                    print(f"-> next suggestion skipped: {exc!r}", file=sys.stderr)
+            if deck_library is not None and grounding_store is not None:
+                try:
+                    from vibemix.library import Grounding, build_embedder
+
                     grounding = Grounding(
                         build_embedder(),
                         grounding_store,
@@ -2079,12 +2102,6 @@ async def main() -> None:
                     print("-> grounding: CLAP self-match armed")
                 except Exception as exc:
                     grounding = None
-                    if grounding_store is not None:
-                        try:
-                            grounding_store.close()
-                        except Exception:
-                            pass
-                        grounding_store = None
                     print(f"-> grounding skipped: {exc!r}", file=sys.stderr)
 
             if recall_enabled:
@@ -2288,7 +2305,7 @@ async def main() -> None:
                     playback=playback,
                     ipc_bus=ipc_router,
                     citation_telemetry=_citation_telemetry if anti_slop_enabled else None,
-                    suggestion_service=None,
+                    suggestion_service=suggestion_service,
                     tracer=tracer,
                     audio_capture_context=audio_capture_context,
                     evidence_registry=evidence_registry,
@@ -2379,6 +2396,7 @@ async def main() -> None:
         finally:
             live_session_active = False
             live_voice_muted = learn_voice_stream is None
+            suggestion_service = None
             if midi_stop is not None:
                 midi_stop.set()
             if midi_watcher_stop is not None:
@@ -2545,7 +2563,7 @@ async def main() -> None:
             stop_event,
             transcript_buf=transcript_buf,
             controller_state=midi_macos.controller_state,
-            suggestion_holder=suggestion_service,
+            suggestion_holder=lambda: suggestion_service,
             tracer=tracer,
             ipc_router=ipc_router,
             screen_available=screen_available,

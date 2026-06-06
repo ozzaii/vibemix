@@ -155,6 +155,20 @@ def _safe_print(*args: object, **kwargs: object) -> None:
         pass
 
 
+def _resolve_suggestion_holder(holder: Any | None) -> Any | None:
+    """Resolve a start-gated suggestion holder at the ws edge."""
+    if holder is None:
+        return None
+    holder_methods = ("current", "current_for_state", "choose_alternative", "record_feedback")
+    if callable(holder) and not any(hasattr(holder, name) for name in holder_methods):
+        try:
+            return holder()
+        except Exception as exc:
+            _safe_print(f"[ws] suggestion holder resolve failed: {exc}", file=sys.stderr)
+            return None
+    return holder
+
+
 def _probe_screen_status(screen_available: bool | None = None) -> str:
     """Return "ok"/"denied"/"unavailable" for live screen capture status.
 
@@ -1109,11 +1123,10 @@ async def ws_broadcast(
                     _tr("manual_trigger")
                     manual_trigger.set()
                 elif data.get("action") == "next_suggestion.choose":
-                    if suggestion_holder is not None and hasattr(
-                        suggestion_holder, "choose_alternative"
-                    ):
+                    holder = _resolve_suggestion_holder(suggestion_holder)
+                    if holder is not None and hasattr(holder, "choose_alternative"):
                         try:
-                            choice = suggestion_holder.choose_alternative(
+                            choice = holder.choose_alternative(
                                 candidate_id=data.get("candidate_id"),
                                 track_id=data.get("track_id"),
                                 state=state,
@@ -1128,11 +1141,10 @@ async def ws_broadcast(
                             ok=choice is not None,
                         )
                 elif data.get("action") == "next_suggestion.feedback":
-                    if suggestion_holder is not None and hasattr(
-                        suggestion_holder, "record_feedback"
-                    ):
+                    holder = _resolve_suggestion_holder(suggestion_holder)
+                    if holder is not None and hasattr(holder, "record_feedback"):
                         try:
-                            event = suggestion_holder.record_feedback(
+                            event = holder.record_feedback(
                                 data.get("feedback"),
                                 state=state,
                             )
@@ -1350,14 +1362,13 @@ async def ws_broadcast(
                 # Phase (PILL next-suggestion) — additive, read-only. The pill
                 # holds the last rendered value when this periodic proof field
                 # is omitted between rich frames.
-                if suggestion_holder is not None:
+                holder = _resolve_suggestion_holder(suggestion_holder)
+                if holder is not None:
                     try:
-                        if hasattr(suggestion_holder, "current_for_state"):
-                            mascot_frame["next_suggestion"] = suggestion_holder.current_for_state(
-                                state
-                            )
+                        if hasattr(holder, "current_for_state"):
+                            mascot_frame["next_suggestion"] = holder.current_for_state(state)
                         else:
-                            mascot_frame["next_suggestion"] = suggestion_holder.current()
+                            mascot_frame["next_suggestion"] = holder.current()
                     except Exception as e:
                         _safe_print(f"[ws] suggestion read failed: {e}", file=sys.stderr)
             # Emit-boundary guard (BRINGUP-04): never serialize an empty or
