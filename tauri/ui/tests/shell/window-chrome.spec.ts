@@ -33,4 +33,17 @@ describe("main window chrome", () => {
     expect(shell).toContain("width: 72px");
     expect(tokens).toContain("overlay titlebar");
   });
+
+  it("spends native material and demotes sidebar accelerator digits at rest", () => {
+    const shell = readUi("src/shell/shell.css");
+    const chromeBlock = shell.match(/\.shell-chrome \{[\s\S]*?\n\}/)?.[0] ?? "";
+    const sidebarBlock = shell.match(/\.shell-sidebar \{[\s\S]*?\n\}/)?.[0] ?? "";
+    expect(shell).toContain("-webkit-backdrop-filter: blur(24px) saturate(1.16)");
+    expect(shell).toContain("box-shadow:\n    var(--bevel-raised)");
+    expect(sidebarBlock).not.toContain("border-right: 1px solid var(--border-default)");
+    expect(chromeBlock).not.toContain("border-bottom: 1px solid var(--border-subtle)");
+    expect(shell).toContain(".sb-nav-item .sb-kbd::before");
+    expect(shell).toContain(".sb-nav-item:hover .sb-kbd");
+    expect(shell).toContain(".sb-nav-item:focus-visible .sb-kbd");
+  });
 });
