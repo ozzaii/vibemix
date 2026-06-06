@@ -463,17 +463,24 @@ const LAYOUT_CSS = `
     text-align: left;
     animation: vmxArmedIn 520ms var(--ease-brand);
   }
+  /* The idle stage is a powered deck warming up, not dead black. A low rose
+   * dawn rises from beneath the stage (toward the Start action) and breathes
+   * slowly — at armed-idle the voice + tail cursor are hidden, so this ambient
+   * is the screen's single sign-of-life (One-Rose holds). Subliminal: a wash,
+   * never nameable as "pink". This is the difference between premium-restraint
+   * and cheap-empty. */
   .vmx-armed__field {
     position: absolute;
     inset: -10% -8% -16%;
     z-index: -1;
     pointer-events: none;
     background:
-      linear-gradient(112deg, transparent 0%, var(--brand-04) 28%, transparent 52%),
-      radial-gradient(112% 78% at 18% 82%, var(--brand-12), transparent 62%),
-      repeating-linear-gradient(90deg, transparent 0 72px, rgba(255, 222, 242, 0.026) 72px 73px);
+      radial-gradient(135% 92% at 50% 116%, var(--brand-16), var(--brand-04) 38%, transparent 66%),
+      linear-gradient(112deg, transparent 0%, var(--brand-04) 30%, transparent 56%),
+      radial-gradient(80% 60% at 82% 8%, rgba(255, 222, 242, 0.03), transparent 58%),
+      repeating-linear-gradient(90deg, transparent 0 78px, rgba(255, 222, 242, 0.022) 78px 79px);
     filter: blur(0.2px);
-    opacity: 0.72;
+    opacity: 0.86;
     transform: translate3d(0, 0, 0);
     animation: vmxArmedField 8600ms var(--ease-brand) infinite alternate;
   }
