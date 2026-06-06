@@ -6,8 +6,8 @@ the native ``codex exec`` runtime is the bounded reasoning harness; this STDIO
 MCP server exposes the grounded tool core, backed by the shared
 :class:`~vibemix.library.toolset.LibraryToolset`. The core discovery/write
 tools are ``search_vibe`` / ``discover_pool`` / ``create_playlist`` /
-``export_set``; additional tools add batch inspection, energy, sequencing, web, quote,
-knowledge, and cue-export capabilities. Codex plans the curation and calls
+``ingest_source`` / ``export_set``; additional tools add batch inspection,
+energy, sequencing, web, quote, knowledge, and cue-export capabilities. Codex plans the curation and calls
 these tools; the seen-set grounding gate (Cardinal Invariant #2) and the
 write/export re-validation are enforced here at the tool boundary — NOT in the
 prompt — so the model can never smuggle in an invented track regardless of what
@@ -364,6 +364,32 @@ def build_server(toolset: Any) -> Any:
         return toolset.sequence_set(
             {"track_ids": track_ids, "curve": curve, "n_slots": n_slots, "novelty": novelty}
         )
+
+    if hasattr(toolset, "ingest_source"):
+
+        @mcp.tool()
+        def ingest_source(
+            source: str = "auto",
+            path: str | None = None,
+            compute_key: bool = True,
+            compute_bpm: bool = True,
+        ) -> dict[str, Any]:
+            """Import a DJ library or music folder into Viber's searchable library.
+
+            source may be "auto", "folder", "rekordbox", "traktor", "serato",
+            "virtualdj", or "engine". Pass path for an explicit collection.xml,
+            collection.nml, Serato database V2, VirtualDJ database.xml,
+            Engine m.db, or a raw music folder. The ingest is local/keyless and
+            refreshes the loaded library so later search_vibe/discover_pool
+            calls can use it."""
+            return toolset.ingest_source(
+                {
+                    "source": source,
+                    "path": path,
+                    "compute_key": compute_key,
+                    "compute_bpm": compute_bpm,
+                }
+            )
 
     @mcp.tool()
     def export_set(

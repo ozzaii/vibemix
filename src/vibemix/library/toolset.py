@@ -72,6 +72,9 @@ TOOL_CALL_TIMEOUT_S = 30.0
 # Candidate inspection intentionally batches many deterministic local reads into
 # one MCP round trip, so it needs more room than the tiny one-track tools.
 BATCH_TOOL_CALL_TIMEOUT_S = 120.0
+# Local library ingest can legitimately touch hundreds of files; keep the hard
+# no-hang wall, but give the "get music in" tool more room than search/export.
+INGEST_TOOL_CALL_TIMEOUT_S = 15 * 60.0
 
 # Phase 99 HARDEN-RETRY (Decision 3, locked): after N consecutive empty
 # ``search_vibe`` returns or ``{"error": ...}`` tool responses, the next
@@ -82,6 +85,9 @@ BATCH_TOOL_CALL_TIMEOUT_S = 120.0
 TOOL_STARVATION_THRESHOLD: int = 3
 MAX_INSPECT_CANDIDATES: int = 24
 INSPECT_CANDIDATES_WORKERS: int = 8
+_INGEST_SOURCE_NAMES: frozenset[str] = frozenset(
+    {"auto", "folder", "rekordbox", "traktor", "serato", "virtualdj", "engine"}
+)
 
 FRESHNESS_GUARDED_TOOLS: frozenset[str] = frozenset(
     {
@@ -983,6 +989,90 @@ class LibraryToolset:
             out["deduped_track_ids"] = deduped_track_ids
         return out
 
+    def ingest_source(self, args: dict[str, Any]) -> dict[str, Any]:
+        """Import a local folder or DJ-software catalog into the Viber library.
+
+        This is the "get music in" counterpart to ``export_set``. It uses the
+        same local, keyless ingest engines as the CLI and refreshes this
+        toolset's in-memory library after a successful cache write so later
+        calls in the same Viber run can search the imported tracks.
+        """
+        raw_source = args.get("source", "auto")
+        source_name = _normalize_ingest_source_name(raw_source)
+        if source_name is None:
+            return {
+                "error": (
+                    "ingest_source: 'source' must be one of "
+                    f"{sorted(_INGEST_SOURCE_NAMES)}"
+                )
+            }
+
+        path, path_error = _ingest_path_arg(args.get("path"))
+        if path_error is not None:
+            return {"error": f"ingest_source: {path_error}"}
+        compute_key = bool(args.get("compute_key", True))
+        compute_bpm = bool(args.get("compute_bpm", True))
+
+        try:
+            if source_name == "auto":
+                route = _infer_ingest_route(path)
+            else:
+                route = _ingest_route_for_source(source_name, path)
+            if route is None:
+                return _ingest_missing_source_payload(source_name, path)
+
+            if route["kind"] == "folder":
+                folder = route["path"]
+                from vibemix.library import ingest_folder
+
+                report = ingest_folder(
+                    folder,
+                    self._embedder,
+                    self._store,
+                    persist_library=True,
+                    compute_band_shares=True,
+                    compute_key=compute_key,
+                    compute_bpm=compute_bpm,
+                )
+                refreshed_tracks = self._refresh_library_cache_after_ingest()
+                return _ingest_tool_report(
+                    source="folder",
+                    catalog=str(folder),
+                    report=report,
+                    refreshed_tracks=refreshed_tracks,
+                )
+
+            source = route["source"]
+            if not source.detect():
+                return _ingest_source_not_detected_payload(source_name, source)
+
+            from vibemix.library.ingest import ingest_source as ingest_library_source
+
+            report = ingest_library_source(
+                source,
+                self._embedder,
+                self._store,
+                persist_library=True,
+                compute_key=compute_key,
+                compute_bpm=compute_bpm,
+            )
+            refreshed_tracks = self._refresh_library_cache_after_ingest()
+            return _ingest_tool_report(
+                source=str(getattr(source, "name", source_name)),
+                catalog=str(getattr(source, "resolved_path", "") or ""),
+                report=report,
+                refreshed_tracks=refreshed_tracks,
+            )
+        except Exception as e:
+            logger.warning("[viber] ingest_source failed: %s", e)
+            return {"error": f"ingest_source failed: {type(e).__name__}: {e}"}
+
+    def _refresh_library_cache_after_ingest(self) -> int:
+        refreshed = RekordboxLibrary()
+        if refreshed.try_load_cache():
+            self._library = refreshed
+        return len(getattr(self._library, "tracks", {}) or {})
+
     def export_set(self, args: dict[str, Any]) -> dict[str, Any]:
         """Export an ordered, grounded set to a Rekordbox-importable XML.
 
@@ -1847,6 +1937,7 @@ class LibraryToolset:
             "get_track_energy": self.get_track_energy,
             "discover_pool": self.discover_pool,
             "sequence_set": self.sequence_set,
+            "ingest_source": self.ingest_source,
             "export_set": self.export_set,
             "export_smart_cues": self.export_smart_cues,
             "web_search": self.web_search,
@@ -1863,9 +1954,12 @@ class LibraryToolset:
             self._emit_tool_event(name, freshness_block, args)
             return freshness_block
         # Hard per-tool timeout — a pathological handler can never park the loop.
-        timeout_s = (
-            BATCH_TOOL_CALL_TIMEOUT_S if name == "inspect_candidates" else TOOL_CALL_TIMEOUT_S
-        )
+        if name == "ingest_source":
+            timeout_s = INGEST_TOOL_CALL_TIMEOUT_S
+        elif name == "inspect_candidates":
+            timeout_s = BATCH_TOOL_CALL_TIMEOUT_S
+        else:
+            timeout_s = TOOL_CALL_TIMEOUT_S
         with concurrent.futures.ThreadPoolExecutor(max_workers=1) as ex:
             fut = ex.submit(handler, args)
             try:
@@ -1975,6 +2069,180 @@ class LibraryToolset:
             section.section_id,
             fallback_vector=self._track_vector(section.track_id),
         )
+
+
+def _normalize_ingest_source_name(raw: Any) -> str | None:
+    if raw is None:
+        return "auto"
+    if not isinstance(raw, str):
+        return None
+    value = raw.strip().lower().replace("-", "_").replace(" ", "_")
+    aliases = {
+        "": "auto",
+        "detect": "auto",
+        "dj_library": "auto",
+        "music_folder": "folder",
+        "raw_folder": "folder",
+        "rekordbox_xml": "rekordbox",
+        "collection_xml": "rekordbox",
+        "xml": "rekordbox",
+        "traktor_nml": "traktor",
+        "nml": "traktor",
+        "database_v2": "serato",
+        "serato_database": "serato",
+        "virtual_dj": "virtualdj",
+        "virtualdj_database": "virtualdj",
+        "engine_dj": "engine",
+        "engine_prime": "engine",
+    }
+    value = aliases.get(value, value)
+    return value if value in _INGEST_SOURCE_NAMES else None
+
+
+def _ingest_path_arg(raw: Any) -> tuple[pathlib.Path | None, str | None]:
+    if raw is None:
+        return None, None
+    if not isinstance(raw, str):
+        return None, "'path' must be a string when provided"
+    stripped = raw.strip()
+    if not stripped:
+        return None, None
+    try:
+        return pathlib.Path(stripped).expanduser(), None
+    except (RuntimeError, OSError) as exc:
+        return None, f"could not resolve path: {exc}"
+
+
+def _infer_ingest_route(path: pathlib.Path | None) -> dict[str, Any] | None:
+    if path is not None:
+        catalog = _catalog_source_for_path(path)
+        if catalog is not None:
+            return {"kind": "catalog", "source": catalog}
+        if path.is_dir():
+            return {"kind": "folder", "path": path}
+        return None
+
+    for source_name in ("rekordbox", "serato", "traktor", "virtualdj", "engine"):
+        source = _source_for_name(source_name, None)
+        try:
+            if source.detect():
+                return {"kind": "catalog", "source": source}
+        except Exception:
+            continue
+    return None
+
+
+def _ingest_route_for_source(source_name: str, path: pathlib.Path | None) -> dict[str, Any] | None:
+    if source_name == "folder":
+        if path is not None and path.is_dir():
+            return {"kind": "folder", "path": path}
+        return None
+    return {"kind": "catalog", "source": _source_for_name(source_name, path)}
+
+
+def _source_for_name(source_name: str, path: pathlib.Path | None) -> Any:
+    path_str = str(path) if path is not None else None
+    if source_name == "traktor":
+        from vibemix.library.sources.traktor import TraktorSource
+
+        return TraktorSource(nml_path=path_str) if path_str else TraktorSource()
+    if source_name == "virtualdj":
+        from vibemix.library.sources.virtualdj import VirtualDJSource
+
+        return VirtualDJSource(database_path=path_str) if path_str else VirtualDJSource()
+    if source_name == "engine":
+        from vibemix.library.sources.engine import EngineDJSource
+
+        return EngineDJSource(database_path=path_str) if path_str else EngineDJSource()
+    if source_name == "serato":
+        from vibemix.library.sources.serato import SeratoSource
+
+        return SeratoSource(library_path=path_str) if path_str else SeratoSource()
+
+    from vibemix.library.sources.rekordbox import RekordboxSource
+
+    return RekordboxSource(xml_path=path_str) if path_str else RekordboxSource()
+
+
+def _catalog_source_for_path(path: pathlib.Path) -> Any | None:
+    if path.is_dir() and (path / "database V2").is_file():
+        return _source_for_name("serato", path)
+
+    lower_name = path.name.lower()
+    suffix = path.suffix.lower()
+    if suffix == ".nml":
+        return _source_for_name("traktor", path)
+    if lower_name == "database.xml":
+        return _source_for_name("virtualdj", path)
+    if lower_name == "m.db" or suffix == ".db":
+        return _source_for_name("engine", path)
+    if lower_name == "database v2":
+        return _source_for_name("serato", path)
+    if suffix == ".xml":
+        return _source_for_name("rekordbox", path)
+    return None
+
+
+def _ingest_missing_source_payload(source_name: str, path: pathlib.Path | None) -> dict[str, Any]:
+    if source_name == "folder":
+        return {"error": "ingest_source: source='folder' requires an existing directory path"}
+    if path is None:
+        return {
+            "error": (
+                "ingest_source: no supported DJ library detected. Pass "
+                "source='rekordbox', 'serato', 'traktor', 'virtualdj', 'engine', "
+                "or 'folder' with a local path."
+            )
+        }
+    return {
+        "error": (
+            "ingest_source: could not infer a supported catalog source from "
+            f"{str(path)!r}"
+        )
+    }
+
+
+def _ingest_source_not_detected_payload(source_name: str, source: Any) -> dict[str, Any]:
+    try:
+        probed = [str(path) for path in source.default_paths()]
+    except Exception:
+        probed = []
+    return {
+        "error": (
+            f"ingest_source: no {source_name} catalog detected"
+            + (f"; probed={probed}" if probed else "")
+        )
+    }
+
+
+def _ingest_tool_report(
+    *,
+    source: str,
+    catalog: str,
+    report: Any,
+    refreshed_tracks: int,
+) -> dict[str, Any]:
+    as_dict = getattr(report, "as_dict", None)
+    if callable(as_dict):
+        report_dict = as_dict()
+    else:
+        report_dict = {
+            "total": int(getattr(report, "total", 0)),
+            "embedded": int(getattr(report, "embedded", 0)),
+            "skipped_cached": int(getattr(report, "skipped_cached", 0)),
+            "failed": int(getattr(report, "failed", 0)),
+        }
+    return {
+        "ingested": True,
+        "source": source,
+        "catalog": catalog,
+        "total": int(report_dict.get("total", 0)),
+        "embedded": int(report_dict.get("embedded", 0)),
+        "skipped_cached": int(report_dict.get("skipped_cached", 0)),
+        "failed": int(report_dict.get("failed", 0)),
+        "library_tracks": refreshed_tracks,
+        "report": report_dict,
+    }
 
 
 def _export_cues_and_grid(entry: Any) -> dict[str, Any]:

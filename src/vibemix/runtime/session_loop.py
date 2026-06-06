@@ -873,6 +873,10 @@ class SessionLoop:
             from vibemix.library.sources.engine import EngineDJSource
 
             return EngineDJSource(database_path=str(source_path))
+        if source_path.name == "database V2":
+            from vibemix.library.sources.serato import SeratoSource
+
+            return SeratoSource(library_path=str(source_path))
         return None
 
     async def _start_catalog_source_import(self, source) -> None:
