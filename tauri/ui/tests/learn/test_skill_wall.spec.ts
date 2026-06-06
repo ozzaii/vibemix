@@ -86,6 +86,21 @@ describe("renderSkillWall — the Earned Wall", () => {
     expect(el.querySelector(".skill-wall__empty")).not.toBeNull();
   });
 
+  it("collapses an all-locked zero-fill snapshot into the same quiet empty state", () => {
+    const el = renderSkillWall([
+      row({ skill_id: "deck_control" }),
+      row({ skill_id: "beatmatching" }),
+      row({ skill_id: "eq_mixing" }),
+      row({ skill_id: "harmonic_mixing" }),
+      row({ skill_id: "transitions" }),
+      row({ skill_id: "phrasing_performance" }),
+    ]);
+    expect(el.querySelectorAll(".skill-wall__row").length).toBe(0);
+    expect(el.querySelector(".skill-wall__empty")?.textContent).toContain(
+      "Nothing earned yet",
+    );
+  });
+
   it("paints the SURF-01 what_remains line on an unfinished skill, none on Mastered", () => {
     const rows = renderSkillWall(SIX).querySelectorAll<HTMLElement>(".skill-wall__row");
     expect(rows[1]!.querySelector(".skill-wall__remains")?.textContent).toBe(

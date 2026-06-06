@@ -249,6 +249,53 @@ describe("practice booth shell", () => {
     }
   });
 
+  it("does not cover fresh lessons with six all-locked skill tiles", () => {
+    const root = document.getElementById("learn-root") as HTMLElement;
+    const { ws } = mountLearnWindow(root);
+    try {
+      const lockedSkill = (skill_id: string) => ({
+        skill_id,
+        stage: "locked" as const,
+        learn_fill: 0,
+        competent: false,
+        live_proof_count: 0,
+        mastered: false,
+        first_mastered_at: null,
+        what_remains: "Finish the lessons to reach Competent",
+      });
+
+      window.dispatchEvent(
+        new CustomEvent("ipc.learn.progress_state", {
+          detail: {
+            action: "snapshot",
+            progress: {
+              schema_version: 2,
+              courses: {},
+              lessons: {},
+              skill_wall: [
+                lockedSkill("deck_control"),
+                lockedSkill("beatmatching"),
+                lockedSkill("eq_mixing"),
+                lockedSkill("harmonic_mixing"),
+                lockedSkill("transitions"),
+                lockedSkill("phrasing_performance"),
+              ],
+            },
+          },
+        }),
+      );
+
+      const earned = root.querySelector<HTMLElement>("#learn-earned-wall-host")!;
+      expect(earned.querySelectorAll(".skill-wall__row").length).toBe(0);
+      expect(earned.querySelector(".skill-wall__empty")?.textContent).toContain(
+        "Nothing earned yet",
+      );
+      expect(earned.textContent).not.toContain("Locked");
+    } finally {
+      ws.close();
+    }
+  });
+
   it("surfaces tutor voice status without waiting for a MIDI status change", () => {
     const root = document.getElementById("learn-root") as HTMLElement;
     const { ws } = mountLearnWindow(root);

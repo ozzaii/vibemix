@@ -12479,3 +12479,34 @@ Proof before staging:
 - `npm --prefix tauri/ui run build`
 - `git diff --check -- tauri/ui/src/learn/learn-window.ts tauri/ui/tests/learn/test_practice_booth_shell.spec.ts .planning/handoffs/2026-05-31-package-checklist.md`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+
+## Package 137 - Earned Wall Hides Empty Locked Grid
+
+Suggested commit: `fix(learn-ui): collapse empty locked skill wall`
+
+Include:
+
+- `tauri/ui/src/learn/SkillWall.ts`
+- `tauri/ui/tests/learn/test_skill_wall.spec.ts`
+- `tauri/ui/tests/learn/test_practice_booth_shell.spec.ts`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Skill-tree backend math, mastery gates, live proof rules, and trophy visuals.
+  This package only changes how a zero-progress all-locked snapshot is rendered.
+
+Reason:
+
+- Fresh Learn snapshots can legitimately contain the six known skills, all
+  locked with zero fill. Rendering those as six large locked cards makes the
+  active practice screen look dead before the learner has earned anything.
+  Collapse that exact zero-progress state into the honest empty Earned line,
+  while preserving normal rows once any lesson or live proof has moved.
+
+Proof before staging:
+
+- `npm --prefix tauri/ui test -- tests/learn/test_skill_wall.spec.ts tests/learn/test_practice_booth_shell.spec.ts`
+- `npm --prefix tauri/ui run build`
+- `git diff --check -- tauri/ui/src/learn/SkillWall.ts tauri/ui/tests/learn/test_skill_wall.spec.ts tauri/ui/tests/learn/test_practice_booth_shell.spec.ts .planning/handoffs/2026-05-31-package-checklist.md`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`

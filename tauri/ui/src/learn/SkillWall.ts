@@ -68,6 +68,16 @@ function proofLine(row: SkillWallRow): string {
   return `${demos}${when}`;
 }
 
+function hasEarnedProgress(row: SkillWallRow): boolean {
+  return (
+    row.stage !== "locked" ||
+    row.competent ||
+    row.mastered ||
+    row.learn_fill > 0 ||
+    row.live_proof_count > 0
+  );
+}
+
 function renderRow(row: SkillWallRow): HTMLLIElement {
   const li = document.createElement("li");
   li.className = "skill-wall__row";
@@ -161,11 +171,16 @@ export function renderSkillWall(rows: SkillWallRow[]): HTMLElement {
   sub.textContent = "Competent comes from the lessons. Mastered comes only from a cited live set.";
   head.append(title, sub);
 
-  if (rows.length === 0) {
-    // Honest-null: no snapshot yet (or fresh user). Say so, don't fake a wall.
+  if (rows.length === 0 || !rows.some(hasEarnedProgress)) {
+    // Honest-null: no snapshot yet, or the backend only knows locked zero-fill
+    // rows. Keep the wall present, but don't let a fresh user stare at six dead
+    // tiles while the practice surface is asking for one concrete move.
     const empty = document.createElement("p");
     empty.className = "skill-wall__empty";
-    empty.textContent = "Your skills light up as you learn — and earn their stars in a live set.";
+    empty.textContent =
+      rows.length === 0
+        ? "Your skills light up as you learn — and earn their stars in a live set."
+        : "Nothing earned yet. Finish the current move and this wall starts filling.";
     section.append(head, empty);
     return section;
   }
