@@ -53,6 +53,49 @@ def test_clap_runtime_and_dj_knowledge_probes_are_present() -> None:
     assert "library_setup" in names
 
 
+def test_dj_knowledge_accepts_text_store_dim_when_credentials(monkeypatch) -> None:
+    class FakeStore:
+        dim = 1536
+
+        def __len__(self) -> int:
+            return 7
+
+    monkeypatch.setenv("GEMINI_API_KEY", "AIza-test")
+    monkeypatch.delenv("VIBEMIX_PROXY_JWT", raising=False)
+    monkeypatch.setattr(
+        "vibemix.library.dj_knowledge.KnowledgeStore.load",
+        lambda path: FakeStore(),
+    )
+
+    result = doctor.check_dj_knowledge()
+
+    assert result["name"] == "dj_knowledge"
+    assert result["ok"] is True
+    assert "7 chunks, dim 1536" in result["detail"]
+
+
+def test_dj_knowledge_requires_text_embedder_credentials(monkeypatch) -> None:
+    class FakeStore:
+        dim = 1536
+
+        def __len__(self) -> int:
+            return 7
+
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    monkeypatch.delenv("VIBEMIX_PROXY_JWT", raising=False)
+    monkeypatch.setattr(
+        "vibemix.library.dj_knowledge.KnowledgeStore.load",
+        lambda path: FakeStore(),
+    )
+
+    result = doctor.check_dj_knowledge()
+
+    assert result["name"] == "dj_knowledge"
+    assert result["ok"] is False
+    assert "no text embedder credential" in result["detail"]
+    assert "GEMINI_API_KEY" in result["fix"]
+
+
 def test_library_setup_candidates_surface_first_run_sources(monkeypatch) -> None:
     class FakeLibrary:
         tracks: ClassVar[dict[str, object]] = {}

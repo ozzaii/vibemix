@@ -131,11 +131,13 @@ class LibraryToolset:
         library: RekordboxLibrary,
         *,
         freshness_provider: Callable[[], Any] | None = None,
+        knowledge_embedder: _EmbeddingProvider | None = None,
     ) -> None:
         self._embedder = embedder
         self._store = store
         self._library = library
         self._freshness_provider = freshness_provider
+        self._knowledge_embedder = knowledge_embedder
         # Lazily-loaded DJ-knowledge RAG store (retrieve_dj_knowledge). Built on
         # first use from disk; honest empty-results when no KB is present.
         self._knowledge_store: Any | None = None
@@ -177,6 +179,39 @@ class LibraryToolset:
         # reuse the built prototype table.
         self._genre_lookup: Any | None = None
         self._genre_lookup_lock = threading.Lock()
+
+    def _resolve_knowledge_embedder(self, store: Any) -> tuple[Any | None, str | None]:
+        """Return the text embedder for DJ-knowledge retrieval.
+
+        The main library embedder is CLAP/512. The bundled DJ-knowledge store is
+        a separate text space, so a non-512 store must get a dedicated text
+        embedder instead of falling through to CLAP and tripping the dim guard.
+        """
+        if self._knowledge_embedder is not None:
+            return self._knowledge_embedder, None
+
+        store_dim = getattr(store, "dim", None)
+        if store_dim is None:
+            return self._embedder, None
+
+        try:
+            from vibemix.library._cosine import EMBEDDING_DIM
+        except Exception:
+            EMBEDDING_DIM = 512
+
+        if int(store_dim) == int(EMBEDDING_DIM):
+            return self._embedder, None
+
+        from vibemix.library.dj_knowledge import build_default_knowledge_embedder
+
+        embedder, error = build_default_knowledge_embedder(output_dimensionality=int(store_dim))
+        if embedder is not None:
+            self._knowledge_embedder = embedder
+            return embedder, None
+        return None, (
+            f"retrieve_dj_knowledge: knowledge store is dim {int(store_dim)} but no "
+            f"matching text embedder is available: {error}"
+        )
 
     def _freshness_payload(self) -> dict[str, Any]:
         """Return a dict freshness snapshot from the optional product provider."""
@@ -1291,10 +1326,13 @@ class LibraryToolset:
         if self._knowledge_store is None:
             self._knowledge_store = KnowledgeStore.load(DEFAULT_KNOWLEDGE_DIR / "dj_knowledge")
         k = args.get("k", 4)
+        embedder, embedder_error = self._resolve_knowledge_embedder(self._knowledge_store)
+        if embedder_error:
+            return {"error": embedder_error, "results": []}
         return _retrieve(
             self._knowledge_store,
             query,
-            embedder=self._embedder,
+            embedder=embedder,
             topic=args.get("topic"),
             skill_level=args.get("skill_level"),
             k=k if isinstance(k, int) else 4,

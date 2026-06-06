@@ -15,11 +15,13 @@ import sys
 from types import ModuleType, SimpleNamespace
 from unittest.mock import MagicMock
 
+import numpy as np
 import pytest
 
 from vibemix.intel.transition_scorer import SectionRecord
 from vibemix.library import toolset as tool_mod
 from vibemix.library.create_playlist import create_playlist
+from vibemix.library.dj_knowledge import KnowledgeChunk, KnowledgeStore
 from vibemix.library.rekordbox import CuePoint, RekordboxLibrary, TrackEntry
 from vibemix.library.toolset import LibraryToolset, _export_cues_and_grid
 
@@ -188,6 +190,47 @@ def _issue_smart_cue_proposal(toolset, monkeypatch):
     return out["proposals"][0]
 
 
+class _KnowledgeTextEmbedder:
+    def __init__(self) -> None:
+        self.calls: list[str] = []
+
+    def embed_text(self, text: str) -> np.ndarray:
+        self.calls.append(text)
+        vec = np.zeros(4, dtype=np.float32)
+        words = text.lower().split()
+        vec[0] = float(words.count("eq"))
+        vec[1] = float(words.count("bass"))
+        vec[2] = float(words.count("phrase"))
+        vec[3] = 1.0
+        return vec
+
+
+class _WrongSpaceMusicEmbedder:
+    def __init__(self) -> None:
+        self.calls: list[str] = []
+
+    def embed_query(self, text: str) -> np.ndarray:
+        self.calls.append(text)
+        return np.ones(2, dtype=np.float32)
+
+
+def _knowledge_store(embedder: _KnowledgeTextEmbedder) -> KnowledgeStore:
+    store = KnowledgeStore()
+    store.add(
+        KnowledgeChunk(
+            chunk_id="eq1",
+            text="EQ the bass before the phrase change",
+            source_title="EQ Guide",
+            source_url="https://example.com/eq",
+            topic="eq",
+            skill_level="any",
+        ),
+        embedder.embed_text("EQ the bass before the phrase change"),
+    )
+    embedder.calls.clear()
+    return store
+
+
 @pytest.fixture
 def library() -> RekordboxLibrary:
     lib = RekordboxLibrary()
@@ -218,6 +261,44 @@ def test_search_populates_seen_set(toolset, monkeypatch):
     out = toolset.search_vibe({"query": "hypnotic", "k": 2})
     assert {r["track_id"] for r in out["results"]} == {"t000", "t001"}
     assert toolset.seen == {"t000", "t001"}
+
+
+def test_retrieve_dj_knowledge_uses_dedicated_text_embedder(library):
+    text_embedder = _KnowledgeTextEmbedder()
+    music_embedder = _WrongSpaceMusicEmbedder()
+    ts = LibraryToolset(
+        music_embedder,
+        MagicMock(),
+        library,
+        knowledge_embedder=text_embedder,
+    )
+    ts._knowledge_store = _knowledge_store(text_embedder)
+
+    out = ts.retrieve_dj_knowledge({"query": "EQ bass", "k": 1})
+
+    assert "error" not in out
+    assert out["results"][0]["topic"] == "eq"
+    assert text_embedder.calls == ["EQ bass"]
+    assert music_embedder.calls == []
+
+
+def test_retrieve_dj_knowledge_does_not_fall_back_to_clap_when_text_embedder_missing(
+    library,
+    monkeypatch,
+):
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    monkeypatch.delenv("VIBEMIX_PROXY_JWT", raising=False)
+    text_embedder = _KnowledgeTextEmbedder()
+    music_embedder = _WrongSpaceMusicEmbedder()
+    ts = LibraryToolset(music_embedder, MagicMock(), library)
+    ts._knowledge_store = _knowledge_store(text_embedder)
+
+    out = ts.retrieve_dj_knowledge({"query": "EQ bass", "k": 1})
+
+    assert out["results"] == []
+    assert "matching text embedder" in out["error"]
+    assert "GEMINI_API_KEY" in out["error"]
+    assert music_embedder.calls == []
 
 
 def test_create_rejects_invented_id(toolset, monkeypatch, tmp_path):

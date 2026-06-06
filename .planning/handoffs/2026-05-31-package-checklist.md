@@ -12544,3 +12544,42 @@ Proof before staging:
 - `npm --prefix tauri/ui run build`
 - `git diff --check -- tauri/ui/library.html tauri/ui/src/library/index.ts tauri/ui/src/library/library.css tauri/ui/src/library/chat.test.ts .planning/handoffs/2026-05-31-package-checklist.md`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+
+## Package 139 - Viber DJ Knowledge Uses Text Embeddings
+
+Suggested commit: `fix(library): route dj knowledge through text embedder`
+
+Include:
+
+- `src/vibemix/library/dj_knowledge.py`
+- `src/vibemix/library/toolset.py`
+- `src/vibemix/library/doctor.py`
+- `tests/library/test_toolset.py`
+- `tests/library/test_doctor.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Music-library CLAP search, knowledge corpus rebuilds, proxy registration
+  changes, Viber prompt tuning, and live co-host speech behavior. This package
+  only fixes the knowledge RAG embedder wiring and capability diagnosis.
+
+Reason:
+
+- The bundled DJ-knowledge store is a text-embedding space (`1536` dimensions),
+  but `LibraryToolset.retrieve_dj_knowledge()` queried it with the normal
+  music-library CLAP embedder (`512` dimensions). The retrieval guard correctly
+  failed loud, and `library doctor` then mislabeled the healthy text store as
+  orphaned by comparing it to the CLAP constant. Route DJ-knowledge through a
+  dedicated text embedder sized to the store, keep CLAP for music search, and
+  make doctor report the real requirement: a present store plus text-embedding
+  credentials.
+
+Proof before staging:
+
+- `uv run pytest -q tests/library/test_dj_knowledge.py tests/library/test_toolset.py tests/library/test_doctor.py`
+- `uv run python -m compileall -q src/vibemix/library/dj_knowledge.py src/vibemix/library/toolset.py src/vibemix/library/doctor.py tests/library/test_toolset.py tests/library/test_doctor.py`
+- `uv run python -m vibemix library doctor --json`
+- `uv run python - <<'PY' ... LibraryToolset(...).retrieve_dj_knowledge({"query": "EQ bass while blending", "k": 1}) ... PY`
+- `git diff --check -- src/vibemix/library/dj_knowledge.py src/vibemix/library/toolset.py src/vibemix/library/doctor.py tests/library/test_toolset.py tests/library/test_doctor.py .planning/handoffs/2026-05-31-package-checklist.md`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`

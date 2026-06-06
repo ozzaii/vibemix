@@ -46,6 +46,7 @@ requested level OR "any".
 from __future__ import annotations
 
 import json
+import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -57,6 +58,8 @@ VALID_SKILL_LEVELS = ("beginner", "intermediate", "pro", "any")
 
 # Default on-disk home, sibling to library.db / embeddings.db under the cache.
 DEFAULT_KNOWLEDGE_DIR = Path.home() / ".cache" / "vibemix" / "knowledge"
+DEFAULT_KNOWLEDGE_EMBEDDING_DIM = 1536
+KNOWLEDGE_EMBEDDING_TIMEOUT_MS = 120_000
 
 
 def _l2_normalize(vec: np.ndarray) -> np.ndarray:
@@ -79,6 +82,94 @@ def _embed_with(embedder: Any, text: str) -> np.ndarray:
     if fn is None:
         raise TypeError("embedder must be callable or expose .embed_text/.embed_query")
     return np.asarray(fn(text), dtype=np.float32).reshape(-1)
+
+
+class GeminiKnowledgeTextEmbedder:
+    """Text-only Gemini embedder for the DJ-knowledge store.
+
+    This is intentionally separate from ``LibraryEmbedder`` / ``ClapEmbedder``.
+    Music-library search stays local CLAP/512; DJ technique RAG uses the text
+    store's own dimensionality, which is 1536 for the bundled corpus.
+    """
+
+    def __init__(
+        self,
+        client: Any,
+        *,
+        output_dimensionality: int = DEFAULT_KNOWLEDGE_EMBEDDING_DIM,
+        model: str | None = None,
+    ) -> None:
+        if output_dimensionality <= 0:
+            raise ValueError("output_dimensionality must be positive")
+        self._client = client
+        self.output_dimensionality = int(output_dimensionality)
+        if model is None:
+            from vibemix.llm.model_router import resolve_model
+
+            model = resolve_model("embedding")
+        self._model = model
+
+    def embed_text(self, text: str) -> np.ndarray:
+        from google.genai import types
+
+        result = self._client.models.embed_content(
+            model=self._model,
+            contents=text,
+            config=types.EmbedContentConfig(
+                output_dimensionality=self.output_dimensionality,
+            ),
+        )
+        values = list(result.embeddings[0].values)
+        return np.asarray(values, dtype=np.float32).reshape(-1)
+
+
+def build_default_knowledge_embedder(
+    *,
+    output_dimensionality: int = DEFAULT_KNOWLEDGE_EMBEDDING_DIM,
+) -> tuple[GeminiKnowledgeTextEmbedder | None, str | None]:
+    """Build the default text embedder for DJ-knowledge retrieval.
+
+    Returns ``(embedder, None)`` on success or ``(None, actionable_error)`` on a
+    missing/unbuildable credential path. No network call happens here; the
+    first actual embed still occurs inside ``retrieve_dj_knowledge``.
+    """
+    api_key = os.environ.get("GEMINI_API_KEY")
+    proxy_jwt = os.environ.get("VIBEMIX_PROXY_JWT")
+    proxy_url = os.environ.get("VIBEMIX_PROXY_BASE_URL", "https://api.altidus.world")
+
+    try:
+        if api_key:
+            from google import genai
+            from google.genai import types
+
+            client = genai.Client(
+                api_key=api_key,
+                http_options=types.HttpOptions(timeout=KNOWLEDGE_EMBEDDING_TIMEOUT_MS),
+            )
+            return (
+                GeminiKnowledgeTextEmbedder(
+                    client,
+                    output_dimensionality=output_dimensionality,
+                ),
+                None,
+            )
+        if proxy_jwt:
+            from vibemix.agent.proxy_client import build_proxy_genai_client
+
+            return (
+                GeminiKnowledgeTextEmbedder(
+                    build_proxy_genai_client(proxy_jwt, proxy_url),
+                    output_dimensionality=output_dimensionality,
+                ),
+                None,
+            )
+    except Exception as exc:
+        return None, f"text embedder setup failed: {type(exc).__name__}"
+
+    return (
+        None,
+        "set GEMINI_API_KEY or VIBEMIX_PROXY_JWT so DJ-knowledge can embed text queries",
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -357,9 +448,12 @@ def chunk_text(text: str, *, max_chars: int = 800) -> list[str]:
 
 __all__ = [
     "DEFAULT_KNOWLEDGE_DIR",
+    "DEFAULT_KNOWLEDGE_EMBEDDING_DIM",
     "VALID_SKILL_LEVELS",
+    "GeminiKnowledgeTextEmbedder",
     "KnowledgeChunk",
     "KnowledgeStore",
+    "build_default_knowledge_embedder",
     "chunk_text",
     "retrieve_dj_knowledge",
 ]

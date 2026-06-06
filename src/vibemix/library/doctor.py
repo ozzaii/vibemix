@@ -147,9 +147,7 @@ def check_embeddings_store() -> dict[str, Any]:
 
 
 def check_dj_knowledge() -> dict[str, Any]:
-    """Catch the orphaned-store landmine: the KB embeddings dim must match the
-    embedder the toolset would query with, or retrieval silently returns nothing.
-    """
+    """Report whether the DJ-knowledge text store can be queried."""
     try:
         from vibemix.library.dj_knowledge import DEFAULT_KNOWLEDGE_DIR, KnowledgeStore
 
@@ -159,16 +157,25 @@ def check_dj_knowledge() -> dict[str, Any]:
                 "dj_knowledge", False, "knowledge base empty", "no corpus ingested yet"
             )
         store_dim = store.dim
-        from vibemix.library._cosine import EMBEDDING_DIM
-
-        if store_dim != EMBEDDING_DIM:
+        if store_dim is None or int(store_dim) <= 0:
             return _check(
                 "dj_knowledge",
                 False,
-                f"ORPHANED store: dim {store_dim} != embedder dim {EMBEDDING_DIM}",
-                "rebuild the KB with a text embedder matching the query dim",
+                f"invalid knowledge matrix dim {store_dim}",
+                "rebuild the KB from the DJ-knowledge corpus",
             )
-        return _check("dj_knowledge", True, f"{len(store)} chunks, dim {store_dim}")
+        if not (os.environ.get("GEMINI_API_KEY") or os.environ.get("VIBEMIX_PROXY_JWT")):
+            return _check(
+                "dj_knowledge",
+                False,
+                f"{len(store)} chunks, dim {store_dim}; no text embedder credential",
+                "set GEMINI_API_KEY or VIBEMIX_PROXY_JWT for DJ-knowledge retrieval",
+            )
+        return _check(
+            "dj_knowledge",
+            True,
+            f"{len(store)} chunks, dim {store_dim}; text embedder credential present",
+        )
     except Exception as e:
         return _check("dj_knowledge", False, f"{type(e).__name__}: {e}")
 
