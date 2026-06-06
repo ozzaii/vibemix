@@ -94,7 +94,8 @@ describe("surface-mount layer", () => {
     expect(got.deck).toBe(
       host.querySelector('.surface[data-surface="deck"] .deck-stage'),
     );
-    // Viber, Learn, and Debrief fold into their revealed keep-alive mounts.
+    // Viber, the parked Learn tease, and Debrief fold into their revealed
+    // keep-alive mounts.
     const viberMount = got.viber;
     const learnMount = got.learn;
     const debriefMount = got.debrief;
@@ -104,6 +105,7 @@ describe("surface-mount layer", () => {
     expect(viberMount!.classList.contains("surface-mount")).toBe(true);
     expect(viberMount!.hidden).toBe(false);
     expect(learnMount!.classList.contains("surface-mount")).toBe(true);
+    expect(learnMount!.dataset.wire).toBe("shell.surface.learn");
     expect(learnMount!.hidden).toBe(false);
     expect(debriefMount!.classList.contains("surface-mount")).toBe(true);
     expect(debriefMount!.hidden).toBe(false);

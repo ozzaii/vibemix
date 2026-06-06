@@ -1301,6 +1301,28 @@
   outline: none;
 }
 
+.vmx-drill-learn:disabled,
+.vmx-drill-learn[aria-disabled="true"] {
+  cursor: default;
+  border-color: var(--border-default);
+  background:
+    linear-gradient(180deg, var(--glass-2), transparent 82%),
+    rgba(0, 0, 0, 0.2);
+  color: var(--text-muted);
+  box-shadow: inset 0 1px 0 var(--glass-top);
+}
+
+.vmx-drill-learn:disabled:hover,
+.vmx-drill-learn[aria-disabled="true"]:hover,
+.vmx-drill-learn:disabled:focus-visible,
+.vmx-drill-learn[aria-disabled="true"]:focus-visible {
+  border-color: var(--border-default);
+  background:
+    linear-gradient(180deg, var(--glass-2), transparent 82%),
+    rgba(0, 0, 0, 0.2);
+  color: var(--text-muted);
+}
+
 .vmx-drill-learn-meta {
   min-width: 0;
   overflow: hidden;

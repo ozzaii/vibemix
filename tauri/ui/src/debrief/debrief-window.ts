@@ -5,7 +5,6 @@ import { mountChapterList, type ChapterPayload } from "./components/chapter-list
 import {
   mountDrillsPanel,
   type DrillPayload,
-  type LearnReferralPayload,
   type MomentFeedbackClickEvent,
 } from "./components/drills-panel.js";
 import {
@@ -180,12 +179,6 @@ if (isMockMode) {
     drillsEl.addEventListener("citation-click", (e: Event) => {
       const detail = (e as CustomEvent).detail as { citation: string };
       client.sendCitationTooltipRequest(detail.citation);
-    });
-    drillsEl.addEventListener("learn-referral-click", (e: Event) => {
-      const detail = (e as CustomEvent).detail as {
-        referral?: LearnReferralPayload;
-      };
-      if (detail.referral) void openLearnReferral(detail.referral);
     });
     drillsEl.addEventListener("moment-feedback-click", (e: Event) => {
       const detail = (e as MomentFeedbackClickEvent).detail;
@@ -370,22 +363,6 @@ function mountMockDebrief(): void {
         citation: "mock:36:02",
       },
     ]);
-  }
-}
-
-async function openLearnReferral(referral: LearnReferralPayload): Promise<void> {
-  try {
-    const { invoke } = await import("@tauri-apps/api/core");
-    await invoke("open_learn_lesson_window", {
-      lessonId: referral.lesson_id,
-    });
-  } catch {
-    try {
-      const { invoke } = await import("@tauri-apps/api/core");
-      await invoke("open_learn_window");
-    } catch {
-      // Not running under Tauri (dev / test).
-    }
   }
 }
 

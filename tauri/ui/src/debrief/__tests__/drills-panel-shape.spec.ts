@@ -69,7 +69,7 @@ describe("drills-panel", () => {
     expect(onClick).toHaveBeenCalledWith({ citation: "[ev:M@1]" });
   });
 
-  it("learn referral renders a practice CTA with lesson metadata", () => {
+  it("learn referral renders a parked coming-soon row with lesson metadata", () => {
     const div = document.createElement("div");
     document.body.append(div);
     mountDrillsPanel(div, [
@@ -79,14 +79,18 @@ describe("drills-panel", () => {
     ]);
 
     const button = div.querySelector<HTMLButtonElement>(".vmx-drill-learn");
-    expect(button?.textContent).toBe("Practice beatmatching by ear");
+    expect(button?.textContent).toBe("Learn coming soon");
     expect(button?.dataset.lessonId).toBe("L2.01");
+    expect(button?.disabled).toBe(true);
     expect(div.querySelector(".vmx-drill-learn-meta")?.textContent).toContain(
       "L2.01",
     );
+    expect(div.querySelector(".vmx-drill-learn-reason")?.textContent).toContain(
+      "Practice routing is parked for launch.",
+    );
   });
 
-  it("learn referral CTA emits learn-referral-click event with detail", () => {
+  it("learn referral does not emit a standalone Learn launch while parked", () => {
     const div = document.createElement("div");
     document.body.append(div);
     const onClick = vi.fn();
@@ -101,7 +105,7 @@ describe("drills-panel", () => {
 
     div.querySelector<HTMLButtonElement>(".vmx-drill-learn")?.click();
 
-    expect(onClick).toHaveBeenCalledWith({ referral });
+    expect(onClick).not.toHaveBeenCalled();
   });
 
   it("moment feedback emits a debrief correction with citation context", () => {

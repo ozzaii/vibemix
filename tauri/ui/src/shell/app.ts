@@ -60,28 +60,69 @@ const appDeps: SurfaceMountDeps = {
     mount.innerHTML = extractSurfaceMarkup(libraryHtmlRaw, ".vmx-lib-app");
     mountLibrary(mount);
   },
-  // Learn folds in two stacked interiors, each in its OWN sub-container so
-  // neither clobbers the other (the lesson window owns its host via
-  // `root.innerHTML`). The lesson runner is first: Learn is a practice
-  // surface, not a trophy case. The Earned Wall remains visible as compact
-  // progress context below it and reads `skill_wall` straight off the same
-  // `ipc.learn.progress_state` event the lesson runner already requests.
   mountLearn: async (mount) => {
-    const lessonHost = document.createElement("div");
-    lessonHost.className = "learn-lesson-host";
-    const wallHost = document.createElement("div");
-    wallHost.className = "learn-earned-wall";
-    mount.append(lessonHost, wallHost);
-    const { mountLearnWindow } = await import("../learn/learn-window.js");
-    mountLearnWindow(lessonHost);
-    const { mountSkillWall } = await import("../learn/SkillWall.js");
-    mountSkillWall(wallHost);
+    mountLearnTease(mount);
   },
   mountDebrief: async (mount) => {
     const { mountDebriefDock } = await import("./DebriefDock.js");
     mountDebriefDock(mount, { autoRefresh: false });
   },
 };
+
+function appendLearnTeaseRow(list: HTMLDListElement, label: string, value: string): void {
+  const row = document.createElement("div");
+  row.className = "learn-tease__row";
+  const dt = document.createElement("dt");
+  dt.textContent = label;
+  const dd = document.createElement("dd");
+  dd.textContent = value;
+  row.append(dt, dd);
+  list.append(row);
+}
+
+function mountLearnTease(mount: HTMLElement): void {
+  mount.replaceChildren();
+
+  const root = document.createElement("section");
+  root.className = "learn-tease";
+  root.setAttribute("aria-labelledby", "learn-tease-title");
+
+  const plate = document.createElement("div");
+  plate.className = "learn-tease__plate";
+
+  const led = document.createElement("span");
+  led.className = "learn-tease__led";
+  led.setAttribute("aria-hidden", "true");
+
+  const kicker = document.createElement("p");
+  kicker.className = "learn-tease__kicker";
+  kicker.textContent = "Premium v2";
+
+  const title = document.createElement("h2");
+  title.id = "learn-tease-title";
+  title.className = "learn-tease__title";
+  title.textContent = "Learning engine coming soon";
+
+  const body = document.createElement("p");
+  body.className = "learn-tease__body";
+  body.textContent =
+    "Lessons stay parked for launch until practice audio, controller proof, and feedback all meet the same bar as Sven.";
+
+  const proof = document.createElement("dl");
+  proof.className = "learn-tease__proof";
+  appendLearnTeaseRow(proof, "Launch", "parked, not hidden");
+  appendLearnTeaseRow(proof, "Engine", "preserved in git");
+  appendLearnTeaseRow(proof, "Rule", "no fake lessons");
+
+  const note = document.createElement("p");
+  note.className = "learn-tease__note";
+  note.textContent =
+    "Debrief and Viber stay live for launch. Lessons return when they can teach without pretending.";
+
+  plate.append(led, kicker, title, body, proof, note);
+  root.append(plate);
+  mount.append(root);
+}
 
 /**
  * Mount the shell as the app and fold the real surfaces in. Idempotent at the

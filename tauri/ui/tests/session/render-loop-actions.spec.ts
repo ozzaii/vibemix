@@ -102,6 +102,21 @@ describe("render-loop mode picker actions", () => {
     });
   });
 
+  it("learn mode stays inside the shell tease and never opens the parked window", async () => {
+    _internals.modeChangeHandler("learn");
+    await flushModeChange();
+
+    expect(getSessionState().mode).toBe("learn");
+    expect(mocks.invoke).not.toHaveBeenCalledWith("open_learn_window");
+    expect(mocks.invoke).not.toHaveBeenCalledWith(
+      "open_learn_lesson_window",
+      expect.anything(),
+    );
+    expect(mocks.emitIpc).toHaveBeenCalledWith("ipc.session.set_mode", {
+      mode: "learn",
+    });
+  });
+
   it("reverts optimistic mode and skips persistence when the owning window fails", async () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     mocks.invoke.mockRejectedValueOnce(new Error("window denied"));

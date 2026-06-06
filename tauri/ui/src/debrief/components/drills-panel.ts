@@ -138,17 +138,10 @@ export function mountDrillsPanel(
       button.type = "button";
       button.className = "vmx-drill-learn";
       button.dataset.lessonId = referral.lesson_id;
-      button.textContent = referral.cta || `Practice ${referral.title}`;
-      button.title = referral.reason;
-      button.addEventListener("click", (e) => {
-        e.stopPropagation();
-        container.dispatchEvent(
-          new CustomEvent("learn-referral-click", {
-            detail: { referral },
-            bubbles: true,
-          }),
-        );
-      });
+      button.disabled = true;
+      button.setAttribute("aria-disabled", "true");
+      button.textContent = "Learn coming soon";
+      button.title = "Learning engine is parked for launch.";
 
       const meta = document.createElement("span");
       meta.className = "vmx-drill-learn-meta";
@@ -156,7 +149,7 @@ export function mountDrillsPanel(
 
       const reason = document.createElement("span");
       reason.className = "vmx-drill-learn-reason";
-      reason.textContent = referral.reason;
+      reason.textContent = `Practice routing is parked for launch. ${referral.reason}`;
 
       route.append(button, meta, reason);
       article.append(route);
