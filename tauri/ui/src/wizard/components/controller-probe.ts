@@ -2,21 +2,16 @@
  *
  * Three vertical zones:
  *   Zone A: controller silhouette + name + port + ● CONNECTED label, or
- *           empty-state "no controller detected — plug one in or skip".
- *   Zone B: JetBrains Mono 48px tabular-nums --amber countdown "00:10"
- *           with 4 concentric amber rings expand-fade outward (2s ease-out
- *           infinite, 0.5s stagger). States: listening / caught / timeout.
- *   Zone C: [ ↻ Listen again ] secondary + [ Skip — use generic mapping ]
- *           (--led-fault destructive idle, primary-armed after timeout).
- *
- * Copy strings VERBATIM from UI-SPEC §10 + §Step 3. */
+ *           passive "controller optional" empty state.
+ *   Zone B: idle "READY", 10s listening countdown, caught, or timeout.
+ *   Zone C: [ Listen now ] / [ ↻ Listen again ] + non-destructive skip. */
 
 import { registerStyle } from "./_style-registry.js";
 import { DDJ_FLX4_SVG } from "../controllers/ddj-flx4.svg.js";
 import { PLUG_SVG } from "../icons/speaker.svg.js";
 import { Button } from "./button.js";
 
-export type ControllerProbeState = "listening" | "caught" | "timeout";
+export type ControllerProbeState = "idle" | "listening" | "caught" | "timeout";
 
 export interface ControllerProbeProps {
   detectedController?: { name: string; port: string; silhouette?: string };
@@ -178,6 +173,11 @@ const CSS = `
     text-shadow: none;
     animation: none;
   }
+  .cmp-ctrl-probe[data-state="idle"] .cmp-ctrl-probe__lcd {
+    color: var(--silk-65);
+    text-shadow: none;
+    animation: none;
+  }
   .cmp-ctrl-probe[data-state="caught"] .cmp-ctrl-probe__lcd {
     color: var(--led-ok);
     text-shadow: 0 0 14px var(--led-ok);
@@ -206,6 +206,15 @@ const CSS = `
     text-transform: none;
     text-shadow: none;
   }
+  .cmp-ctrl-probe[data-state="idle"] .cmp-ctrl-probe__caption {
+    color: var(--silk-65);
+    font-family: var(--type-body);
+    font-variation-settings: "wdth" 100, "wght" 400;
+    font-size: 14px;
+    letter-spacing: 0.01em;
+    text-transform: none;
+    text-shadow: none;
+  }
   .cmp-ctrl-probe[data-state="caught"] .cmp-ctrl-probe__caption {
     color: var(--led-ok);
   }
@@ -221,6 +230,9 @@ const CSS = `
     text-align: center;
   }
   .cmp-ctrl-probe[data-state="timeout"] .cmp-ctrl-probe__hint {
+    display: block;
+  }
+  .cmp-ctrl-probe[data-state="idle"] .cmp-ctrl-probe__hint {
     display: block;
   }
   .cmp-ctrl-probe__zone-c {
@@ -281,8 +293,7 @@ export function ControllerProbe(props: ControllerProbeProps): HTMLElement {
     plug.className = "cmp-ctrl-probe__empty-glyph";
     plug.innerHTML = PLUG_SVG;
     const txt = document.createElement("span");
-    // UI-SPEC §Step 3 "Empty-state" — VERBATIM
-    txt.textContent = "no controller detected. plug one in or skip.";
+    txt.textContent = "controller optional. plug one in now or continue.";
     empty.append(plug, txt);
     zoneA.append(empty);
   }
@@ -307,7 +318,7 @@ export function ControllerProbe(props: ControllerProbeProps): HTMLElement {
   const hint = document.createElement("div");
   hint.className = "cmp-ctrl-probe__hint";
   hint.textContent =
-    "DDJ-FLX4 over USB. Turn on controller output in your DJ app, then move a fader, knob, pad, cue, or play.";
+    "Need mapping now? Click Listen now, then move a fader, knob, pad, cue, or play.";
 
   if (props.state === "caught") {
     lcd.textContent = "✓";
@@ -315,8 +326,10 @@ export function ControllerProbe(props: ControllerProbeProps): HTMLElement {
     caption.textContent = `✓ ${props.caughtLabel ?? "control"} · CONNECTED`;
   } else if (props.state === "timeout") {
     lcd.textContent = "--:--";
-    // UI-SPEC §Step 3 "Timeout state" — VERBATIM
-    caption.textContent = "no controller move received";
+    caption.textContent = "no controller move received. continue is ready.";
+  } else if (props.state === "idle") {
+    lcd.textContent = "READY";
+    caption.textContent = "controller detection is optional.";
   } else {
     lcd.textContent = fmtCountdown(props.secondsLeft ?? 10);
     // UI-SPEC §Step 3 "Listen instruction" — VERBATIM
@@ -329,12 +342,12 @@ export function ControllerProbe(props: ControllerProbeProps): HTMLElement {
   // --- Zone C ---
   const zoneC = document.createElement("div");
   zoneC.className = "cmp-ctrl-probe__zone-c";
+  const listenLabel = props.state === "idle" ? "Listen now" : "↻ Listen again";
   zoneC.append(
     Button({
       variant: "secondary",
       state: "idle",
-      // UI-SPEC §Step 3 "Listen-again button" — VERBATIM
-      label: "↻ Listen again",
+      label: listenLabel,
       leadingGlyph: "[",
       trailingGlyph: "]",
       onClick: props.onListenAgain,
@@ -342,8 +355,7 @@ export function ControllerProbe(props: ControllerProbeProps): HTMLElement {
     Button({
       variant: props.state === "timeout" ? "primary" : "secondary",
       state: props.state === "timeout" ? "armed" : "idle",
-      destructive: props.state !== "timeout",
-      // UI-SPEC §Step 3 "Skip button" — VERBATIM
+      destructive: false,
       label: "Skip · use generic mapping",
       leadingGlyph: "[",
       trailingGlyph: "]",

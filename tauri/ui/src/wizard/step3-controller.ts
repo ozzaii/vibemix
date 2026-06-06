@@ -1,9 +1,9 @@
 /* step3-controller.ts — Step 3 surface (UI-SPEC §Step 3).
  *
- * Header + ControllerProbe (3 zones). 10s countdown is mocked by the
- * router; Wave 4 wires real MIDI events.
+ * Header + ControllerProbe (3 zones). Controller detection is passive by
+ * default; the router starts the 10s MIDI listener only when requested.
  *
- * Continue CTA armed after caught OR skip. */
+ * Continue CTA stays armed so a no-MIDI rig never blocks first-run. */
 
 import { PrimaryPanel } from "./components/primary-panel.js";
 import { ControllerProbe, type ControllerProbeState } from "./components/controller-probe.js";
@@ -61,7 +61,8 @@ export function renderStep3(state: Step3State, cb: Step3Callbacks): HTMLElement 
 
   const subtitle = document.createElement("p");
   subtitle.className = "wizard-step__subtitle";
-  subtitle.textContent = "move a control so vibemix knows what is connected.";
+  subtitle.textContent =
+    "plug in a controller now, or keep going and vibemix will detect it later.";
 
   body.append(heading, subtitle);
 
@@ -93,7 +94,10 @@ export function renderStep3(state: Step3State, cb: Step3Callbacks): HTMLElement 
       }),
     );
   }
-  const armed = state.probeState === "caught" || state.probeState === "timeout";
+  const armed =
+    state.probeState === "idle" ||
+    state.probeState === "caught" ||
+    state.probeState === "timeout";
   ctaRow.append(
     Button({
       variant: "primary",

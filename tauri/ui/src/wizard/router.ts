@@ -10,7 +10,7 @@
  *   - Step 1 [ Grant ] buttons invoke Tauri commands open_*_settings /
  *     request_microphone_permission.
  *   - Step 2 mount -> ipc.calibration.list_devices.
- *   - Step 3 mount → ipc.calibration.start_midi_listen (timeout 10s).
+ *   - Step 3 "Listen now" → ipc.calibration.start_midi_listen (timeout 10s).
  *   - Smoke-test mount → ipc.calibration.smoke_test (timeout 30s).
  *   - Wizard done → emitIpc ipc.wizard.done + invoke write_first_run_state.
  *
@@ -94,8 +94,8 @@ const DEFAULT_STATE: WizardState = {
   },
   step3: {
     detectedController: undefined,
-    probeState: "listening",
-    secondsLeft: 10,
+    probeState: "idle",
+    secondsLeft: 0,
     caughtLabel: undefined,
   },
   skillLevel: {
@@ -418,15 +418,12 @@ export function renderCurrentStep(): void {
       });
       break;
     case "controller":
-      if (!step3ListenStarted) {
-        step3ListenStarted = true;
-        void runMidiListen();
-      }
       primary = renderStep3(wizardState.step3, {
         onContinue: () => advanceTo("skill-level"),
         onBack: () => back(),
         onListenAgain: () => {
-          step3ListenStarted = false;
+          if (step3ListenStarted) return;
+          step3ListenStarted = true;
           setState({
             step3: {
               ...wizardState.step3,
@@ -435,6 +432,7 @@ export function renderCurrentStep(): void {
               caughtLabel: undefined,
             },
           });
+          void runMidiListen();
         },
         onSkip: () => advanceTo("skill-level"),
       });
@@ -732,6 +730,7 @@ async function runMidiListen(): Promise<void> {
     }
   } finally {
     if (timeoutUnlisten) timeoutUnlisten();
+    step3ListenStarted = false;
   }
 }
 

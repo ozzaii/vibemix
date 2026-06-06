@@ -2,7 +2,7 @@
  *
  * The fresh-account continuity smoke. Drives the wizard router across the
  * full STEP_ORDER chain — intro → permissions → audio → controller →
- * profile-consent → telemetry-consent → smoke-test — and pins the
+ * skill-level → profile-consent → telemetry-consent → smoke-test — and pins the
  * POLISH-03 invariant: a fresh user is NEVER stuck before audio is live.
  *
  * For every step it asserts (a) the step renders into the #wizard-primary
@@ -63,6 +63,7 @@ const STEP_ORDER: WizardStep[] = [
   "permissions",
   "audio",
   "controller",
+  "skill-level",
   "profile-consent",
   "telemetry-consent",
   "smoke-test",
@@ -125,9 +126,9 @@ function armStep(step: WizardStep): void {
       });
       break;
     case "controller":
-      // Listen times out (or catches) → Continue arms; Skip is always there.
+      // Hardware mapping is optional, so Continue is armed before a listen.
       dev.setState({
-        step3: { ...dev.getState().step3, probeState: "timeout", secondsLeft: 0 },
+        step3: { ...dev.getState().step3, probeState: "idle", secondsLeft: 0 },
       });
       break;
     case "smoke-test":
@@ -150,6 +151,23 @@ describe("first-run continuity smoke (POLISH-03)", () => {
     // Reset router state to the fresh-install default (intro) via the dev
     // surface — getDevSurface().setState merges, so set currentStep explicitly.
     getDevSurface().setState({ currentStep: "intro" });
+    getDevSurface().setState({
+      step1: { screenRecording: "pending", microphone: "pending" },
+      step2: {
+        blackHolePresent: false,
+        blackHoleBannerPostClick: false,
+        devices: [],
+        selectedDeviceId: "",
+        selectedHeadphoneDeviceIndex: null,
+      },
+      step3: {
+        detectedController: undefined,
+        probeState: "idle",
+        secondsLeft: 0,
+        caughtLabel: undefined,
+      },
+      smokeTest: { greetingPlayed: false, meterLevel: 0.5 },
+    });
     renderCurrentStep();
   });
 
@@ -167,6 +185,7 @@ describe("first-run continuity smoke (POLISH-03)", () => {
       "permissions",
       "audio",
       "controller",
+      "skill-level",
       "profile-consent",
       "telemetry-consent",
       "smoke-test",
@@ -268,5 +287,57 @@ describe("first-run continuity smoke (POLISH-03)", () => {
       {},
       "ipc.calibration.window_list",
     );
+  });
+
+  it("controller step is passive and does not start MIDI listen on mount", () => {
+    const sendIpcRequestMock = vi.mocked(sendIpcRequest);
+    sendIpcRequestMock.mockClear();
+
+    getDevSurface().setState({ currentStep: "controller" });
+    renderCurrentStep();
+
+    expect(sendIpcRequestMock).not.toHaveBeenCalledWith(
+      "ipc.calibration.start_midi_listen",
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
+    );
+    expect(primary().textContent).toContain("controller detection is optional");
+
+    const continueCta = Array.from(primary().querySelectorAll("button")).find((b) =>
+      (b.textContent ?? "").toLowerCase().includes("continue"),
+    );
+    expect(continueCta).toBeDefined();
+    expect(continueCta!.disabled).toBe(false);
+  });
+
+  it("controller Listen now starts the MIDI listener on demand", async () => {
+    const sendIpcRequestMock = vi.mocked(sendIpcRequest);
+    sendIpcRequestMock.mockClear();
+    sendIpcRequestMock.mockResolvedValueOnce({
+      type: "ipc.calibration.midi_event",
+      ts: "2026-06-06T00:00:00.000Z",
+      payload: { control_label: "filter knob", raw: "b0 10 7f" },
+    });
+
+    getDevSurface().setState({ currentStep: "controller" });
+    renderCurrentStep();
+
+    const listenCta = Array.from(primary().querySelectorAll("button")).find((b) =>
+      (b.textContent ?? "").toLowerCase().includes("listen now"),
+    );
+    expect(listenCta).toBeDefined();
+    listenCta!.click();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(sendIpcRequestMock).toHaveBeenCalledWith(
+      "ipc.calibration.start_midi_listen",
+      { timeout_s: 10 },
+      "ipc.calibration.midi_event",
+      12_000,
+    );
+    expect(getDevSurface().getState().step3.probeState).toBe("caught");
+    expect(getDevSurface().getState().step3.caughtLabel).toBe("filter knob");
   });
 });
