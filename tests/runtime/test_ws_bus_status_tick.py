@@ -174,6 +174,59 @@ def test_status_midi_activity_is_bounded():
     assert _status_midi_activity(SimpleNamespace(controller_midi_activity="")) is None
 
 
+def test_status_midi_activity_falls_back_to_controller_snapshot_when_unknown():
+    controller = SimpleNamespace(
+        activity_snapshot=lambda: {
+            "connected": False,
+            "port_name": None,
+            "messages_seen_total": 0,
+            "events_seen_total": 0,
+            "moves_seen_total": 0,
+        }
+    )
+
+    assert (
+        _status_midi_activity(
+            SimpleNamespace(controller_midi_activity="unknown"),
+            controller,
+        )
+        == "disconnected"
+    )
+
+
+def test_status_midi_activity_reports_connected_idle_from_controller_snapshot():
+    controller = SimpleNamespace(
+        activity_snapshot=lambda: {
+            "connected": True,
+            "port_name": "DDJ-FLX4",
+            "messages_seen_total": 0,
+            "events_seen_total": 0,
+            "moves_seen_total": 0,
+        }
+    )
+
+    assert _status_midi_activity(SimpleNamespace(controller_midi_activity=""), controller) == (
+        "connected_no_midi_traffic"
+    )
+
+
+def test_status_midi_activity_prefers_proven_music_state_activity():
+    controller = SimpleNamespace(
+        activity_snapshot=lambda: {
+            "connected": False,
+            "port_name": None,
+            "messages_seen_total": 0,
+            "events_seen_total": 0,
+            "moves_seen_total": 0,
+        }
+    )
+
+    assert (
+        _status_midi_activity(SimpleNamespace(controller_midi_activity="active"), controller)
+        == "active"
+    )
+
+
 def test_status_midi_device_prefers_activity_snapshot_port_name():
     controller = SimpleNamespace(
         port_name="fallback",

@@ -68,7 +68,13 @@ from vibemix.runtime.drop_display import predicted_drop_bars
 from vibemix.runtime.parent_watchdog import watch_parent
 from vibemix.runtime.recordings_index import RecordingsIndex, run_retention_sweep
 from vibemix.runtime.settings import SettingsApplier
-from vibemix.runtime.ws_bus import WizardBus, _probe_midi_count, _trusted_bpm_for_display
+from vibemix.runtime.ws_bus import (
+    WizardBus,
+    _probe_midi_count,
+    _status_midi_activity,
+    _status_midi_device,
+    _trusted_bpm_for_display,
+)
 from vibemix.ui_bus.messages import (
     IpcBoot,
     IpcError,
@@ -1515,6 +1521,8 @@ class SessionLoop:
             gemini="ok" if live_attached else "down",
             midi=self._probe_midi_count(),
             screen=self._probe_screen_status(),
+            midi_activity=_status_midi_activity(self.music_state, self.controller_state),
+            midi_device=_status_midi_device(self.controller_state),
         )
         await self.bus.emit(json.loads(tick.to_json()))
 

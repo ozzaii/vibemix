@@ -13508,3 +13508,39 @@ Proof before staging:
 - `uv run python -m compileall -q src/vibemix/runtime/session_loop.py tests/memory/test_ingest_wiring.py`
 - `git diff --check -- src/vibemix/runtime/session_loop.py tests/memory/test_ingest_wiring.py .planning/handoffs/2026-05-31-package-checklist.md`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+
+## Package 164 - Controller Status Truth
+
+Suggested commit: `fix(status): report controller disconnects from live state`
+
+Include:
+
+- `src/vibemix/runtime/ws_bus.py`
+- `src/vibemix/runtime/session_loop.py`
+- `tests/runtime/test_ws_bus_status_tick.py`
+- `tests/runtime/test_session_loop.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- MIDI listener lifecycle changes, controller mapping/profile changes, Learn
+  lesson logic, IPC schema changes, UI redesign, and hardware probing on the
+  hot path. This package only improves the already-existing status diagnostics.
+
+Reason:
+
+- A fresh user-test boot with no controller connected emitted `midi:0` but
+  `midi_activity:"unknown"`, leaving the UI unable to distinguish a real
+  hardware disconnect from stale/offline app state. Fall back to
+  `ControllerState.activity_snapshot()` when `MusicState` has not yet proven
+  richer MIDI activity, and include the same diagnostics in manual
+  `ipc.status.recheck` ticks.
+
+Proof before staging:
+
+- `uv run pytest -q tests/runtime/test_ws_bus_status_tick.py tests/runtime/test_session_loop.py::test_live_status_recheck_reports_visible_controller_without_midi_as_connected tests/runtime/test_session_loop.py::test_live_status_recheck_reports_disconnected_controller_activity`
+- `uv run pytest -q tests/runtime/test_ws_bus_status_tick.py tests/runtime/test_session_loop.py`
+- `uv run ruff check src/vibemix/runtime/ws_bus.py src/vibemix/runtime/session_loop.py tests/runtime/test_ws_bus_status_tick.py tests/runtime/test_session_loop.py`
+- `uv run python -m compileall -q src/vibemix/runtime/ws_bus.py src/vibemix/runtime/session_loop.py tests/runtime/test_ws_bus_status_tick.py tests/runtime/test_session_loop.py`
+- `git diff --check -- src/vibemix/runtime/ws_bus.py src/vibemix/runtime/session_loop.py tests/runtime/test_ws_bus_status_tick.py tests/runtime/test_session_loop.py .planning/handoffs/2026-05-31-package-checklist.md`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`

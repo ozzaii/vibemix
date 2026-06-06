@@ -26,6 +26,7 @@ import jsonschema as _jsonschema
 import websockets
 
 from vibemix.audio import SILENT_RMS, WS_HOST, WS_PORT, Levels
+from vibemix.midi.activity import classify_controller_midi_activity
 from vibemix.runtime.drop_display import predicted_drop_bars
 from vibemix.state import MusicState
 from vibemix.state.deck_context import (
@@ -206,16 +207,33 @@ def _probe_midi_count(
         return None
 
 
-def _status_midi_activity(music_state: MusicState | None = None) -> str | None:
+def _status_midi_activity(
+    music_state: MusicState | None = None,
+    controller_state: Any | None = None,
+) -> str | None:
     """Return the bounded controller-traffic diagnosis for status diagnostics."""
+    fallback: str | None = None
+    if controller_state is not None:
+        try:
+            snap_fn = getattr(controller_state, "activity_snapshot", None)
+            snap = snap_fn() if callable(snap_fn) else None
+            connected = bool(snap.get("connected")) if isinstance(snap, dict) else False
+            fallback = classify_controller_midi_activity(
+                controller_state,
+                connected=connected,
+            )[0]
+        except Exception:
+            fallback = "unknown"
     if music_state is None:
-        return None
+        return fallback
     try:
         activity = str(getattr(music_state, "controller_midi_activity", "") or "").strip()
     except Exception:
-        return "unknown"
+        return fallback or "unknown"
     if not activity:
-        return None
+        return fallback
+    if activity == "unknown" and fallback not in (None, "unknown"):
+        return fallback
     return activity if activity in _STATUS_MIDI_ACTIVITY_VALUES else "unknown"
 
 
@@ -1443,7 +1461,7 @@ async def ws_broadcast(
                         screen=_probe_screen_status(screen_available),
                         voice="muted" if voice_muted else "ok",
                         capture_device=_status_capture_device(audio_capture_context),
-                        midi_activity=_status_midi_activity(state),
+                        midi_activity=_status_midi_activity(state, controller_state),
                         midi_device=_status_midi_device(controller_state),
                     )
                     status_payload = status_msg.to_json()
