@@ -115,6 +115,17 @@ def test_driver_waveform_payload_uses_bundled_demo_sections() -> None:
         }
 
 
+def test_driver_waveform_payload_carries_bundled_loop_source_reason() -> None:
+    driver = BeatmatchPracticeDriver()
+    driver.set_source_reason("library vector store is empty")
+
+    payload = driver.waveform_payload()
+
+    assert payload["decks"]["A"]["source"] == "bundled_demo"
+    assert payload["decks"]["A"]["source_reason"] == "library vector store is empty"
+    assert payload["decks"]["B"]["source_reason"] == "library vector store is empty"
+
+
 def test_driver_accepts_own_track_sources_and_centers_pitch_to_real_bpm_lock() -> None:
     driver = BeatmatchPracticeDriver(_own_track_sources())
 

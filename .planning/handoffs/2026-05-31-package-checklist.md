@@ -12104,3 +12104,54 @@ Proof before staging:
 - `npm --prefix tauri/ui run build`
 - `git diff --check -- tauri/ui/src/learn/waveform-display.ts tauri/ui/src/learn/styles/learn.css tauri/ui/tests/learn/test_waveform_hidden_until_ready.spec.ts .planning/handoffs/2026-05-31-package-checklist.md`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+
+## Package 127 - Learn Save Fallback Reason
+
+Suggested commit: `feat(learn): explain save-mode practice fallback`
+
+Include:
+
+- `src/vibemix/__main__.py`
+- `src/vibemix/learn/beatmatch_practice_driver.py`
+- `src/vibemix/ui_bus/learn_messages.py`
+- `tauri/ui/src/ipc/messages.schema.json`
+- `tauri/ui/src/ipc/messages.ts`
+- `tauri/ui/src/ipc/validator.generated.mjs`
+- `tauri/ui/src/learn/waveform-display.ts`
+- `tauri/ui/src/learn/styles/learn.css`
+- `tauri/ui/tests/learn/test_waveform_hidden_until_ready.spec.ts`
+- `tests/learn/test_beatmatch_practice_driver.py`
+- `tests/learn/test_observer_boot_wiring.py`
+- `tests/ui_bus/test_learn_waveform_ready_message.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Save-mode loader ranking changes, new onboarding/library ingest flows, new
+  lesson copy, broader waveform UI redesign, and any changes to practice
+  grading. This only carries the existing fallback reason from the lazy loader
+  to the already-rendered waveform source readout.
+
+Reason:
+
+- After Package 126, Save Mode can show `practice loops`, but first-user tests
+  still cannot see why own-track Save Mode failed to arm. Preserve
+  `SaveModeLoadOutcome.fallback_reason` on the bundled practice driver,
+  serialize it as optional `source_reason` on waveform deck rows, and show a
+  bounded `reason:` suffix only when the source remains bundled practice loops.
+  This makes library-vector/ANLZ readiness problems visible without claiming
+  the loops are user tracks.
+
+Proof before staging:
+
+- `uv run pytest -q tests/learn/test_beatmatch_practice_driver.py tests/learn/test_observer_boot_wiring.py tests/ui_bus/test_learn_waveform_ready_message.py`
+- `npm --prefix tauri/ui test -- tests/learn/test_waveform_hidden_until_ready.spec.ts`
+- `uv run python scripts/check_ipc_schema.py`
+- `npm --prefix tauri/ui run check:ipc`
+- `npm --prefix tauri/ui run build`
+- `cd tauri/ui && npx playwright test -c tests/learn/playwright.config.ts tests/learn/browser-responsive.pw.ts`
+- `uv run ruff check src/vibemix/__main__.py src/vibemix/learn/beatmatch_practice_driver.py src/vibemix/ui_bus/learn_messages.py tests/learn/test_beatmatch_practice_driver.py tests/learn/test_observer_boot_wiring.py tests/ui_bus/test_learn_waveform_ready_message.py`
+- `uv run python -m compileall -q src/vibemix/__main__.py src/vibemix/learn/beatmatch_practice_driver.py src/vibemix/ui_bus/learn_messages.py tests/learn/test_beatmatch_practice_driver.py tests/learn/test_observer_boot_wiring.py tests/ui_bus/test_learn_waveform_ready_message.py`
+- `uv run python .claude/skills/ipc-wiring-checker/scripts/check_ipc_wiring.py` (expected current-source fail: existing one-ended calibration/settings/library types; no new `ipc.learn.*` dead type)
+- `git diff --check -- src/vibemix/__main__.py src/vibemix/learn/beatmatch_practice_driver.py src/vibemix/ui_bus/learn_messages.py tauri/ui/src/ipc/messages.schema.json tauri/ui/src/ipc/messages.ts tauri/ui/src/ipc/validator.generated.mjs tauri/ui/src/learn/waveform-display.ts tauri/ui/src/learn/styles/learn.css tauri/ui/tests/learn/test_waveform_hidden_until_ready.spec.ts tests/learn/test_beatmatch_practice_driver.py tests/learn/test_observer_boot_wiring.py tests/ui_bus/test_learn_waveform_ready_message.py .planning/handoffs/2026-05-31-package-checklist.md`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`

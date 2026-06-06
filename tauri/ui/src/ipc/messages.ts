@@ -1759,6 +1759,7 @@ export interface LearnWaveformDeck {
   artist?: string | null;
   source?: ("bundled_demo" | "library_save_mode") | null;
   source_start_s?: number | null;
+  source_reason?: string | null;
 }
 export interface LearnPlayheadTick {
   type: "ipc.learn.playhead_tick";

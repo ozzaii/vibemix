@@ -290,6 +290,7 @@ class BeatmatchPracticeDriver:
             or self._waveform_decks.get("B", {}).get("source")
             or "bundled_demo"
         )
+        self._source_reason: str | None = None
         self._deck = MiniDeck(
             src_a,
             src_b,
@@ -328,6 +329,11 @@ class BeatmatchPracticeDriver:
         except (TypeError, ValueError):
             raw = 1
         self._save_difficulty_level = max(1, min(5, raw))
+
+    def set_source_reason(self, reason: str | None) -> None:
+        """Record why Save mode stayed on bundled practice loops."""
+
+        self._source_reason = _optional_text(reason)
 
     def record_action(self, lesson_id: str | None, midi: dict[str, Any]) -> bool:
         """Record one matched Learn action.
@@ -506,10 +512,16 @@ class BeatmatchPracticeDriver:
     def waveform_payload(self) -> dict[str, Any]:
         """Return compact two-deck waveform payload for Learn Canvas rendering."""
 
+        decks = self._waveform_decks
+        if self._source_reason is not None:
+            decks = {
+                deck: {**row, "source_reason": self._source_reason}
+                for deck, row in self._waveform_decks.items()
+            }
         return {
             "sample_rate": self._sample_rate,
             "beat_interval_s": 60.0 / self._grid_a.bpm,
-            "decks": self._waveform_decks,
+            "decks": decks,
         }
 
     def playhead_payload(self) -> dict[str, Any]:

@@ -65,6 +65,8 @@ def test_beatmatch_practice_audio_uses_shared_learn_output_device() -> None:
     assert "beatmatch_practice_player = TwoDeckPlayer(" in src
     assert "beatmatch_practice_driver.deck" in src
     assert "def _prepare_learn_save_mode_sources()" in src
+    assert "def _set_learn_save_mode_source_reason(reason: str | None) -> None:" in src
+    assert "set_source_reason" in src
     assert "load_save_mode_sources(lib, store)" in src
     assert "beatmatch_practice_prepare=_prepare_learn_save_mode_sources" in src
     assert "beatmatch_practice_difficulty_setter=_beatmatch_practice_set_difficulty" in src

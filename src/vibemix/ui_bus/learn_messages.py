@@ -933,6 +933,7 @@ class LearnWaveformDeck:
     artist: str | None = None
     source: Literal["bundled_demo", "library_save_mode"] | None = None
     source_start_s: float | None = None
+    source_reason: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -986,6 +987,7 @@ class LearnWaveformReady:
                         artist=_optional_text(row.get("artist")),
                         source=row.get("source"),  # type: ignore[arg-type]
                         source_start_s=_optional_float(row.get("source_start_s")),
+                        source_reason=_optional_text(row.get("source_reason")),
                     )
                     for side, row in decks.items()
                     if isinstance(row, dict)
@@ -998,7 +1000,14 @@ class LearnWaveformReady:
         for deck in d["payload"].get("decks", {}).values():
             if not isinstance(deck, dict):
                 continue
-            for key in ("track_id", "title", "artist", "source", "source_start_s"):
+            for key in (
+                "track_id",
+                "title",
+                "artist",
+                "source",
+                "source_start_s",
+                "source_reason",
+            ):
                 if deck.get(key) is None:
                     deck.pop(key, None)
         _validate(d)

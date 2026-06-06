@@ -94,6 +94,26 @@ describe("learn waveform strips hide until audio is ready", () => {
     expect(h.querySelector("[data-source-kind]")?.textContent).toBe("practice loops");
   });
 
+  it("keeps the bundled-loop fallback reason visible when own tracks are unavailable", () => {
+    const h = host();
+    const wf = WaveformDisplay(h);
+    wf.updateWaveforms(ready({
+      A: deck({
+        source: "bundled_demo",
+        source_reason: "library vector store is empty",
+      }),
+      B: deck({
+        source: "bundled_demo",
+        source_reason: "library vector store is empty",
+      }),
+    }));
+
+    expect(h.querySelector("[data-source-kind]")?.textContent).toBe("practice loops");
+    expect(h.querySelector("[data-source-decks]")?.textContent).toContain(
+      "reason: library vector store is empty",
+    );
+  });
+
   it("hides again (false) when both decks unload (back to idle)", () => {
     const h = host();
     const wf = WaveformDisplay(h);

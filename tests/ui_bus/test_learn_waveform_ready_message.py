@@ -19,6 +19,7 @@ def test_waveform_ready_roundtrips_own_track_source_metadata() -> None:
                 "artist": "Library Artist",
                 "source": "library_save_mode",
                 "source_start_s": 32.5,
+                "source_reason": "library vector store is empty",
                 "bpm": 128.0,
                 "duration_s": 30.0,
                 "peaks": ((16, 32, 64), (24, 48, 96)),
@@ -36,4 +37,5 @@ def test_waveform_ready_roundtrips_own_track_source_metadata() -> None:
     assert deck["artist"] == "Library Artist"
     assert deck["source"] == "library_save_mode"
     assert deck["source_start_s"] == 32.5
+    assert deck["source_reason"] == "library vector store is empty"
     _VALIDATOR.validate(wire)

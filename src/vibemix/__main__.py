@@ -2615,6 +2615,13 @@ async def main() -> None:
     _learn_save_mode_sources_ready = False
     _LEARN_SAVE_MODE_SOURCE_LESSONS = frozenset({"L2.01", "L2.02", "L3.05"})
 
+    def _set_learn_save_mode_source_reason(reason: str | None) -> None:
+        if beatmatch_practice_driver is None:
+            return
+        setter = getattr(beatmatch_practice_driver, "set_source_reason", None)
+        if callable(setter):
+            setter(reason)
+
     def _prepare_learn_save_mode_sources() -> None:
         """Lazily replace bundled practice loops with own tracks for Save mode."""
 
@@ -2632,6 +2639,7 @@ async def main() -> None:
 
             lib = _RBLibrary()
             if not lib.try_load_cache():
+                _set_learn_save_mode_source_reason("library cache unavailable")
                 return
             store = _open_library_store()
             try:
@@ -2642,6 +2650,9 @@ async def main() -> None:
                 except Exception:
                     pass
             if outcome.sources is None:
+                _set_learn_save_mode_source_reason(
+                    outcome.fallback_reason or "own-track sources unavailable"
+                )
                 print(
                     "-> learn save mode using bundled practice loops: "
                     f"{outcome.fallback_reason or 'own-track sources unavailable'}",
@@ -2663,6 +2674,7 @@ async def main() -> None:
                 file=sys.stderr,
             )
         except Exception as _save_mode_exc:  # pragma: no cover - defensive boot path
+            _set_learn_save_mode_source_reason("own-track source load failed")
             print(
                 f"[learn boot] save-mode own-track load failed: {_save_mode_exc!r}",
                 file=sys.stderr,

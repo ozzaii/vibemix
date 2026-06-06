@@ -3410,7 +3410,8 @@
             {"type": "null"}
           ]
         },
-        "source_start_s": {"type": ["number", "null"], "minimum": 0}
+        "source_start_s": {"type": ["number", "null"], "minimum": 0},
+        "source_reason": {"type": ["string", "null"], "maxLength": 160}
       }
     },
     "LearnPlayheadTick": {

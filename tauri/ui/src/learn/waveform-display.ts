@@ -18,6 +18,7 @@ interface WaveformDeck {
   artist?: string | null;
   source?: "bundled_demo" | "library_save_mode" | null;
   source_start_s?: number | null;
+  source_reason?: string | null;
 }
 
 export interface WaveformReadyPayload {
@@ -96,6 +97,13 @@ function sourceKindLabel(decks: WaveformReadyPayload["decks"]): string {
 
 function sourceDecksLabel(decks: WaveformReadyPayload["decks"]): string {
   const labels = DECKS.map((deck) => deckSourceLabel(deck, decks[deck])).filter(Boolean);
+  const reason = cleanLabel(
+    DECKS.map((deck) => decks[deck]?.source_reason).find((value) => cleanLabel(value)),
+    92,
+  );
+  if (reason && sourceKindLabel(decks) === "practice loops") {
+    return `${labels.join("  ")}  reason: ${reason}`.trim();
+  }
   return labels.join("  ");
 }
 
