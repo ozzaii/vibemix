@@ -517,37 +517,34 @@ const LAYOUT_CSS = `
     line-height: 1.55;
     color: var(--text-muted);
   }
+  /* The four at-rest states are TELEMETRY, not four dashboard cards. Boxed
+   * identical cells read as a SaaS stat-grid (the exact AI-slop tell); a
+   * Pioneer faceplate spells its status flush on the metal. So: no per-cell
+   * boxes — a single machined seam seats the readout like a spec line, the
+   * values flow at their natural width, one figure on one ground. */
   .vmx-armed__context {
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: var(--sp-3);
-    margin-top: var(--sp-3);
+    display: flex;
+    flex-wrap: wrap;
+    gap: clamp(20px, 3vw, 44px);
+    margin-top: var(--sp-4);
+    padding-top: var(--sp-4);
+    box-shadow: inset 0 1px 0 rgba(255, 222, 242, 0.07);
   }
   .vmx-armed__context-item {
     min-width: 0;
-    padding: 13px 14px 12px;
-    border-radius: var(--rad-md);
-    background:
-      linear-gradient(180deg, rgba(255, 251, 244, 0.024), rgba(0, 0, 0, 0.16)),
-      rgba(48, 42, 46, 0.30);
-    box-shadow:
-      inset 0 1px 0 rgba(255, 210, 240, 0.075),
-      inset 0 -1px 0 rgba(0, 0, 0, 0.46),
-      0 10px 28px rgba(0, 0, 0, 0.20);
+    display: grid;
+    gap: 6px;
   }
   .vmx-armed__context-label {
-    display: block;
-    margin-bottom: 8px;
     color: var(--text-disabled);
   }
   .vmx-armed__context-value {
-    display: block;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
     font-family: var(--type-display);
-    font-size: 13px;
-    font-weight: 600;
+    font-variation-settings: "wdth" 90, "wght" 600;
+    font-size: 14px;
     letter-spacing: 0;
     color: var(--text-secondary);
   }

@@ -296,17 +296,12 @@
     color 180ms var(--ease-brand),
     font-size 180ms var(--ease-brand);
 }
+/* No resting mark. A native sidebar (Finder, Mail, Music) shows nothing on the
+ * right of a nav row at rest; the persistent rose pip read as stray clutter on
+ * every row. The accelerator digit still reveals on hover/focus (below) as the
+ * power-user affordance, and the Cmd+K palette is its permanent cheat-sheet. */
 .sb-nav-item .sb-kbd::before {
-  content: "";
-  width: 3px;
-  height: 12px;
-  border-radius: 999px;
-  background: rgba(216, 212, 215, 0.36);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.10),
-    0 0 10px rgba(0, 0, 0, 0.24);
-  opacity: 0.72;
-  transition: opacity 180ms var(--ease-brand), transform 180ms var(--ease-brand);
+  display: none;
 }
 .sb-nav-item:hover .sb-kbd,
 .sb-nav-item:focus-visible .sb-kbd {

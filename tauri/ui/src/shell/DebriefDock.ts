@@ -229,16 +229,12 @@ const CSS = `
     gap: var(--sp-2);
     min-width: 0;
   }
+  /* Flush figure-ground, not a boxed cell. These pairs live INSIDE the
+   * readiness card, so per-cell boxes here were nested cards (always wrong) and
+   * read as a dashboard stat-grid. The label-over-value pairs carry themselves
+   * on the grid gap alone. */
   .debrief-dock__payback-cell {
     min-width: 0;
-    padding: 8px 9px;
-    border-radius: var(--rad-sm);
-    background:
-      linear-gradient(180deg, rgba(255, 222, 242, 0.018), transparent 62%),
-      rgba(0, 0, 0, 0.18);
-    box-shadow:
-      inset 0 1px 0 rgba(255, 222, 242, 0.040),
-      inset 0 -1px 0 rgba(0, 0, 0, 0.34);
   }
   .debrief-dock__payback-label {
     display: block;
@@ -262,19 +258,17 @@ const CSS = `
   .debrief-dock__readiness-metrics {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: var(--sp-2);
+    gap: var(--sp-4);
     width: 100%;
     min-width: 0;
     margin: 0;
+    padding-top: var(--sp-3);
+    /* One machined seam seats the three readouts like a spec line, instead of
+     * three boxed cells stacked under the payback pairs. */
+    box-shadow: inset 0 1px 0 rgba(255, 222, 242, 0.06);
   }
   .debrief-dock__readiness-metric {
     min-width: 0;
-    padding: 7px 8px;
-    border-radius: var(--rad-sm);
-    background: rgba(0, 0, 0, 0.18);
-    box-shadow:
-      inset 0 1px 0 rgba(255, 222, 242, 0.036),
-      inset 0 -1px 0 rgba(0, 0, 0, 0.30);
   }
   .debrief-dock__readiness-metric dt {
     margin: 0;
