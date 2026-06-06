@@ -13010,3 +13010,50 @@ Proof before staging:
 - `npm --prefix tauri/ui run build`
 - `git diff --check -- src/vibemix/learn/exemplar_lesson.py src/vibemix/ui_bus/learn_messages.py tauri/ui/src/ipc/messages.schema.json tauri/ui/src/ipc/messages.ts tauri/ui/src/ipc/validator.generated.mjs tauri/ui/src/learn/learn-window.ts tauri/ui/tests/learn/test_practice_booth_shell.spec.ts tests/learn/test_exemplar_lesson.py .planning/handoffs/2026-05-31-package-checklist.md`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+
+## Package 151 - Recordings Voice Replay Availability
+
+Suggested commit: `fix(recordings-ui): skip missing voice replay loads`
+
+Include:
+
+- `src/vibemix/runtime/recordings_index.py`
+- `src/vibemix/ui_bus/messages.py`
+- `tauri/ui/src/ipc/messages.schema.json`
+- `tauri/ui/src/ipc/messages.ts`
+- `tauri/ui/src/ipc/validator.generated.mjs`
+- `tauri/ui/src/settings/components/recording-row.ts`
+- `tauri/ui/src/settings/components/recording-row.spec.ts`
+- `tests/recording/test_recordings_index.py`
+- `tests/ui_bus/test_recordings_messages.py`
+- `tests/ui_bus/test_messages_schema.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Recording asset scope changes, debrief renderer changes, recorder close
+  semantics, retention/deletion behavior, live voice/TTS routing, library ingest,
+  and Learn runtime work. This package only lets the recordings list tell the UI
+  whether a `voice.wav` artifact exists before the row mounts a replay player.
+
+Reason:
+
+- Fresh-user sessions can contain `events.jsonl` without a `voice.wav` artifact.
+  The Settings recordings row still mounted an `asset://.../voice.wav` audio
+  element on expand, causing WebKit 403 spam and making the drawer look broken
+  even though the events list loaded correctly. Add an additive
+  `voice_available` summary field, derive it from a regular-file check under
+  the recordings root, and have the row render a quiet unavailable receipt
+  instead of requesting a missing audio asset.
+
+Proof before staging:
+
+- `uv run pytest -q tests/recording/test_recordings_index.py tests/ui_bus/test_recordings_messages.py tests/ui_bus/test_messages_schema.py`
+- `npm --prefix tauri/ui run codegen:ipc`
+- `npm --prefix tauri/ui test -- src/settings/components/recording-row.spec.ts`
+- `uv run python scripts/check_ipc_schema.py`
+- `uv run ruff check src/vibemix/runtime/recordings_index.py src/vibemix/ui_bus/messages.py tests/recording/test_recordings_index.py tests/ui_bus/test_recordings_messages.py tests/ui_bus/test_messages_schema.py`
+- `uv run python -m compileall -q src/vibemix/runtime/recordings_index.py src/vibemix/ui_bus/messages.py tests/recording/test_recordings_index.py tests/ui_bus/test_recordings_messages.py tests/ui_bus/test_messages_schema.py`
+- `npm --prefix tauri/ui run build`
+- `git diff --check -- src/vibemix/runtime/recordings_index.py src/vibemix/ui_bus/messages.py tauri/ui/src/ipc/messages.schema.json tauri/ui/src/ipc/messages.ts tauri/ui/src/ipc/validator.generated.mjs tauri/ui/src/settings/components/recording-row.ts tauri/ui/src/settings/components/recording-row.spec.ts tests/recording/test_recordings_index.py tests/ui_bus/test_recordings_messages.py tests/ui_bus/test_messages_schema.py .planning/handoffs/2026-05-31-package-checklist.md`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`

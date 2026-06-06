@@ -2034,6 +2034,10 @@
                   },
                   "crashed": {
                     "type": "boolean"
+                  },
+                  "voice_available": {
+                    "type": "boolean",
+                    "description": "True when recordings/<session_dir>/voice.wav exists as a regular file. Optional for additive compatibility; current sidecars send it so the UI can avoid mounting missing audio assets."
                   }
                 }
               }

@@ -1334,6 +1334,9 @@ class RecordingSummary:
     event_count: int
     bytes_total: int
     crashed: bool
+    # True only when recordings/<session_dir>/voice.wav exists as a regular file.
+    # The UI uses this to avoid mounting an asset:// player for event-only sessions.
+    voice_available: bool = False
 
 
 @dataclass(frozen=True, slots=True)

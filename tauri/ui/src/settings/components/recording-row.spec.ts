@@ -52,6 +52,7 @@ const baseSummary = {
   event_count: 38,
   bytes_total: 12345678,
   crashed: false,
+  voice_available: true,
 };
 
 let matchMediaReduced = false;
@@ -184,6 +185,26 @@ describe("recording-row — Test 4: setExpanded(true) mounts audio with asset://
     );
     expect(handle.root.getAttribute("aria-expanded")).toBe("true");
     expect(handle.root.dataset.open).toBe("true");
+  });
+});
+
+describe("recording-row — voice replay availability", () => {
+  it("skips the voice.wav player when the recording summary has no voice artifact", () => {
+    const handle = renderRecordingRow({
+      summary: { ...baseSummary, voice_available: false },
+      onToggle: vi.fn(),
+      onDelete: vi.fn(),
+      absoluteWavPathResolver: (sd) => `/recordings/${sd}/voice.wav`,
+    });
+    document.body.append(handle.root);
+
+    handle.setExpanded(true);
+
+    expect(handle.root.querySelector("audio")).toBeNull();
+    expect(handle.root.querySelector(".vmx-rec-row__audio-missing")?.textContent).toBe(
+      "Voice replay unavailable for this session.",
+    );
+    expect(handle.root.getAttribute("aria-expanded")).toBe("true");
   });
 });
 

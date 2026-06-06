@@ -284,6 +284,7 @@ def _make_examples() -> list[tuple[str, object]]:
                         event_count=38,
                         bytes_total=12345678,
                         crashed=False,
+                        voice_available=True,
                     ),
                 ],
                 bytes_total=12345678,

@@ -24,18 +24,15 @@ import json
 import os
 import time
 import wave
-from datetime import datetime
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable
 
 import pytest
 
 from vibemix.runtime.recordings_index import (
     SESSION_DIR_RE,
     RecordingsIndex,
-    run_retention_sweep,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -68,8 +65,8 @@ def test_list_returns_three_summaries_sorted_newest_first(
     tmp_recordings_dir: Path, make_fake_session: Callable[..., Path]
 ) -> None:
     # Older sessions first so we exercise the sort, not insertion order.
-    s_old = make_fake_session(name="20260510-100000", ended=True)
-    s_mid = make_fake_session(name="20260512-120000", ended=True)
+    make_fake_session(name="20260510-100000", ended=True)
+    make_fake_session(name="20260512-120000", ended=True)
     # Legacy dir (no session.json) — must still appear in the list.
     legacy = tmp_recordings_dir / "20260513-210410"
     legacy.mkdir(parents=True)
@@ -116,6 +113,31 @@ def test_legacy_dir_synthesis_from_wav_header_and_jsonl(
     # Dir-name parses to local-time isoformat.
     assert s.started_at_iso.startswith("2026-05-13T21:04:10")
     assert s.crashed is False
+    assert s.voice_available is True
+
+
+def test_summary_marks_voice_unavailable_when_voice_wav_missing(
+    tmp_recordings_dir: Path,
+) -> None:
+    sd = tmp_recordings_dir / "20260513-210410"
+    sd.mkdir(parents=True)
+    (sd / "session.json").write_text(
+        json.dumps(
+            {
+                "started_at_iso": "2026-05-13T21:04:10+02:00",
+                "duration_s": 90.0,
+                "event_count": 1,
+                "crashed": False,
+            }
+        ),
+        encoding="utf-8",
+    )
+    _write_jsonl(sd / "events.jsonl", {"t": 0.0, "kind": "session_start"})
+
+    sessions = RecordingsIndex(tmp_recordings_dir).list()
+
+    assert len(sessions) == 1
+    assert sessions[0].voice_available is False
 
 
 # ---------------------------------------------------------------------------

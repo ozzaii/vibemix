@@ -201,6 +201,14 @@ def _count_jsonl_lines(jsonl_path: Path) -> int:
         return 0
 
 
+def _voice_wav_available(session_dir: Path) -> bool:
+    """Return whether this session has a replayable voice.wav artifact."""
+    try:
+        return (session_dir / "voice.wav").is_file()
+    except OSError:
+        return False
+
+
 def _synthesize_legacy_summary(session_dir: Path) -> RecordingSummary | None:
     """Build a RecordingSummary for a legacy (pre-Phase-15) directory.
 
@@ -222,6 +230,7 @@ def _synthesize_legacy_summary(session_dir: Path) -> RecordingSummary | None:
         event_count=event_count,
         bytes_total=bytes_total,
         crashed=False,
+        voice_available=_voice_wav_available(session_dir),
     )
 
 
@@ -277,6 +286,7 @@ def _read_session_summary(session_dir: Path) -> RecordingSummary | None:
         event_count=event_count,
         bytes_total=bytes_total,
         crashed=crashed,
+        voice_available=_voice_wav_available(session_dir),
     )
 
 

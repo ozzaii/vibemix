@@ -74,6 +74,7 @@ def test_recordings_list_result_roundtrips_with_session_summary() -> None:
             event_count=38,
             bytes_total=12345678,
             crashed=False,
+            voice_available=True,
         ),
     )
     msg = RecordingsListResult.make(sessions=sessions, bytes_total=12345678)
@@ -84,6 +85,7 @@ def test_recordings_list_result_roundtrips_with_session_summary() -> None:
     # `sessions` tuple must serialize as a JSON array.
     assert isinstance(parsed["payload"]["sessions"], list)
     assert parsed["payload"]["sessions"][0]["session_dir"] == "20260513-210410"
+    assert parsed["payload"]["sessions"][0]["voice_available"] is True
     assert parsed["payload"]["bytes_total"] == 12345678
 
 
@@ -264,7 +266,7 @@ def test_recordings_events_result_accepts_empty_events_array() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_count_parity_at_72() -> None:
+def test_count_parity_at_83() -> None:
     """Phase 15 Plan 01 bumped the IPC count 27 → 34 (+7 recordings.* families);
     Phase 20-04 added SessionCitation → 35; Phase 24-02 added
     SessionOverlayHighlight → 36; Phase 25/29 keeps 1 DEBRIEF session wrapper
@@ -322,12 +324,11 @@ def test_count_parity_at_72() -> None:
                 seen.add(obj)
                 wrapper_count += 1
 
-    assert len(_SCHEMA["oneOf"]) == 81, (
-        "schema oneOf count should be 81 after adding the SHIP-WIRE START-gate "
-        "SessionStart/SessionStop envelopes (live-session arm/run control) on top "
-        "of the DEMOCRATIZATION-1 SettingsSetBrain/SettingsBrainAck envelopes"
+    assert len(_SCHEMA["oneOf"]) == 83, (
+        "schema oneOf count should be 83 after the current live-session, "
+        "democratization, and Learn progress envelopes"
     )
-    assert wrapper_count == 81, f"wrapper count {wrapper_count} != 81"
+    assert wrapper_count == 83, f"wrapper count {wrapper_count} != 83"
 
 
 def test_check_ipc_schema_script_exits_zero() -> None:

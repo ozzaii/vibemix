@@ -439,6 +439,10 @@ export interface RecordingsListResult {
       event_count: number;
       bytes_total: number;
       crashed: boolean;
+      /**
+       * True when recordings/<session_dir>/voice.wav exists as a regular file. Optional for additive compatibility; current sidecars send it so the UI can avoid mounting missing audio assets.
+       */
+      voice_available?: boolean;
     }[];
     bytes_total: number;
   };

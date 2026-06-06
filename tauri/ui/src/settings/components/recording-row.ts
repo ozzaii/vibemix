@@ -67,6 +67,7 @@ export interface RecordingSummary {
   event_count: number;
   bytes_total: number;
   crashed: boolean;
+  voice_available?: boolean;
 }
 
 export interface RecordingRowHandle {
@@ -325,6 +326,16 @@ const CSS = `
     display: block;
     margin-bottom: var(--sp-3);
   }
+  .vmx-rec-row__audio-missing {
+    font-size: 12px;
+    line-height: 1.4;
+    color: var(--silk-40);
+    padding: var(--sp-2) var(--sp-3);
+    margin-bottom: var(--sp-3);
+    border: 1px solid var(--glass-edge);
+    border-radius: 6px;
+    background: var(--glass-2);
+  }
   .vmx-rec-row__transcript {
     display: flex;
     flex-direction: column;
@@ -567,6 +578,15 @@ export function renderRecordingRow(opts: RecordingRowProps): RecordingRowHandle 
 
   function mountAudio(innerEl: HTMLElement): void {
     if (audioEl !== null) return;
+    if (summary.voice_available !== true) {
+      if (innerEl.querySelector(".vmx-rec-row__audio-missing") === null) {
+        const missing = document.createElement("div");
+        missing.className = "vmx-rec-row__audio-missing";
+        missing.textContent = "Voice replay unavailable for this session.";
+        innerEl.append(missing);
+      }
+      return;
+    }
     audioEl = document.createElement("audio");
     audioEl.className = "vmx-rec-row__audio";
     audioEl.controls = true;
