@@ -26,9 +26,16 @@ export interface PlayheadTickPayload {
   decks: Partial<Record<DeckId, { frame: number; position_s: number; bpm: number }>>;
 }
 
+export interface WaveformGradePayload {
+  verdict: "locked" | "drifting" | "tempo_off" | "trainwreck" | "abstain";
+  phase_error_beats: number;
+  save_landed?: boolean;
+}
+
 export interface WaveformDisplayHandle {
   updateWaveforms(payload: WaveformReadyPayload): void;
   updatePlayhead(payload: PlayheadTickPayload): void;
+  updateGrade(payload: WaveformGradePayload): void;
   dispose(): void;
 }
 
@@ -44,6 +51,20 @@ const DECKS: DeckId[] = ["A", "B"];
 const STRIP_WIDTH = 720;
 const STRIP_HEIGHT = 72;
 const DPR_MAX = 2;
+const GALLOP_SHIFT_PX = 96;
+
+function clamp(value: number, min: number, max: number): number {
+  if (!Number.isFinite(value)) return min;
+  return Math.min(max, Math.max(min, value));
+}
+
+function beatTrainMarkup(deck: DeckId): string {
+  const beats = Array.from(
+    { length: 9 },
+    (_value, index) => `<i style="--beat-index:${index}"></i>`,
+  ).join("");
+  return `<div class="learn-waveforms__train" data-deck="${deck}">${beats}</div>`;
+}
 
 function makeCanvas(width: number, height: number): HTMLCanvasElement | OffscreenCanvas {
   if (typeof OffscreenCanvas !== "undefined") {
@@ -113,12 +134,20 @@ export function WaveformDisplay(host: HTMLElement): WaveformDisplayHandle {
     <div class="learn-waveforms" role="img" aria-label="practice waveforms">
       <canvas class="learn-waveform" data-deck="A"></canvas>
       <canvas class="learn-waveform" data-deck="B"></canvas>
+      <div class="learn-waveforms__gallop" aria-hidden="true">
+        ${beatTrainMarkup("A")}
+        ${beatTrainMarkup("B")}
+      </div>
     </div>
   `;
   // Start hidden: with no audio loaded the strips are empty boxes parked over
   // the tutor line. CSS reveals the host only once updateWaveforms flags real
   // data ("partial"/"true"); an idle lesson never shows the dead panels.
   host.dataset.ready = "false";
+  host.dataset.gallop = "idle";
+  host.dataset.gallopSnap = "false";
+  host.style.setProperty("--gallop-shift", "0px");
+  host.style.setProperty("--gallop-intensity", "0");
   const canvases = new Map<DeckId, HTMLCanvasElement>();
   host.querySelectorAll<HTMLCanvasElement>("canvas[data-deck]").forEach((canvas) => {
     const deck = canvas.dataset.deck as DeckId;
@@ -191,8 +220,31 @@ export function WaveformDisplay(host: HTMLElement): WaveformDisplayHandle {
       playheads = payload.decks;
       requestDraw();
     },
+    updateGrade(payload: WaveformGradePayload): void {
+      const phase = clamp(payload.phase_error_beats, -0.5, 0.5);
+      const intensity = Math.min(1, Math.abs(phase) / 0.25);
+      host.style.setProperty("--gallop-shift", `${phase * GALLOP_SHIFT_PX}px`);
+      host.style.setProperty("--gallop-intensity", intensity.toFixed(3));
+      host.dataset.gallopPhase = phase.toFixed(4);
+      host.dataset.gallopIntensity = intensity.toFixed(3);
+      host.dataset.gallopVerdict = payload.verdict;
+      host.dataset.gallopSnap = payload.verdict === "locked" ? "true" : "false";
+      if (payload.verdict === "locked") {
+        host.dataset.gallop = payload.save_landed ? "save" : "locked";
+      } else if (payload.verdict === "trainwreck" || payload.verdict === "tempo_off") {
+        host.dataset.gallop = "off";
+      } else if (phase > 0.005) {
+        host.dataset.gallop = "behind";
+      } else if (phase < -0.005) {
+        host.dataset.gallop = "ahead";
+      } else {
+        host.dataset.gallop = "center";
+      }
+    },
     dispose(): void {
       if (raf) window.cancelAnimationFrame(raf);
+      host.style.removeProperty("--gallop-shift");
+      host.style.removeProperty("--gallop-intensity");
       host.innerHTML = "";
     },
   };

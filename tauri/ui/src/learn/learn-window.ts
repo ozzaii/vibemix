@@ -1446,6 +1446,7 @@ function mountLearnWindow(root: HTMLElement): {
     if (!liveMeter) {
       liveMeter = LiveGradeMeter(liveMeterHost);
     }
+    waveforms.updateGrade(payload);
     liveMeter.update(payload);
     showLiveGradeMissionFeedback(payload);
   });

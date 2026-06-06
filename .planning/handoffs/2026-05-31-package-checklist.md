@@ -11622,3 +11622,37 @@ Proof before staging:
 - `npm --prefix tauri/ui run build`
 - `git diff --check -- tauri/ui/src/learn/live-meter.ts tauri/ui/src/learn/styles/learn.css tauri/ui/tests/learn/live-meter.spec.ts .planning/handoffs/2026-05-31-package-checklist.md`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+
+## Package 115 - Learn Gallop Beat Trains
+
+Suggested commit: `feat(learn-ui): show gallop beat trains`
+
+Include:
+
+- `tauri/ui/src/learn/waveform-display.ts`
+- `tauri/ui/src/learn/learn-window.ts`
+- `tauri/ui/src/learn/styles/learn.css`
+- `tauri/ui/tests/learn/test_waveform_hidden_until_ready.spec.ts`
+- `tauri/ui/tests/learn/test_practice_booth_shell.spec.ts`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Backend grade semantics, waveform peak generation, debrief Morning Mirror,
+  and new IPC. This package only renders existing `ipc.learn.live_grade`
+  phase error as motion over the already-mounted practice waveform strips.
+
+Reason:
+
+- The meter tells the DJ they are behind or ahead, but it does not show two
+  beat trains fighting. Feed live-grade phase into the waveform component so
+  deck A/B pulses diverge while drifting and collapse on lock/save, making the
+  Save drill feel like pulling two moving trains into one pulse.
+
+Proof before staging:
+
+- `npm --prefix tauri/ui test -- tests/learn/test_waveform_hidden_until_ready.spec.ts tests/learn/test_practice_booth_shell.spec.ts tests/learn/live-meter.spec.ts`
+- `npm --prefix tauri/ui run test:e2e:learn -- tests/learn/browser-responsive.pw.ts`
+- `npm --prefix tauri/ui run build`
+- `git diff --check -- tauri/ui/src/learn/waveform-display.ts tauri/ui/src/learn/learn-window.ts tauri/ui/src/learn/styles/learn.css tauri/ui/tests/learn/test_waveform_hidden_until_ready.spec.ts tauri/ui/tests/learn/test_practice_booth_shell.spec.ts .planning/handoffs/2026-05-31-package-checklist.md`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`

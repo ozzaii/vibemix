@@ -592,9 +592,13 @@ describe("practice booth shell", () => {
       );
 
       const meter = root.querySelector<HTMLElement>("#learn-live-meter");
+      const waveformHost = root.querySelector<HTMLElement>("#learn-waveform-host");
       expect(meter).not.toBeNull();
       expect(meter?.dataset.state).toBe("active");
       expect(meter?.dataset.verdict).toBe("drifting");
+      expect(waveformHost?.dataset.gallop).toBe("behind");
+      expect(waveformHost?.dataset.gallopPhase).toBe("0.2500");
+      expect(waveformHost?.style.getPropertyValue("--gallop-shift")).toBe("24px");
       expect(meter?.dataset.saveActive).toBe("true");
       expect(meter?.dataset.saveRemaining).toBe("8.5");
       expect(meter?.querySelector(".learn-live-meter__save")?.textContent).toContain("L2");
@@ -622,6 +626,8 @@ describe("practice booth shell", () => {
       );
 
       expect(meter?.dataset.verdict).toBe("locked");
+      expect(waveformHost?.dataset.gallop).toBe("locked");
+      expect(waveformHost?.dataset.gallopSnap).toBe("true");
       expect(Number(meter?.dataset.needlePct)).toBe(50);
       expect(meter?.dataset.citation).toBe("[ev:BEATMATCH_GRADED@12.345]");
       expect(hint.textContent).toBe("locked proof");

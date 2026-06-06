@@ -75,4 +75,35 @@ describe("learn waveform strips hide until audio is ready", () => {
     wf.updateWaveforms(ready({}));
     expect(h.dataset.ready).toBe("false");
   });
+
+  it("maps live grade phase into gallop direction and save snap state", () => {
+    const h = host();
+    const wf = WaveformDisplay(h);
+
+    wf.updateGrade({
+      verdict: "drifting",
+      phase_error_beats: 0.25,
+    });
+    expect(h.dataset.gallop).toBe("behind");
+    expect(h.dataset.gallopVerdict).toBe("drifting");
+    expect(h.dataset.gallopSnap).toBe("false");
+    expect(h.dataset.gallopPhase).toBe("0.2500");
+    expect(h.style.getPropertyValue("--gallop-shift")).toBe("24px");
+
+    wf.updateGrade({
+      verdict: "locked",
+      phase_error_beats: 0,
+      save_landed: true,
+    });
+    expect(h.dataset.gallop).toBe("save");
+    expect(h.dataset.gallopSnap).toBe("true");
+    expect(h.style.getPropertyValue("--gallop-shift")).toBe("0px");
+
+    wf.updateGrade({
+      verdict: "trainwreck",
+      phase_error_beats: -0.42,
+    });
+    expect(h.dataset.gallop).toBe("off");
+    expect(h.dataset.gallopVerdict).toBe("trainwreck");
+  });
 });
