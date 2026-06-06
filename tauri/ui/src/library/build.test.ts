@@ -559,6 +559,28 @@ describe("build — real renderBuildSet path (jsdom, via mountLibrary)", () => {
     expect(rows[0]?.classList.contains("top")).toBe(true);
     // built rows carry NO score number (ordered by the agent's arc).
     expect(rows[0]?.querySelector(".num")).toBeNull();
+    expect(rows[0]?.querySelector(".vmx-lib-artwork")?.textContent).toContain(
+      "CX",
+    );
+    expect(rows[0]?.querySelector(".vmx-lib-track-kicker")?.textContent).toContain(
+      "Charli XCX",
+    );
+    expect(rows[0]?.querySelector(".title")?.textContent).toContain("Guess");
+    expect(rows[0]?.querySelector(".vmx-lib-track-chips")?.textContent).toContain(
+      "BPM 122",
+    );
+    expect(rows[0]?.querySelector(".vmx-lib-track-chips")?.textContent).toContain(
+      "Key 5A",
+    );
+    expect(rows[0]?.querySelector(".vmx-lib-track-chips")?.textContent).toContain(
+      "Energy 64",
+    );
+    expect(document.getElementById("vmx-lib-scope-state")?.textContent).toBe(
+      "sequenced",
+    );
+    expect(document.querySelectorAll("#vmx-lib-scope circle").length).toBeGreaterThan(
+      6,
+    );
     expect(document.getElementById("vmx-lib-rationale-body")?.textContent).toContain(
       "peak-time",
     );

@@ -60,6 +60,11 @@ export interface TrackResult {
   /** Cosine score in [0,1]. Higher = closer in the active vibe space. */
   score: number;
   meta: string;
+  artist?: string;
+  bpm?: number;
+  key?: string;
+  energy?: number;
+  artwork?: string;
 }
 
 export interface SearchResult {
@@ -190,6 +195,11 @@ export interface CurateTrack {
   track_id: string;
   title: string;
   meta: string;
+  artist?: string;
+  bpm?: number;
+  key?: string;
+  energy?: number;
+  artwork?: string;
 }
 
 /** Result of an AI-curated playlist (`library curate <theme> --json`, mapped by
@@ -1755,6 +1765,11 @@ function normalizeTrackResult(value: unknown, label: string): TrackResult {
     title: asString(row.title, `${label}.title`),
     score: asFiniteNumber(row.score, `${label}.score`),
     meta: asString(row.meta, `${label}.meta`),
+    artist: optionalString(row, "artist"),
+    bpm: optionalNumber(row, "bpm"),
+    key: optionalString(row, "key"),
+    energy: optionalNumber(row, "energy"),
+    artwork: optionalString(row, "artwork"),
   };
 }
 
@@ -1778,6 +1793,11 @@ function normalizeCurateTrack(value: unknown, label: string): CurateTrack {
     track_id: asString(row.track_id, `${label}.track_id`),
     title: asString(row.title, `${label}.title`),
     meta: asString(row.meta, `${label}.meta`),
+    artist: optionalString(row, "artist"),
+    bpm: optionalNumber(row, "bpm"),
+    key: optionalString(row, "key"),
+    energy: optionalNumber(row, "energy"),
+    artwork: optionalString(row, "artwork"),
   };
 }
 

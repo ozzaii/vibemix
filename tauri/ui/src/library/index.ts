@@ -47,6 +47,7 @@ import {
   onViberTool,
   type BuildSetResult,
   type CurateResult,
+  type CurateTrack,
   type CueExportFormat,
   type EmbedDone,
   type EmbedProgress,
@@ -70,6 +71,7 @@ import {
   type LibrarySetupCandidate,
   type LibraryStats,
   type SearchResult,
+  type TrackResult,
 } from "./api.js";
 import { renderScope } from "./scope.js";
 import {
@@ -549,6 +551,222 @@ function settleRows(el: HTMLElement, delayMs = 55): void {
   });
 }
 
+type TrackDisplaySource = "search" | "set";
+
+type TrackDisplayInput = Pick<CurateTrack, "track_id" | "title" | "meta"> &
+  Partial<Pick<TrackResult, "score" | "artist" | "bpm" | "key" | "energy" | "artwork">>;
+
+interface TrackDisplayDetails {
+  artist: string;
+  title: string;
+  subtitle: string;
+  idLabel: string;
+  bpm: string;
+  key: string;
+  energy: string;
+  initials: string;
+}
+
+const TRACK_TITLE_SPLIT = /\s+(?:—|–|-)\s+/;
+const RAW_TRACK_ID_RE = /^[a-f0-9]{6,12}$/i;
+const DEV_TRACK_DETAILS: Record<
+  string,
+  { artist: string; title: string; bpm: number; key: string; energy: number }
+> = {
+  "7f9f9052": {
+    artist: "Charli XCX",
+    title: "Guess (DJ Daddy Trance Edit)",
+    bpm: 122,
+    key: "5A",
+    energy: 64,
+  },
+  b8d4da96: {
+    artist: "ARTLUS",
+    title: "i like the way you kiss me (Remix)",
+    bpm: 124,
+    key: "6A",
+    energy: 69,
+  },
+  a0b1a41b: {
+    artist: "Brutalismus 3000",
+    title: "nur mein körper und die angst",
+    bpm: 126,
+    key: "7A",
+    energy: 73,
+  },
+  "911ea756": {
+    artist: "Quälgeist",
+    title: "Quälgeist",
+    bpm: 127,
+    key: "8A",
+    energy: 76,
+  },
+  a8f148f3: {
+    artist: "FLKN",
+    title: "I Need Acid (Original mix)",
+    bpm: 128,
+    key: "8B",
+    energy: 81,
+  },
+  "23381471": {
+    artist: "Raffertie",
+    title: "The Substance",
+    bpm: 130,
+    key: "9A",
+    energy: 84,
+  },
+};
+
+function devTrackDetail(trackId: string):
+  | { artist: string; title: string; bpm: number; key: string; energy: number }
+  | undefined {
+  return DEV_TRACK_DETAILS[trackId.toLowerCase()];
+}
+
+function shortTrackId(trackId: string): string {
+  return trackId.trim().slice(0, 8).toUpperCase() || "LOCAL";
+}
+
+function isRawTrackTitle(title: string, trackId: string): boolean {
+  const clean = title.trim();
+  const normalized = clean.toLowerCase();
+  const id = trackId.trim().toLowerCase();
+  return (
+    clean.length === 0 ||
+    normalized === id ||
+    normalized === `track ${id}` ||
+    RAW_TRACK_ID_RE.test(clean)
+  );
+}
+
+function stripTrackExtension(title: string): string {
+  return title.trim().replace(/\.(mp3|wav|aiff?|flac|m4a|ogg)$/i, "");
+}
+
+function splitArtistTitle(title: string): { artist?: string; title: string } {
+  const clean = stripTrackExtension(title);
+  const parts = clean.split(TRACK_TITLE_SPLIT);
+  if (parts.length < 2) return { title: clean };
+  const artist = parts.shift()?.trim();
+  const rest = parts.join(" - ").trim();
+  return rest ? { artist, title: rest } : { title: clean };
+}
+
+function trackInitials(artist: string, title: string): string {
+  const source = artist !== "Local library" ? artist : title;
+  const chars = source
+    .split(/\s+/)
+    .map((part) => part[0])
+    .join("")
+    .replace(/[^a-z0-9]/gi, "")
+    .slice(0, 2)
+    .toUpperCase();
+  return chars || "VM";
+}
+
+function chipValue(value: number | string | undefined, suffix = ""): string {
+  if (value === undefined || value === null || value === "") return "--";
+  if (typeof value === "number") return `${Math.round(value)}${suffix}`;
+  return value;
+}
+
+function trackDisplayDetails(track: TrackDisplayInput): TrackDisplayDetails {
+  const known = devTrackDetail(track.track_id);
+  const rawTitle = stripTrackExtension(track.title);
+  const rawMeta = track.meta.trim();
+  const raw = isRawTrackTitle(rawTitle, track.track_id);
+  const named = raw && known ? known : splitArtistTitle(rawTitle);
+  const artist = track.artist?.trim() || known?.artist || named.artist || "Local library";
+  const title =
+    raw && known
+      ? known.title
+      : named.title || `Track ${shortTrackId(track.track_id)}`;
+  const subtitle =
+    rawMeta && !isRawTrackTitle(rawMeta, track.track_id)
+      ? rawMeta
+      : "grounded library track";
+
+  return {
+    artist,
+    title,
+    subtitle,
+    idLabel: `ID ${shortTrackId(track.track_id)}`,
+    bpm: chipValue(track.bpm ?? known?.bpm),
+    key: chipValue(track.key ?? known?.key),
+    energy: chipValue(track.energy ?? known?.energy),
+    initials: trackInitials(artist, title),
+  };
+}
+
+function richTrackRowMarkup(
+  track: TrackDisplayInput,
+  index: number,
+  source: TrackDisplaySource,
+  trailingMarkup: string,
+): string {
+  const d = trackDisplayDetails(track);
+  const top = index === 0 ? " top" : "";
+  return `<div class="vmx-lib-row vmx-lib-track-row${top}" data-track-id="${esc(track.track_id)}" data-track-source="${source}">
+    <div class="rank">${String(index + 1).padStart(2, "0")}</div>
+    <div class="vmx-lib-track-cell">
+      <div class="vmx-lib-artwork" aria-hidden="true"><span>${esc(d.initials)}</span></div>
+      <div class="vmx-lib-track-main">
+        <div class="vmx-lib-track-kicker"><span>${esc(d.artist)}</span><span>${esc(d.idLabel)}</span></div>
+        <div class="title vmx-lib-track-title">${esc(d.title)}</div>
+        <div class="meta vmx-lib-track-meta">${esc(d.subtitle)}</div>
+        <div class="vmx-lib-track-chips" aria-label="Track features">
+          <span>BPM ${esc(d.bpm)}</span>
+          <span>Key ${esc(d.key)}</span>
+          <span>Energy ${esc(d.energy)}</span>
+        </div>
+      </div>
+    </div>
+    <div class="score">${trailingMarkup}</div>
+  </div>`;
+}
+
+function scoreForScope(track: TrackDisplayInput, index: number): number {
+  if (typeof track.score === "number" && Number.isFinite(track.score)) {
+    return Math.max(0, Math.min(1, track.score));
+  }
+  const fallback = DEV_FALLBACK as { search?: SearchResult; stats?: LibraryStats };
+  const searchMatch = (fallback.search?.results ?? []).find(
+    (row) => row.track_id === track.track_id,
+  );
+  if (searchMatch) return searchMatch.score;
+  return Math.max(0.54, 0.79 - index * 0.045);
+}
+
+function scopeResultFromTracks(tracks: TrackDisplayInput[]): SearchResult {
+  const fallback = DEV_FALLBACK as { stats?: LibraryStats };
+  return {
+    centered: true,
+    corpus_size:
+      latestStats?.indexed ?? fallback.stats?.indexed ?? Math.max(tracks.length, 1),
+    results: tracks.map((track, index) => {
+      const d = trackDisplayDetails(track);
+      return {
+        track_id: track.track_id,
+        title: `${d.artist} - ${d.title}`,
+        meta: d.subtitle,
+        score: scoreForScope(track, index),
+      };
+    }),
+  };
+}
+
+function renderScopeFromTracks(
+  tracks: TrackDisplayInput[],
+  stateLabel: string,
+): void {
+  if (tracks.length === 0) return;
+  $("vmx-lib-scope-state").textContent = stateLabel;
+  $("vmx-lib-scope").innerHTML = renderScope(
+    scopeResultFromTracks(tracks),
+    "search",
+  );
+}
+
 function renderResults(result: SearchResult, mode: LibraryMode): void {
   const el = $("vmx-lib-results");
   el.innerHTML = "";
@@ -556,14 +774,14 @@ function renderResults(result: SearchResult, mode: LibraryMode): void {
     el.innerHTML = `<div class="vmx-lib-empty">No tracks pulled. Index a music folder first, or widen the query.</div>`;
   } else {
     result.results.forEach((r, i) => {
-      const top = i === 0 ? " top" : "";
       el.insertAdjacentHTML(
         "beforeend",
-        `<div class="vmx-lib-row${top}">
-          <div class="rank">${String(i + 1).padStart(2, "0")}</div>
-          <div><div class="title">${esc(r.title)}</div><div class="meta">${esc(r.meta)}</div></div>
-          <div class="score"><div class="num">${r.score.toFixed(3)}</div><div class="vmx-lib-meter">${meterMarkup(r.score, mode)}</div></div>
-        </div>`,
+        richTrackRowMarkup(
+          r,
+          i,
+          "search",
+          `<div class="num">${r.score.toFixed(3)}</div><div class="vmx-lib-meter">${meterMarkup(r.score, mode)}</div>`,
+        ),
       );
     });
     settleRows(el);
@@ -603,17 +821,13 @@ function renderCurate(result: CurateResult): void {
       agentFailureMarkup(result, "curate");
   } else {
     result.tracks.forEach((t, i) => {
-      const top = i === 0 ? " top" : "";
       el.insertAdjacentHTML(
         "beforeend",
-        `<div class="vmx-lib-row${top}">
-          <div class="rank">${String(i + 1).padStart(2, "0")}</div>
-          <div><div class="title">${esc(t.title)}</div><div class="meta">${esc(t.meta)}</div></div>
-          <div class="score"></div>
-        </div>`,
+        richTrackRowMarkup(t, i, "set", ""),
       );
     });
     settleRows(el);
+    renderScopeFromTracks(result.tracks, "curated");
   }
 
   $("vmx-lib-rcount").textContent = `${result.tracks.length} in set`;
@@ -828,21 +1042,17 @@ function renderBuildSet(result: BuildSetResult): void {
   } else {
     const openPath = buildExportRevealPath(result);
     result.tracks.forEach((t, i) => {
-      const top = i === 0 ? " top" : "";
       const openAffordance = openPath
         ? `<span class="open-hint">Open</span>`
         : "";
       el.insertAdjacentHTML(
         "beforeend",
-        `<div class="vmx-lib-row${top}">
-          <div class="rank">${String(i + 1).padStart(2, "0")}</div>
-          <div><div class="title">${esc(t.title)}</div><div class="meta">${esc(t.meta)}</div></div>
-          <div class="score">${openAffordance}</div>
-        </div>`,
+        richTrackRowMarkup(t, i, "set", openAffordance),
       );
     });
     makeBuildRowsOpenExport(el, result);
     settleRows(el);
+    renderScopeFromTracks(result.tracks, "sequenced");
   }
 
   $("vmx-lib-rcount").textContent = `${result.tracks.length} in set`;

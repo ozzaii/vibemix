@@ -26,8 +26,8 @@ const RINGS: ReadonlyArray<{ r: number; label: string }> = [
 
 const RADIUS_MIN = 30;
 const RADIUS_MAX = 132;
-/** How many of the nearest plotted tracks are drawn "hot" (amber). */
-const NEAR_COUNT = 2;
+/** How many of the nearest plotted tracks get the brightest rose treatment. */
+const NEAR_COUNT = 3;
 
 /** Map a track's score → a plotted radius from the origin.
  *
@@ -72,18 +72,18 @@ export function renderScope(result: SearchResult, mode: LibraryMode): string {
     const x = CX + Math.cos(ang) * rr;
     const y = CY + Math.sin(ang) * rr;
     const near = i < NEAR_COUNT;
-    const spoke = near ? "var(--amber-22)" : "var(--silk-12)";
+    const spoke = near ? "var(--brand-22)" : "var(--brand-08)";
     h += `<line x1="${CX}" y1="${CY}" x2="${x.toFixed(2)}" y2="${y.toFixed(2)}" stroke="${spoke}"/>`;
     if (near) {
-      h += `<circle cx="${x.toFixed(2)}" cy="${y.toFixed(2)}" r="4.5" fill="var(--amber-pale)" class="vmx-lib-dot-near"/>`;
+      h += `<circle cx="${x.toFixed(2)}" cy="${y.toFixed(2)}" r="4.8" fill="var(--brand-glow)" class="vmx-lib-dot-near"/>`;
     } else {
-      h += `<circle cx="${x.toFixed(2)}" cy="${y.toFixed(2)}" r="3.5" fill="var(--silk-40)"/>`;
+      h += `<circle cx="${x.toFixed(2)}" cy="${y.toFixed(2)}" r="3.7" fill="var(--brand-40)" class="vmx-lib-dot-far"/>`;
     }
   });
 
   // Origin (query/seed) with sonar ping.
-  h += `<circle class="vmx-lib-seed-ping" cx="${CX}" cy="${CY}" r="3" fill="none" stroke="var(--amber)"/>`;
-  h += `<circle cx="${CX}" cy="${CY}" r="4.5" fill="var(--amber)" class="vmx-lib-dot-origin"/>`;
+  h += `<circle class="vmx-lib-seed-ping" cx="${CX}" cy="${CY}" r="3" fill="none" stroke="var(--brand)"/>`;
+  h += `<circle cx="${CX}" cy="${CY}" r="4.8" fill="var(--brand)" class="vmx-lib-dot-origin"/>`;
 
   return h;
 }
