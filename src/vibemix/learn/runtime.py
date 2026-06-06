@@ -2921,23 +2921,34 @@ class LessonRuntime(StateMachine):
     def _emit_live_cue_placement_grade(
         self, result: CuePlacementPracticeResult | None
     ) -> None:
-        """Voice the cited cue-placement result only after a real graded edge."""
+        """Voice measured cue-placement feedback without fabricating evidence.
 
-        if result is None or result.event is None:
+        Beat/drop-locked cues carry the cited ``CUE_PLACEMENT_GRADED`` receipt.
+        Misses are still useful coaching because Learn owns the practice grid,
+        but they stay uncited and never imply proof was banked.
+        """
+
+        if result is None:
             return
-        citation = (
-            f"[{CUE_PLACEMENT_EVIDENCE_SOURCE}:"
-            f"{CUE_PLACEMENT_GRADED_EVENT}@{result.t_session:.3f}]"
-        )
-        text = "hot cue landed on the drop."
-        if result.grade.verdict == "beat_locked":
-            text = "hot cue landed on the beat."
+        citations: tuple[str, ...] = ()
+        if result.event is not None:
+            citations = (
+                f"[{CUE_PLACEMENT_EVIDENCE_SOURCE}:"
+                f"{CUE_PLACEMENT_GRADED_EVENT}@{result.t_session:.3f}]",
+            )
+            text = "hot cue landed on the drop."
+            if result.grade.verdict == "beat_locked":
+                text = "hot cue landed on the beat."
+        else:
+            text = self._cue_placement_miss_text(result.grade)
+        if text is None:
+            return
         lesson_id = self._learn.current_lesson_id or "learn"
         try:
             speak = LearnTutorSpeak.make(
                 text=text,
                 tts_marker=f"{lesson_id}.cue_grade",
-                citations=(citation,),
+                citations=citations,
                 data_state="hint",
             ).to_dict()
             self._emit_tutor_speak(speak)
@@ -2948,6 +2959,34 @@ class LessonRuntime(StateMachine):
                 f"[learn.runtime] cue placement live grade emit failed: {exc!r}",
                 file=sys.stderr,
             )
+
+    def _cue_placement_miss_text(self, grade) -> str | None:
+        """Return short, measured cue-placement correction copy for misses."""
+
+        verdict = getattr(grade, "verdict", "")
+        if verdict == "off_beat":
+            beat_error = float(getattr(grade, "beat_error_beats", 0.0) or 0.0)
+            if beat_error > 0:
+                return "hot cue is late - move it back onto the beat."
+            if beat_error < 0:
+                return "hot cue is early - wait for the beat before setting it."
+            return "hot cue is off the beat - set it on the kick."
+        if verdict == "wrong_drop":
+            target_error = getattr(grade, "target_error_beats", None)
+            if target_error is not None:
+                try:
+                    beats = float(target_error)
+                except (TypeError, ValueError):
+                    beats = 0.0
+                if math.isfinite(beats):
+                    distance = max(1, round(abs(beats)))
+                    unit = "beat" if distance == 1 else "beats"
+                    if beats > 0:
+                        return f"on beat, but {distance} {unit} late - aim at the drop."
+                    if beats < 0:
+                        return f"on beat, but {distance} {unit} early - wait for the drop."
+            return "on beat, but wrong drop - aim for the target phrase."
+        return None
 
     def _grade_cue_placement_practice_tick(self) -> CuePlacementPracticeResult | None:
         """Grade the optional owned-deck cue-placement lane on a lock edge.

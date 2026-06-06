@@ -1627,3 +1627,78 @@ def test_cue_placement_practice_rearms_after_wrong_drop(monkeypatch) -> None:
     assert wrong_drop is not None and wrong_drop.grade.verdict == "wrong_drop"
     assert relock is not None and relock.credited == ("phrasing_performance",)
     assert progress.skills["phrasing_performance"]["live_proof_count"] == 2
+
+
+def test_cue_placement_wrong_drop_speaks_uncited_correction() -> None:
+    """A measured wrong-drop cue is useful tutor feedback, not citable proof."""
+    grid = _beat_grid()
+    target = grid.beat_at(16)
+    registry = EvidenceRegistry()
+    ipc = MagicMock(name="ipc_router")
+    learn_state = LearnState(current_lesson_id="L2.10")
+    runtime = LessonRuntime(
+        learn_state=learn_state,
+        midi_mirror=MagicMock(name="midi_mirror"),
+        controller_state=MagicMock(name="controller_state"),
+        ipc_router=ipc,
+        progress_store=LearnProgress(),
+        evidence_registry=registry,
+        evidence_clock=lambda: 90.0,
+        cue_placement_practice_loader=lambda: CuePlacementPracticeSnapshot(
+            grid=grid,
+            cue_frame=grid.beat_at(17),
+            target_frame=target,
+        ),
+    )
+
+    result = runtime._grade_cue_placement_practice_tick()
+    runtime._emit_live_cue_placement_grade(result)
+
+    assert result is not None
+    assert result.event is None
+    assert result.grade.verdict == "wrong_drop"
+    assert not registry.has("ev", "CUE_PLACEMENT_GRADED", 90.0, tol=1.0)
+    cue_grade_payloads = [
+        payload
+        for payload in _tutor_speak_payloads(ipc)
+        if payload.get("tts_marker") == "L2.10.cue_grade"
+    ]
+    assert len(cue_grade_payloads) == 1
+    assert cue_grade_payloads[0]["text"] == "on beat, but 1 beat late - aim at the drop."
+    assert cue_grade_payloads[0]["citations"] == []
+
+
+def test_cue_placement_offbeat_speaks_uncited_timing_fix() -> None:
+    """An off-beat hot cue gets early/late coaching without a receipt."""
+    grid = _beat_grid()
+    target = grid.beat_at(16)
+    ipc = MagicMock(name="ipc_router")
+    runtime = LessonRuntime(
+        learn_state=LearnState(current_lesson_id="L2.10"),
+        midi_mirror=MagicMock(name="midi_mirror"),
+        controller_state=MagicMock(name="controller_state"),
+        ipc_router=ipc,
+        progress_store=LearnProgress(),
+        evidence_registry=EvidenceRegistry(),
+        evidence_clock=lambda: 91.0,
+        cue_placement_practice_loader=lambda: CuePlacementPracticeSnapshot(
+            grid=grid,
+            cue_frame=target + (0.2 * grid.beat_len_frames),
+            target_frame=target,
+        ),
+    )
+
+    result = runtime._grade_cue_placement_practice_tick()
+    runtime._emit_live_cue_placement_grade(result)
+
+    assert result is not None
+    assert result.event is None
+    assert result.grade.verdict == "off_beat"
+    cue_grade_payloads = [
+        payload
+        for payload in _tutor_speak_payloads(ipc)
+        if payload.get("tts_marker") == "L2.10.cue_grade"
+    ]
+    assert len(cue_grade_payloads) == 1
+    assert cue_grade_payloads[0]["text"] == "hot cue is late - move it back onto the beat."
+    assert cue_grade_payloads[0]["citations"] == []
