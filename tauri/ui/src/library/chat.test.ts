@@ -495,6 +495,7 @@ function mountSkeleton(): void {
     <span id="vmx-lib-qlabel"></span>
     <input id="vmx-lib-q" />
     <input id="vmx-lib-folder" value="~/Music" />
+    <button id="vmx-lib-folder-pick">Browse</button>
     <input id="vmx-lib-cue-folder" value="~/Music" />
     <input id="vmx-lib-theme" />
     <textarea id="vmx-lib-brief"></textarea>
@@ -735,6 +736,29 @@ describe("chat - real runChat path", () => {
     expect(embedFolderMock).not.toHaveBeenCalled();
     expect(importMock).not.toHaveBeenCalled();
     expect(document.activeElement).toBe(document.getElementById("vmx-lib-folder"));
+  });
+
+  it("fills the music folder from the native Browse picker (F7)", async () => {
+    dialogOpenMock.mockResolvedValueOnce("/Users/kaan/Music/PSYMIND");
+
+    await mountChat();
+
+    const pick = document.getElementById(
+      "vmx-lib-folder-pick",
+    ) as HTMLButtonElement;
+    expect(pick).not.toBeNull();
+    pick.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(dialogOpenMock).toHaveBeenCalledWith({
+      title: "Choose music folder",
+      directory: true,
+      multiple: false,
+    });
+    expect(
+      (document.getElementById("vmx-lib-folder") as HTMLInputElement).value,
+    ).toBe("/Users/kaan/Music/PSYMIND");
+    expect(importMock).not.toHaveBeenCalled();
   });
 
   it("surfaces folder indexing failures inside the visible ingest panel", async () => {

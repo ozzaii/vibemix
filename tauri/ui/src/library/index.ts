@@ -2543,6 +2543,7 @@ export function mountLibrary(root: ParentNode = document): void {
   const installModelsBtn = $("vmx-lib-install-models") as HTMLButtonElement;
   const buildTagsToggle = $maybe("vmx-lib-build-tags") as HTMLButtonElement | null;
   const exportOpenBtn = $maybe("vmx-lib-export-open") as HTMLButtonElement | null;
+  const folderPickBtn = $maybe("vmx-lib-folder-pick") as HTMLButtonElement | null;
   const chatFolderBtn = $maybe("vmx-lib-chat-folder") as HTMLButtonElement | null;
   const echoEl = $("vmx-lib-echo");
   const qlabelEl = $("vmx-lib-qlabel");
@@ -3046,6 +3047,27 @@ export function mountLibrary(root: ParentNode = document): void {
     void libraryImport(sourcePath);
   }
 
+  async function pickIngestFolder(): Promise<void> {
+    let sourcePath: string | null = null;
+    try {
+      const { open } = await import("@tauri-apps/plugin-dialog");
+      const selection = await open({
+        title: "Choose music folder",
+        directory: true,
+        multiple: false,
+      });
+      sourcePath = firstDialogPath(selection);
+    } catch (e) {
+      // Native dialog unavailable (plain browser/jsdom); keep the typed field usable.
+      // eslint-disable-next-line no-console
+      console.error("[vmx-lib] folder picker unavailable:", e);
+      return;
+    }
+    if (!sourcePath) return;
+    folderInput.value = sourcePath;
+    state = setFolder(state, sourcePath);
+  }
+
   // ── event wiring ───────────────────────────────────────────────────────────
 
   runBtn.addEventListener("click", () => {
@@ -3059,6 +3081,7 @@ export function mountLibrary(root: ParentNode = document): void {
   if (chatFolderBtn) {
     chatFolderBtn.addEventListener("click", () => void pickChatFolder());
   }
+  folderPickBtn?.addEventListener("click", () => void pickIngestFolder());
   cueRunBtn?.addEventListener("click", () => void runBuildCueExport());
   exportOpenBtn?.addEventListener("click", () => void revealExportFromButton(exportOpenBtn));
   installModelsBtn.addEventListener("click", () => void installLocalModels());
