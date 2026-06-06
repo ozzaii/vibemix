@@ -59,10 +59,12 @@ _FIRST_WORD_ACTIONS = frozenset(
         "leave",
         "lift",
         "loop",
+        "nudge",
         "open",
         "pull",
         "push",
         "ride",
+        "slide",
         "swap",
         "trim",
         "wait",
@@ -87,7 +89,7 @@ _MOVE_TERM_RE = re.compile(
     r"\b("
     r"bar|bars|bass|blend|breakdown|bring|cue|cut|deck\s*[ab]|drop|duck|"
     r"fader|filter|high|highs|hold|kill|layer|lift|loop|low|lows|mid|mids|"
-    r"phrase|pull|push|ride|swap|top|trim|wait"
+    r"nudge|phrase|pull|push|ride|slide|swap|top|trim|wait"
     r")\b",
     re.IGNORECASE,
 )
@@ -616,6 +618,7 @@ def summarize_live_package(
     feedback_by_response = _latest_feedback_by_response(feedback_rows)
     positive = sum(1 for row in feedback_by_response.values() if row.get("score") == 1)
     negative = sum(1 for row in feedback_by_response.values() if row.get("score") == -1)
+    actionability = summarize_live_actionability(request_logs)
     return {
         "live_spans": len(request_logs),
         "spoken_spans": spoken,
@@ -626,14 +629,51 @@ def summarize_live_package(
         "positive_labels": positive,
         "negative_labels": negative,
         "five_dim_evaluators": len(EVALUATOR_SPECS),
-        "local_actionability": {
-            "status": "metadata_only_not_a_respan_verdict",
-        },
+        "local_actionability": actionability,
         "privacy": {
             "contains_audio_bytes": False,
             "contains_screen_frames": False,
             "contains_full_prompt": False,
         },
+    }
+
+
+def summarize_live_actionability(request_logs: list[dict[str, Any]]) -> dict[str, Any]:
+    """Aggregate local smoke-signal actionability metadata for live rows."""
+
+    audits: list[dict[str, Any]] = []
+    for row in request_logs:
+        metadata = row.get("metadata") if isinstance(row.get("metadata"), dict) else {}
+        audit = metadata.get("local_actionability_audit")
+        if isinstance(audit, dict):
+            audits.append(audit)
+    scores = [
+        float(score)
+        for audit in audits
+        for score in [audit.get("move_specific_score_0_to_3")]
+        if isinstance(score, int | float)
+    ]
+    move_named = sum(1 for audit in audits if bool(audit.get("move_named")))
+    should_not_hints = sum(1 for audit in audits if bool(audit.get("should_not_have_spoken_hint")))
+    flag_counts: dict[str, int] = {}
+    for audit in audits:
+        flags = audit.get("flags")
+        if not isinstance(flags, list):
+            continue
+        for raw in flags:
+            flag = str(raw or "").strip()
+            if not flag:
+                continue
+            flag_counts[flag] = flag_counts.get(flag, 0) + 1
+    return {
+        "status": "metadata_only_not_a_respan_verdict",
+        "audited_rows": len(audits),
+        "move_named_rows": move_named,
+        "should_not_have_spoken_hints": should_not_hints,
+        "mean_move_specific_score_0_to_3": (
+            round(sum(scores) / len(scores), 3) if scores else None
+        ),
+        "flag_counts": dict(sorted(flag_counts.items())),
     }
 
 
@@ -758,7 +798,11 @@ def local_actionability_audit(text: str, *, errored: bool = False) -> dict[str, 
         "move_terms": move_terms[:12],
         "narration_terms": narration_terms[:12],
         "slop_terms": slop_terms[:12],
-        "should_not_have_spoken_hint": ("sound_narration_only" in flags or "generic_slop" in flags),
+        "should_not_have_spoken_hint": (
+            "no_move_named" in flags
+            or "sound_narration_only" in flags
+            or "generic_slop" in flags
+        ),
         "flags": flags,
     }
 
@@ -1005,6 +1049,12 @@ def _format_live_readme(manifest: dict[str, Any]) -> str:
         f"- labeled_responses: {summary['labeled_responses']}\n"
         f"- positive_labels: {summary['positive_labels']}\n"
         f"- negative_labels: {summary['negative_labels']}\n"
+        f"- local_actionability_move_named_rows: "
+        f"{summary['local_actionability']['move_named_rows']}\n"
+        f"- local_actionability_should_not_have_spoken_hints: "
+        f"{summary['local_actionability']['should_not_have_spoken_hints']}\n"
+        f"- local_actionability_mean_move_specific_score_0_to_3: "
+        f"{summary['local_actionability']['mean_move_specific_score_0_to_3']}\n"
     )
 
 
@@ -1073,6 +1123,7 @@ __all__ = [
     "build_respan_package",
     "load_bench_results",
     "local_actionability_audit",
+    "summarize_live_actionability",
     "summarize_live_package",
     "summarize_package",
     "write_live_respan_package",

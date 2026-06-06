@@ -4105,10 +4105,13 @@ def _cmd_bench_respan_live_package(args: argparse.Namespace) -> int:
         print(_json.dumps(manifest, indent=2, ensure_ascii=False))
     else:
         summary = manifest["summary"]
+        actionability = summary.get("local_actionability", {})
         print(
             "-> bench respan-live-package: "
             f"{summary['dataset_rows']}/{summary['live_spans']} evaluable rows, "
             f"{summary['labeled_responses']} labeled, "
+            f"{actionability.get('move_named_rows', 0)} move-named, "
+            f"{actionability.get('should_not_have_spoken_hints', 0)} local should-not hints, "
             f"{summary['five_dim_evaluators']} evaluators -> {out_dir}",
             file=sys.stderr,
         )
