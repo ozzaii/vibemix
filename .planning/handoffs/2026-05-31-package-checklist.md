@@ -11558,3 +11558,36 @@ Proof before staging:
 - `uv run python -m compileall -q src/vibemix/learn/practice_loop.py src/vibemix/learn/beatmatch_practice_driver.py src/vibemix/learn/runtime.py src/vibemix/ui_bus/learn_messages.py src/vibemix/__main__.py tests/ui_bus/test_learn_live_grade_message.py tests/learn/test_runtime_evidence_grounding.py tests/learn/test_beatmatch_practice_driver.py tests/learn/test_observer_boot_wiring.py`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
 - `git diff --check -- src/vibemix/learn/practice_loop.py src/vibemix/learn/beatmatch_practice_driver.py src/vibemix/learn/runtime.py src/vibemix/ui_bus/learn_messages.py src/vibemix/__main__.py tauri/ui/src/ipc/messages.schema.json tauri/ui/src/ipc/messages.ts tauri/ui/src/ipc/validator.generated.mjs tests/ui_bus/test_learn_live_grade_message.py tests/learn/test_runtime_evidence_grounding.py tests/learn/test_beatmatch_practice_driver.py tests/learn/test_observer_boot_wiring.py .planning/handoffs/2026-05-31-package-checklist.md`
+
+## Package 113 - Learn Save-Mode Dare HUD
+
+Suggested commit: `feat(learn-ui): show save mode dare hud`
+
+Include:
+
+- `tauri/ui/src/learn/live-meter.ts`
+- `tauri/ui/src/learn/styles/learn.css`
+- `tauri/ui/src/learn/learn-window.ts`
+- `tauri/ui/tests/learn/live-meter.spec.ts`
+- `tauri/ui/tests/learn/test_practice_booth_shell.spec.ts`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- New backend save-state semantics, thunk/ring animation, waveform animation,
+  and broader Learn layout rewrites. This package only renders the existing
+  Save-mode live-grade fields in the current Learn meter and status hint.
+
+Reason:
+
+- Package 112 made Save mode real but invisible. Put the dare in the user-facing
+  booth: active Save attempts show a countdown, level, and streak; late saves
+  read as `floor dropped`; earned recoveries read as `save landed` before
+  generic locked/drifting copy can flatten the moment.
+
+Proof before staging:
+
+- `npm --prefix tauri/ui test -- tests/learn/live-meter.spec.ts tests/learn/test_practice_booth_shell.spec.ts`
+- `npm --prefix tauri/ui run build`
+- `git diff --check -- tauri/ui/src/learn/live-meter.ts tauri/ui/src/learn/styles/learn.css tauri/ui/src/learn/learn-window.ts tauri/ui/tests/learn/live-meter.spec.ts tauri/ui/tests/learn/test_practice_booth_shell.spec.ts .planning/handoffs/2026-05-31-package-checklist.md`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`

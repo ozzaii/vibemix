@@ -2155,6 +2155,35 @@ function liveGradeMissionFeedback(payload: LiveGradeWirePayload): {
   state: "idle" | "ready" | "listening" | "success";
 } | null {
   const phaseLine = liveGradePhaseLine(payload.phase_error_beats);
+  if (payload.save_landed) {
+    const streak = Math.max(0, Math.round(payload.save_streak ?? 0));
+    return {
+      text: streak > 1 ? `save x${streak}` : "save landed",
+      ariaLabel: `save landed from ${phaseLine}. streak ${streak}.`,
+      tone: "locked",
+      state: "success",
+    };
+  }
+  if (payload.save_floor_expired) {
+    return {
+      text: "floor dropped",
+      ariaLabel: `save window ended at ${phaseLine}. reset the 1 and try the next rep.`,
+      tone: "danger",
+      state: "idle",
+    };
+  }
+  if (payload.save_attempt_active) {
+    const remaining = Number.isFinite(payload.save_floor_seconds_remaining)
+      ? Math.max(0, payload.save_floor_seconds_remaining ?? 0)
+      : null;
+    const timeText = remaining === null ? "now" : `${Math.ceil(remaining)}s`;
+    return {
+      text: `save ${timeText}`,
+      ariaLabel: `save attempt active, ${timeText} before the floor drops, ${phaseLine}.`,
+      tone: payload.verdict === "trainwreck" ? "danger" : "correct",
+      state: "ready",
+    };
+  }
   if (payload.verdict === "locked") {
     if (payload.citation) {
       return {

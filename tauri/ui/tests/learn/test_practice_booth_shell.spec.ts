@@ -582,6 +582,11 @@ describe("practice booth shell", () => {
             phase_error_beats: 0.25,
             score: 0.5,
             citation: null,
+            save_attempt_active: true,
+            save_floor_seconds_total: 14,
+            save_floor_seconds_remaining: 8.5,
+            save_difficulty_level: 2,
+            save_streak: 1,
           },
         }),
       );
@@ -590,11 +595,20 @@ describe("practice booth shell", () => {
       expect(meter).not.toBeNull();
       expect(meter?.dataset.state).toBe("active");
       expect(meter?.dataset.verdict).toBe("drifting");
+      expect(meter?.dataset.saveActive).toBe("true");
+      expect(meter?.dataset.saveRemaining).toBe("8.5");
+      expect(meter?.querySelector(".learn-live-meter__save")?.textContent).toContain("L2");
+      expect(meter?.querySelector(".learn-live-meter__save")?.textContent).toContain(
+        "8.5s",
+      );
+      expect(meter?.querySelector(".learn-live-meter__save")?.textContent).toContain("x1");
       expect(Number(meter?.dataset.needlePct)).toBeGreaterThan(50);
       const hint = root.querySelector<HTMLElement>(".learn-status-hint")!;
-      expect(hint.textContent).toBe("nudge jog");
+      expect(hint.textContent).toBe("save 9s");
       expect(hint.dataset.practiceFeedback).toBe("correct");
-      expect(hint.getAttribute("aria-label")).toContain("0.25 beat behind");
+      expect(hint.getAttribute("aria-label")).toContain(
+        "save attempt active, 9s before the floor drops",
+      );
 
       window.dispatchEvent(
         new CustomEvent("ipc.learn.live_grade", {
@@ -645,6 +659,31 @@ describe("practice booth shell", () => {
       expect(hint.textContent).toBe("re-find the 1");
       expect(hint.dataset.practiceFeedback).toBe("danger");
       expect(hint.getAttribute("aria-label")).toContain("0.42 beat ahead");
+
+      window.dispatchEvent(
+        new CustomEvent("ipc.learn.live_grade", {
+          detail: {
+            verdict: "trainwreck",
+            phase_error_beats: -0.42,
+            score: 0.05,
+            citation: null,
+            save_floor_expired: true,
+            save_floor_seconds_total: 14,
+            save_floor_seconds_remaining: 0,
+            save_difficulty_level: 2,
+            save_streak: 0,
+          },
+        }),
+      );
+
+      const meter = root.querySelector<HTMLElement>("#learn-live-meter");
+      expect(hint.textContent).toBe("floor dropped");
+      expect(hint.dataset.practiceFeedback).toBe("danger");
+      expect(hint.getAttribute("aria-label")).toContain("save window ended");
+      expect(meter?.dataset.saveExpired).toBe("true");
+      expect(meter?.querySelector(".learn-live-meter__receipt")?.textContent).toBe(
+        "floor dropped",
+      );
     } finally {
       ws.close();
     }

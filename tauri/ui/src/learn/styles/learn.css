@@ -925,7 +925,7 @@
 
 .learn-live-meter {
   display: grid;
-  grid-template-rows: 26px 96px 24px 22px;
+  grid-template-rows: 26px 96px 24px auto 22px;
   width: 100%;
   border: 1px solid var(--glass-edge);
   border-radius: var(--rad-sm);
@@ -1021,6 +1021,65 @@
 
 .learn-live-meter[data-locked="true"] .learn-live-meter__receipt {
   color: var(--silk);
+}
+
+.learn-live-meter__save {
+  display: grid;
+  grid-template-columns: 48px 1fr 48px;
+  align-items: center;
+  min-height: 26px;
+  margin: 0 var(--sp-3);
+  border-top: 1px solid var(--glass-edge);
+  color: var(--silk-40);
+  font-family: var(--type-mono);
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.learn-live-meter__save[hidden] {
+  display: none;
+}
+
+.learn-live-meter__save-level,
+.learn-live-meter__save-streak {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.learn-live-meter__save-timer {
+  color: var(--amber-pale);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-align: center;
+}
+
+.learn-live-meter__save-streak {
+  text-align: right;
+}
+
+.learn-live-meter[data-save-active="true"] {
+  border-color: var(--amber-22);
+}
+
+.learn-live-meter[data-save-landed="true"] {
+  border-color: var(--silk-40);
+}
+
+.learn-live-meter[data-save-landed="true"] .learn-live-meter__save-timer {
+  color: var(--silk);
+}
+
+.learn-live-meter[data-save-expired="true"] {
+  border-color: color-mix(in srgb, var(--led-fault) 44%, transparent);
+}
+
+.learn-live-meter[data-save-expired="true"] .learn-live-meter__save-timer {
+  color: var(--led-fault);
 }
 
 @keyframes learn-live-meter-lock {

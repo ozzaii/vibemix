@@ -8,6 +8,13 @@ export interface LiveGradePayload {
   phase_error_beats: number;
   score: number;
   citation: string | null;
+  save_landed?: boolean;
+  save_attempt_active?: boolean;
+  save_floor_seconds_total?: number | null;
+  save_floor_seconds_remaining?: number | null;
+  save_floor_expired?: boolean;
+  save_difficulty_level?: number;
+  save_streak?: number;
 }
 
 export interface LiveGradeMeterHandle {
@@ -32,6 +39,15 @@ function formatPhase(phase: number): string {
 }
 
 function receiptText(payload: LiveGradePayload, phase: number): string {
+  if (payload.save_landed) {
+    return "save landed";
+  }
+  if (payload.save_floor_expired) {
+    return "floor dropped";
+  }
+  if (payload.save_attempt_active) {
+    return "save window";
+  }
   if (payload.verdict === "locked") {
     return payload.citation ? "proof caught" : "hold pocket";
   }
@@ -45,6 +61,37 @@ function receiptText(payload: LiveGradePayload, phase: number): string {
     return "reset the 1";
   }
   return "listening";
+}
+
+function finiteNumber(value: number | null | undefined): number | null {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function boundedLevel(value: number | undefined): number {
+  const level = finiteNumber(value);
+  if (level === null) return 1;
+  return clamp(Math.round(level), 1, 5);
+}
+
+function boundedStreak(value: number | undefined): number {
+  const streak = finiteNumber(value);
+  if (streak === null) return 0;
+  return Math.max(0, Math.round(streak));
+}
+
+function saveSecondsText(value: number | null | undefined): string {
+  const seconds = finiteNumber(value);
+  if (seconds === null) return "--.-s";
+  return `${Math.max(0, seconds).toFixed(1)}s`;
+}
+
+function saveHudVisible(payload: LiveGradePayload): boolean {
+  return Boolean(
+    payload.save_attempt_active ||
+      payload.save_floor_expired ||
+      payload.save_landed ||
+      boundedStreak(payload.save_streak) > 0,
+  );
 }
 
 function drawNeedle(canvas: HTMLCanvasElement, payload: LiveGradePayload | null): void {
@@ -135,7 +182,18 @@ export function LiveGradeMeter(host: HTMLElement): LiveGradeMeterHandle {
   receipt.className = "learn-live-meter__receipt";
   receipt.textContent = "no proof yet";
 
-  root.append(header, canvas, phaseText, receipt);
+  const save = document.createElement("div");
+  save.className = "learn-live-meter__save";
+  save.hidden = true;
+  const saveLevel = document.createElement("span");
+  saveLevel.className = "learn-live-meter__save-level";
+  const saveTimer = document.createElement("strong");
+  saveTimer.className = "learn-live-meter__save-timer";
+  const saveStreak = document.createElement("span");
+  saveStreak.className = "learn-live-meter__save-streak";
+  save.append(saveLevel, saveTimer, saveStreak);
+
+  root.append(header, canvas, phaseText, save, receipt);
   host.replaceChildren(root);
 
   let pending: LiveGradePayload | null = null;
@@ -175,10 +233,36 @@ export function LiveGradeMeter(host: HTMLElement): LiveGradeMeterHandle {
     root.dataset.lockEdge = enteredLock ? "true" : "false";
     root.dataset.lockCount = String(lockCount);
     root.dataset.locked = payload.verdict === "locked" ? "true" : "false";
+    root.dataset.saveActive = payload.save_attempt_active ? "true" : "false";
+    root.dataset.saveExpired = payload.save_floor_expired ? "true" : "false";
+    root.dataset.saveLanded = payload.save_landed ? "true" : "false";
+    root.dataset.saveLevel = String(boundedLevel(payload.save_difficulty_level));
+    root.dataset.saveStreak = String(boundedStreak(payload.save_streak));
+    const remaining = finiteNumber(payload.save_floor_seconds_remaining);
+    if (remaining === null) {
+      root.removeAttribute("data-save-remaining");
+    } else {
+      root.dataset.saveRemaining = remaining.toFixed(1);
+    }
     if (payload.citation) {
       root.dataset.citation = payload.citation;
     } else {
       root.removeAttribute("data-citation");
+    }
+    const showSaveHud = saveHudVisible(payload);
+    save.hidden = !showSaveHud;
+    if (showSaveHud) {
+      const level = boundedLevel(payload.save_difficulty_level);
+      const streak = boundedStreak(payload.save_streak);
+      saveLevel.textContent = `L${level}`;
+      if (payload.save_landed) {
+        saveTimer.textContent = "landed";
+      } else if (payload.save_floor_expired) {
+        saveTimer.textContent = "00.0s";
+      } else {
+        saveTimer.textContent = saveSecondsText(payload.save_floor_seconds_remaining);
+      }
+      saveStreak.textContent = streak > 0 ? `x${streak}` : "x0";
     }
     const receiptLine = receiptText(payload, phase);
     verdict.textContent = payload.verdict.replace("_", " ");
@@ -188,6 +272,20 @@ export function LiveGradeMeter(host: HTMLElement): LiveGradeMeterHandle {
       "aria-label",
       `beatmatch ${payload.verdict.replace("_", " ")}, ${formatPhase(phase)}, ${receiptLine}`,
     );
+    if (showSaveHud) {
+      const level = boundedLevel(payload.save_difficulty_level);
+      const streak = boundedStreak(payload.save_streak);
+      let remainingText = saveSecondsText(payload.save_floor_seconds_remaining);
+      if (payload.save_landed) {
+        remainingText = "save landed";
+      } else if (payload.save_floor_expired) {
+        remainingText = "floor dropped";
+      }
+      root.setAttribute(
+        "aria-label",
+        `beatmatch ${payload.verdict.replace("_", " ")}, ${formatPhase(phase)}, save level ${level}, ${remainingText}, streak ${streak}, ${receiptLine}`,
+      );
+    }
     scheduleDraw();
   };
 
@@ -204,6 +302,16 @@ export function LiveGradeMeter(host: HTMLElement): LiveGradeMeterHandle {
     root.removeAttribute("data-phase");
     root.removeAttribute("data-score");
     root.removeAttribute("data-citation");
+    root.removeAttribute("data-save-active");
+    root.removeAttribute("data-save-expired");
+    root.removeAttribute("data-save-landed");
+    root.removeAttribute("data-save-level");
+    root.removeAttribute("data-save-remaining");
+    root.removeAttribute("data-save-streak");
+    save.hidden = true;
+    saveLevel.textContent = "";
+    saveTimer.textContent = "";
+    saveStreak.textContent = "";
     verdict.textContent = "idle";
     phaseText.textContent = "waiting for decks";
     receipt.textContent = "no proof yet";
