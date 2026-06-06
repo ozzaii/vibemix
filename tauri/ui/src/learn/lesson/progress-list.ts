@@ -52,6 +52,15 @@ export interface ProgressListEntry {
   is_recommended?: boolean;
   /** Capped free-practice reps banked for this lesson before starting it. */
   practice_bank_count?: number;
+  /** Monotonic receipt order for the latest free-practice gesture on this lesson. */
+  last_practice_seq?: number;
+  /** Measured miss that should send the learner into a repair rep. */
+  practice_feedback?: {
+    kind: "beatmatch" | "cue_placement";
+    label: string;
+    message: string;
+    detail?: string;
+  };
   /** Optional short reason for the locked state. */
   lock_reason?: string;
 }
@@ -279,11 +288,13 @@ function defaultExpandedCourseId(groups: ReadonlyArray<LessonGroup>): string | n
 function groupSummary(lessons: ReadonlyArray<ProgressListEntry>): string {
   const total = lessons.length;
   const completed = lessons.filter((lesson) => lesson.status === "completed").length;
+  const hasFix = lessons.some((lesson) => effectivePracticeFeedback(lesson));
   const hasBanked = lessons.some((lesson) => effectivePracticeBankCount(lesson) > 0);
   const inProgress = lessons.some((lesson) => lesson.status === "in-progress");
   const allLocked = lessons.every((lesson) => lesson.locked && lesson.status !== "completed");
   if (allLocked) return `${total} locked`;
   if (completed === total) return `${total}/${total} complete`;
+  if (hasFix) return `${completed}/${total} done, fix queued`;
   if (hasBanked) return `${completed}/${total} done, banked`;
   if (inProgress) return `${completed}/${total} done, in progress`;
   return `${completed}/${total} done`;
@@ -297,11 +308,18 @@ function syncLessonButton(
   btn.dataset.locked = lesson.locked ? "true" : "false";
   btn.dataset.recommended = lesson.is_recommended ? "true" : "false";
   const bankCount = effectivePracticeBankCount(lesson);
+  const feedback = effectivePracticeFeedback(lesson);
   btn.dataset.practiceBanked = bankCount > 0 ? "true" : "false";
   btn.dataset.practiceBank = String(bankCount);
+  btn.dataset.practiceFeedback = feedback ? "true" : "false";
+  if (feedback) {
+    btn.dataset.practiceFeedbackKind = feedback.kind;
+  } else {
+    delete btn.dataset.practiceFeedbackKind;
+  }
   const dot = btn.querySelector<HTMLElement>(".vmx-progress-list__dot");
   if (dot) dot.dataset.status = lesson.status;
-  syncLessonTag(btn, lesson, bankCount);
+  syncLessonTag(btn, lesson, bankCount, feedback);
   setButtonAriaLabel(btn, lesson);
 }
 
@@ -309,8 +327,9 @@ function syncLessonTag(
   btn: HTMLButtonElement,
   lesson: ProgressListEntry,
   bankCount: number,
+  feedback: ProgressListEntry["practice_feedback"] | null,
 ): void {
-  const tagText = lessonTagText(lesson, bankCount);
+  const tagText = lessonTagText(lesson, bankCount, feedback);
   const existing = btn.querySelector<HTMLElement>(".vmx-progress-list__tag");
   if (!tagText) {
     existing?.remove();
@@ -320,15 +339,22 @@ function syncLessonTag(
   tag.className = "vmx-progress-list__tag";
   tag.dataset.kind = lesson.locked
     ? "locked"
-    : lesson.is_recommended
+    : feedback
+      ? "fix"
+      : lesson.is_recommended
       ? "next"
       : "banked";
   tag.textContent = tagText;
   if (!existing) btn.append(tag);
 }
 
-function lessonTagText(lesson: ProgressListEntry, bankCount: number): string | null {
+function lessonTagText(
+  lesson: ProgressListEntry,
+  bankCount: number,
+  feedback: ProgressListEntry["practice_feedback"] | null,
+): string | null {
   if (lesson.locked) return "locked";
+  if (feedback) return "fix";
   if (lesson.is_recommended) return "next";
   if (bankCount > 0) return "banked";
   return null;
@@ -352,6 +378,8 @@ function lessonStateLabel(lesson: ProgressListEntry): string {
       : `${lesson.status}, locked`;
   }
   const parts: string[] = [lesson.status];
+  const feedback = effectivePracticeFeedback(lesson);
+  if (feedback) parts.push(`fix ${feedback.label}`);
   if (lesson.is_recommended) parts.push("next");
   const bankCount = effectivePracticeBankCount(lesson);
   if (bankCount > 0) parts.push(`practice bank ${bankCount} of 3`);
@@ -362,6 +390,8 @@ function lessonStateLabel(lesson: ProgressListEntry): string {
 
 function lessonTitle(lesson: ProgressListEntry): string | null {
   if (lesson.locked) return lesson.lock_reason ?? "locked";
+  const feedback = effectivePracticeFeedback(lesson);
+  if (feedback) return `fix ${feedback.message}. start the recovery drill.`;
   const bankCount = effectivePracticeBankCount(lesson);
   if (bankCount > 0) return `practice bank ${bankCount} of 3. press to finish this lesson.`;
   if (lesson.status === "completed") return "press to replay this lesson.";
@@ -372,6 +402,22 @@ function lessonTitle(lesson: ProgressListEntry): string | null {
 function effectivePracticeBankCount(lesson: ProgressListEntry): number {
   if (lesson.status === "completed") return 0;
   return Math.min(3, Math.max(0, Math.trunc(lesson.practice_bank_count ?? 0)));
+}
+
+function effectivePracticeFeedback(
+  lesson: ProgressListEntry,
+): ProgressListEntry["practice_feedback"] | null {
+  if (lesson.locked || lesson.status === "completed") return null;
+  const feedback = lesson.practice_feedback;
+  if (!feedback) return null;
+  const label = feedback.label.trim();
+  const message = feedback.message.trim();
+  if (!label || !message) return null;
+  return {
+    ...feedback,
+    label,
+    message,
+  };
 }
 
 /** Minimal CSS.escape polyfill for jsdom — the test env's CSS.escape can

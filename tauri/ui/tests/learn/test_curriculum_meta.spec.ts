@@ -115,6 +115,7 @@ describe("curriculum meta projection", () => {
         "L1.03": {
           practice_sources: { screen: 2, hardware: 4 },
           last_practice_source: "hardware" as const,
+          last_practice_seq: 2,
         },
       },
     };
@@ -126,6 +127,56 @@ describe("curriculum meta projection", () => {
     expect(banked?.practice_bank_count).toBe(3);
     expect(banked?.is_recommended).toBe(true);
     expect(firstRecommendedLessonId(progress)).toBe("L1.03");
+  });
+
+  it("recommends the latest banked practice row", () => {
+    const progress = {
+      lessons: {
+        "L1.03": {
+          practice_sources: { screen: 2, hardware: 0 },
+          last_practice_seq: 1,
+        },
+        "L1.04": {
+          practice_sources: { screen: 1, hardware: 0 },
+          last_practice_seq: 4,
+        },
+      },
+    };
+
+    const entries = buildProgressEntries(progress);
+
+    expect(entries.find((entry) => entry.lesson_id === "L1.03")?.is_recommended)
+      .toBeFalsy();
+    expect(entries.find((entry) => entry.lesson_id === "L1.04")?.is_recommended)
+      .toBe(true);
+    expect(firstRecommendedLessonId(progress)).toBe("L1.04");
+  });
+
+  it("carries measured recovery feedback as the next route", () => {
+    const progress = {
+      lessons: {
+        "L1.03": {
+          completed: false,
+          completed_at: null,
+        },
+        "L1.04": {
+          completed: false,
+          completed_at: null,
+          practice_feedback: {
+            kind: "beatmatch" as const,
+            label: "beatmatch",
+            message: "tempo is off",
+          },
+        },
+      },
+    };
+
+    const entries = buildProgressEntries(progress);
+    const recovery = entries.find((entry) => entry.lesson_id === "L1.04");
+
+    expect(recovery?.practice_feedback?.message).toBe("tempo is off");
+    expect(recovery?.is_recommended).toBe(true);
+    expect(firstRecommendedLessonId(progress)).toBe("L1.04");
   });
 
   it("preserves completed locked-course rows for replay orientation", () => {

@@ -359,6 +359,43 @@ describe("progress-list — pick + level", () => {
       "channel strip, in-progress, next, practice bank 3 of 3, retry",
     );
   });
+
+  it("surfaces measured recovery rows as fixes", () => {
+    const root = renderProgressList({
+      lessons: [
+        mkLesson({
+          lesson_id: "L1.03",
+          title: "channel strip",
+          status: "in-progress",
+          is_recommended: true,
+          practice_bank_count: 3,
+          practice_feedback: {
+            kind: "beatmatch",
+            label: "beatmatch",
+            message: "tempo is off",
+          },
+        }),
+      ],
+      onPickLesson: () => {},
+    });
+    document.body.append(root);
+
+    const btn = root.querySelector<HTMLButtonElement>(
+      "[data-lesson-id='L1.03']",
+    );
+    const tag = btn?.querySelector<HTMLElement>(".vmx-progress-list__tag");
+
+    expect(btn?.dataset.practiceFeedback).toBe("true");
+    expect(btn?.dataset.practiceFeedbackKind).toBe("beatmatch");
+    expect(tag?.textContent).toBe("fix");
+    expect(tag?.dataset.kind).toBe("fix");
+    expect(btn?.getAttribute("aria-label")).toBe(
+      "channel strip, in-progress, fix beatmatch, next, practice bank 3 of 3, retry",
+    );
+    expect(btn?.getAttribute("title")).toBe(
+      "fix tempo is off. start the recovery drill.",
+    );
+  });
 });
 
 describe("progress-list — empty state", () => {
@@ -608,5 +645,36 @@ describe("progress-list — setStatus", () => {
         "[data-course='course_1_anatomy'] .vmx-progress-list__group-summary",
       )?.textContent,
     ).toBe("1/2 done, banked");
+  });
+
+  it("course summaries prioritize queued fixes over banked practice", () => {
+    const root = renderProgressList({
+      lessons: [
+        mkLesson({
+          lesson_id: "L1.01",
+          title: "opening dialog",
+          status: "completed",
+        }),
+        mkLesson({
+          lesson_id: "L1.03",
+          title: "channel strip",
+          status: "in-progress",
+          practice_bank_count: 1,
+          practice_feedback: {
+            kind: "cue_placement",
+            label: "cue placement",
+            message: "drop was late",
+          },
+        }),
+      ],
+      onPickLesson: () => {},
+    });
+    document.body.append(root);
+
+    expect(
+      root.querySelector<HTMLElement>(
+        "[data-course='course_1_anatomy'] .vmx-progress-list__group-summary",
+      )?.textContent,
+    ).toBe("1/2 done, fix queued");
   });
 });

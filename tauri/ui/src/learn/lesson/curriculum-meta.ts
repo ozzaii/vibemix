@@ -185,10 +185,13 @@ export function buildProgressEntries(
       strikes_used: entry?.strikes_used,
       locked,
       practice_bank_count: bankCount,
+      last_practice_seq: practiceSequence(entry),
+      practice_feedback: practiceFeedback(entry),
       lock_reason: locked ? lockReason(meta.course_id) : undefined,
     };
   });
   const recommended = (
+    momentumEntry(projected) ??
     projected.find(
       (entry) => !entry.locked && entry.status === "in-progress",
     ) ??
@@ -225,7 +228,62 @@ function practiceBankCount(
   );
 }
 
+function momentumEntry(
+  entries: ReadonlyArray<ProgressListEntry>,
+): ProgressListEntry | undefined {
+  let best: ProgressListEntry | undefined;
+  let bestRank = -1;
+  for (const entry of entries) {
+    const rank = practiceMomentumRank(entry);
+    if (rank > bestRank) {
+      best = entry;
+      bestRank = rank;
+    }
+  }
+  return bestRank >= 0 ? best : undefined;
+}
+
+function practiceMomentumRank(entry: ProgressListEntry): number {
+  if (entry.locked || entry.status !== "in-progress") return -1;
+  const hasFix = entry.practice_feedback ? 1 : 0;
+  const hasBank = (entry.practice_bank_count ?? 0) > 0 ? 1 : 0;
+  if (!hasFix && !hasBank) return -1;
+  return hasFix * 1_000_000 + hasBank * 10_000 + practiceSequence(entry);
+}
+
 function nonNegativeInt(value: unknown): number {
   if (typeof value !== "number" || !Number.isFinite(value)) return 0;
   return Math.max(0, Math.trunc(value));
+}
+
+function practiceSequence(
+  entry: NonNullable<LearnProgressProjection["lessons"]>[string] | ProgressListEntry | undefined,
+): number {
+  const value = entry?.last_practice_seq;
+  if (typeof value !== "number" || !Number.isFinite(value)) return 0;
+  return Math.max(0, Math.trunc(value));
+}
+
+function practiceFeedback(
+  entry: NonNullable<LearnProgressProjection["lessons"]>[string] | undefined,
+): ProgressListEntry["practice_feedback"] | undefined {
+  const feedback = entry?.practice_feedback;
+  if (!feedback || typeof feedback !== "object") return undefined;
+  const label = cleanFeedbackText(feedback.label);
+  const message = cleanFeedbackText(feedback.message);
+  if (!label || !message) return undefined;
+  if (feedback.kind !== "beatmatch" && feedback.kind !== "cue_placement") {
+    return undefined;
+  }
+  const detail = cleanFeedbackText(feedback.detail);
+  return {
+    kind: feedback.kind,
+    label,
+    message,
+    ...(detail ? { detail } : {}),
+  };
+}
+
+function cleanFeedbackText(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim() ? value.trim() : undefined;
 }

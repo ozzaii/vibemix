@@ -1741,6 +1741,12 @@
   background: var(--brand-04);
   border-color: var(--brand-16);
 }
+.vmx-progress-list__lesson[data-practice-feedback="true"] {
+  background:
+    linear-gradient(180deg, var(--brand-08), transparent 76%),
+    rgba(0, 0, 0, 0.12);
+  border-color: var(--brand-22);
+}
 .vmx-progress-list__lesson[data-practice-banked="true"][data-recommended="true"] {
   border-color: var(--amber-22);
 }
@@ -1811,6 +1817,11 @@
 .vmx-progress-list__lesson[data-practice-banked="true"] .vmx-progress-list__tag[data-kind="banked"] {
   border-color: var(--brand-22);
   color: var(--brand);
+}
+.vmx-progress-list__lesson[data-practice-feedback="true"] .vmx-progress-list__tag[data-kind="fix"] {
+  border-color: var(--brand-40);
+  color: var(--brand);
+  text-shadow: var(--text-emboss);
 }
 .vmx-progress-list__lesson[data-locked="true"] .vmx-progress-list__tag {
   border-color: var(--silk-12);

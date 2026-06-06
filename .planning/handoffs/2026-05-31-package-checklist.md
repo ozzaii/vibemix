@@ -11094,3 +11094,41 @@ Proof before staging:
 - `uv run python -m compileall -q src/vibemix/learn/progress.py src/vibemix/learn/practice_mission.py src/vibemix/learn/curriculum_projection.py tests/learn/test_practice_mission.py tests/learn/test_progress_persistence.py`
 - `npm --prefix tauri/ui run build`
 - `git diff --check -- src/vibemix/learn/progress.py src/vibemix/learn/practice_mission.py src/vibemix/learn/curriculum_projection.py tauri/ui/src/ipc/messages.schema.json tauri/ui/src/ipc/messages.ts tauri/ui/src/ipc/validator.generated.mjs tauri/ui/src/learn/lesson/curriculum-meta.ts tests/learn/test_practice_mission.py tests/learn/test_progress_persistence.py .planning/handoffs/2026-05-31-package-checklist.md`
+
+## Package 100 - Learn Practice Momentum Surface
+
+Suggested commit: `feat(learn-ui): surface practice momentum in lesson routing`
+
+Include:
+
+- `src/vibemix/learn/curriculum_projection.py`
+- `tauri/ui/src/learn/lesson/curriculum-meta.ts`
+- `tauri/ui/src/learn/lesson/progress-list.ts`
+- `tauri/ui/src/learn/styles/learn.css`
+- `tauri/ui/tests/learn/test_curriculum_meta.spec.ts`
+- `tauri/ui/tests/learn/test_progress_list.spec.ts`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- New lesson engines, live-credit rules, runtime coach copy, and broader Learn
+  layout redesign. This package only makes already-persisted practice receipts
+  and measured recovery targets visible and consistent in the lesson chooser.
+
+Reason:
+
+- Backend missions now follow the latest banked practice and measured misses,
+  but the local curriculum projection and visible progress list could still
+  read like a static checklist. Carry recency and recovery feedback into the
+  list rows, prefer the newest repair/practice row when no backend mission is
+  attached, and label repair rows as fixes so the learner understands why the
+  app is sending them back.
+
+Proof before staging:
+
+- `uv run python scripts/export_learn_curriculum_meta.py --check`
+- `uv run ruff check src/vibemix/learn/curriculum_projection.py`
+- `uv run python -m compileall -q src/vibemix/learn/curriculum_projection.py`
+- `npm --prefix tauri/ui test -- tests/learn/test_curriculum_meta.spec.ts tests/learn/test_progress_list.spec.ts`
+- `npm --prefix tauri/ui run build`
+- `git diff --check -- src/vibemix/learn/curriculum_projection.py tauri/ui/src/learn/lesson/curriculum-meta.ts tauri/ui/src/learn/lesson/progress-list.ts tauri/ui/src/learn/styles/learn.css tauri/ui/tests/learn/test_curriculum_meta.spec.ts tauri/ui/tests/learn/test_progress_list.spec.ts .planning/handoffs/2026-05-31-package-checklist.md`
