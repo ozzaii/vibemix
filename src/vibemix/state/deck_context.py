@@ -67,6 +67,7 @@ _MULTI_DECK_PHRASE_RE = re.compile(
     r")\b",
     re.IGNORECASE,
 )
+_CITATION_ATOM_RE = re.compile(r"\[[a-z][a-z0-9_]*:[^\]]+\]", re.IGNORECASE)
 _SINGLE_EVENT_TRANSITION_OUTCOME_RE = re.compile(
     r"\b("
     r"transition(?:ed|ing)?|blend(?:ed|ing)?|mix(?:ed|ing)?|crossfade(?:d|s|ing)?|"
@@ -2830,7 +2831,11 @@ def render_mixer_context(state: MusicState) -> str | None:
 
 def has_multi_deck_outcome_claim(text: str) -> bool:
     """Return True when text promotes a multi-deck musical outcome."""
-    return bool(_MULTI_DECK_OUTCOME_RE.search(text) or _MULTI_DECK_PHRASE_RE.search(text))
+    public_text = _CITATION_ATOM_RE.sub(" ", str(text or ""))
+    return bool(
+        _MULTI_DECK_OUTCOME_RE.search(public_text)
+        or _MULTI_DECK_PHRASE_RE.search(public_text)
+    )
 
 
 def _is_grounded_single_event_audio_observation(text: str, event_type: str | None) -> bool:

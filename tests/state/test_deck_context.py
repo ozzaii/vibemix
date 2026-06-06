@@ -3135,6 +3135,41 @@ def test_live_claim_guard_corrects_multi_deck_outcome_category() -> None:
     assert "second_deck=independent_source_required" not in result.text
 
 
+def test_live_claim_guard_allows_cited_next_suggestion_nudge_on_single_deck() -> None:
+    state = MusicState(audible_deck="A")
+    state.controller_connected = True
+    state.xfader = 0
+    state.deck_a = {"vol": 112, "eq_low": 64, "eq_mid": 64, "eq_hi": 64, "filter": 64}
+    state.deck_b = {"vol": 0, "eq_low": 64, "eq_mid": 64, "eq_hi": 64, "filter": 64}
+    state.deck_state = DeckState(decks={"A": _deck("Mitro - Atencion [WHA068]")})
+    reply = (
+        "Darker, heavier sub-weight here; nudge AMRK next to ride that drive. "
+        "[mix:next_suggestion=folder:6837ec1665d7bb44]"
+    )
+
+    result = apply_live_claim_guard(reply, state, event_type="TRACK_CHANGE")
+
+    assert result.corrected is False
+    assert result.text == reply
+    assert result.policy == "blocked"
+    assert result.reason == "single_resolved_deck"
+
+
+def test_live_claim_guard_still_blocks_transition_claim_with_next_suggestion_cite() -> None:
+    state = MusicState(audible_deck="A")
+    state.deck_state = DeckState(decks={"A": _deck("Mitro - Atencion [WHA068]")})
+    reply = (
+        "That was a clean transition; nudge AMRK next. "
+        "[mix:next_suggestion=folder:6837ec1665d7bb44]"
+    )
+
+    result = apply_live_claim_guard(reply, state, event_type="TRACK_CHANGE")
+
+    assert result.corrected is True
+    assert result.reason == "single_resolved_deck"
+    assert "clear two-deck proof" in result.text
+
+
 def test_live_claim_guard_generalizes_beyond_transition_word() -> None:
     state = MusicState(audible_deck="A")
     state.deck_state = DeckState(

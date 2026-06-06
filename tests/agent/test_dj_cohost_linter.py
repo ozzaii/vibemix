@@ -246,6 +246,46 @@ def test_live_claim_guard_corrects_single_deck_transition_claim(mocker, tmp_path
     playback.push.assert_not_called()
 
 
+def test_live_claim_guard_allows_cited_next_suggestion_nudge(mocker, tmp_path) -> None:
+    """A grounded next-suggestion cite is not itself a public multi-deck claim."""
+    registry = EvidenceRegistry()
+    registry.write("mix", "next_suggestion=folder:6837ec1665d7bb44", 0.0)
+    agent, gen, recorder, state, _, tracker, playback = _build_agent_wired(
+        mocker, tmp_path, registry
+    )
+    state.audible = True
+    state.audible_deck = "A"
+    state.deck_state = DeckState(decks={"A": _deck("Mitro - Atencion [WHA068]")})
+    mocker.patch("vibemix.agent.dj_cohost.snapshot_wav", return_value=b"FAKEWAV")
+    mocker.patch.object(AICoach, "build_prompt", return_value="EVIDENCE: x")
+    gen.aio.models.generate_content_stream = mocker.AsyncMock(
+        return_value=_async_iter(
+            [
+                "Darker, heavier sub-weight here; nudge AMRK next to ride that drive. "
+                "[mix:next_suggestion=folder:6837ec1665d7bb44]"
+            ]
+        )
+    )
+
+    agent.set_next_event(Event(type="TRACK_CHANGE", state=state, extra={}))
+    chunks = _drive(agent)
+
+    assert chunks == ["Darker, heavier sub-weight here; nudge AMRK next to ride that drive. "]
+    kinds = [kind for kind, _ in recorder.events]
+    assert "ai_text" in kinds
+    assert "live_claim_guard" not in kinds
+    assert "citation_strip" not in kinds
+    assert tracker.rate() == 0.0
+    ai_row = next(fields for kind, fields in recorder.events if kind == "ai_message")
+    assert ai_row["message"] == chunks[0]
+    assert (
+        Path(ai_row["artifacts"]["session_response_path"]).read_text(encoding="utf-8")
+        == "Darker, heavier sub-weight here; nudge AMRK next to ride that drive. "
+        "[mix:next_suggestion=folder:6837ec1665d7bb44]"
+    )
+    playback.push.assert_not_called()
+
+
 def test_live_claim_guard_strips_cited_phase_advice_without_move_proof(mocker, tmp_path) -> None:
     """A valid PHASE citation is not permission to coach without move/deck proof."""
     registry = EvidenceRegistry()
