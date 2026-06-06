@@ -13398,3 +13398,37 @@ Proof before staging:
 - `npm --prefix tauri/ui run build`
 - `git diff --check -- src/vibemix/__main__.py src/vibemix/library/model_assets.py tests/library/test_models_cli.py tauri/src-tauri/src/library_cmds.rs tauri/ui/src/library/api.ts tauri/ui/src/library/api.test.ts tauri/ui/src/library/index.ts tauri/ui/src/library/model-setup.test.ts tauri/ui/src/library/build.test.ts tauri/ui/src/shell/VoiceReadinessBadge.ts tauri/ui/tests/shell/voice-readiness-badge.spec.ts tauri/ui/src/shell/DesktopShell.ts tauri/ui/src/shell/dj-vocab.ts .planning/handoffs/2026-05-31-package-checklist.md`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+
+## Package 161 - Shell Status-Tick Connection Fallback
+
+Suggested commit: `fix(shell): mark connection live on status ticks`
+
+Include:
+
+- `tauri/ui/src/shell/activation-bridge.ts`
+- `tauri/ui/tests/shell/activation-bridge.spec.ts`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Runtime status tick generation, Deck status-bar badge semantics, screen
+  permission probing, live co-host prompt behavior, and footer redesign. This
+  package only prevents the shell footer from staying `co-host offline` after
+  the app is already receiving valid sidecar IPC frames.
+
+Reason:
+
+- The shell footer connection model listened only for the separate Tauri
+  `ws-state` event. During a fresh-user run the console and `ui.log` showed
+  live `ipc.status.tick` frames with `gemini: ok`, `voice: ok`, and `livekit:
+  ok`, while the shell footer could still read `co-host offline` if it mounted
+  after the last `ws-state` event. Treat any valid status tick as proof that
+  the shell-to-sidecar pipe is connected, while leaving `ws-state` as the
+  primary reconnect/disconnect signal.
+
+Proof before staging:
+
+- `npm --prefix tauri/ui test -- tests/shell/activation-bridge.spec.ts`
+- `npm --prefix tauri/ui run build`
+- `git diff --check -- tauri/ui/src/shell/activation-bridge.ts tauri/ui/tests/shell/activation-bridge.spec.ts .planning/handoffs/2026-05-31-package-checklist.md`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`

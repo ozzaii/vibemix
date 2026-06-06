@@ -12,12 +12,15 @@
 //     the user opened by hand (invariant: the shell self-arranges, it doesn't
 //     fight the user).
 //   - Connection mirrors the Rust↔sidecar ws bridge (the `ws-state` Tauri
-//     event), which is the honest "is the pipe up" signal — independent of
-//     whether music is playing (idle is connected-but-quiet, never a fault;
-//     cardinal invariant #5).
+//     event), with a status-tick fallback. A live ipc.status.tick proves the
+//     pipe is up even if the shell mounted after the last ws-state event.
+//     This stays independent of whether music is playing (idle is
+//     connected-but-quiet, never a fault; cardinal invariant #5).
 
 import type { CohostStatus } from "../session/cohost-model.js";
 import { getSessionState } from "../session/state.js";
+import { subscribeIpc } from "../ipc/client.js";
+import type { StatusTick } from "../ipc/messages.js";
 import { listenTauri } from "../tauri-runtime.js";
 import type { ActivationState, ConnectionState, ShellStore } from "./shell-store.js";
 
@@ -52,16 +55,25 @@ export function connectionForWsState(state: string): ConnectionState {
 export interface ActivationBridgeOpts {
   /** Poll cadence for the (pub/sub-less) session state. Ambient, so low. */
   intervalMs?: number;
+  /** Test seam; production subscribes to ipc.status.tick through the IPC client. */
+  subscribeStatusTick?: (callback: (msg: StatusTick) => void) => Promise<() => void>;
 }
 
 /**
  * Wire the live session onto the shell store. Returns a teardown that stops the
- * poll and detaches the ws-state listener.
+ * poll and detaches the ws-state/status listeners.
  */
 export function wireActivation(store: ShellStore, opts: ActivationBridgeOpts = {}): () => void {
   // Connection ← the Rust ws bridge state.
   const unlistenPromise = listenTauri<string>("ws-state", (event) => {
     store.setConnection(connectionForWsState(String(event.payload)));
+  });
+  const subscribeStatusTick =
+    opts.subscribeStatusTick ??
+    ((callback: (msg: StatusTick) => void) =>
+      subscribeIpc<StatusTick>("ipc.status.tick", callback));
+  const unlistenStatusPromise = subscribeStatusTick(() => {
+    store.setConnection("connected");
   });
 
   // Activation ← the co-host status, pushed only on a real transition.
@@ -79,5 +91,6 @@ export function wireActivation(store: ShellStore, opts: ActivationBridgeOpts = {
   return (): void => {
     globalThis.clearInterval(timer);
     void unlistenPromise.then((unlisten) => unlisten?.()).catch(() => {});
+    void unlistenStatusPromise.then((unlisten) => unlisten?.()).catch(() => {});
   };
 }

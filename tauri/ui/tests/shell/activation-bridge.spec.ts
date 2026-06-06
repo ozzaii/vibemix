@@ -74,4 +74,22 @@ describe("activation bridge — observer", () => {
     expect(store.getState().panelOpen).toBe(true);
     expect(store.getState().activation).toBe("idle");
   });
+
+  it("uses live status ticks as a connected fallback when ws-state was missed", () => {
+    const statusTick = { fire: null as (() => void) | null };
+    const store = new ShellStore();
+    stop = wireActivation(store, {
+      intervalMs: 10,
+      subscribeStatusTick: async (callback) => {
+        statusTick.fire = () => callback({} as Parameters<typeof callback>[0]);
+        return () => {
+          statusTick.fire = null;
+        };
+      },
+    });
+
+    expect(store.getState().connection).toBe("disconnected");
+    statusTick.fire?.();
+    expect(store.getState().connection).toBe("connected");
+  });
 });
