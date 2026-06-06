@@ -60,6 +60,7 @@ from __future__ import annotations
 import asyncio
 import collections
 import json
+import os
 import sys
 import time
 from collections.abc import Callable
@@ -112,6 +113,19 @@ CITATION_UNCHANGED_PUBLISH_INTERVAL_S = 30.0
 NEXT_SUGGESTION_VOICE_WAIT_S = 0.75
 _BEATMATCH_GRADED_EVENT = "BEATMATCH_GRADED"
 _BEATMATCH_GRADED_RECEIPT_FRESH_S = 2.0
+
+
+def _coach_playout_timeout_s() -> float:
+    raw = os.environ.get("VIBEMIX_COACH_PLAYOUT_TIMEOUT_S", "").strip()
+    if not raw:
+        return 60.0
+    try:
+        return max(5.0, float(raw))
+    except ValueError:
+        return 60.0
+
+
+COACH_PLAYOUT_TIMEOUT_S = _coach_playout_timeout_s()
 
 
 def _safe_print(*args: object, **kwargs: object) -> None:
@@ -1108,7 +1122,10 @@ async def coach_loop(
                 else:
                     handle = session.generate_reply(allow_interruptions=False)
                 # generate_reply returns a SpeechHandle; wait for playout
-                await asyncio.wait_for(handle.wait_for_playout(), timeout=20.0)
+                await asyncio.wait_for(
+                    handle.wait_for_playout(),
+                    timeout=COACH_PLAYOUT_TIMEOUT_S,
+                )
                 if wired:
                     trigger_state["last_response_at"] = time.monotonic()
                 _tr(

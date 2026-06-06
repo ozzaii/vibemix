@@ -20,6 +20,7 @@ from __future__ import annotations
 import asyncio
 import importlib.util
 import os
+import queue
 import sys
 import threading
 from collections.abc import Callable
@@ -156,6 +157,21 @@ class ChatterboxEngine:
         raise NotImplementedError
 
 
+class _ChatterboxWorkerJob:
+    def __init__(
+        self,
+        kind: str,
+        *,
+        text: str | None = None,
+        on_pcm: Callable[[bytes], None] | None = None,
+    ) -> None:
+        self.kind = kind
+        self.text = text
+        self.on_pcm = on_pcm
+        self.done = threading.Event()
+        self.error: BaseException | None = None
+
+
 class _MlxChatterboxEngine(ChatterboxEngine):
     """Real engine: ``mlx-audio`` Chatterbox-Turbo, ref-conditioned once, streamed."""
 
@@ -224,6 +240,15 @@ class ChatterboxLocalTTS(agents_tts.TTS):
         self._engine: ChatterboxEngine | None = engine
         self._engine_lock = threading.Lock()
         self._synth_lock = threading.Lock()
+        self._prewarm_start_lock = threading.Lock()
+        self._prewarm_done = threading.Event()
+        self._prewarm_error: BaseException | None = None
+        self._prewarm_inflight = False
+        self._worker_lock = threading.Lock()
+        self._worker_queue: queue.Queue[_ChatterboxWorkerJob] | None = None
+        self._worker_thread: threading.Thread | None = None
+        if engine is not None:
+            self._prewarm_done.set()
 
         sample_rate = engine.sample_rate if engine is not None else NATIVE_SR
         super().__init__(
@@ -242,37 +267,112 @@ class ChatterboxLocalTTS(agents_tts.TTS):
 
     def _get_engine(self) -> ChatterboxEngine:
         if self._engine is not None:
+            self._prewarm_done.set()
             return self._engine
         with self._engine_lock:
             if self._engine is None:
                 if self._ref_path is None:
-                    raise APIError(f"Chatterbox voice unavailable: {chatterbox_unavailable_reason()}")
-                self._engine = _MlxChatterboxEngine.load(
-                    self._model_name,
-                    self._ref_path,
-                    self._temperature,
-                    revision=self._model_revision,
-                )
+                    exc = APIError(
+                        f"Chatterbox voice unavailable: {chatterbox_unavailable_reason()}"
+                    )
+                    self._prewarm_error = exc
+                    self._prewarm_done.set()
+                    raise exc
+                try:
+                    self._engine = _MlxChatterboxEngine.load(
+                        self._model_name,
+                        self._ref_path,
+                        self._temperature,
+                        revision=self._model_revision,
+                    )
+                except BaseException as exc:
+                    self._prewarm_error = exc
+                    self._prewarm_done.set()
+                    raise
+                self._prewarm_error = None
+                self._prewarm_done.set()
         return self._engine
+
+    def _ensure_worker(self) -> queue.Queue[_ChatterboxWorkerJob]:
+        with self._worker_lock:
+            if self._worker_queue is None:
+                self._worker_queue = queue.Queue()
+            if self._worker_thread is None or not self._worker_thread.is_alive():
+                self._worker_thread = threading.Thread(
+                    target=self._worker_loop,
+                    name="chatterbox-tts-worker",
+                    daemon=True,
+                )
+                self._worker_thread.start()
+            return self._worker_queue
+
+    def _worker_loop(self) -> None:
+        q = self._worker_queue
+        if q is None:
+            return
+        while True:
+            job = q.get()
+            try:
+                if job.kind == "prewarm":
+                    self._get_engine()
+                elif job.kind == "synth":
+                    if job.text is None or job.on_pcm is None:
+                        raise APIError("Chatterbox synthesis job missing text or callback")
+                    self._get_engine().synthesize(job.text, job.on_pcm)
+                else:
+                    raise APIError(f"unknown Chatterbox worker job: {job.kind}")
+            except BaseException as exc:
+                job.error = exc
+                if job.kind == "prewarm":
+                    self._prewarm_error = exc
+            finally:
+                if job.kind == "prewarm":
+                    with self._prewarm_start_lock:
+                        self._prewarm_inflight = False
+                    self._prewarm_done.set()
+                job.done.set()
 
     def prewarm(self) -> None:
         """Load the model + prime the ref conditional off the loop so reaction #1 is warm."""
         if self._engine is not None:
+            self._prewarm_done.set()
             return
 
-        def _bg() -> None:
-            try:
-                self._get_engine()
-            except Exception:
-                # A failed prewarm must not crash boot; the synth path surfaces the error.
-                pass
+        with self._prewarm_start_lock:
+            if self._prewarm_inflight:
+                return
+            self._prewarm_done.clear()
+            self._prewarm_error = None
+            self._prewarm_inflight = True
+            self._ensure_worker().put(_ChatterboxWorkerJob("prewarm"))
 
-        threading.Thread(target=_bg, name="chatterbox-tts-prewarm", daemon=True).start()
+    @property
+    def prewarm_error(self) -> BaseException | None:
+        return self._prewarm_error
+
+    def wait_until_warm(self, timeout_s: float | None = None) -> bool:
+        """Wait for the prewarm thread to finish loading the engine.
+
+        Returns True only when the local voice is ready to synthesize. Failures
+        stay fail-soft here; the actual synth path still raises the provider
+        error if a caller tries to speak while unavailable.
+        """
+        if self._engine is not None:
+            self._prewarm_done.set()
+            return True
+        self.prewarm()
+        if not self._prewarm_done.wait(timeout_s):
+            return False
+        return self._engine is not None and self._prewarm_error is None
 
     def synthesize_pcm(self, text: str, on_pcm: Callable[[bytes], None]) -> None:
         """Synthesize mono PCM bytes for non-LiveKit sinks."""
         with self._synth_lock:
-            self._get_engine().synthesize(text, on_pcm)
+            job = _ChatterboxWorkerJob("synth", text=text, on_pcm=on_pcm)
+            self._ensure_worker().put(job)
+            job.done.wait()
+            if job.error is not None:
+                raise job.error
 
     def synthesize(
         self, text: str, *, conn_options: APIConnectOptions = DEFAULT_API_CONNECT_OPTIONS
@@ -281,9 +381,7 @@ class ChatterboxLocalTTS(agents_tts.TTS):
 
 
 class _ChatterboxChunkedStream(agents_tts.ChunkedStream):
-    """Runs blocking Chatterbox synthesis in an executor, streaming PCM to the emitter."""
-
-    _DONE = object()
+    """Runs blocking Chatterbox synthesis in an executor, then emits finished PCM."""
 
     async def _run(self, output_emitter: agents_tts.AudioEmitter) -> None:
         tts: ChatterboxLocalTTS = self._tts  # type: ignore[assignment]
@@ -296,30 +394,20 @@ class _ChatterboxChunkedStream(agents_tts.ChunkedStream):
         )
 
         loop = asyncio.get_running_loop()
-        queue: asyncio.Queue = asyncio.Queue()
-
-        def _on_pcm(pcm: bytes) -> None:
-            loop.call_soon_threadsafe(queue.put_nowait, pcm)
+        chunks: list[bytes] = []
 
         def _produce() -> None:
-            try:
-                tts.synthesize_pcm(self._input_text, _on_pcm)
-            except BaseException as exc:
-                loop.call_soon_threadsafe(queue.put_nowait, exc)
-            finally:
-                loop.call_soon_threadsafe(queue.put_nowait, self._DONE)
+            tts.synthesize_pcm(self._input_text, chunks.append)
 
-        fut = loop.run_in_executor(None, _produce)
         try:
-            while True:
-                item = await queue.get()
-                if item is self._DONE:
-                    break
-                if isinstance(item, BaseException):
-                    raise APIError(f"Chatterbox local TTS synthesis failed: {item}") from item
-                output_emitter.push(item)
-        finally:
-            await fut
+            await loop.run_in_executor(None, _produce)
+        except asyncio.CancelledError:
+            raise
+        except BaseException as exc:
+            raise APIError(f"Chatterbox local TTS synthesis failed: {exc}") from exc
+
+        for pcm in chunks:
+            output_emitter.push(pcm)
 
         output_emitter.flush()
 

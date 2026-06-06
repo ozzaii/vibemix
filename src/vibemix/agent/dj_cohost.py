@@ -3716,6 +3716,18 @@ class DJCoHostAgent(Agent):
                     raw_live_claim_text = full_text
                     full_text = live_claim_guard.text
                     stripped = full_text.strip()
+                    if live_claim_guard.emit_corrected and not re.search(
+                        r"[A-Za-z0-9]",
+                        model_text_for_tts(full_text),
+                    ):
+                        live_claim_guard = LiveClaimGuardResult(
+                            text=full_text,
+                            corrected=True,
+                            emit_corrected=False,
+                            policy=live_claim_guard.policy,
+                            reason="corrected_text_not_speakable",
+                            summary=live_claim_guard.summary,
+                        )
                     buffered_chunks = [full_text] if full_text else []
                     guard_action = "emit_corrected" if live_claim_guard.emit_corrected else "strip"
                     try:

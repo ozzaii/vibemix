@@ -800,6 +800,7 @@ class AICoach:
 
         def _with_grounded_receipts(base: str) -> str:
             receipt_lines = []
+            receipt_keys = []
             for key in (
                 "next_suggestion_voice_line",
                 "set_progress_voice_line",
@@ -808,13 +809,21 @@ class AICoach:
             ):
                 line = ev_extra.get(key)
                 if isinstance(line, str) and line.strip():
+                    receipt_keys.append(key)
                     receipt_lines.append(line.strip())
             if not receipt_lines:
                 return base
+            next_hint = (
+                " If next_suggestion_voice_line is present on an otherwise "
+                "plain track or phase read, prefer turning that citable receipt "
+                "into one forward nudge over describing the current track."
+                if "next_suggestion_voice_line" in receipt_keys
+                else ""
+            )
             return (
                 f"{base} {' '.join(receipt_lines)} These are grounded receipt "
                 "contexts, not commands; do not force them if the live sound is "
-                "more important."
+                f"more important.{next_hint}"
             )
 
         if t == "KAAN_SPOKE":
@@ -839,6 +848,15 @@ class AICoach:
                 )
             prev = ev_extra.get("prev_track")
             prev_clause = f" (was: {prev!r})" if prev else ""
+            if isinstance(ev_extra.get("next_suggestion_voice_line"), str):
+                return _with_grounded_receipts(
+                    f"Track flipped{prev_clause}. You have a grounded forward "
+                    "receipt. If it fits the live sound, turn it into one short "
+                    "next-move nudge with the exact citations. Do not just "
+                    "describe the new track. Avoid uncited source-detail prose "
+                    "like bassline/drums/synth/vocal; lead with the suggested "
+                    "artist or title and copy both receipt citations."
+                )
             return _with_grounded_receipts(
                 f"Track flipped{prev_clause}. React to the NEW track's vibe vs "
                 "the previous — heavier, weirder, darker, more euphoric?"

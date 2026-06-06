@@ -259,6 +259,17 @@ def _build_tts_chain_or_mute(**kwargs: Any) -> Any:
         return _livekit_not_given()
 
 
+def _chatterbox_start_warmup_timeout_s() -> float:
+    """How long Start waits for local voice warmup before continuing."""
+    raw = os.environ.get("VIBEMIX_CHATTERBOX_START_WARMUP_TIMEOUT_S", "").strip()
+    if not raw:
+        return 90.0
+    try:
+        return max(0.0, float(raw))
+    except ValueError:
+        return 90.0
+
+
 def _local_voice_ready_for_status() -> bool:
     """Cheap readiness probe for the status badge before Start loads TTS."""
 
@@ -2047,6 +2058,37 @@ async def main() -> None:
                 live_voice_tts = None
             else:
                 print("-> tts:   Chatterbox local only (provider=chatterbox-mlx)")
+                wait_until_warm = getattr(live_voice_tts, "wait_until_warm", None)
+                if callable(wait_until_warm):
+                    warm_timeout_s = _chatterbox_start_warmup_timeout_s()
+                    print(
+                        "-> tts:   warming Chatterbox before live capture "
+                        f"(timeout={warm_timeout_s:.0f}s)",
+                        flush=True,
+                    )
+                    warmed = await asyncio.to_thread(wait_until_warm, warm_timeout_s)
+                    if warmed:
+                        print("-> tts:   Chatterbox warm", flush=True)
+                        synthesize_pcm = getattr(live_voice_tts, "synthesize_pcm", None)
+                        if callable(synthesize_pcm):
+                            try:
+                                await asyncio.to_thread(synthesize_pcm, "Ready.", lambda _pcm: None)
+                                print("-> tts:   Chatterbox synthesis primed", flush=True)
+                            except Exception as exc:
+                                print(
+                                    f"-> tts:   Chatterbox synthesis prime failed: {exc!r}",
+                                    file=sys.stderr,
+                                    flush=True,
+                                )
+                    else:
+                        warm_error = getattr(live_voice_tts, "prewarm_error", None)
+                        reason = f"; last error={warm_error!r}" if warm_error is not None else ""
+                        print(
+                            "-> tts:   Chatterbox still warming; first spoken line may be delayed"
+                            f"{reason}",
+                            file=sys.stderr,
+                            flush=True,
+                        )
 
             anti_slop_flag = os.environ.get("VIBEMIX_ANTI_SLOP", "on").strip().lower()
             anti_slop_enabled = anti_slop_flag not in ("off", "0", "false")
@@ -2481,8 +2523,9 @@ async def main() -> None:
         active_stop_event = asyncio.Event()
         started_event = asyncio.Event()
         active_task = asyncio.create_task(_activate_session(active_stop_event, started_event))
+        activation_timeout_s = 30.0 + _chatterbox_start_warmup_timeout_s()
         try:
-            await asyncio.wait_for(started_event.wait(), timeout=30.0)
+            await asyncio.wait_for(started_event.wait(), timeout=activation_timeout_s)
         except TimeoutError:
             raise RuntimeError("session.start timed out waiting for activation") from None
         if active_task.done():

@@ -76,9 +76,12 @@ def build_next_suggestion_voice_line(
 
     return (
         f"Forward read: {title}{artist_clause} pairs next{why_clause}. "
+        f"Suggested spoken shape: {title} next. "
         f"{section_clause}Hand it as one nudge if it fits the live sound. "
-        f"Copy these citations exactly: {cite_tail}. Do not say it is loaded "
-        "or playing; it is not a proven transition unless deck/live evidence says so."
+        "Keep the spoken words under 8 words, and do not add bassline, drums, "
+        f"synth, vocal, or low-end descriptions. Copy these citations exactly: {cite_tail}. "
+        "Do not say it is loaded or playing; it is not a proven transition unless "
+        "deck/live evidence says so."
     )
 
 
