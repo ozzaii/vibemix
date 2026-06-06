@@ -452,15 +452,17 @@ const LAYOUT_CSS = `
     position: relative;
     isolation: isolate;
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(288px, 360px);
-    align-items: end;
+    grid-template-columns: minmax(0, min(640px, 100%));
+    justify-content: center;
+    justify-items: center;
+    align-content: center;
     gap: clamp(28px, 5vw, 72px);
     min-height: 0;
     width: 100%;
     max-width: 1120px;
     margin: 0 auto;
     padding: clamp(28px, 6vh, 72px) clamp(4px, 1.8vw, 22px) clamp(34px, 7vh, 86px);
-    text-align: left;
+    text-align: center;
     animation: vmxArmedIn 520ms var(--ease-brand);
   }
   /* The idle stage is a powered deck warming up, not dead black. A low rose
@@ -487,7 +489,7 @@ const LAYOUT_CSS = `
   .vmx-armed__copy {
     display: grid;
     gap: var(--sp-4);
-    align-content: end;
+    justify-items: center;
     min-width: 0;
   }
   .vmx-armed__eyebrow,
@@ -504,6 +506,7 @@ const LAYOUT_CSS = `
   }
   .vmx-armed__title {
     margin: 0;
+    margin-inline: auto;
     max-width: 11ch;
     font-family: var(--type-serif);
     font-weight: 400;
@@ -519,6 +522,7 @@ const LAYOUT_CSS = `
   .vmx-armed__lead {
     max-width: 48ch;
     margin: 0;
+    margin-inline: auto;
     font-family: var(--type-body);
     font-size: 15px;
     line-height: 1.55;
@@ -532,6 +536,7 @@ const LAYOUT_CSS = `
   .vmx-armed__context {
     display: flex;
     flex-wrap: wrap;
+    justify-content: center;
     gap: clamp(20px, 3vw, 44px);
     margin-top: var(--sp-4);
     padding-top: var(--sp-4);
@@ -560,6 +565,7 @@ const LAYOUT_CSS = `
     display: grid;
     gap: var(--sp-4);
     align-self: center;
+    justify-self: center;
     padding: 24px;
     border-radius: var(--rad-md);
     background:
