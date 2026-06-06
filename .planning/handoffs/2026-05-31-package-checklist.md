@@ -12826,3 +12826,39 @@ Proof before staging:
 - `npm --prefix tauri/ui run build`
 - `git diff --check -- src/vibemix/learn/practice_mission.py src/vibemix/learn/curriculum_projection.py tauri/ui/src/learn/lesson/curriculum-meta.ts tauri/ui/src/learn/learn-window.ts tauri/ui/src/ipc/messages.schema.json tauri/ui/src/ipc/messages.ts tauri/ui/src/ipc/validator.generated.mjs tests/learn/test_practice_mission.py tauri/ui/tests/learn/test_practice_booth_shell.spec.ts tests/ipc/test_learn_envelope_parity_p92.py .planning/handoffs/2026-05-31-package-checklist.md`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+
+## Package 146 - Learn Free Practice Repeats Earn Real Bank
+
+Suggested commit: `fix(learn): count separate free-practice gestures`
+
+Include:
+
+- `src/vibemix/learn/runtime.py`
+- `tests/learn/test_beatmatch_practice_audio_lifecycle.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Mission ranking, lesson scripts, live-grade math, controller mapping, frontend
+  reward rendering, and beginner-path suites. This package only changes the
+  sandbox receipt dedupe rule so real repeated gestures can fill the persisted
+  practice bank.
+
+Reason:
+
+- Free practice already shows a local warmup counter, but the backend de-duped
+  receipts by `(lesson, source, control)` for the entire runtime. That protected
+  against duplicate drag frames, but it also meant three deliberate reps on the
+  same knob could paint as `warmup 3/3` while the stored Learn progress only
+  banked one rep. Keep a duplicate-frame signature for continuous CC moves,
+  continue collapsing exact repeated frames, cap the persisted bank at three,
+  and let separate toggles/gestures on the same control earn the same
+  controller-checkpoint mission the UI is promising.
+
+Proof before staging:
+
+- `uv run pytest -q tests/learn/test_beatmatch_practice_audio_lifecycle.py`
+- `uv run ruff check src/vibemix/learn/runtime.py tests/learn/test_beatmatch_practice_audio_lifecycle.py`
+- `uv run python -m compileall -q src/vibemix/learn/runtime.py tests/learn/test_beatmatch_practice_audio_lifecycle.py`
+- `git diff --check -- src/vibemix/learn/runtime.py tests/learn/test_beatmatch_practice_audio_lifecycle.py .planning/handoffs/2026-05-31-package-checklist.md`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`

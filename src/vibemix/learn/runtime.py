@@ -327,6 +327,17 @@ def _practice_bank_total(row: Any) -> int:
     return min(3, counts["hardware"] + counts["screen"])
 
 
+def _free_practice_receipt_signature(action: dict[str, Any]) -> tuple[str, int] | None:
+    """Return a duplicate-frame signature for continuous free-practice CC moves."""
+    if str(action.get("type") or "").strip().lower() != "cc":
+        return None
+    try:
+        prev_value = int(action.get("prev_value", -1))
+    except (TypeError, ValueError):
+        prev_value = -1
+    return (str(action.get("direction") or ""), prev_value)
+
+
 def _practice_bank_source_label(counts: dict[str, int]) -> str:
     if counts["hardware"] > 0 and counts["screen"] > 0:
         return "screen + hardware"
@@ -788,7 +799,7 @@ class LessonRuntime(StateMachine):
         self._beatmatch_practice_ack_prehandled = False
         self._beatmatch_practice_player: Any | None = None
         self._beatmatch_practice_player_active = False
-        self._free_practice_receipts: set[tuple[str, str, str]] = set()
+        self._free_practice_receipts: dict[tuple[str, str, str], set[tuple[str, int]]] = {}
         self._waveform_ready_lesson_id: str | None = None
         self._active_harmonic_pair: HarmonicPracticePair | None = None
         self._recovery_drill_armed_step_key: tuple[str, int] | None = None
@@ -2622,16 +2633,26 @@ class LessonRuntime(StateMachine):
         if source_key is None:
             return
         receipt_key = (lesson_id, source_key, control)
-        if receipt_key in self._free_practice_receipts:
+        receipt_signature = _free_practice_receipt_signature(midi)
+        if (
+            receipt_signature is not None
+            and receipt_signature in self._free_practice_receipts.get(receipt_key, set())
+        ):
             return
         try:
             from vibemix.learn.progress import LearnProgress, save_progress
 
             if not isinstance(self._progress, LearnProgress):
                 return
+            row = self._progress.lessons.get(lesson_id)
+            if _practice_bank_total(row) >= 3:
+                return
             self._progress.mark_practice_source(meta.course_id, lesson_id, source_key)
             save_progress(self._progress)
-            self._free_practice_receipts.add(receipt_key)
+            if receipt_signature is not None:
+                self._free_practice_receipts.setdefault(receipt_key, set()).add(
+                    receipt_signature
+                )
         except Exception as exc:  # pragma: no cover — defensive
             import sys
 
