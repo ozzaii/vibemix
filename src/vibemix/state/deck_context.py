@@ -318,6 +318,19 @@ _MIXER_LOW_KILL_NEGATION_RE = re.compile(
     r"\b(?:not|no|never|didn't|didnt|doesn't|doesnt|without)\b[^.?!]{0,32}\bkilled\b",
     re.IGNORECASE,
 )
+_TRACK_CITATION_RE = re.compile(r"\[track:[^\]]+\]", re.IGNORECASE)
+_TRACK_IDENTITY_QUOTED_RE = re.compile(
+    r"\b(?:track|song|tune|record|id)\b[^.?!]{0,36}[\"'`]([^\"'`]{3,})[\"'`]",
+    re.IGNORECASE,
+)
+_TRACK_IDENTITY_CALLED_RE = re.compile(
+    r"\b(?:track|song|tune|record|id)\b[^.?!]{0,24}\b(?:called|named)\b[^.?!]{0,64}",
+    re.IGNORECASE,
+)
+_TRACK_IDENTITY_BY_RE = re.compile(
+    r"\b[A-Z][A-Za-z0-9&'.,:/+-]{1,}(?:\s+[A-Z][A-Za-z0-9&'.,:/+-]{1,}){0,8}"
+    r"\s+by\s+[A-Z][A-Za-z0-9&'.,:/+-]{1,}",
+)
 _EVIDENCE_TOKEN_RE = re.compile(r"[^A-Za-z0-9_.:+-]+")
 _AUDIO_WINDOW_CONTEXT_REQUIRED_ATOMS: tuple[str, ...] = (
     "P1=master_global_mix",
@@ -516,6 +529,9 @@ LIVE_COACHING_ADVICE_HELD_REPLY = (
 )
 LIVE_AUDIO_SOURCE_DETAIL_HELD_REPLY = (
     "I only have a broad listener read from the audio here, not source-level proof."
+)
+LIVE_TRACK_IDENTITY_HELD_REPLY = (
+    "I can hear the sound, but I need a citable track match before naming the tune."
 )
 LIVE_JUDGE_OVERPRAISE_HELD_REPLY = (
     "The measured Judge read was restrained there. The useful note is the evidence, not a hype grade."
@@ -2992,6 +3008,7 @@ def should_defer_live_claim_text(
             event_type=event_type,
             judge_evidence_line=judge_evidence_line,
         )
+        or _has_uncited_track_identity_claim(text, state)
         or _has_unsupported_mixer_low_kill_claim(text, state)
         or (not moves and _has_unsupported_no_move_control_claim(text))
         or (not moves and event == "PHASE" and _has_unsupported_no_move_coaching_advice(text))
@@ -3070,6 +3087,26 @@ def apply_live_claim_guard(
                 summary=pending_corrected_summary,
             )
         return LiveClaimGuardResult(text=text, policy=policy, reason=reason, summary=summary)
+
+    if _has_uncited_track_identity_claim(text, state):
+        summary = _live_guard_summary(state, moves)
+        stripped = _strip_uncited_track_identity_clause(text, state)
+        if stripped:
+            text = stripped
+            outcome_claim, public_diagnostic, source_detail_reason = _text_claim_flags(text)
+            _mark_emit_correction(
+                policy="track_identity_not_cited",
+                reason="missing_track_citation",
+                summary=summary,
+            )
+        else:
+            return LiveClaimGuardResult(
+                text=LIVE_TRACK_IDENTITY_HELD_REPLY,
+                corrected=True,
+                policy="track_identity_not_cited",
+                reason="missing_track_citation",
+                summary=summary,
+            )
 
     if _has_unsupported_harmonic_deck_claim(
         text,
@@ -3422,6 +3459,66 @@ def _judge_overpraise_reason(text: str, judge_score: float | None) -> str | None
     if judge_score < 0.60 and _JUDGE_POSITIVE_PRAISE_RE.search(text):
         return "judge_score_below_positive_praise"
     return None
+
+
+def _has_uncited_track_identity_claim(text: str, state: MusicState) -> bool:
+    """Return True when live text names a track without a track citation."""
+    raw = str(text or "").strip()
+    if not raw or _TRACK_CITATION_RE.search(raw):
+        return False
+    return bool(
+        _TRACK_IDENTITY_QUOTED_RE.search(raw)
+        or _TRACK_IDENTITY_CALLED_RE.search(raw)
+        or _TRACK_IDENTITY_BY_RE.search(raw)
+        or _mentions_known_track_identity(raw, state)
+    )
+
+
+def _strip_uncited_track_identity_clause(text: str, state: MusicState) -> str:
+    """Drop sentence(s) that name tracks without a ``[track:*]`` citation."""
+    sentences = re.split(r"(?<=[.?!])\s+", str(text or ""))
+    kept = [
+        sentence.strip()
+        for sentence in sentences
+        if sentence.strip() and not _has_uncited_track_identity_claim(sentence, state)
+    ]
+    return _normalize_salvaged_public_text(kept)
+
+
+def _mentions_known_track_identity(text: str, state: MusicState) -> bool:
+    raw = str(text or "")
+    for name in _known_track_identity_names(state):
+        pattern = r"(?<![A-Za-z0-9])" + re.escape(name) + r"(?![A-Za-z0-9])"
+        if re.search(pattern, raw, flags=re.IGNORECASE):
+            return True
+    return False
+
+
+def _known_track_identity_names(state: MusicState) -> tuple[str, ...]:
+    candidates: list[str] = []
+    deck_state = getattr(state, "deck_state", None)
+    decks = getattr(deck_state, "decks", None) or {}
+    if isinstance(decks, dict):
+        for deck in decks.values():
+            candidates.extend(
+                [
+                    str(getattr(deck, "title", "") or ""),
+                    str(getattr(deck, "track_id", "") or ""),
+                ]
+            )
+    candidates.append(str(getattr(state, "audible_track", "") or ""))
+    out: list[str] = []
+    seen: set[str] = set()
+    for candidate in candidates:
+        name = re.sub(r"\s+", " ", candidate).strip(" '\"\t\r\n")
+        if len(name) < 3 or name.lower() in {"unknown", "none", "null", "untitled"}:
+            continue
+        lowered = name.lower()
+        if lowered in seen:
+            continue
+        seen.add(lowered)
+        out.append(name)
+    return tuple(out)
 
 
 def _unsupported_audio_source_detail_reason(
