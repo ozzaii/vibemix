@@ -62,6 +62,30 @@ beforeEach(() => {
 });
 
 describe("DebriefDock", () => {
+  it("can mount cold inside the keep-alive shell without loading recording history", async () => {
+    const host = document.createElement("div");
+
+    mountDebriefDock(host, { autoRefresh: false });
+    await flush();
+
+    expect(mocks.sendIpcRequest).not.toHaveBeenCalled();
+    expect(host.textContent).toContain("ready when you are");
+    expect(host.textContent).toContain("Refresh when you want the latest local set receipts.");
+    expect(host.textContent).toContain("record a real set");
+
+    const refresh = host.querySelector<HTMLButtonElement>(".debrief-dock__refresh");
+    mocks.sendIpcRequest.mockResolvedValueOnce(sessionsPayload());
+    refresh?.click();
+    await flush();
+
+    expect(mocks.sendIpcRequest).toHaveBeenCalledWith(
+      "ipc.recordings.list",
+      {},
+      "ipc.recordings.list_result",
+    );
+    expect(host.textContent).toContain("2 sessions");
+  });
+
   it("lists recent recordings and opens the real debrief window for ready sessions", async () => {
     mocks.sendIpcRequest.mockResolvedValueOnce(sessionsPayload());
     const host = document.createElement("div");

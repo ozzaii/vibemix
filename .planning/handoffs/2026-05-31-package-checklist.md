@@ -13432,3 +13432,43 @@ Proof before staging:
 - `npm --prefix tauri/ui run build`
 - `git diff --check -- tauri/ui/src/shell/activation-bridge.ts tauri/ui/tests/shell/activation-bridge.spec.ts .planning/handoffs/2026-05-31-package-checklist.md`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+
+## Package 162 - First-Run Ready Status And Lazy Debrief Boot
+
+Suggested commit: `fix(shell): avoid false muted and recording boot storms`
+
+Include:
+
+- `src/vibemix/__main__.py`
+- `tests/test_main_smoke.py`
+- `tauri/ui/src/shell/DebriefDock.ts`
+- `tauri/ui/src/shell/app.ts`
+- `tauri/ui/tests/shell/debrief-dock.spec.ts`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Recording IPC schema changes, retention/deletion policy, Chatterbox synthesis,
+  Start/Stop graph construction, Settings recording browser behavior, and broad
+  Debrief redesign. This package only fixes the fresh shell boot signals that
+  confused the user-test path.
+
+Reason:
+
+- A fresh user-test boot could show `voice: muted` before Start even when the
+  local Chatterbox voice was installed and only waiting behind the Start gate.
+  The app also mounted the keep-alive Debrief dock cold but immediately fired
+  `ipc.recordings.list`, pulling a multi-GB history payload while the user was
+  on Learn. Make the idle status use a cheap local-voice readiness probe, keep
+  actual model construction lazy until Start, and mount the shell Debrief dock
+  in lazy mode so recordings load only when the DJ asks for that surface data.
+
+Proof before staging:
+
+- `uv run pytest -q tests/test_main_smoke.py::test_idle_status_marks_chatterbox_ready_without_loading_model`
+- `npm --prefix tauri/ui test -- tests/shell/debrief-dock.spec.ts`
+- `uv run ruff check src/vibemix/__main__.py tests/test_main_smoke.py`
+- `uv run python -m compileall -q src/vibemix/__main__.py tests/test_main_smoke.py`
+- `npm --prefix tauri/ui run build`
+- `git diff --check -- src/vibemix/__main__.py tests/test_main_smoke.py tauri/ui/src/shell/DebriefDock.ts tauri/ui/src/shell/app.ts tauri/ui/tests/shell/debrief-dock.spec.ts .planning/handoffs/2026-05-31-package-checklist.md`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`

@@ -17,6 +17,11 @@ export interface DebriefDockHandle {
   teardown(): void;
 }
 
+export interface DebriefDockOptions {
+  /** When false, mount the dock cold and wait for the user to ask for sessions. */
+  readonly autoRefresh?: boolean;
+}
+
 const MIN_DEBRIEF_SECONDS = 300;
 const MIN_DEBRIEF_EVENTS = 5;
 const MAX_VISIBLE_SESSIONS = 5;
@@ -423,7 +428,11 @@ const CSS = `
 
 registerStyle("shell-debrief-dock", CSS);
 
-export function mountDebriefDock(host: HTMLElement): DebriefDockHandle {
+export function mountDebriefDock(
+  host: HTMLElement,
+  options: DebriefDockOptions = {},
+): DebriefDockHandle {
+  const autoRefresh = options.autoRefresh ?? true;
   const root = document.createElement("div");
   root.className = "debrief-dock";
   root.dataset.wire = "shell.debrief.dock";
@@ -444,7 +453,7 @@ export function mountDebriefDock(host: HTMLElement): DebriefDockHandle {
   sessions.className = "debrief-dock__sessions";
   sessions.innerHTML =
     '<div class="debrief-dock__toolbar">' +
-    '<div class="debrief-dock__status" role="status" aria-live="polite">loading sessions</div>' +
+    '<div class="debrief-dock__status" role="status" aria-live="polite">ready when you are</div>' +
     '<button class="debrief-dock__refresh" type="button">Refresh</button>' +
     "</div>" +
     '<section class="debrief-dock__readiness" aria-label="next debrief readiness">' +
@@ -474,6 +483,12 @@ export function mountDebriefDock(host: HTMLElement): DebriefDockHandle {
   const list = root.querySelector<HTMLElement>(".debrief-dock__list")!;
   let disposed = false;
   let retryTimer: ReturnType<typeof setTimeout> | null = null;
+
+  const renderColdState = (): void => {
+    status.textContent = "ready when you are";
+    list.replaceChildren(renderEmpty("Refresh when you want the latest local set receipts."));
+    renderReadiness(readiness, null);
+  };
 
   const refresh = async (attempt = 0): Promise<void> => {
     if (retryTimer !== null) {
@@ -515,7 +530,11 @@ export function mountDebriefDock(host: HTMLElement): DebriefDockHandle {
   refreshButton.addEventListener("click", () => {
     void refresh();
   });
-  void refresh();
+  if (autoRefresh) {
+    void refresh();
+  } else {
+    renderColdState();
+  }
 
   return {
     root,

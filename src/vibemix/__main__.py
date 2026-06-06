@@ -259,6 +259,17 @@ def _build_tts_chain_or_mute(**kwargs: Any) -> Any:
         return _livekit_not_given()
 
 
+def _local_voice_ready_for_status() -> bool:
+    """Cheap readiness probe for the status badge before Start loads TTS."""
+
+    try:
+        from vibemix.agent.chatterbox_tts import chatterbox_available, engine_selected
+
+        return bool(engine_selected() and chatterbox_available())
+    except Exception:
+        return False
+
+
 def _log_brain_unavailable(reason: str) -> None:
     """Surface a boot-time brain outage without crashing the sidecar."""
     print(
@@ -1748,7 +1759,7 @@ async def main() -> None:
     active_task: asyncio.Task | None = None
     active_stop_event: asyncio.Event | None = None
     live_session_active = False
-    live_voice_muted = True
+    live_voice_muted = not _local_voice_ready_for_status()
     learn_voice_stream: Any | None = None
     learn_voice_lock = threading.RLock()
     learn_voice_tts_cache: dict[str, Any | None] = {"tts": None}

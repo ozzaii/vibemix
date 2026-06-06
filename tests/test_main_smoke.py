@@ -983,6 +983,23 @@ def test_smoke_03b_idle_is_cold_until_start(monkeypatch, mocker, tmp_path):
     assert audio_mocks["open_mic_capture"].call_count == 0
 
 
+def test_idle_status_marks_chatterbox_ready_without_loading_model(
+    monkeypatch,
+    mocker,
+):
+    """Idle status readiness stays cheap and does not construct the TTS chain."""
+
+    mocker.patch("vibemix.agent.chatterbox_tts.engine_selected", return_value=True)
+    mocker.patch("vibemix.agent.chatterbox_tts.chatterbox_available", return_value=True)
+
+    import vibemix.__main__ as main_mod
+
+    build_tts = mocker.patch.object(main_mod, "build_tts_chain")
+
+    assert main_mod._local_voice_ready_for_status() is True
+    build_tts.assert_not_called()
+
+
 def test_screen_vision_capture_opt_in_spawns_capture_task(monkeypatch, mocker, tmp_path):
     """Screen capture is a dormant live leg unless the explicit eval flag is set."""
     monkeypatch.setenv("GEMINI_API_KEY", "dummy-key")

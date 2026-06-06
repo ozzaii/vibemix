@@ -79,7 +79,7 @@ const appDeps: SurfaceMountDeps = {
   },
   mountDebrief: async (mount) => {
     const { mountDebriefDock } = await import("./DebriefDock.js");
-    mountDebriefDock(mount);
+    mountDebriefDock(mount, { autoRefresh: false });
   },
 };
 
