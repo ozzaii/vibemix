@@ -12448,3 +12448,34 @@ Proof before staging:
 - `npm --prefix tauri/ui run build`
 - `git diff --check -- tauri/ui/src/learn/learn-window.ts tauri/ui/src/learn/styles/learn.css tauri/ui/src/shell/StatusFooter.ts tauri/ui/src/shell/shell.css tauri/ui/tests/learn/test_practice_booth_shell.spec.ts tauri/ui/tests/shell/shell.spec.ts tauri/ui/tests/shell/learn-folded-layout.spec.ts .planning/handoffs/2026-05-31-package-checklist.md`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+
+## Package 136 - Learn Live Meter Waits For Proof
+
+Suggested commit: `fix(learn-ui): hide idle beatmatch meter until graded`
+
+Include:
+
+- `tauri/ui/src/learn/learn-window.ts`
+- `tauri/ui/tests/learn/test_practice_booth_shell.spec.ts`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Beatmatch scoring, lesson content, deck-proof backend behavior, and meter
+  visuals. This package only changes when the existing live proof meter is
+  allowed to appear.
+
+Reason:
+
+- Course 1 anatomy lessons looked blocked because the beatmatch meter mounted
+  in its idle state on every lesson load, showing "waiting for decks / no proof
+  yet" before any `ipc.learn.live_grade` evidence existed. Keep the meter hidden
+  on first paint and lesson load, reveal it only when live grading arrives, and
+  hide it again on lesson completion.
+
+Proof before staging:
+
+- `npm --prefix tauri/ui test -- tests/learn/test_practice_booth_shell.spec.ts`
+- `npm --prefix tauri/ui run build`
+- `git diff --check -- tauri/ui/src/learn/learn-window.ts tauri/ui/tests/learn/test_practice_booth_shell.spec.ts .planning/handoffs/2026-05-31-package-checklist.md`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`

@@ -178,6 +178,27 @@ describe("practice booth shell", () => {
       expect(root.querySelector<HTMLElement>("#learn-booth-voice")?.textContent).toBe(
         "voice pending",
       );
+      expect(root.querySelector<HTMLElement>("#learn-live-meter-host")?.hidden).toBe(
+        true,
+      );
+      expect(root.querySelector("#learn-live-meter")).toBeNull();
+    } finally {
+      ws.close();
+    }
+  });
+
+  it("keeps the live proof meter hidden on anatomy lessons until grading arrives", async () => {
+    const root = document.getElementById("learn-root") as HTMLElement;
+    const { ws } = mountLearnWindow(root);
+    try {
+      await waitForMountedControl(root, "eq_hi:A");
+      dispatchLessonLoaded("L1.03", "course_1_anatomy");
+
+      const meterHost = root.querySelector<HTMLElement>("#learn-live-meter-host")!;
+      expect(meterHost.hidden).toBe(true);
+      expect(root.querySelector("#learn-live-meter")).toBeNull();
+      expect(root.textContent).not.toContain("waiting for decks");
+      expect(root.textContent).not.toContain("no proof yet");
     } finally {
       ws.close();
     }
@@ -589,6 +610,9 @@ describe("practice booth shell", () => {
     try {
       await waitForMountedControl(root, "eq_hi:A");
       dispatchLessonLoaded("L2.01", "course_2_transitions");
+      const meterHost = root.querySelector<HTMLElement>("#learn-live-meter-host")!;
+      expect(meterHost.hidden).toBe(true);
+      expect(root.querySelector("#learn-live-meter")).toBeNull();
 
       window.dispatchEvent(
         new CustomEvent("ipc.learn.live_grade", {
@@ -609,6 +633,7 @@ describe("practice booth shell", () => {
       const meter = root.querySelector<HTMLElement>("#learn-live-meter");
       const waveformHost = root.querySelector<HTMLElement>("#learn-waveform-host");
       expect(meter).not.toBeNull();
+      expect(meterHost.hidden).toBe(false);
       expect(meter?.dataset.state).toBe("active");
       expect(meter?.dataset.verdict).toBe("drifting");
       expect(waveformHost?.dataset.gallop).toBe("behind");
@@ -653,6 +678,15 @@ describe("practice booth shell", () => {
       expect(root.querySelector<HTMLElement>("#learn-booth-panel")?.dataset.visible).toBe(
         "false",
       );
+      window.dispatchEvent(
+        new CustomEvent("ipc.learn.complete_lesson", {
+          detail: {
+            lesson_id: "L2.01",
+            reason: "completed",
+          },
+        }),
+      );
+      expect(meterHost.hidden).toBe(true);
     } finally {
       ws.close();
     }

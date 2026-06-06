@@ -443,7 +443,7 @@ function mountLearnWindow(root: HTMLElement): {
       <span id="learn-exemplar-meta" class="learn-exemplar-chip__meta"></span>
     </div>
     <div id="learn-waveform-host" class="learn-waveform-host"></div>
-    <div id="learn-live-meter-host" class="learn-live-meter-host"></div>
+    <div id="learn-live-meter-host" class="learn-live-meter-host" hidden></div>
     <aside id="learn-earned-wall-host" class="learn-earned-wall" aria-label="earned skill wall"></aside>
     <aside id="learn-progress-list-host" class="learn-progress-list-host" data-visible="false" aria-hidden="true">
       <div class="learn-progress-list-shell">
@@ -1243,9 +1243,8 @@ function mountLearnWindow(root: HTMLElement): {
     lessonMatchedSourceCounts = freshLessonSourceCounts();
     lessonUsedHint = false;
     status.clearPracticeFeedback();
-    if (!liveMeter) {
-      liveMeter = LiveGradeMeter(liveMeterHost);
-    } else {
+    liveMeterHost.hidden = true;
+    if (liveMeter) {
       liveMeter.reset();
     }
 
@@ -1373,6 +1372,7 @@ function mountLearnWindow(root: HTMLElement): {
     screenAction.hidden = true;
     if (tutorDock) tutorDock.hide();
     if (liveMeter) liveMeter.reset();
+    liveMeterHost.hidden = true;
     hideExemplarChip();
     clearHighlight(stageEl);
     lastPositions = {};
@@ -1468,6 +1468,7 @@ function mountLearnWindow(root: HTMLElement): {
     if (!liveMeter) {
       liveMeter = LiveGradeMeter(liveMeterHost);
     }
+    liveMeterHost.hidden = false;
     waveforms.updateGrade(payload);
     liveMeter.update(payload);
     showLiveGradeMissionFeedback(payload);
