@@ -506,6 +506,51 @@ describe("build — real renderBuildSet path (jsdom, via mountLibrary)", () => {
     document.body.innerHTML = "";
   });
 
+  it("shows staged sequencing rows while AutoCrate is running", async () => {
+    let resolveBuild!: (payload: BuildSetResult) => void;
+    buildMock.mockImplementation(
+      () =>
+        new Promise<BuildSetResult>((resolve) => {
+          resolveBuild = resolve;
+        }),
+    );
+    vi.resetModules();
+    doMockApi();
+    const { mountLibrary } = await import("./index.js");
+    mountSkeleton();
+    mountLibrary();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    document.querySelector<HTMLElement>('button[data-mode="build"]')?.click();
+    for (let i = 0; i < 6; i++) await Promise.resolve();
+    (document.getElementById("vmx-lib-runbtn") as HTMLButtonElement).click();
+    for (let i = 0; i < 6; i++) await Promise.resolve();
+
+    const runningRows = document.querySelectorAll(".vmx-lib-sequence-step");
+    expect(runningRows).toHaveLength(6);
+    expect(runningRows[0]?.textContent).toContain("Find candidates");
+    expect(runningRows[5]?.textContent).toContain("Write handoff");
+    expect(document.getElementById("vmx-lib-rationale-meta")?.textContent).toContain(
+      "discovering / ordering / exporting",
+    );
+    expect(document.getElementById("vmx-lib-rcount")?.textContent).toBe(
+      "sequencing…",
+    );
+    const runBtn = document.getElementById("vmx-lib-runbtn") as HTMLButtonElement;
+    expect(runBtn.disabled).toBe(true);
+    expect(runBtn.textContent).toBe("Sequencing");
+
+    resolveBuild(DEV_FALLBACK.build);
+    for (let i = 0; i < 8; i++) await Promise.resolve();
+
+    expect(document.querySelectorAll(".vmx-lib-sequence-step")).toHaveLength(0);
+    expect(document.querySelectorAll(".vmx-lib-row")).toHaveLength(6);
+    expect(document.getElementById("vmx-lib-rcount")?.textContent).toBe("6 in set");
+    expect(runBtn.disabled).toBe(false);
+    expect(runBtn.textContent).toBe("Build set");
+  });
+
   it("renders the numbered set, rationale + export receipt (real renderBuildSet)", async () => {
     await runRealBuild(DEV_FALLBACK.build);
     const rows = document.querySelectorAll(".vmx-lib-row");

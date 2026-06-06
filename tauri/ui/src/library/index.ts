@@ -541,6 +541,14 @@ function liveContextForChat(
   return moves.length > 0 ? { recent_moves: moves } : null;
 }
 
+function settleRows(el: HTMLElement, delayMs = 55): void {
+  Array.from(el.children).forEach((row, i) => {
+    requestAnimationFrame(() =>
+      setTimeout(() => row.classList.add("settled"), i * delayMs),
+    );
+  });
+}
+
 function renderResults(result: SearchResult, mode: LibraryMode): void {
   const el = $("vmx-lib-results");
   el.innerHTML = "";
@@ -558,12 +566,7 @@ function renderResults(result: SearchResult, mode: LibraryMode): void {
         </div>`,
       );
     });
-    // staggered ease-out settle (.settled adds the transition on next frame)
-    Array.from(el.children).forEach((row, i) => {
-      requestAnimationFrame(() =>
-        setTimeout(() => row.classList.add("settled"), i * 55),
-      );
-    });
+    settleRows(el);
   }
 
   $("vmx-lib-rcount").textContent =
@@ -610,11 +613,7 @@ function renderCurate(result: CurateResult): void {
         </div>`,
       );
     });
-    Array.from(el.children).forEach((row, i) => {
-      requestAnimationFrame(() =>
-        setTimeout(() => row.classList.add("settled"), i * 55),
-      );
-    });
+    settleRows(el);
   }
 
   $("vmx-lib-rcount").textContent = `${result.tracks.length} in set`;
@@ -843,22 +842,27 @@ function renderBuildSet(result: BuildSetResult): void {
       );
     });
     makeBuildRowsOpenExport(el, result);
-    Array.from(el.children).forEach((row, i) => {
-      requestAnimationFrame(() =>
-        setTimeout(() => row.classList.add("settled"), i * 55),
-      );
-    });
+    settleRows(el);
   }
 
   $("vmx-lib-rcount").textContent = `${result.tracks.length} in set`;
 }
 
-/** Working state while AutoCrate discovers + sequences the set. Skeleton rows +
- *  a "building" note keep the surface alive while the deterministic engine runs.
- *  Replaced wholesale by renderBuildSet / renderError when the run lands. */
+const BUILD_SEQUENCE_STEPS = [
+  ["Find candidates", "reading local library matches"],
+  ["Choose opener", "anchoring the first slot"],
+  ["Order the middle", "building the set arc"],
+  ["Check key and BPM", "keeping blends realistic"],
+  ["Smooth energy", "fitting the curve"],
+  ["Write handoff", "preparing Rekordbox and M3U8"],
+] as const;
+
+/** Working state while AutoCrate discovers + sequences the set. Staged slot rows
+ *  keep the surface alive while the deterministic engine runs. Replaced
+ *  wholesale by renderBuildSet / renderError when the run lands. */
 function renderBuildSetLoading(brief: string): void {
-  $("vmx-lib-rationale-body").textContent = `Building a set for "${brief}"…`;
-  $("vmx-lib-rationale-meta").textContent = "set prep · working";
+  $("vmx-lib-rationale-body").textContent = `Sequencing a set for "${brief}"…`;
+  $("vmx-lib-rationale-meta").textContent = "set prep · discovering / ordering / exporting";
   $("vmx-lib-export").style.display = "none";
   $("vmx-lib-export-path").textContent = "";
   const hint = $maybe("vmx-lib-export-hint");
@@ -866,13 +870,18 @@ function renderBuildSetLoading(brief: string): void {
   setExportRevealTarget(null);
   const el = $("vmx-lib-results");
   el.innerHTML = "";
-  for (let i = 0; i < 4; i++) {
+  BUILD_SEQUENCE_STEPS.forEach(([title, meta], i) => {
     el.insertAdjacentHTML(
       "beforeend",
-      `<div class="vmx-lib-row vmx-lib-skeleton"><div class="rank">${String(i + 1).padStart(2, "0")}</div><div><div class="title"></div><div class="meta"></div></div><div class="score"></div></div>`,
+      `<div class="vmx-lib-row vmx-lib-sequence-step" style="--seq-delay: ${(i * 0.14).toFixed(2)}s">
+        <div class="rank">${String(i + 1).padStart(2, "0")}</div>
+        <div><div class="title">${title}</div><div class="meta">${meta}</div></div>
+        <div class="score"><span class="vmx-lib-sequence-pulse">queue</span></div>
+      </div>`,
     );
-  }
-  $("vmx-lib-rcount").textContent = "building…";
+  });
+  settleRows(el, 70);
+  $("vmx-lib-rcount").textContent = "sequencing…";
 }
 
 function cueOutputPath(result: LibraryCueResult): string | null {
@@ -2699,6 +2708,7 @@ export function mountLibrary(root: ParentNode = document): void {
       runBtn.disabled = false;
       runBtn.textContent = "Cancel import";
     } else if (modeAtStart === "build") {
+      runBtn.textContent = "Sequencing";
       setCueActionState(true, "Set building");
     }
     // Reset transient Viber status/proof chrome so each run starts clean.
@@ -2745,6 +2755,7 @@ export function mountLibrary(root: ParentNode = document): void {
       if (isCurrentRun(runId, modeAtStart) && modeAtStart !== "ingest") {
         busy = false;
         runBtn.disabled = false;
+        runBtn.textContent = runLabel(state.mode);
         if (modeAtStart === "build") setCueActionState(false);
         cancelActiveRun = null;
         if (modeAtStart === "chat" && chatHistory.length === 0) {

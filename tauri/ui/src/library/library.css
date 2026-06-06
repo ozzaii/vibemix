@@ -788,6 +788,45 @@ body {
   .vmx-lib-row.vmx-lib-skeleton .title,
   .vmx-lib-row.vmx-lib-skeleton .meta { animation: none; opacity: 0.55; }
 }
+.vmx-lib-row.vmx-lib-sequence-step {
+  cursor: progress;
+  border-color: var(--brand-12);
+  background:
+    linear-gradient(90deg, var(--brand-06), transparent 58%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.022), transparent 46%, rgba(0, 0, 0, 0.28)),
+    var(--void-5);
+}
+.vmx-lib-row.vmx-lib-sequence-step .rank {
+  color: var(--brand);
+  border-color: var(--brand-12);
+}
+.vmx-lib-row.vmx-lib-sequence-step .title {
+  color: var(--silk);
+}
+.vmx-lib-row.vmx-lib-sequence-step .score {
+  display: flex;
+  justify-content: flex-end;
+}
+.vmx-lib-sequence-pulse {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0 9px;
+  border: 1px solid var(--brand-22);
+  border-radius: var(--rad-sm);
+  background: var(--brand-04);
+  color: var(--brand);
+  font-family: var(--type-mono);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  animation: vmx-lib-breathe 1.35s ease-in-out infinite;
+  animation-delay: var(--seq-delay, 0s);
+}
+@media (prefers-reduced-motion: reduce) {
+  .vmx-lib-sequence-pulse { animation: none; opacity: 0.8; }
+}
 .vmx-lib-row .rank {
   font-family: var(--type-mono);
   font-size: 12px;
