@@ -93,6 +93,8 @@ class DebriefNearMissPayload:
             ``None`` means no confident near-miss window.
         receipt_text: resolver-backed proof text for the card.
         friend_line_text: one human line that may be spoken/rendered.
+        friend_line_audio_relative_path: optional MP3 filename relative to
+            session_dir when the local product voice rendered the line.
         duration_s: real set duration from events/input, not ``voice.wav``.
         waveform_peaks: optional ``[[low, mid, high], ...]`` master-input
             display peaks scaled 0..255. ``None`` means the recording could
@@ -105,6 +107,7 @@ class DebriefNearMissPayload:
     receipt_text: str
     friend_line_text: str
     duration_s: float
+    friend_line_audio_relative_path: str | None = None
     waveform_peaks: tuple[tuple[int, int, int], ...] | None = None
 
 

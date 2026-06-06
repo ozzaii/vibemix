@@ -9,7 +9,9 @@ from vibemix.debrief.friend_line import (
     build_near_miss_friend_line,
     synthesize_friend_line_audio,
 )
+from vibemix.debrief.main import _friend_line_audio_relative_path
 from vibemix.debrief.near_miss_detector import NearMissResult
+from vibemix.debrief.persistence import FRIEND_LINE_MP3_FILENAME
 
 
 def _near_miss(citation: str = "[mix:near_miss@42.000]") -> NearMissResult:
@@ -103,3 +105,44 @@ def test_synthesize_friend_line_audio_uses_line_voice_seam() -> None:
 
     assert (audio, sample_rate) == ("audio", 24_000)
     assert calls == [("adapter", line.text)]
+
+
+def test_friend_line_audio_relative_path_writes_optional_mp3(tmp_path) -> None:
+    line = build_near_miss_friend_line(_near_miss(), {})
+    assert line is not None
+
+    relative = _friend_line_audio_relative_path(
+        tmp_path,
+        line,
+        synthesizer=lambda text: f"mp3:{text}".encode(),
+    )
+
+    assert relative == FRIEND_LINE_MP3_FILENAME
+    assert (tmp_path / FRIEND_LINE_MP3_FILENAME).read_bytes().startswith(b"mp3:I heard")
+
+
+def test_friend_line_audio_relative_path_reuses_existing_file(tmp_path) -> None:
+    line = build_near_miss_friend_line(_near_miss(), {})
+    assert line is not None
+    (tmp_path / FRIEND_LINE_MP3_FILENAME).write_bytes(b"old-mp3")
+
+    def explode(_text: str) -> bytes:
+        raise AssertionError("should not resynthesize")
+
+    relative = _friend_line_audio_relative_path(tmp_path, line, synthesizer=explode)
+
+    assert relative == FRIEND_LINE_MP3_FILENAME
+    assert (tmp_path / FRIEND_LINE_MP3_FILENAME).read_bytes() == b"old-mp3"
+
+
+def test_friend_line_audio_relative_path_fails_soft(tmp_path) -> None:
+    line = build_near_miss_friend_line(_near_miss(), {})
+    assert line is not None
+
+    def fail(_text: str) -> bytes:
+        raise RuntimeError("tts unavailable")
+
+    relative = _friend_line_audio_relative_path(tmp_path, line, synthesizer=fail)
+
+    assert relative is None
+    assert not (tmp_path / FRIEND_LINE_MP3_FILENAME).exists()

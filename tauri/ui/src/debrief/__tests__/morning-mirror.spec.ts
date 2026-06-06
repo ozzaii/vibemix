@@ -70,6 +70,7 @@ describe("morning mirror", () => {
         receipt_text: "the mix recovered by ear [mix:near_miss@42.000]",
         friend_line_text: "I heard the mix pull back in [mix:near_miss@42.000]",
         duration_s: 600,
+        friend_line_audio_relative_path: "debrief_friend_line.mp3",
         waveform_peaks: [
           [0, 0, 0],
           [255, 120, 30],
@@ -84,6 +85,13 @@ describe("morning mirror", () => {
     expect(container.textContent).toContain("I was there");
     expect(container.textContent).toContain("the mix recovered by ear");
     expect(convertFileSrcMock).toHaveBeenCalledWith("/recordings/set-001/input.wav");
+    expect(convertFileSrcMock).toHaveBeenCalledWith(
+      "/recordings/set-001/debrief_friend_line.mp3",
+    );
+    expect(container.textContent).toContain("Play line");
+    expect(
+      container.querySelector(".vmx-morning-mirror__friend-audio")?.getAttribute("src"),
+    ).toBe("asset://converted/recordings/set-001/debrief_friend_line.mp3");
     expect(container.querySelector(".vmx-morning-mirror__rail")?.getAttribute("data-source")).toBe(
       "master-input",
     );
@@ -111,5 +119,33 @@ describe("morning mirror", () => {
     expect(container.textContent).toContain("Nothing sharp enough to flag");
     expect(container.querySelector("audio")).toBeNull();
     expect(timeline.querySelector(".vmx-debrief-replay-window")).toBeNull();
+  });
+
+  it("can play the grounded friend line even when there is no replay window", () => {
+    Object.defineProperty(window, "__TAURI_INTERNALS__", {
+      configurable: true,
+      value: {},
+    });
+
+    mountMorningMirror(
+      container,
+      {
+        input_wav_relative_path: "input.wav",
+        t_center: null,
+        window: null,
+        receipt_text: "",
+        friend_line_text: "Your recovery stayed musical [mix:near_miss@42.000]",
+        duration_s: 600,
+        friend_line_audio_relative_path: "debrief_friend_line.mp3",
+      },
+      "/recordings/set-001",
+      { timelineEl: timeline },
+    );
+
+    expect(container.dataset.state).toBe("quiet");
+    expect(container.textContent).toContain("Your recovery stayed musical");
+    expect(container.textContent).toContain("Play line");
+    expect(container.querySelector(".vmx-morning-mirror__audio")).toBeNull();
+    expect(container.querySelector(".vmx-morning-mirror__friend-audio")).not.toBeNull();
   });
 });

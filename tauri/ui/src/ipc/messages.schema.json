@@ -2479,6 +2479,12 @@
             "receipt_text": { "type": "string" },
             "friend_line_text": { "type": "string" },
             "duration_s": { "type": "number", "minimum": 0 },
+            "friend_line_audio_relative_path": {
+              "anyOf": [
+                { "type": "string", "minLength": 1 },
+                { "type": "null" }
+              ]
+            },
             "waveform_peaks": {
               "anyOf": [
                 {

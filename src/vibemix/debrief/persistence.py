@@ -23,10 +23,12 @@ from typing import Any
 
 __all__ = [
     "DEBRIEF_JSON_FILENAME",
+    "FRIEND_LINE_MP3_FILENAME",
     "SCHEMA_VERSION",
     "TLDR_MP3_FILENAME",
     "read_debrief",
     "write_debrief",
+    "write_friend_line_audio",
 ]
 
 logger = logging.getLogger(__name__)
@@ -34,6 +36,7 @@ logger = logging.getLogger(__name__)
 SCHEMA_VERSION = "v1"
 DEBRIEF_JSON_FILENAME = "session_debrief.json"
 TLDR_MP3_FILENAME = "debrief_tldr.mp3"
+FRIEND_LINE_MP3_FILENAME = "debrief_friend_line.mp3"
 
 
 def _sha256_bytes(b: bytes) -> str:
@@ -96,6 +99,15 @@ def write_debrief(
 
     logger.info("[debrief] wrote %s (%d bytes mp3)", session_dir, len(tldr_mp3))
     return (json_path, mp3_path)
+
+
+def write_friend_line_audio(session_dir: Path, mp3: bytes) -> Path:
+    """Atomically write the optional Morning Mirror friend-line MP3."""
+
+    path = Path(session_dir) / FRIEND_LINE_MP3_FILENAME
+    _atomic_write_bytes(path, mp3)
+    logger.info("[debrief] wrote %s (%d bytes friend-line mp3)", path, len(mp3))
+    return path
 
 
 def read_debrief(session_dir: Path) -> dict[str, Any] | None:

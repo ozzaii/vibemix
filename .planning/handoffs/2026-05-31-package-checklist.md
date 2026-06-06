@@ -11810,3 +11810,49 @@ Proof before staging:
 - `npm --prefix tauri/ui run build`
 - `git diff --check -- src/vibemix/audio/waveform_peaks.py src/vibemix/ui_bus/schemas/debrief.py src/vibemix/ui_bus/messages.py src/vibemix/debrief/main.py src/vibemix/debrief/ws_server.py tests/audio/test_waveform_peaks.py tests/debrief/test_near_miss_detector.py tests/ui_bus/test_debrief_new_wrappers_roundtrip.py tests/debrief/test_ws_server_progressive_emit.py tauri/ui/src/ipc/messages.schema.json tauri/ui/src/ipc/messages.ts tauri/ui/src/ipc/validator.generated.mjs tauri/ui/src/debrief/components/timeline.ts tauri/ui/src/debrief/components/morning-mirror.ts tauri/ui/src/debrief/debrief-window.ts tauri/ui/src/debrief/__tests__/timeline-regions-click-seek.spec.ts tauri/ui/src/debrief/__tests__/morning-mirror.spec.ts .planning/handoffs/2026-05-31-package-checklist.md`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+
+## Package 120 - Debrief Friend Line Audio
+
+Suggested commit: `feat(debrief): play morning friend line`
+
+Include:
+
+- `src/vibemix/debrief/persistence.py`
+- `src/vibemix/ui_bus/schemas/debrief.py`
+- `src/vibemix/ui_bus/messages.py`
+- `src/vibemix/debrief/main.py`
+- `src/vibemix/debrief/ws_server.py`
+- `tests/debrief/test_friend_line.py`
+- `tests/ui_bus/test_debrief_new_wrappers_roundtrip.py`
+- `tests/debrief/test_ws_server_progressive_emit.py`
+- `tauri/ui/src/ipc/messages.schema.json`
+- `tauri/ui/src/ipc/messages.ts`
+- `tauri/ui/src/ipc/validator.generated.mjs`
+- `tauri/ui/src/debrief/components/morning-mirror.ts`
+- `tauri/ui/src/debrief/__tests__/morning-mirror.spec.ts`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- New LLM text, new TTS provider wiring, TLDR persistence changes, and hard
+  failures when local voice is unavailable. The line is already grounded text;
+  this package only writes and renders an optional local-voice MP3 for it.
+
+Reason:
+
+- The Morning Mirror shows the human line but cannot yet speak it. Generate
+  `debrief_friend_line.mp3` from the resolver-backed line through the existing
+  local Chatterbox seam, carry an optional relative path on
+  `ipc.debrief.near-miss`, and render a small Play line control only when the
+  file exists. If synthesis fails, the card still works as text plus master
+  replay.
+
+Proof before staging:
+
+- `uv run pytest -q tests/debrief/test_friend_line.py tests/ui_bus/test_debrief_new_wrappers_roundtrip.py tests/debrief/test_ws_server_progressive_emit.py`
+- `uv run python scripts/check_ipc_schema.py`
+- `npm --prefix tauri/ui run codegen:ipc`
+- `npm --prefix tauri/ui test -- src/debrief/__tests__/morning-mirror.spec.ts`
+- `npm --prefix tauri/ui run build`
+- `git diff --check -- src/vibemix/debrief/persistence.py src/vibemix/ui_bus/schemas/debrief.py src/vibemix/ui_bus/messages.py src/vibemix/debrief/main.py src/vibemix/debrief/ws_server.py tests/debrief/test_friend_line.py tests/ui_bus/test_debrief_new_wrappers_roundtrip.py tests/debrief/test_ws_server_progressive_emit.py tauri/ui/src/ipc/messages.schema.json tauri/ui/src/ipc/messages.ts tauri/ui/src/ipc/validator.generated.mjs tauri/ui/src/debrief/components/morning-mirror.ts tauri/ui/src/debrief/__tests__/morning-mirror.spec.ts .planning/handoffs/2026-05-31-package-checklist.md`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`

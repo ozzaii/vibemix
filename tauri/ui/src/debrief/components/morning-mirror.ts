@@ -16,6 +16,7 @@ export interface MorningMirrorPayload {
   receipt_text: string;
   friend_line_text: string;
   duration_s: number;
+  friend_line_audio_relative_path?: string | null;
   waveform_peaks?: TimelineWaveformPeak[] | null;
 }
 
@@ -96,66 +97,98 @@ export function mountMorningMirror(
 
   container.append(eyebrow, line, receipt, friend, rail);
 
-  if (!hasReplay) return;
+  const friendAudioPath = String(payload.friend_line_audio_relative_path ?? "").trim();
+  const hasFriendAudio = friendAudioPath.length > 0;
+  if (!hasReplay && !hasFriendAudio) return;
 
   const controls = document.createElement("div");
   controls.className = "vmx-morning-mirror__controls";
 
-  const play = document.createElement("button");
-  play.type = "button";
-  play.className = "vmx-morning-mirror__play";
-  play.textContent = "Play window";
+  let masterAudio: HTMLAudioElement | null = null;
+  if (hasReplay) {
+    const play = document.createElement("button");
+    play.type = "button";
+    play.className = "vmx-morning-mirror__play";
+    play.textContent = "Play window";
 
-  const time = document.createElement("span");
-  time.className = "vmx-morning-mirror__time";
-  time.textContent = `${formatClock(payload.window![0])} to ${formatClock(payload.window![1])}`;
+    const time = document.createElement("span");
+    time.className = "vmx-morning-mirror__time";
+    time.textContent = `${formatClock(payload.window![0])} to ${formatClock(payload.window![1])}`;
 
-  const audio = document.createElement("audio");
-  audio.className = "vmx-morning-mirror__audio";
-  audio.controls = true;
-  audio.preload = "metadata";
-  audio.src = buildAssetUrl(`${sessionDirAbs}/${payload.input_wav_relative_path}`);
+    masterAudio = document.createElement("audio");
+    masterAudio.className = "vmx-morning-mirror__audio";
+    masterAudio.controls = true;
+    masterAudio.preload = "metadata";
+    masterAudio.src = buildAssetUrl(`${sessionDirAbs}/${payload.input_wav_relative_path}`);
 
-  const syncTimeline = (active: boolean): void => {
-    if (!opts.timelineEl) return;
-    const duration = payload.duration_s > 0 ? payload.duration_s : audio.duration;
-    const fraction = duration && Number.isFinite(duration)
-      ? audio.currentTime / duration
-      : 0;
-    setTimelinePlayhead(opts.timelineEl, fraction, active);
-  };
+    const syncTimeline = (active: boolean): void => {
+      if (!opts.timelineEl || !masterAudio) return;
+      const duration = payload.duration_s > 0 ? payload.duration_s : masterAudio.duration;
+      const fraction = duration && Number.isFinite(duration)
+        ? masterAudio.currentTime / duration
+        : 0;
+      setTimelinePlayhead(opts.timelineEl, fraction, active);
+    };
 
-  const seekToWindow = (): void => {
-    const [start] = payload.window!;
-    audio.currentTime = Math.max(0, start);
-    syncTimeline(true);
-  };
+    const seekToWindow = (): void => {
+      if (!masterAudio) return;
+      const [start] = payload.window!;
+      masterAudio.currentTime = Math.max(0, start);
+      syncTimeline(true);
+    };
 
-  play.addEventListener("click", () => {
-    seekToWindow();
-    const maybePromise = audio.play?.();
-    if (maybePromise && "catch" in maybePromise) {
-      maybePromise.catch(() => undefined);
+    play.addEventListener("click", () => {
+      seekToWindow();
+      const maybePromise = masterAudio?.play?.();
+      if (maybePromise && "catch" in maybePromise) {
+        maybePromise.catch(() => undefined);
+      }
+    });
+    masterAudio.addEventListener("timeupdate", () => syncTimeline(true));
+    masterAudio.addEventListener("play", () => syncTimeline(true));
+    masterAudio.addEventListener("pause", () => syncTimeline(false));
+    masterAudio.addEventListener("ended", () => syncTimeline(false));
+    if (opts.timelineEl) {
+      const timelineHost = opts.timelineEl as TimelineMirrorHost;
+      if (timelineHost.__vmxMorningReplayListener) {
+        opts.timelineEl.removeEventListener(
+          "replay-window-clicked",
+          timelineHost.__vmxMorningReplayListener,
+        );
+      }
+      timelineHost.__vmxMorningReplayListener = seekToWindow;
+      opts.timelineEl.addEventListener("replay-window-clicked", seekToWindow);
     }
-  });
-  audio.addEventListener("timeupdate", () => syncTimeline(true));
-  audio.addEventListener("play", () => syncTimeline(true));
-  audio.addEventListener("pause", () => syncTimeline(false));
-  audio.addEventListener("ended", () => syncTimeline(false));
-  if (opts.timelineEl) {
-    const timelineHost = opts.timelineEl as TimelineMirrorHost;
-    if (timelineHost.__vmxMorningReplayListener) {
-      opts.timelineEl.removeEventListener(
-        "replay-window-clicked",
-        timelineHost.__vmxMorningReplayListener,
-      );
-    }
-    timelineHost.__vmxMorningReplayListener = seekToWindow;
-    opts.timelineEl.addEventListener("replay-window-clicked", seekToWindow);
+
+    controls.append(play, time);
   }
 
-  controls.append(play, time);
-  container.append(controls, audio);
+  let friendAudio: HTMLAudioElement | null = null;
+  if (hasFriendAudio) {
+    const playLine = document.createElement("button");
+    playLine.type = "button";
+    playLine.className = "vmx-morning-mirror__play vmx-morning-mirror__play--voice";
+    playLine.textContent = "Play line";
+
+    friendAudio = document.createElement("audio");
+    friendAudio.className = "vmx-morning-mirror__friend-audio";
+    friendAudio.preload = "metadata";
+    friendAudio.src = buildAssetUrl(`${sessionDirAbs}/${friendAudioPath}`);
+
+    playLine.addEventListener("click", () => {
+      if (!friendAudio) return;
+      friendAudio.currentTime = 0;
+      const maybePromise = friendAudio.play?.();
+      if (maybePromise && "catch" in maybePromise) {
+        maybePromise.catch(() => undefined);
+      }
+    });
+    controls.append(playLine);
+  }
+
+  container.append(controls);
+  if (masterAudio) container.append(masterAudio);
+  if (friendAudio) container.append(friendAudio);
 }
 
 function formatClock(totalS: number): string {

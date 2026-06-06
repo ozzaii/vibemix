@@ -259,8 +259,47 @@ def _build_debrief_near_miss_payload(
         receipt_text=receipt_text,
         friend_line_text=chosen.text if chosen else "",
         duration_s=max(duration_s, 0.0),
+        friend_line_audio_relative_path=_friend_line_audio_relative_path(
+            session_dir,
+            chosen,
+        ),
         waveform_peaks=_build_debrief_waveform_peaks(input_wav),
     )
+
+
+def _friend_line_audio_relative_path(
+    session_dir: Path,
+    line: Any | None,
+    *,
+    synthesizer=None,
+) -> str | None:
+    """Best-effort local-voice render for the already-grounded friend line."""
+
+    text = str(getattr(line, "text", "") or "").strip()
+    if not text:
+        return None
+
+    from vibemix.debrief.persistence import FRIEND_LINE_MP3_FILENAME, write_friend_line_audio
+
+    path = Path(session_dir) / FRIEND_LINE_MP3_FILENAME
+    try:
+        if path.exists() and path.stat().st_size > 0:
+            return FRIEND_LINE_MP3_FILENAME
+    except OSError:
+        return None
+
+    try:
+        if synthesizer is None:
+            from vibemix.debrief.tldr import synthesize_chatterbox_mp3 as synthesizer
+
+        mp3 = synthesizer(text)
+        if not mp3:
+            return None
+        write_friend_line_audio(session_dir, bytes(mp3))
+    except Exception as exc:  # pragma: no cover - local voice is optional here
+        logger.warning("[debrief] friend-line audio skipped: %s", exc)
+        return None
+    return FRIEND_LINE_MP3_FILENAME
 
 
 def _build_debrief_waveform_peaks(
