@@ -511,7 +511,7 @@ def _practice_chain_for(
                 candidate_id,
                 state="next",
                 mode="finish" if status == "in-progress" else "start",
-                label="next rep" if status == "empty" else "finish",
+                label=_chain_label_for(row, status),
             )
         )
         seen.add(candidate_id)
@@ -552,6 +552,15 @@ def _locked_chain_label(course_id: str) -> str:
     if course is None:
         return "locked"
     return course.lock_reason or "locked"
+
+
+def _chain_label_for(row: dict[str, Any] | None, status: str) -> str:
+    if status == "empty":
+        return "next rep"
+    bank_count = _practice_bank_count(row)
+    if bank_count > 0:
+        return f"banked {bank_count}/3"
+    return "finish"
 
 
 def _plural_left(count: int, unit: str, target: str) -> str:

@@ -1819,6 +1819,92 @@ describe("practice booth shell", () => {
     }
   });
 
+  it("renders banked practice labels inside the booth run chain", () => {
+    const root = document.getElementById("learn-root") as HTMLElement;
+    const { ws } = mountLearnWindow(root);
+    try {
+      window.dispatchEvent(
+        new CustomEvent("ipc.learn.progress_state", {
+          detail: {
+            action: "snapshot",
+            progress: {
+              schema_version: 2,
+              courses: {},
+              lessons: {},
+              course_2_unlocked: false,
+              course_3_unlocked: false,
+              next_practice_mission: {
+                lesson_id: "L1.03",
+                course_id: "course_1_anatomy",
+                course_label: "Course 1 · Anatomy",
+                skill_id: "deck_control",
+                skill_label: "deck control",
+                title: "channel strip",
+                mode: "finish",
+                command: "Finish channel strip; repeat the banked move.",
+                payoff: "Your hands learn where the booth lives before the music gets busy.",
+                proof: "screen deck has worked; repeat it cleanly",
+                why: "1 banked practice rep; finish the matching lesson to keep it",
+                estimated_minutes: 4,
+                focus: "first_rep",
+                focus_label: "practice bank 1/3",
+                challenge: "Repeat a banked move inside the lesson.",
+                chain: [
+                  {
+                    lesson_id: "L1.03",
+                    course_id: "course_1_anatomy",
+                    course_label: "Course 1 · Anatomy",
+                    title: "channel strip",
+                    state: "now",
+                    mode: "finish",
+                    label: "practice bank 1/3",
+                  },
+                  {
+                    lesson_id: "L1.04",
+                    course_id: "course_1_anatomy",
+                    course_label: "Course 1 · Anatomy",
+                    title: "crossfader",
+                    state: "next",
+                    mode: "finish",
+                    label: "banked 2/3",
+                  },
+                  {
+                    lesson_id: "L1.05",
+                    course_id: "course_1_anatomy",
+                    course_label: "Course 1 · Anatomy",
+                    title: "pitch fader",
+                    state: "next",
+                    mode: "start",
+                    label: "next rep",
+                  },
+                ],
+                meter_label: "practice bank",
+                meter_value: 1,
+                meter_max: 3,
+                meter_state: "armed",
+                meter_caption: "1 screen rep banked",
+              },
+            },
+          },
+        }),
+      );
+
+      const labels = Array.from(
+        root.querySelectorAll<HTMLElement>(".learn-booth-chain__label"),
+      ).map((el) => el.textContent);
+      expect(labels).toEqual([
+        "practice bank 1/3",
+        "banked 2/3",
+        "next rep",
+      ]);
+      expect(
+        root.querySelector<HTMLElement>("#learn-booth-chain")?.getAttribute("aria-label"),
+      ).toContain("banked 2/3: crossfader");
+    } finally {
+      ws.close();
+    }
+  });
+
   it("renders banked free-practice reps as a booth reward meter", () => {
     const root = document.getElementById("learn-root") as HTMLElement;
     const { ws } = mountLearnWindow(root);

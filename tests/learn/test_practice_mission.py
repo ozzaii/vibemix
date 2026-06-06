@@ -116,6 +116,24 @@ def test_mixed_free_practice_receipts_build_a_three_rep_bank() -> None:
     assert mission["meter_caption"] == "3 reps banked: screen + hardware"
 
 
+def test_practice_chain_labels_later_banked_steps() -> None:
+    progress = LearnProgress()
+    progress.mark_practice_source("course_1_anatomy", "L1.03", "screen")
+    progress.mark_practice_source("course_1_anatomy", "L1.04", "screen")
+    progress.mark_practice_source("course_1_anatomy", "L1.04", "midi")
+
+    mission = next_practice_mission(progress)
+
+    assert [step["lesson_id"] for step in mission["chain"][:3]] == [
+        "L1.03",
+        "L1.04",
+        "L1.05",
+    ]
+    assert mission["chain"][0]["label"] == "practice bank 1/3"
+    assert mission["chain"][1]["label"] == "banked 2/3"
+    assert mission["chain"][2]["label"] == "next rep"
+
+
 def test_locked_next_course_replays_cleared_open_course() -> None:
     progress = LearnProgress()
     for lesson_id in [f"L1.{i:02d}" for i in range(1, 17)]:
