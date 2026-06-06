@@ -12,10 +12,10 @@
  *   - search   ← text vibe query → ranked tracks + scope
  *   - similar  ← seed track (id or dropped file) → nearest neighbours + scope
  *   - ingest   ← folder path + strategy → indexing progress + live log
- *   - cue      ← folder path + export format → auto-cued XML/M3U8 receipt
  *   - curate   ← theme → AI-curated playlist (numbered set + rationale)
  *   - build    ← brief + energy curve → set-prep co-host: discovered + sequenced
- *               set, exported to files, optional per-run DJ app tag landing
+ *               set, exported to files, optional per-run DJ app tag landing,
+ *               plus the hot-cue folder export instrument
  *   - chat     ← conversational Viber, grounded tool trace + artifacts
  */
 
@@ -25,7 +25,6 @@ export type LibraryMode =
   | "search"
   | "similar"
   | "ingest"
-  | "cue"
   | "curate"
   | "build"
   | "chat";
@@ -45,9 +44,9 @@ export interface LibraryState {
   folder: string;
   /** Indexing strategy chip (ingest mode). */
   strategy: EmbedStrategy;
-  /** Folder path to auto-cue (cue mode). */
+  /** Folder path to auto-cue from the Build hot-cue instrument. */
   cueFolder: string;
-  /** Portable cue export format (cue mode). */
+  /** Portable cue export format from the Build hot-cue instrument. */
   cueExport: CueExportFormat;
   /** Free-text theme for the AI curator (curate mode). */
   theme: string;
@@ -83,8 +82,6 @@ export function fieldLabel(mode: LibraryMode): string {
       return "Seed track";
     case "ingest":
       return "Music folder";
-    case "cue":
-      return "Folder to cue";
     case "curate":
       return "Curate a set";
     case "build":
@@ -104,8 +101,6 @@ export function runLabel(mode: LibraryMode): string {
       return "▸ Find similar";
     case "ingest":
       return "▸ Index folder";
-    case "cue":
-      return "▸ Export cues";
     case "curate":
       return "▸ Curate playlist";
     case "build":
@@ -127,8 +122,6 @@ export function echoText(state: LibraryState): string {
       return state.theme;
     case "build":
       return state.brief;
-    case "cue":
-      return state.cueFolder;
     case "chat":
       return "conversation";
     default:

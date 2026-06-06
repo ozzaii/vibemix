@@ -252,6 +252,7 @@ body {
 .vmx-lib-modeswitch {
   position: relative;
   display: flex;
+  flex: 0 0 auto;
   flex-wrap: wrap;
   gap: 5px;
   padding: 6px;
@@ -321,7 +322,7 @@ body {
     inset 0 0 14px var(--brand-04);
 }
 .vmx-lib-modeswitch button[aria-selected="true"]::after {
-  background: var(--amber);
+  background: var(--brand);
   box-shadow: var(--glow-faint);
 }
 .vmx-lib-modeswitch button:hover:not([aria-selected="true"]) {
@@ -335,27 +336,27 @@ body {
 }
 
 /* Conversation-first hierarchy: Viber is the wide hero on the top row; the two
-   kept power tools (Build, Ingest) split the row below as a compact strip —
+   kept power tools (Build, Music) split the row below as a compact strip —
    "talk to Viber; these are the instruments worth a direct grab." `flex-basis:
    100%` forces the wrap; the rest are flex:1. The `.vmx-lib-modeswitch button`
    selector still matches every mode, so the search/similar/curate wiring + tests
    stay intact even though those tabs now live inside the conversation. */
 .vmx-lib-modeswitch button[data-mode="chat"] {
   flex: 1 0 100%;
-  min-height: 50px;
-  font-size: 12px;
-  letter-spacing: 0.18em;
+  min-height: 38px;
+  font-size: 11px;
+  letter-spacing: 0.16em;
 }
 .vmx-lib-modeswitch button:not([data-mode="chat"]) {
   flex: 1 1 0;
   min-width: 0;
-  min-height: 36px;
+  min-height: 30px;
   font-size: 10px;
   letter-spacing: 0.10em;
   color: var(--silk-40);
 }
 .vmx-lib-modeswitch button:not([data-mode="chat"])[aria-selected="true"] {
-  color: var(--amber-pale);
+  color: var(--brand);
 }
 
 .vmx-lib-field { margin-top: 18px; }
@@ -981,7 +982,7 @@ body {
    Send (the composer reads as one job: type + send). `position: fixed` lifts
    the switch out of the bottom-pinned composer to the top center without a DOM
    move, so the non-chat modes that keep the switch in the console are untouched.
-   All four tabs show here, so Build/Cue/Ingest stay reachable from the chat. */
+   Direct tabs stay minimal here: Viber, Build, Music. */
 :is(body, .vmx-lib-app)[data-mode="chat"] .vmx-lib-modeswitch {
   position: fixed;
   top: clamp(64px, 8vh, 84px);
@@ -1012,6 +1013,12 @@ body {
 }
 :is(body, .vmx-lib-app)[data-mode="chat"] .vmx-lib-modeswitch button:not([data-mode="chat"]) {
   color: var(--silk-40);
+}
+.vmx-lib-app:not([data-mode="chat"]) .vmx-lib-modeswitch button[data-mode="chat"]:not([aria-selected="true"]) {
+  color: var(--silk-65);
+}
+.vmx-lib-app:not([data-mode="chat"]) .vmx-lib-modeswitch button[aria-selected="true"] {
+  color: var(--brand);
 }
 :is(body, .vmx-lib-app)[data-mode="chat"] .vmx-lib-field[data-for="chat"] {
   display: block !important;
@@ -1725,8 +1732,7 @@ body {
    restrained, not a decorative card. */
 .vmx-lib-rationale { display: none; }
 :is(body, .vmx-lib-app)[data-mode="curate"] .vmx-lib-rationale,
-:is(body, .vmx-lib-app)[data-mode="build"] .vmx-lib-rationale,
-:is(body, .vmx-lib-app)[data-mode="cue"] .vmx-lib-rationale {
+:is(body, .vmx-lib-app)[data-mode="build"] .vmx-lib-rationale {
   display: block;
   margin-bottom: 16px;
   padding: 15px 16px;
@@ -1828,7 +1834,7 @@ body {
 .vmx-lib-curveseg:active { transform: translateY(1px); }
 
 .vmx-lib-build-permission {
-  margin-top: 12px;
+  margin-top: 10px;
 }
 .vmx-lib-tag-toggle {
   width: 100%;
@@ -1887,6 +1893,63 @@ body {
 }
 .vmx-lib-tag-toggle[aria-checked="true"] b {
   color: var(--brand);
+}
+
+.vmx-lib-build-cue {
+  margin-top: 10px;
+  padding: 10px;
+  border-radius: var(--rad-md);
+  border: 1px solid var(--glass-edge);
+  background:
+    linear-gradient(180deg, rgba(255, 251, 244, 0.016), transparent 58%, rgba(0, 0, 0, 0.20)),
+    rgba(2, 3, 6, 0.26);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 251, 244, 0.026),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.55);
+}
+.vmx-lib-build-cue-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+.vmx-lib-cue-run {
+  min-width: 118px;
+  padding: 6px 9px;
+  border: 1px solid var(--brand-22);
+  border-radius: var(--rad-sm);
+  background:
+    linear-gradient(180deg, var(--brand-12), var(--brand-04)),
+    var(--void-8);
+  color: var(--brand);
+  font-family: var(--type-body);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  line-height: 1;
+  text-transform: uppercase;
+  cursor: pointer;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.52);
+  transition: color 180ms var(--ease-brand), border-color 180ms var(--ease-brand), background 180ms var(--ease-brand);
+}
+.vmx-lib-cue-run:hover:not(:disabled) {
+  border-color: var(--brand-40);
+  background:
+    linear-gradient(180deg, var(--brand-16), var(--brand-06)),
+    var(--void-8);
+}
+.vmx-lib-cue-run:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+.vmx-lib-cue-formats {
+  margin-top: 8px;
+}
+.vmx-lib-build-cue .vmx-lib-seg-note {
+  margin-top: 6px;
 }
 
 /* Rekordbox export receipt — shown only in build mode when a file was written.

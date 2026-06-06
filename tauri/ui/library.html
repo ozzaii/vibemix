@@ -33,18 +33,18 @@
           <aside class="vmx-lib-panel" data-wire="library.console">
             <div class="vmx-lib-panel-hd"><span class="vmx-lib-label">Console</span></div>
             <div class="vmx-lib-panel-bd" style="display: flex; flex-direction: column">
-              <!-- Conversation-first, with three power tools kept as direct tabs.
+              <!-- Conversation-first, with two power tools kept as direct tabs.
                    Viber is the home — one agent you talk to that searches, finds
                    similar, curates and builds, showing each tool it fires live.
                    Build stays a direct tab because set-prep wants its instrument:
-                   the energy-curve segmented picker a chat prompt can't express.
-                   Cue is an export instrument. Music is setup. Search/Similar/Curate fold into the conversation.
+                   the energy-curve segmented picker, hot-cue export, and per-run
+                   tag consent a chat prompt can't express. Music is setup.
+                   Search/Similar/Curate fold into the conversation.
                    The `data-mode` contract (+ `.vmx-lib-modeswitch button`) is
                    unchanged — only the hierarchy is. -->
               <div class="vmx-lib-modeswitch" role="tablist" data-wire="library.mode-tabs">
                 <button role="tab" aria-selected="true" data-mode="chat">Viber</button>
                 <button role="tab" aria-selected="false" data-mode="build">Build</button>
-                <button role="tab" aria-selected="false" data-mode="cue">Cue</button>
                 <button role="tab" aria-selected="false" data-mode="ingest">Music</button>
               </div>
 
@@ -94,26 +94,6 @@
                 <p class="vmx-lib-seg-note">Around the cue points is faster and focuses on the part you actually mix. Whole track listens start to finish.</p>
               </div>
 
-              <!-- cue export field — local auto-cue engine → portable files.
-                   The Build tab owns per-run DJ app tag permission when exporting
-                   a chosen set; this folder tool stays file-export only. -->
-              <div class="vmx-lib-field" data-for="cue" data-wire="library.cue-field" style="display: none">
-                <span class="vmx-lib-label">Folder to cue</span>
-                <div class="vmx-lib-qbox">
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none"
-                       stroke="currentColor" stroke-width="2">
-                    <path d="M9 18V5l12-2v13" />
-                    <circle cx="6" cy="18" r="3" /><circle cx="18" cy="16" r="3" />
-                  </svg>
-                  <input id="vmx-lib-cue-folder" value="~/Music" />
-                </div>
-                <div class="vmx-lib-chips" data-for="cue">
-                  <span class="vmx-lib-chip" data-cue-export="rekordbox" aria-pressed="true">Rekordbox XML</span>
-                  <span class="vmx-lib-chip" data-cue-export="m3u8" aria-pressed="false">M3U8</span>
-                  <span class="vmx-lib-chip" data-cue-export="both" aria-pressed="false">Both</span>
-                </div>
-              </div>
-
               <!-- curate field -->
               <div class="vmx-lib-field" data-for="curate" data-wire="library.curate-field" style="display: none">
                 <span class="vmx-lib-label">Curate a set</span>
@@ -159,6 +139,29 @@
                     <b>OFF</b>
                   </button>
                   <p class="vmx-lib-seg-note">Writes VM cue tags into audio files for this export only.</p>
+                </div>
+
+                <!-- hot-cue folder export — folded into Build so set arc and cue
+                     landing live on one Viber instrument, not a separate mode. -->
+                <div class="vmx-lib-build-cue" data-wire="library.cue-field">
+                  <div class="vmx-lib-build-cue-head">
+                    <span class="vmx-lib-label">Hot cues</span>
+                    <button type="button" class="vmx-lib-cue-run" id="vmx-lib-cue-run">Export hot cues</button>
+                  </div>
+                  <div class="vmx-lib-qbox">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none"
+                         stroke="currentColor" stroke-width="2">
+                      <path d="M9 18V5l12-2v13" />
+                      <circle cx="6" cy="18" r="3" /><circle cx="18" cy="16" r="3" />
+                    </svg>
+                    <input id="vmx-lib-cue-folder" value="~/Music" />
+                  </div>
+                  <div class="vmx-lib-chips vmx-lib-cue-formats">
+                    <span class="vmx-lib-chip" data-cue-export="rekordbox" aria-pressed="true">Rekordbox XML</span>
+                    <span class="vmx-lib-chip" data-cue-export="m3u8" aria-pressed="false">M3U8</span>
+                    <span class="vmx-lib-chip" data-cue-export="both" aria-pressed="false">Both</span>
+                  </div>
+                  <p class="vmx-lib-seg-note">Folder export only. Set exports above can also land Serato/Mixxx tags with consent.</p>
                 </div>
 
                 <div class="vmx-lib-chips">

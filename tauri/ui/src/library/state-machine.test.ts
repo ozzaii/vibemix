@@ -39,7 +39,7 @@ describe("mode switch + labels", () => {
     expect(fieldLabel("search")).toBe("Vibe query");
     expect(fieldLabel("similar")).toBe("Seed track");
     expect(fieldLabel("ingest")).toBe("Music folder");
-    expect(fieldLabel("cue")).toBe("Folder to cue");
+    expect(fieldLabel("build")).toBe("Build a Set");
     expect(fieldLabel("chat")).toBe("Talk to Viber");
   });
 
@@ -47,16 +47,16 @@ describe("mode switch + labels", () => {
     expect(runLabel("search")).toBe("Run search");
     expect(runLabel("similar")).toBe("▸ Find similar");
     expect(runLabel("ingest")).toBe("▸ Index folder");
-    expect(runLabel("cue")).toBe("▸ Export cues");
+    expect(runLabel("build")).toBe("Build set");
     expect(runLabel("chat")).toBe("Send");
   });
 
-  it("echoes conversation in chat, query in search, seed in similar, and folder in cue", () => {
+  it("echoes conversation in chat, query in search, seed in similar, and build brief", () => {
     const s = initialLibraryState;
     expect(echoText(s)).toBe("conversation");
     expect(echoText(setMode(s, "search"))).toBe(s.query);
     expect(echoText(setMode(s, "similar"))).toBe(s.seed);
-    expect(echoText(setMode(s, "cue"))).toBe(s.cueFolder);
+    expect(echoText(setMode(s, "build"))).toBe(s.brief);
   });
 });
 
