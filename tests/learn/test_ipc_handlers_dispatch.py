@@ -941,6 +941,55 @@ def test_control_lesson_speaks_action_prompt_before_verification() -> None:
     ]
 
 
+def test_banked_practice_lesson_starts_with_proof_preface() -> None:
+    """A banked free-practice lesson should sound earned when entered."""
+    runtime, progress, runtime_emit_sink = _make_runtime()
+    for _idx in range(3):
+        progress.mark_practice_source("course_1_anatomy", "L1.03", "click")
+    router = IpcRouterBus()
+    midi_mirror = MagicMock(name="midi_mirror_inbound")
+    midi_mirror.current_profile.return_value = None
+    register_learn_handlers(
+        ipc_router=router,
+        lesson_runtime=runtime,
+        midi_mirror=midi_mirror,
+        progress=progress,
+    )
+
+    async def start() -> bool:
+        return await router.dispatch(
+            {
+                "type": "ipc.learn.start_lesson",
+                "payload": {
+                    "lesson_id": "L1.03",
+                    "level": "fresh",
+                },
+            }
+        )
+
+    assert asyncio.run(start()) is True
+
+    tutor_lines = [
+        call.args[0]["payload"]["text"]
+        for call in runtime_emit_sink.emit.call_args_list
+        if call.args and call.args[0].get("type") == "ipc.learn.tutor_speak"
+    ]
+    assert tutor_lines[:3] == [
+        "3 screen reps are banked. prove one clean move here.",
+        "the channel strip is the vertical column above each deck: "
+        "gain on top, three EQ knobs, fader at the bottom.",
+        "twist the top EQ knob on deck A and listen for the cymbals "
+        "getting brighter or darker.",
+    ]
+
+    markers = [
+        call.args[0]["payload"]["tts_marker"]
+        for call in runtime_emit_sink.emit.call_args_list
+        if call.args and call.args[0].get("type") == "ipc.learn.tutor_speak"
+    ]
+    assert markers[0] == "L1.03.practice_bank"
+
+
 def test_wrong_action_ack_emits_adaptive_hint_without_advancing() -> None:
     """A wrong control should produce coaching, not silence."""
     runtime, progress, runtime_emit_sink = _make_runtime()

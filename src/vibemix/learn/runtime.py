@@ -292,6 +292,50 @@ def _practice_source_key(source: Any) -> str | None:
     return None
 
 
+def _nonnegative_int(value: Any) -> int:
+    try:
+        raw = int(value)
+    except (TypeError, ValueError):
+        return 0
+    return max(0, raw)
+
+
+def _practice_bank_counts(row: Any) -> dict[str, int]:
+    counts = {"hardware": 0, "screen": 0}
+    if not isinstance(row, dict):
+        return counts
+    sources = row.get("practice_sources")
+    if not isinstance(sources, dict):
+        return counts
+    counts["hardware"] = _nonnegative_int(sources.get("hardware"))
+    counts["screen"] = _nonnegative_int(sources.get("screen"))
+    return counts
+
+
+def _practice_bank_total(row: Any) -> int:
+    counts = _practice_bank_counts(row)
+    return min(3, counts["hardware"] + counts["screen"])
+
+
+def _practice_bank_source_label(counts: dict[str, int]) -> str:
+    if counts["hardware"] > 0 and counts["screen"] > 0:
+        return "screen + hardware"
+    if counts["hardware"] > 0:
+        return "controller"
+    return "screen"
+
+
+def _practice_bank_preface_text(row: Any) -> str | None:
+    count = _practice_bank_total(row)
+    if count <= 0:
+        return None
+    counts = _practice_bank_counts(row)
+    source = _practice_bank_source_label(counts)
+    unit = "rep" if count == 1 else "reps"
+    verb = "is" if count == 1 else "are"
+    return f"{count} {source} {unit} {verb} banked. prove one clean move here."
+
+
 def _observable_control_id(control: str, deck: str) -> str:
     return f"{control}:{deck}" if deck else control
 
@@ -2092,6 +2136,7 @@ class LessonRuntime(StateMachine):
         expected = self._current_expected_action() or lesson.script["expected_action"]
         self._emit_highlight(expected)
 
+        self._emit_practice_bank_preface_if_needed()
         self._emit_opening_tutor_beats(expected)
         self._start_beatmatch_practice_player()
         self._arm_recovery_drill_if_needed()
@@ -3103,6 +3148,42 @@ class LessonRuntime(StateMachine):
         for beat_idx, _row in enumerate(beats):
             self._learn.current_beat_index = beat_idx
             self._emit_tutor_beat(beat_idx)
+
+    def _emit_practice_bank_preface_if_needed(self) -> None:
+        """Name banked free-practice reps before the authored lesson line."""
+        lesson_id = self._learn.current_lesson_id
+        if lesson_id is None:
+            return
+        lessons = getattr(self._progress, "lessons", {})
+        if not isinstance(lessons, dict):
+            return
+        row = lessons.get(lesson_id)
+        if not isinstance(row, dict) or row.get("completed") is True:
+            return
+        text = _practice_bank_preface_text(row)
+        if text is None:
+            return
+        try:
+            speak = LearnTutorSpeak.make(
+                text=text,
+                tts_marker=f"{lesson_id}.practice_bank",
+                citations=(),
+                data_state="active",
+            ).to_dict()
+            self._emit_tutor_speak(speak)
+            self._log_session_event(
+                "learn_practice_bank_preface",
+                lesson_id=lesson_id,
+                course_id=self._learn.current_course_id or "",
+                practice_bank_count=_practice_bank_total(row),
+            )
+        except Exception as exc:  # pragma: no cover - defensive
+            import sys
+
+            print(
+                f"[learn.runtime] practice bank preface emit failed: {exc!r}",
+                file=sys.stderr,
+            )
 
     def _emit_step_tutor(self, step: LessonStep) -> None:
         """Emit tutor text from a compiled structured-flow step."""
