@@ -355,6 +355,69 @@ def test_memory_hygiene_failure_is_swallowed_before_ingest(
     assert calls == {"boot": 1, "retention": 1}
 
 
+def test_memory_hygiene_dispatches_retention_without_ingest_embedder(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Periodic memory hygiene runs retention only, off-loop, with no CLAP build."""
+    rec: dict[str, object] = {
+        "loop_tid": None,
+        "retention_tid": None,
+        "closed": 0,
+    }
+
+    class FakeMemoryStore:
+        def run_retention_sweep(self):
+            rec["retention_tid"] = threading.get_ident()
+            return SimpleNamespace(deleted=2, deleted_sessions=["old_session"])
+
+        def close(self) -> None:
+            rec["closed"] = int(rec["closed"]) + 1
+
+    def embedder_must_not_build(_self):
+        raise AssertionError("periodic memory hygiene must not construct CLAP")
+
+    monkeypatch.setattr(store_mod, "MemoryStore", lambda *a, **k: FakeMemoryStore())
+    monkeypatch.setattr(SessionLoop, "_build_ingest_embedder", embedder_must_not_build)
+
+    loop = SessionLoop(FakeBus(), recordings_root=tmp_path)
+
+    async def _run() -> None:
+        rec["loop_tid"] = threading.get_ident()
+        await loop._fire_memory_hygiene("periodic")
+
+    asyncio.run(_run())
+
+    assert rec["retention_tid"] is not None
+    assert rec["retention_tid"] != rec["loop_tid"]
+    assert rec["closed"] == 1
+
+
+def test_periodic_recordings_sweep_also_runs_memory_hygiene(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Long-running sessions periodically bound both recordings and memory data."""
+    calls: list[tuple[str, str]] = []
+    monkeypatch.setattr(session_loop_mod, "RETENTION_SWEEP_INTERVAL_S", 0.01)
+
+    async def fake_recordings_sweep(self, trigger: str) -> None:
+        calls.append(("recordings", trigger))
+
+    async def fake_memory_hygiene(self, trigger: str) -> None:
+        calls.append(("memory", trigger))
+        self.request_stop()
+
+    monkeypatch.setattr(SessionLoop, "_fire_one_retention_sweep", fake_recordings_sweep)
+    monkeypatch.setattr(SessionLoop, "_fire_memory_hygiene", fake_memory_hygiene)
+    loop = SessionLoop(FakeBus(), recordings_root=tmp_path)
+
+    async def _run() -> None:
+        await asyncio.wait_for(loop._periodic_retention_sweep_loop(), timeout=1.0)
+
+    asyncio.run(_run())
+
+    assert calls == [("recordings", "periodic"), ("memory", "periodic")]
+
+
 def test_close_seam_falls_back_to_sweep_without_recorder(
     tmp_path: Path, _stub_ingest: dict
 ) -> None:

@@ -13472,3 +13472,39 @@ Proof before staging:
 - `npm --prefix tauri/ui run build`
 - `git diff --check -- src/vibemix/__main__.py tests/test_main_smoke.py tauri/ui/src/shell/DebriefDock.ts tauri/ui/src/shell/app.ts tauri/ui/tests/shell/debrief-dock.spec.ts .planning/handoffs/2026-05-31-package-checklist.md`
 - `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+
+## Package 163 - Periodic Memory Hygiene
+
+Suggested commit: `fix(memory): run periodic retention hygiene`
+
+Include:
+
+- `src/vibemix/runtime/session_loop.py`
+- `tests/memory/test_ingest_wiring.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Spoken recall prompt behavior, CLAP ingest semantics, memory retention
+  budgets, profile-consent persistence, recordings retention policy, and
+  library/Viber memory reads. This package only makes the existing memory
+  retention primitive run during long sessions without starting an ingest
+  scan.
+
+Reason:
+
+- Boot and session-close memory ingest already run orphan/retention hygiene,
+  but a live session left open for hours only ran the recordings retention loop.
+  Add a periodic memory-only hygiene pass after each recordings retention tick
+  so `memory.db` stays bounded over real use. The new path opens `MemoryStore`
+  in the executor, runs `store.run_retention_sweep()`, closes the store, and
+  deliberately does not build the CLAP embedder or scan recordings.
+
+Proof before staging:
+
+- `uv run pytest -q tests/memory/test_ingest_wiring.py::test_memory_hygiene_dispatches_retention_without_ingest_embedder tests/memory/test_ingest_wiring.py::test_periodic_recordings_sweep_also_runs_memory_hygiene`
+- `uv run pytest -q tests/memory/test_ingest_wiring.py`
+- `uv run ruff check src/vibemix/runtime/session_loop.py tests/memory/test_ingest_wiring.py`
+- `uv run python -m compileall -q src/vibemix/runtime/session_loop.py tests/memory/test_ingest_wiring.py`
+- `git diff --check -- src/vibemix/runtime/session_loop.py tests/memory/test_ingest_wiring.py .planning/handoffs/2026-05-31-package-checklist.md`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`

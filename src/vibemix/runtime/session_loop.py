@@ -1381,6 +1381,44 @@ class SessionLoop:
         except Exception:
             log.exception("memory ingest (%s) dispatch failed", trigger)
 
+    async def _fire_memory_hygiene(self, trigger: str) -> None:
+        """Run memory retention only, without constructing the ingest embedder.
+
+        The boot/close ingest worker already runs full hygiene around session
+        accrual. Long-running sessions also need bounded memory growth, but a
+        periodic hygiene tick must not rebuild CLAP or re-scan recordings. This
+        worker therefore opens the store, runs the retention budget, closes the
+        store, and does nothing else.
+        """
+        if not self.memory_ingest_enabled:
+            log.info("memory hygiene (%s) skipped: disabled for this session loop", trigger)
+            return
+
+        def _worker() -> None:
+            try:
+                from vibemix.memory.store import MemoryStore
+
+                store = MemoryStore(db_path=None)
+                try:
+                    result = store.run_retention_sweep()
+                    if getattr(result, "deleted", 0):
+                        log.info(
+                            "memory retention (%s hygiene): deleted %s moment(s) from %d session(s)",
+                            trigger,
+                            getattr(result, "deleted", "?"),
+                            len(getattr(result, "deleted_sessions", []) or []),
+                        )
+                finally:
+                    store.close()
+            except Exception:
+                log.exception("memory hygiene (%s) failed", trigger)
+
+        try:
+            loop = asyncio.get_running_loop()
+            await loop.run_in_executor(None, _worker)
+        except Exception:
+            log.exception("memory hygiene (%s) dispatch failed", trigger)
+
     def _log_retention_event_to_active_recorder(self, *, count: int, bytes_pruned: int) -> None:
         """Write the `retention_pruned` events.jsonl line on the live recorder.
 
@@ -1433,6 +1471,7 @@ class SessionLoop:
             if self._stop.is_set():
                 return
             await self._fire_one_retention_sweep("periodic")
+            await self._fire_memory_hygiene("periodic")
 
     async def _emit_recordings_usage(self) -> None:
         """Compute current usage + emit ``ipc.recordings.usage`` on the bus."""
