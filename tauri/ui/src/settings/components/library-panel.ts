@@ -20,6 +20,7 @@ import {
   onLibraryImportProgress,
   type LibraryImportProgress,
 } from "../../library/api.js";
+import { registerStyle } from "../../session/components/_style-registry.js";
 
 export interface LibraryPanelHandle {
   element: HTMLElement;
@@ -36,17 +37,274 @@ interface LibraryPanelOptions {
   }) => void;
 }
 
+const CSS = `
+  .vmx-library-panel {
+    display: grid;
+    gap: var(--sp-3);
+    min-width: 0;
+    font-family: var(--type-body);
+  }
+  .vmx-library-panel__hero {
+    position: relative;
+    overflow: hidden;
+    padding: var(--sp-4);
+    border-radius: var(--rad-md);
+    background:
+      radial-gradient(circle at 16% 0%, var(--brand-12), transparent 36%),
+      linear-gradient(180deg, rgba(255, 251, 244, 0.024), transparent 52%, rgba(0, 0, 0, 0.18)),
+      var(--glass-2);
+    box-shadow:
+      var(--chrome-highlight),
+      inset 0 -18px 34px rgba(0, 0, 0, 0.20),
+      var(--shadow-raised);
+  }
+  .vmx-library-panel__eyebrow {
+    margin-bottom: var(--sp-2);
+    font-family: var(--type-mono);
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--brand);
+    text-shadow: 0 0 8px var(--brand-22);
+  }
+  .vmx-library-panel__title {
+    margin: 0;
+    font-family: var(--type-serif);
+    font-size: 34px;
+    font-weight: 400;
+    line-height: 0.98;
+    letter-spacing: 0;
+    color: var(--silk);
+  }
+  .vmx-library-panel__copy {
+    margin: var(--sp-2) 0 0;
+    max-width: 42ch;
+    color: var(--silk-65);
+    font-size: 12px;
+    line-height: 1.45;
+  }
+  .vmx-library-formats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--sp-1);
+    margin-top: var(--sp-3);
+  }
+  .vmx-library-format-chip {
+    min-height: 22px;
+    display: inline-flex;
+    align-items: center;
+    padding: 0 var(--sp-2);
+    border-radius: var(--rad-sm);
+    background: var(--void-8);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 251, 244, 0.035),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.45);
+    color: var(--silk-65);
+    font-family: var(--type-mono);
+    font-size: 9px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+  .vmx-library-droptarget {
+    position: relative;
+    display: grid;
+    grid-template-columns: 52px minmax(0, 1fr);
+    gap: var(--sp-3);
+    align-items: center;
+    min-width: 0;
+    padding: var(--sp-3);
+    border: 0;
+    border-radius: var(--rad-md);
+    background:
+      linear-gradient(180deg, rgba(255, 251, 244, 0.020), transparent 54%, rgba(0, 0, 0, 0.22)),
+      var(--void-10);
+    box-shadow:
+      var(--chrome-highlight),
+      inset 0 -18px 36px rgba(0, 0, 0, 0.24),
+      var(--shadow-raised);
+    transition:
+      background var(--motion-transition) var(--ease-brand),
+      box-shadow var(--motion-transition) var(--ease-brand),
+      transform var(--motion-transition) var(--ease-brand);
+  }
+  .vmx-library-droptarget.dragging,
+  .vmx-library-droptarget:hover {
+    background:
+      linear-gradient(180deg, var(--brand-06), transparent 56%, rgba(0, 0, 0, 0.22)),
+      var(--void-10);
+    box-shadow:
+      var(--chrome-highlight),
+      inset 0 0 24px var(--brand-06),
+      inset 0 -18px 36px rgba(0, 0, 0, 0.24),
+      var(--shadow-float);
+  }
+  .vmx-library-droptarget__badge {
+    width: 52px;
+    height: 52px;
+    display: grid;
+    place-items: center;
+    border-radius: var(--rad-md);
+    background:
+      radial-gradient(circle at 34% 24%, var(--brand-22), transparent 36%),
+      linear-gradient(145deg, var(--glass-3), var(--void-8));
+    box-shadow:
+      inset 0 1px 0 rgba(255, 251, 244, 0.055),
+      inset 0 -10px 20px rgba(0, 0, 0, 0.34);
+    color: var(--silk);
+    font-family: var(--type-mono);
+    font-size: 10px;
+    letter-spacing: 0.06em;
+  }
+  .vmx-library-droptarget__headline {
+    color: var(--silk);
+    font-family: var(--type-display);
+    font-variation-settings: "wdth" 85, "wght" 600;
+    font-size: 11px;
+    letter-spacing: 0.10em;
+    line-height: 1.25;
+    text-transform: uppercase;
+  }
+  .vmx-library-droptarget__hint {
+    margin-top: var(--sp-1);
+    color: var(--silk-50);
+    font-size: 11px;
+    line-height: 1.35;
+  }
+  .vmx-library-actions {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--sp-2);
+  }
+  .vmx-library-panel :is(.vmx-library-pick-folder-btn, .vmx-library-pick-catalog-btn, .vmx-library-cancel-btn) {
+    min-height: 34px;
+    border: 0;
+    border-radius: var(--rad-sm);
+    background:
+      linear-gradient(180deg, var(--brand-16), var(--brand-04)),
+      var(--glass-3);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 251, 244, 0.065),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.42),
+      var(--glow-faint);
+    color: var(--brand-glow);
+    font-family: var(--type-display);
+    font-variation-settings: "wdth" 85, "wght" 600;
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition:
+      color var(--motion-snap) var(--ease-brand),
+      background var(--motion-snap) var(--ease-brand),
+      box-shadow var(--motion-snap) var(--ease-brand),
+      transform var(--motion-snap) var(--ease-brand);
+  }
+  .vmx-library-panel :is(.vmx-library-pick-folder-btn, .vmx-library-pick-catalog-btn, .vmx-library-cancel-btn):hover,
+  .vmx-library-panel :is(.vmx-library-pick-folder-btn, .vmx-library-pick-catalog-btn, .vmx-library-cancel-btn):focus-visible {
+    color: var(--silk);
+    background:
+      linear-gradient(180deg, var(--brand-22), var(--brand-06)),
+      var(--glass-3);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 251, 244, 0.085),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.42),
+      var(--glow-soft);
+  }
+  .vmx-library-progress {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: var(--sp-2);
+    align-items: center;
+    padding: var(--sp-3);
+    border-radius: var(--rad-md);
+    background: var(--glass-2);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 251, 244, 0.035),
+      inset 0 -14px 26px rgba(0, 0, 0, 0.20);
+  }
+  .vmx-library-progress.hidden {
+    display: none;
+  }
+  .vmx-library-progress-track {
+    grid-column: 1 / -1;
+    height: 6px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: rgba(0, 0, 0, 0.36);
+    box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.5);
+  }
+  .vmx-library-progress-fill {
+    width: 0%;
+    height: 100%;
+    border-radius: inherit;
+    background: linear-gradient(90deg, var(--brand-40), var(--brand));
+    box-shadow: 0 0 14px var(--brand-22);
+    transition: width var(--motion-transition) var(--ease-brand);
+  }
+  .vmx-library-progress-label,
+  .vmx-library-status,
+  .vmx-library-filelog-row {
+    color: var(--silk-65);
+    font-size: 11px;
+    line-height: 1.35;
+  }
+  .vmx-library-filelog {
+    display: grid;
+    gap: var(--sp-1);
+  }
+  .vmx-library-filelog-row {
+    padding: 7px var(--sp-2);
+    border-radius: var(--rad-sm);
+    background: rgba(0, 0, 0, 0.18);
+    font-family: var(--type-mono);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .vmx-library-status:not(:empty) {
+    padding: 8px var(--sp-2);
+    border-radius: var(--rad-sm);
+    background: rgba(0, 0, 0, 0.18);
+    box-shadow: inset 0 1px 0 rgba(255, 251, 244, 0.025);
+  }
+`;
+
+registerStyle("vmx-library-panel", CSS);
+
 export async function renderLibraryPanel(
   opts: LibraryPanelOptions = {},
 ): Promise<LibraryPanelHandle> {
   const root = document.createElement("section");
   root.className = "vmx-library-panel";
+  root.dataset.state = "idle";
   root.innerHTML = `
+    <div class="vmx-library-panel__hero">
+      <div class="vmx-library-panel__eyebrow">local library</div>
+      <h3 class="vmx-library-panel__title">Feed Viber real tracks</h3>
+      <p class="vmx-library-panel__copy">
+        Index the music you own so set prep, cue export, and Viber choices stay grounded.
+      </p>
+      <div class="vmx-library-formats" aria-label="supported library formats">
+        <span class="vmx-library-format-chip">folders</span>
+        <span class="vmx-library-format-chip">rekordbox</span>
+        <span class="vmx-library-format-chip">traktor</span>
+        <span class="vmx-library-format-chip">engine</span>
+      </div>
+    </div>
     <div class="vmx-library-droptarget" role="region"
          aria-label="Drop a music folder or DJ catalog here">
-      Drop music folder or DJ catalog,
-      then <button type="button" class="vmx-library-pick-folder-btn">Choose folder</button>
-      or <button type="button" class="vmx-library-pick-catalog-btn">Choose catalog</button>
+      <div class="vmx-library-droptarget__badge" aria-hidden="true">m.db</div>
+      <div class="vmx-library-droptarget__body">
+        <div class="vmx-library-droptarget__headline">Drop music folder or DJ catalog</div>
+        <div class="vmx-library-droptarget__hint">
+          Rekordbox XML, Traktor NML, VirtualDJ XML, Engine DB, or a plain music folder.
+        </div>
+      </div>
+      <div class="vmx-library-actions">
+        <button type="button" class="vmx-library-pick-folder-btn">Choose folder</button>
+        <button type="button" class="vmx-library-pick-catalog-btn">Choose catalog</button>
+      </div>
     </div>
     <div class="vmx-library-progress hidden">
       <div class="vmx-library-progress-track" aria-hidden="true">
@@ -98,6 +356,7 @@ export async function renderLibraryPanel(
 
   function showProgress(): void {
     if (disposed) return;
+    root.dataset.state = "indexing";
     progress.classList.remove("hidden");
     cancelBtn.hidden = false;
     cancelBtn.disabled = false;
@@ -105,6 +364,7 @@ export async function renderLibraryPanel(
   }
   function hideProgress(): void {
     if (disposed) return;
+    root.dataset.state = "idle";
     progress.classList.add("hidden");
     cancelBtn.hidden = true;
     cancelBtn.disabled = false;
