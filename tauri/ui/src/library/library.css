@@ -925,17 +925,15 @@ body {
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
-.vmx-lib-track-kicker span:first-child {
+/* The kicker is the artist line only — the raw DB hash ("ID 7f9f9052") read as
+ * a dev placeholder on a music cell and carried no meaning for a DJ; the title
+ * already falls back to "Track <id>" when a track has no real name. */
+.vmx-lib-track-kicker span {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   color: var(--silk-65);
-}
-.vmx-lib-track-kicker span:last-child {
-  flex: none;
-  color: var(--brand);
-  opacity: 0.62;
 }
 .vmx-lib-row .vmx-lib-track-title {
   margin-top: 3px;

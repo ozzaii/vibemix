@@ -718,7 +718,7 @@ function richTrackRowMarkup(
     <div class="vmx-lib-track-cell">
       <div class="vmx-lib-artwork" aria-hidden="true"><span>${esc(d.initials)}</span></div>
       <div class="vmx-lib-track-main">
-        <div class="vmx-lib-track-kicker"><span>${esc(d.artist)}</span><span>${esc(d.idLabel)}</span></div>
+        <div class="vmx-lib-track-kicker"><span>${esc(d.artist)}</span></div>
         <div class="title vmx-lib-track-title">${esc(d.title)}</div>
         <div class="meta vmx-lib-track-meta">${esc(d.subtitle)}</div>
         <div class="vmx-lib-track-chips" aria-label="Track features">
