@@ -942,15 +942,25 @@ def _deck_vision_capture_enabled() -> bool:
 
 
 def _resolve_recall_enabled(config: Any | None = None) -> bool:
-    """Resolve explicit cross-session recall opt-in from env or config.
+    """Resolve cross-session recall from explicit opt-in AND profile consent.
 
-    Env wins for dev/CI. Absent env, the persisted ConfigStore field is the
-    source of truth and defaults false. Garbage never enables recall.
+    Env/config answer only the "may Sven read past-session memory aloud?" part.
+    Profile consent is a second required gate: a stale config flag or dev env
+    must not resurrect spoken recall after the user has turned profile storage
+    off. Garbage never enables recall.
     """
     raw = os.environ.get("VIBEMIX_RECALL_ENABLED")
     if raw is not None:
-        return raw.strip().lower() in {"1", "true", "yes", "on"}
-    return bool(getattr(config, "recall_enabled", False) is True)
+        explicitly_enabled = raw.strip().lower() in {"1", "true", "yes", "on"}
+    else:
+        explicitly_enabled = bool(getattr(config, "recall_enabled", False) is True)
+    if not explicitly_enabled:
+        return False
+    try:
+        return bool(load_consent())
+    except Exception as exc:
+        print(f"-> memory recall consent read skipped: {exc!r}", file=sys.stderr)
+        return False
 
 
 def _resolve_memory_ingest_enabled() -> bool:

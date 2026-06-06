@@ -567,6 +567,7 @@ def test_recall_enabled_resolves_env_before_config(monkeypatch):
     import vibemix.__main__ as main_mod
 
     monkeypatch.delenv("VIBEMIX_RECALL_ENABLED", raising=False)
+    monkeypatch.setattr(main_mod, "load_consent", lambda: True)
     assert main_mod._resolve_recall_enabled(SimpleNamespace(recall_enabled=True)) is True
     assert main_mod._resolve_recall_enabled(SimpleNamespace(recall_enabled="yes")) is False
 
@@ -574,6 +575,23 @@ def test_recall_enabled_resolves_env_before_config(monkeypatch):
     assert main_mod._resolve_recall_enabled(SimpleNamespace(recall_enabled=False)) is True
 
     monkeypatch.setenv("VIBEMIX_RECALL_ENABLED", "off")
+    assert main_mod._resolve_recall_enabled(SimpleNamespace(recall_enabled=True)) is False
+
+
+def test_recall_enabled_requires_profile_consent(monkeypatch):
+    import vibemix.__main__ as main_mod
+
+    monkeypatch.delenv("VIBEMIX_RECALL_ENABLED", raising=False)
+    monkeypatch.setattr(main_mod, "load_consent", lambda: False)
+    assert main_mod._resolve_recall_enabled(SimpleNamespace(recall_enabled=True)) is False
+
+    monkeypatch.setenv("VIBEMIX_RECALL_ENABLED", "1")
+    assert main_mod._resolve_recall_enabled(SimpleNamespace(recall_enabled=False)) is False
+
+    def broken_consent() -> bool:
+        raise RuntimeError("consent unreadable")
+
+    monkeypatch.setattr(main_mod, "load_consent", broken_consent)
     assert main_mod._resolve_recall_enabled(SimpleNamespace(recall_enabled=True)) is False
 
 
@@ -829,6 +847,7 @@ def test_smoke_03_recall_enabled_wires_memory_recall_and_ingest(
     monkeypatch.delenv("VIBEMIX_DECK_VISION", raising=False)
     monkeypatch.setenv("VIBEMIX_DECK_AUDIO_CHANNELS", "off")
     monkeypatch.setenv("VIBEMIX_ENABLE_MIC", "1")
+    monkeypatch.setattr("vibemix.__main__.load_consent", lambda: True)
 
     audio_mocks = _build_audio_mocks(mocker)
     _build_sensor_mocks(mocker)

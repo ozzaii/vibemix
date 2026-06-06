@@ -17,6 +17,16 @@ vi.mock("../../src/ipc/client.js", () => ({
 import { mountLearnWindow } from "../../src/learn/learn-window";
 
 const RealWebSocket = globalThis.WebSocket;
+const RealPointerEvent = globalThis.PointerEvent;
+
+class TestPointerEvent extends MouseEvent {
+  readonly pointerId: number;
+
+  constructor(type: string, init: MouseEventInit & { pointerId?: number } = {}) {
+    super(type, { bubbles: true, cancelable: true, ...init });
+    this.pointerId = init.pointerId ?? 1;
+  }
+}
 
 class StubWebSocket {
   static readonly CONNECTING = 0;
@@ -77,6 +87,12 @@ function dispatchLessonLoaded(
   );
 }
 
+function nextAnimationFrame(): Promise<void> {
+  return new Promise((resolve) => {
+    window.requestAnimationFrame(() => resolve());
+  });
+}
+
 const COURSE_1_LESSON_IDS = Array.from(
   { length: 16 },
   (_value, index) => `L1.${String(index + 1).padStart(2, "0")}`,
@@ -102,11 +118,15 @@ function completedRows(lessonIds: ReadonlyArray<string>): Record<string, {
 describe("practice booth shell", () => {
   beforeAll(() => {
     (globalThis as unknown as { WebSocket: unknown }).WebSocket = StubWebSocket;
+    (globalThis as unknown as { PointerEvent: typeof PointerEvent }).PointerEvent =
+      TestPointerEvent as unknown as typeof PointerEvent;
   });
 
   afterAll(() => {
     (globalThis as unknown as { WebSocket: typeof RealWebSocket }).WebSocket =
       RealWebSocket;
+    (globalThis as unknown as { PointerEvent: typeof RealPointerEvent }).PointerEvent =
+      RealPointerEvent;
   });
 
   beforeEach(() => {
@@ -336,6 +356,74 @@ describe("practice booth shell", () => {
       expect(pulse.getAttribute("aria-label")).toBe(
         "free practice hardware move, deck A high EQ",
       );
+    } finally {
+      ws.close();
+    }
+  });
+
+  it("free-practice screen drags emit continuous analog acks before a lesson starts", async () => {
+    const root = document.getElementById("learn-root") as HTMLElement;
+    const { ws } = mountLearnWindow(root);
+    try {
+      const eq = await waitForMountedControl(root, "eq_hi:A");
+      const pulse = root.querySelector<HTMLElement>("#learn-booth-pulse")!;
+
+      mocks.emitIpc.mockClear();
+      eq.dispatchEvent(
+        new PointerEvent("pointerdown", {
+          clientX: 120,
+          clientY: 120,
+          pointerId: 17,
+        }),
+      );
+      window.dispatchEvent(
+        new PointerEvent("pointermove", {
+          clientX: 120,
+          clientY: 96,
+          pointerId: 17,
+        }),
+      );
+      await nextAnimationFrame();
+      window.dispatchEvent(
+        new PointerEvent("pointermove", {
+          clientX: 120,
+          clientY: 72,
+          pointerId: 17,
+        }),
+      );
+      await nextAnimationFrame();
+      window.dispatchEvent(new PointerEvent("pointerup", { pointerId: 17 }));
+
+      const ackPayloads = mocks.emitIpc.mock.calls
+        .filter(([type]) => type === "ipc.learn.ack")
+        .map(([, payload]) => payload) as Array<{
+          control_id: string;
+          source: string;
+          value: number;
+          prev_value: number;
+          direction: string;
+        }>;
+
+      expect(ackPayloads.length).toBeGreaterThanOrEqual(2);
+      expect(ackPayloads).toEqual(
+        expect.arrayContaining([
+          {
+            control_id: "eq_hi:A",
+            source: "click",
+            value: 82,
+            prev_value: 64,
+            direction: "down",
+          },
+          {
+            control_id: "eq_hi:A",
+            source: "click",
+            value: 100,
+            prev_value: 82,
+            direction: "down",
+          },
+        ]),
+      );
+      expect(pulse.textContent).toBe("screen: deck A high EQ");
     } finally {
       ws.close();
     }

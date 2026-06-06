@@ -50,6 +50,14 @@ describe("learn waveform strips hide until audio is ready", () => {
     expect(h.dataset.ready).toBe("false");
   });
 
+  it("names the waveform group through a valid image role", () => {
+    const h = host();
+    WaveformDisplay(h);
+    const waveforms = h.querySelector<HTMLElement>(".learn-waveforms");
+    expect(waveforms?.getAttribute("role")).toBe("img");
+    expect(waveforms?.getAttribute("aria-label")).toBe("practice waveforms");
+  });
+
   it("reveals partial on one deck, true on both", () => {
     const h = host();
     const wf = WaveformDisplay(h);

@@ -110,7 +110,7 @@ function drawCachedDeck(
 
 export function WaveformDisplay(host: HTMLElement): WaveformDisplayHandle {
   host.innerHTML = `
-    <div class="learn-waveforms" aria-label="practice waveforms">
+    <div class="learn-waveforms" role="img" aria-label="practice waveforms">
       <canvas class="learn-waveform" data-deck="A"></canvas>
       <canvas class="learn-waveform" data-deck="B"></canvas>
     </div>
