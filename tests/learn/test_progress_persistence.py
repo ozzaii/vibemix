@@ -196,6 +196,7 @@ def test_practice_source_memory_tracks_hardware_and_screen() -> None:
         "strikes_used": 0,
         "practice_sources": {"hardware": 1, "screen": 1},
         "last_practice_source": "screen",
+        "last_practice_seq": 2,
     }
 
 
@@ -214,6 +215,7 @@ def test_hint_and_completion_preserve_practice_source_memory() -> None:
         "screen": 0,
     }
     assert progress.lessons["L1.03"]["last_practice_source"] == "hardware"
+    assert progress.lessons["L1.03"]["last_practice_seq"] == 1
 
 
 def test_practice_feedback_is_bounded_and_cleared_by_completion() -> None:

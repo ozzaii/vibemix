@@ -99,6 +99,19 @@ def test_hardware_free_practice_receipt_becomes_controller_finish_mission() -> N
     assert mission["meter_caption"] == "1 controller rep banked"
 
 
+def test_latest_free_practice_receipt_beats_older_unfinished_lesson() -> None:
+    progress = LearnProgress()
+    progress.mark_practice_source("course_1_anatomy", "L1.03", "screen")
+    progress.mark_practice_source("course_1_anatomy", "L1.07", "screen")
+
+    mission = next_practice_mission(progress)
+
+    assert mission["lesson_id"] == "L1.07"
+    assert mission["mode"] == "finish"
+    assert mission["focus_label"] == "practice bank 1/3"
+    assert mission["challenge"] == "Repeat a banked move inside the lesson."
+
+
 def test_mixed_free_practice_receipts_build_a_three_rep_bank() -> None:
     progress = LearnProgress()
     progress.mark_practice_source("course_1_anatomy", "L1.03", "screen")
@@ -118,9 +131,9 @@ def test_mixed_free_practice_receipts_build_a_three_rep_bank() -> None:
 
 def test_practice_chain_labels_later_banked_steps() -> None:
     progress = LearnProgress()
-    progress.mark_practice_source("course_1_anatomy", "L1.03", "screen")
     progress.mark_practice_source("course_1_anatomy", "L1.04", "screen")
     progress.mark_practice_source("course_1_anatomy", "L1.04", "midi")
+    progress.mark_practice_source("course_1_anatomy", "L1.03", "screen")
 
     mission = next_practice_mission(progress)
 

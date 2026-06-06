@@ -50,6 +50,7 @@ export interface LearnProgressProjection {
       strikes_used?: number;
       practice_sources?: { hardware?: number; screen?: number };
       last_practice_source?: "hardware" | "screen" | null;
+      last_practice_seq?: number;
       practice_feedback?: {
         kind: "beatmatch" | "cue_placement";
         label: string;

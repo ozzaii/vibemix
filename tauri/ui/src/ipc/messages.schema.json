@@ -3445,6 +3445,7 @@
                         "type": ["string", "null"],
                         "enum": ["hardware", "screen", null]
                       },
+                      "last_practice_seq": {"type": "integer", "minimum": 0},
                       "practice_feedback": {
                         "type": "object",
                         "additionalProperties": false,

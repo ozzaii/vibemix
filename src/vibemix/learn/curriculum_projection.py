@@ -148,6 +148,7 @@ def render_curriculum_meta_ts() -> str:
         "      strikes_used?: number;\n"
         "      practice_sources?: { hardware?: number; screen?: number };\n"
         '      last_practice_source?: "hardware" | "screen" | null;\n'
+        "      last_practice_seq?: number;\n"
         "      practice_feedback?: {\n"
         '        kind: "beatmatch" | "cue_placement";\n'
         "        label: string;\n"

@@ -118,6 +118,9 @@ def _recommended_lesson(
     active_proof = _active_proof_lesson(progress, wall, active_lesson_id)
     if active_proof is not None:
         return active_proof, "prove"
+    recent_practice = _recent_practice_lesson(progress)
+    if recent_practice is not None:
+        return recent_practice, "finish"
     first_unlocked: str | None = None
     first_empty: str | None = None
     for lesson_id, meta in CURRICULUM.items():
@@ -220,6 +223,28 @@ def _proof_lesson_for_skill(progress: Any, skill_id: str) -> str | None:
         if meta is not None and _course_unlocked(progress, meta.course_id):
             return lesson_id
     return None
+
+
+def _recent_practice_lesson(progress: Any) -> str | None:
+    """Return the unfinished lesson behind the learner's latest banked gesture."""
+    lessons = getattr(progress, "lessons", {}) or {}
+    best_lesson_id: str | None = None
+    best_seq = 0
+    for lesson_id, row in lessons.items():
+        if not isinstance(lesson_id, str) or not isinstance(row, dict):
+            continue
+        if _lesson_status(row) != "in-progress":
+            continue
+        if _practice_bank_count(row) <= 0:
+            continue
+        meta = CURRICULUM.get(lesson_id)
+        if meta is None or not _course_unlocked(progress, meta.course_id):
+            continue
+        seq = _practice_sequence(row)
+        if seq > best_seq:
+            best_lesson_id = lesson_id
+            best_seq = seq
+    return best_lesson_id
 
 
 def _active_mastered_lesson(
@@ -683,6 +708,15 @@ def _practice_bank_count(row: dict[str, Any] | None) -> int:
         0,
         min(3, _source_total(row, "hardware") + _source_total(row, "screen")),
     )
+
+
+def _practice_sequence(row: dict[str, Any] | None) -> int:
+    if row is None:
+        return 0
+    try:
+        return max(0, int(row.get("last_practice_seq", 0)))
+    except (TypeError, ValueError):
+        return 0
 
 
 def _practice_bank_label(row: dict[str, Any] | None) -> str:

@@ -11052,3 +11052,45 @@ Proof before staging:
 - `npm --prefix tauri/ui test -- tests/learn/test_practice_booth_shell.spec.ts`
 - `npm --prefix tauri/ui run build`
 - `git diff --check -- tauri/ui/src/learn/learn-window.ts tauri/ui/tests/learn/test_practice_booth_shell.spec.ts .planning/handoffs/2026-05-31-package-checklist.md`
+
+## Package 99 - Learn Practice Recency Routing
+
+Suggested commit: `feat(learn): route missions by latest practice receipt`
+
+Include:
+
+- `src/vibemix/learn/progress.py`
+- `src/vibemix/learn/practice_mission.py`
+- `src/vibemix/learn/curriculum_projection.py`
+- `tauri/ui/src/ipc/messages.schema.json`
+- `tauri/ui/src/ipc/messages.ts`
+- `tauri/ui/src/ipc/validator.generated.mjs`
+- `tauri/ui/src/learn/lesson/curriculum-meta.ts`
+- `tests/learn/test_practice_mission.py`
+- `tests/learn/test_progress_persistence.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- New schema-version migration, visual redesign, streak badges, lesson-credit
+  rules, and free-practice completion credit. This package only records a
+  bounded practice receipt sequence and lets the derived next mission follow
+  the learner's latest unfinished banked gesture.
+
+Reason:
+
+- The sandbox already banks useful practice receipts, but mission routing could
+  still choose the earliest unfinished lesson and ignore the control the user
+  just moved. Route the next booth mission by the latest banked unfinished
+  practice receipt so free play feels connected to the curriculum.
+
+Proof before staging:
+
+- `uv run pytest -q tests/learn/test_practice_mission.py tests/learn/test_progress_persistence.py tests/learn/test_progress_snapshot_skill_wall.py tests/learn/test_curriculum_projection.py`
+- `uv run ruff check src/vibemix/learn/progress.py src/vibemix/learn/practice_mission.py src/vibemix/learn/curriculum_projection.py tests/learn/test_practice_mission.py tests/learn/test_progress_persistence.py`
+- `uv run python scripts/export_learn_curriculum_meta.py --check`
+- `uv run python scripts/check_ipc_schema.py`
+- `npm --prefix tauri/ui run check:ipc`
+- `uv run python -m compileall -q src/vibemix/learn/progress.py src/vibemix/learn/practice_mission.py src/vibemix/learn/curriculum_projection.py tests/learn/test_practice_mission.py tests/learn/test_progress_persistence.py`
+- `npm --prefix tauri/ui run build`
+- `git diff --check -- src/vibemix/learn/progress.py src/vibemix/learn/practice_mission.py src/vibemix/learn/curriculum_projection.py tauri/ui/src/ipc/messages.schema.json tauri/ui/src/ipc/messages.ts tauri/ui/src/ipc/validator.generated.mjs tauri/ui/src/learn/lesson/curriculum-meta.ts tests/learn/test_practice_mission.py tests/learn/test_progress_persistence.py .planning/handoffs/2026-05-31-package-checklist.md`

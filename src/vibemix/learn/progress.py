@@ -114,6 +114,16 @@ def _practice_source_counts(raw: Any) -> dict[str, int]:
     return counts
 
 
+def _practice_sequence(row: Any) -> int:
+    """Return a bounded practice-recency sequence for one lesson row."""
+    if not isinstance(row, dict):
+        return 0
+    try:
+        return max(0, int(row.get("last_practice_seq", 0)))
+    except (TypeError, ValueError):
+        return 0
+
+
 def _carry_practice_source_fields(
     target: dict[str, Any],
     existing: dict[str, Any] | None,
@@ -127,6 +137,9 @@ def _carry_practice_source_fields(
     last_source = _practice_source_key(existing.get("last_practice_source"))
     if last_source is not None:
         target["last_practice_source"] = last_source
+    practice_seq = _practice_sequence(existing)
+    if practice_seq > 0:
+        target["last_practice_seq"] = practice_seq
 
 
 def _practice_feedback(raw: Any) -> dict[str, str] | None:
@@ -349,6 +362,7 @@ class LearnProgress:
         counts[source_key] += 1
         row["practice_sources"] = counts
         row["last_practice_source"] = source_key
+        row["last_practice_seq"] = self._next_practice_sequence()
 
     def mark_hint_strike(
         self,
@@ -405,6 +419,13 @@ class LearnProgress:
             return False
         del row["practice_feedback"]
         return True
+
+    def _next_practice_sequence(self) -> int:
+        """Return the next monotonic free-practice receipt sequence."""
+        highest = 0
+        for row in self.lessons.values():
+            highest = max(highest, _practice_sequence(row))
+        return highest + 1
 
     def snapshot(self, *, active_lesson_id: str | None = None) -> dict[str, Any]:
         """The ``LearnProgressState`` envelope payload — the file shape PLUS the
