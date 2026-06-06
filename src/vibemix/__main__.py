@@ -3919,6 +3919,51 @@ def _build_bench_subparsers(parser: argparse.ArgumentParser) -> None:
     )
     sp_run.set_defaults(func=_cmd_bench_run)
 
+    sp_respan = sub.add_parser(
+        "respan-package",
+        help="Package a recorded bench run for offline Respan Sven evals",
+        description=(
+            "Convert a bench results JSON file into text-only Respan request-log "
+            "rows, dataset rows, five Sven evaluator rubrics, and experiment "
+            "metadata. This is offline/keyless: it writes artifacts only and never "
+            "claims a judge verdict."
+        ),
+    )
+    sp_respan.add_argument(
+        "results_json",
+        type=Path,
+        help="bench results JSON written by `vibemix bench run --out ...`",
+    )
+    sp_respan.add_argument(
+        "--out",
+        type=Path,
+        default=None,
+        help="output directory (default: <results stem>_respan next to the results file)",
+    )
+    sp_respan.add_argument(
+        "--suite-name",
+        default="sven_offline_bench",
+        help="Respan experiment/dataset suite name",
+    )
+    sp_respan.add_argument(
+        "--category",
+        default="sven-bench-offline",
+        help="Respan request-log category/dataset tag",
+    )
+    sp_respan.add_argument(
+        "--max-input-chars",
+        type=int,
+        default=5000,
+        help="maximum evidence/prompt excerpt length per row",
+    )
+    sp_respan.add_argument(
+        "--json",
+        action="store_true",
+        dest="as_json",
+        help="print the manifest JSON to stdout",
+    )
+    sp_respan.set_defaults(func=_cmd_bench_respan_package)
+
 
 def _cmd_bench_run(args: argparse.Namespace) -> int:
     import json as _json
@@ -3944,6 +3989,37 @@ def _cmd_bench_run(args: argparse.Namespace) -> int:
         file=sys.stderr,
     )
     print(_json.dumps(get_session_meter().summary(), indent=2))
+    return 0
+
+
+def _cmd_bench_respan_package(args: argparse.Namespace) -> int:
+    import json as _json
+
+    from vibemix.bench.respan import write_respan_package
+
+    results_path = Path(args.results_json)
+    out_dir = (
+        Path(args.out)
+        if args.out is not None
+        else results_path.with_name(f"{results_path.stem}_respan")
+    )
+    manifest = write_respan_package(
+        results_path,
+        out_dir,
+        suite_name=args.suite_name,
+        category=args.category,
+        max_input_chars=args.max_input_chars,
+    )
+    if args.as_json:
+        print(_json.dumps(manifest, indent=2, ensure_ascii=False))
+    else:
+        summary = manifest["summary"]
+        print(
+            "-> bench respan-package: "
+            f"{summary['dataset_rows']}/{summary['bench_rows']} evaluable rows, "
+            f"{summary['five_dim_evaluators']} evaluators -> {out_dir}",
+            file=sys.stderr,
+        )
     return 0
 
 
