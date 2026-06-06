@@ -34,7 +34,7 @@ import pytest
 
 from vibemix.agent.dj_cohost import _build_citation_strip
 from vibemix.state import EvidenceRegistry
-
+from vibemix.ui_bus import SessionCohostReaction
 
 # --------------------------------------------------------------------------
 # Fixtures
@@ -201,6 +201,34 @@ def test_fabricated_key_citation_yields_no_chip_DECK03() -> None:
         registry=reg,
     )
     assert strip == []
+
+
+def test_next_suggestion_mix_citation_chip_uses_schema_safe_label() -> None:
+    """A grounded next-suggestion cite keeps the opaque id out of the chip label."""
+    reg = EvidenceRegistry()
+    reg.write("mix", "next_suggestion=folder:6837ec1665d7bb44", 0.0)
+
+    strip = _build_citation_strip(
+        reaction_text=(
+            "This heavy low end shifted us darker. "
+            "[mix:next_suggestion=folder:6837ec1665d7bb44]"
+        ),
+        registry=reg,
+    )
+
+    assert strip == [
+        {
+            "event_id": "mix:next_suggestion=folder:6837ec1665d7bb44",
+            "verb": "next suggestion",
+            "timestamp_s": 0.0,
+        }
+    ]
+    assert len(strip[0]["verb"]) <= 32
+    assert SessionCohostReaction.make(
+        text="This heavy low end shifted us darker. ",
+        event_id="TRACK_CHANGE",
+        citation_strip=strip,
+    ).to_dict()["payload"]["citation_strip"] == strip
 
 
 # --------------------------------------------------------------------------

@@ -1356,6 +1356,12 @@ def _build_citation_strip(
             # UI surface. A single lowercase word trivially matches the locked
             # verb-format regex ``^[a-z]+( [a-z]+){0,2}$``.
             verb = "judge"
+        elif source == "mix" and body.startswith("next_suggestion="):
+            # The next-suggestion body carries an opaque library id
+            # (``next_suggestion=folder:<hash>``). Keep that full id in
+            # ``event_id`` for the receipt/deep-link, but render a stable
+            # human-sized chip label that satisfies the cohost-reaction schema.
+            verb = "next suggestion"
         else:
             # Body shape is ``KEY@t`` for ev/aud/midi/mix; partition on "@"
             # so a missing "@" (defensive: future grammar drift) falls back
