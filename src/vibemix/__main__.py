@@ -32,6 +32,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import inspect
+import json
 import os
 import queue
 import re
@@ -701,6 +702,76 @@ def _run_debrief_sidecar(session_dir: str) -> None:
     from vibemix.debrief.main import run as run_debrief
 
     run_debrief(session_dir, port=DEBRIEF_PORT)
+
+
+def _run_debrief_cli(argv: list[str]) -> int:
+    """Headless ``vibemix debrief <subcommand>`` tools.
+
+    This is intentionally separate from the legacy ``--debrief`` sidecar flag:
+    the flag launches the review window on port 8766, while these subcommands
+    run offline analysis and exit.
+    """
+    parser = argparse.ArgumentParser(prog="vibemix debrief")
+    sub = parser.add_subparsers(dest="debrief_command", required=True)
+
+    sp_near_miss = sub.add_parser(
+        "near-miss",
+        help="Find one confident OUT->IN timing recovery in a recorded session",
+    )
+    sp_near_miss.add_argument("session_dir", help="Bare session id or path under recordings root")
+    sp_near_miss.add_argument(
+        "--recordings-root",
+        type=Path,
+        default=None,
+        help="Recordings root for validating a bare session id or absolute session path",
+    )
+    sp_near_miss.add_argument(
+        "--min-confidence",
+        type=float,
+        default=0.38,
+        help="Minimum detector confidence before reporting a near miss",
+    )
+    sp_near_miss.add_argument("--json", action="store_true", help="Print machine-readable JSON")
+    sp_near_miss.set_defaults(func=_cmd_debrief_near_miss)
+
+    args = parser.parse_args(argv)
+    return int(args.func(args))
+
+
+def _cmd_debrief_near_miss(args: argparse.Namespace) -> int:
+    from vibemix.debrief.main import resolve_recordings_root, validate_session_dir_under_root
+    from vibemix.debrief.near_miss_detector import detect_near_miss
+    from vibemix.debrief.session_loader import InvalidSessionDir
+
+    recordings_root = args.recordings_root or resolve_recordings_root()
+    try:
+        session_dir = validate_session_dir_under_root(args.session_dir, recordings_root)
+    except InvalidSessionDir:
+        print(
+            f"vibemix debrief near-miss: invalid session dir {args.session_dir!r}",
+            file=sys.stderr,
+            flush=True,
+        )
+        return 2
+
+    result = detect_near_miss(session_dir, min_confidence=float(args.min_confidence))
+    payload = {"near_miss": result.to_dict() if result is not None else None}
+    if args.json:
+        print(json.dumps(payload, indent=2, sort_keys=True), file=sys.stdout, flush=True)
+        return 0
+
+    if result is None:
+        print("No confident near-miss found in the mix.", file=sys.stdout, flush=True)
+        return 0
+
+    print(
+        "The mix slipped "
+        f"{result.depth_beats:.2f} beat out, recovered in "
+        f"{result.recovery_bars:.1f} bars, and is cited as {result.citation}.",
+        file=sys.stdout,
+        flush=True,
+    )
+    return 0
 
 
 # =============================================================================
@@ -8039,6 +8110,8 @@ def cli_entry(argv: list[str] | None = None) -> None:
         sys.exit(_run_bench_cli(raw_argv[1:]))
     if raw_argv and raw_argv[0] == "eval":
         sys.exit(_run_eval_cli(raw_argv[1:]))
+    if raw_argv and raw_argv[0] == "debrief":
+        sys.exit(_run_debrief_cli(raw_argv[1:]))
     # Phase 92 (LESSON-03) — `vibemix learn <sub>` dispatch. v9.0 ships ONE
     # subcommand: `learn reset` (wipes ~/.cache/vibemix/learn-progress.json).
     # Dispatched the same way as `library` / `bench` — short-circuits BEFORE

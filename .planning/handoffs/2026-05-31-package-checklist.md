@@ -11259,3 +11259,36 @@ Proof before staging:
 - `uv run ruff check src/vibemix/learn/runtime.py tests/learn/test_runtime_evidence_grounding.py tests/learn/test_beatmatch_practice_audio_lifecycle.py`
 - `uv run python -m compileall -q src/vibemix/learn/runtime.py tests/learn/test_runtime_evidence_grounding.py tests/learn/test_beatmatch_practice_audio_lifecycle.py`
 - `git diff --check -- src/vibemix/learn/runtime.py tests/learn/test_runtime_evidence_grounding.py tests/learn/test_beatmatch_practice_audio_lifecycle.py .planning/handoffs/2026-05-31-package-checklist.md`
+
+## Package 105 - Debrief Near-Miss Detector CLI
+
+Suggested commit: `feat(debrief): detect last-night timing recoveries`
+
+Include:
+
+- `src/vibemix/debrief/near_miss_detector.py`
+- `src/vibemix/__main__.py`
+- `src/vibemix/audio/recorder.py`
+- `tests/debrief/test_near_miss_detector.py`
+- `.planning/handoffs/2026-05-31-package-checklist.md`
+
+Keep out:
+
+- Debrief UI cards, generated friend lines, Gemini prompt rewrites, live
+  co-host speech, and lesson routing. This package only lands the headless
+  detector and CLI entry point that future Learn/Debrief surfaces can consume.
+
+Reason:
+
+- Last Night, Heard needs a real observed receipt, not a presence-only story.
+  Re-derive one OUT->IN timing recovery from `input.wav` around MIX_MOVE /
+  TRACK_CHANGE / transition_judged windows, abstain when confidence is low, and
+  phrase the result as "the mix" instead of deck blame.
+
+Proof before staging:
+
+- `uv run pytest -q tests/debrief/test_near_miss_detector.py`
+- `uv run ruff check src/vibemix/debrief/near_miss_detector.py src/vibemix/__main__.py src/vibemix/audio/recorder.py tests/debrief/test_near_miss_detector.py`
+- `uv run python -m compileall -q src/vibemix/debrief/near_miss_detector.py src/vibemix/__main__.py src/vibemix/audio/recorder.py tests/debrief/test_near_miss_detector.py`
+- `uv run python scripts/check_dirty_package_plan.py --strict-assignments --summary`
+- `git diff --check -- src/vibemix/debrief/near_miss_detector.py src/vibemix/__main__.py src/vibemix/audio/recorder.py tests/debrief/test_near_miss_detector.py .planning/handoffs/2026-05-31-package-checklist.md`

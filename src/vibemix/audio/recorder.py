@@ -174,7 +174,7 @@ class VoiceRecorder:
     Layout (verbatim from v4 + Phase 15 session.json addition):
         recordings/<YYYYMMDD-HHMMSS>/
             ├── voice.wav            # 24kHz mono int16 — AI replies
-            ├── input.wav            # 16kHz mono int16 — BlackHole captured music + mic mix
+            ├── input.wav            # 16kHz mono int16 — captured master/music input
             ├── events.jsonl         # JSONL timeline, timestamped from session start
             └── session.json         # Phase 15 — meta (started/ended/voice/mode/genre/...)
 
