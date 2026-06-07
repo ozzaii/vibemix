@@ -2032,6 +2032,9 @@ function boot(): void {
   };
 
   let state = initialPillState(performance.now());
+  // Declared here (not at the bus-subscription block below) so
+  // view.onPeekPrimaryAction can emit feedback over it; assigned on connect.
+  let bus: MascotBusClient | null = null;
   let suppressNextFocusPeek = false;
   let demoReturnIdleAt: number | null = null;
   let demoDeckHoldUntil: number | null = null;
@@ -2053,6 +2056,13 @@ function boot(): void {
     // suggestion handled so a stale echo of the same pick doesn't re-open the
     // glance until a fresh suggestion arrives.
     const suggestion = effectiveNextSuggestion(view);
+    // Close the explicit feedback loop: the peek primary action means "activate
+    // to load suggestion" (its aria label) — an accept. Emit it over the bus so
+    // SuggestionService.record_feedback pins the pick + feeds the (consent-gated)
+    // taste loop. Real grounded picks only — never the demo card.
+    if (suggestion && suggestion !== DEMO_NEXT_SUGGESTION) {
+      bus?.send({ action: "next_suggestion.feedback", feedback: "accept" });
+    }
     const completionKey = pillNextCompletionKey(suggestion);
     const renderKey = nextSuggestionRenderKey(suggestion);
     if (renderKey) view.handledNextRenderKey = renderKey;
@@ -2160,7 +2170,7 @@ function boot(): void {
   })();
 
   // ── Bus subscription — REUSE the copied connectMascotBus ──────────────────
-  let bus: MascotBusClient | null = null;
+  // (bus is declared at the top of boot so the peek primary action can emit over it)
   try {
     bus = connectMascotBus("ws://127.0.0.1:8765");
     bus.addMessageListener((msg) => {

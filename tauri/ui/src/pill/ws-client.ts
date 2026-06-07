@@ -30,6 +30,10 @@ export type StatusListener = (status: ConnectionStatus) => void;
 export interface MascotBusClient {
   addMessageListener(l: BusListener): () => void;
   addStatusListener(l: StatusListener): () => void;
+  /** Send a JSON control frame back over the live socket (e.g.
+   *  next_suggestion.feedback / .choose). Best-effort: a send while
+   *  disconnected is silently dropped and never crashes the always-on-top pill. */
+  send(msg: unknown): void;
   close(): void;
 }
 
@@ -166,6 +170,18 @@ export function connectMascotBus(url: string = DEFAULT_URL): MascotBusClient {
     addStatusListener(l: StatusListener): () => void {
       statusListeners.add(l);
       return () => statusListeners.delete(l);
+    },
+    send(msg: unknown): void {
+      // Best-effort outbound. The bus is normally receive-only, but the pill
+      // emits next_suggestion.feedback/.choose back to the ws_bus inbound
+      // handlers. Silent-drop when not OPEN — matching the self-healing /
+      // anti-slop discipline: a failed send must never crash the pill.
+      if (closed || ws === null || ws.readyState !== WebSocket.OPEN) return;
+      try {
+        ws.send(JSON.stringify(msg));
+      } catch {
+        // swallow — reconnect/backoff owns socket health elsewhere
+      }
     },
     close(): void {
       closed = true;
