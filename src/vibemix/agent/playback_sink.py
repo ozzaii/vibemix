@@ -23,7 +23,7 @@ from scipy import signal
 from livekit import rtc
 from livekit.agents.voice import io as voice_io
 
-from vibemix.audio import INPUT_SR_NATIVE, OUTPUT_SR, PlaybackQueue, VoiceRecorder
+from vibemix.audio import OUTPUT_SR, PlaybackQueue, VoiceRecorder
 
 # 2026-05-21 (Kaan: "sesini yuksege al") — software gain on the AI voice
 # before it hits the speaker. Local co-host speech can still get buried under
@@ -130,7 +130,7 @@ class PlaybackQueueAudioOutput(voice_io.AudioOutput):
         self,
         playback: PlaybackQueue,
         recorder: VoiceRecorder,
-        sample_rate: int = INPUT_SR_NATIVE,
+        sample_rate: int = OUTPUT_SR,
         buffer_segments: bool = False,
     ):
         super().__init__(

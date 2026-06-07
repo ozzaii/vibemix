@@ -295,6 +295,44 @@ DECK_AUDIO_PART_AUTO_EVENTS: frozenset[str] = frozenset(
 )
 
 
+_TRUTHY_ENV_VALUES = ("1", "true", "yes", "on")
+_FALSEY_ENV_VALUES = ("0", "false", "no", "off")
+
+
+def _env_flag_enabled(name: str, *, default: bool = False) -> bool:
+    raw = os.environ.get(name)
+    if raw is None:
+        return default
+    value = raw.strip().lower()
+    if value in _TRUTHY_ENV_VALUES:
+        return True
+    if value in _FALSEY_ENV_VALUES or value == "":
+        return False
+    return default
+
+
+def _sven_probe_mode_enabled() -> bool:
+    return _env_flag_enabled("VIBEMIX_SVEN_PROBE_MODE") or _env_flag_enabled(
+        "VIBEMIX_SVEN_QA_SET"
+    )
+
+
+def _anti_slop_runtime_enabled() -> bool:
+    return _env_flag_enabled("VIBEMIX_ANTI_SLOP", default=not _sven_probe_mode_enabled())
+
+
+def _runtime_coach_audio_seconds() -> float:
+    raw = os.environ.get("VIBEMIX_LIVE_COACH_AUDIO_SECONDS", "").strip()
+    default = COACH_AUDIO_SECONDS
+    if not raw:
+        return float(default)
+    try:
+        seconds = float(raw)
+    except (TypeError, ValueError):
+        return float(default)
+    return float(min(max(seconds, 3.0), COACH_AUDIO_SECONDS))
+
+
 def _has_grounded_receipt_extra(extra: dict[str, Any]) -> bool:
     return any(
         isinstance(extra.get(key), str) and bool(str(extra.get(key)).strip())
@@ -2246,15 +2284,10 @@ class DJCoHostAgent(Agent):
         return None
 
     def _probe_direct_voice_enabled(self) -> bool:
-        direct_override = os.environ.get("VIBEMIX_SVEN_PROBE_DIRECT_VOICE", "1")
+        direct_override = os.environ.get("VIBEMIX_SVEN_PROBE_DIRECT_VOICE", "0")
         if direct_override.strip().lower() in ("0", "false", "no", "off"):
             return False
-        return os.environ.get("VIBEMIX_SVEN_PROBE_MODE", "").strip().lower() in (
-            "1",
-            "true",
-            "yes",
-            "on",
-        )
+        return _sven_probe_mode_enabled()
 
     @staticmethod
     def _probe_spoken_text(text: str) -> str:
@@ -2266,13 +2299,13 @@ class DJCoHostAgent(Agent):
 
     @staticmethod
     def _probe_playback_speed() -> float:
-        raw = os.environ.get("VIBEMIX_SVEN_PROBE_PLAYBACK_SPEED", "1.15")
+        raw = os.environ.get("VIBEMIX_SVEN_PROBE_PLAYBACK_SPEED", "1.0")
         try:
             speed = float(raw)
         except (TypeError, ValueError):
-            return 1.15
+            return 1.0
         if speed < 0.75 or speed > 1.5:
-            return 1.15
+            return 1.0
         return speed
 
     @staticmethod
@@ -2337,7 +2370,7 @@ class DJCoHostAgent(Agent):
                 raw_pcm = _resample_int16_mono_pcm(
                     raw_pcm,
                     source_sr=source_sr,
-                    target_sr=INPUT_SR_NATIVE,
+                    target_sr=OUTPUT_SR,
                 )
                 speed = self._probe_playback_speed()
                 out_pcm = self._speed_int16_mono_pcm(raw_pcm, speed)
@@ -2355,7 +2388,7 @@ class DJCoHostAgent(Agent):
                     chunks=len(chunks),
                     pcm_bytes=len(out_pcm),
                     source_sr=source_sr,
-                    target_sr=INPUT_SR_NATIVE,
+                    target_sr=OUTPUT_SR,
                     playback_speed=speed,
                     latency_s=round(time.time() - start, 2),
                 )
@@ -2889,7 +2922,7 @@ class DJCoHostAgent(Agent):
             # context instead of reacting to an underfed instant.
             ev_type_for_diet = ev.type if ev is not None else "MANUAL"
             diet = ev_type_for_diet in RUNTIME_DIET_EVENTS
-            audio_seconds = DIET_AUDIO_SECONDS if diet else COACH_AUDIO_SECONDS
+            audio_seconds = DIET_AUDIO_SECONDS if diet else _runtime_coach_audio_seconds()
             skip_screen = ev_type_for_diet in SCREEN_SKIP_EVENTS
             ev_extra = ev.extra if ev is not None and isinstance(ev.extra, dict) else {}
             guard_option_scaffold = _should_guard_option_scaffold(ev_type_for_diet, ev_extra)
@@ -3853,20 +3886,36 @@ class DJCoHostAgent(Agent):
             # ---- Silence + slop gate (Phase 10) ----
             suppression: str | None = None
             slop_matches: list[str] = []
-            if option_scaffold_suppressed:
-                suppression = "option_scaffold"
-            elif line_scaffold_suppressed:
-                suppression = "line_scaffold"
-            elif packet_fragment_suppressed:
-                suppression = "packet_fragment"
+            if _anti_slop_runtime_enabled():
+                if option_scaffold_suppressed:
+                    suppression = "option_scaffold"
+                elif line_scaffold_suppressed:
+                    suppression = "line_scaffold"
+                elif packet_fragment_suppressed:
+                    suppression = "packet_fragment"
+                elif stripped == SILENCE_TOKEN or stripped.startswith(SILENCE_TOKEN):
+                    suppression = "silence"
+                else:
+                    # Run filter_for_slop on the FULL accumulated text; suppress turn
+                    # if any banned phrase matches.
+                    _filtered, slop_matches = filter_for_slop(full_text)
+                    if slop_matches:
+                        suppression = "slop"
             elif stripped == SILENCE_TOKEN or stripped.startswith(SILENCE_TOKEN):
-                suppression = "silence"
-            else:
-                # Run filter_for_slop on the FULL accumulated text; suppress turn
-                # if any banned phrase matches.
-                _filtered, slop_matches = filter_for_slop(full_text)
-                if slop_matches:
-                    suppression = "slop"
+                original_text = full_text
+                full_text = re.sub(rf"^\s*{re.escape(SILENCE_TOKEN)}\s*", "", full_text).strip()
+                if not full_text:
+                    full_text = "I am listening."
+                stripped = full_text.strip()
+                try:
+                    self._recorder.log_event(
+                        "silence_bypassed",
+                        event=ev_tag,
+                        original_text=original_text,
+                        replacement=full_text,
+                    )
+                except Exception:
+                    pass
 
             # Plan 20-01 meta.json fields — initialized here so the dump
             # path at the bottom can reference them regardless of which
@@ -3941,11 +3990,7 @@ class DJCoHostAgent(Agent):
                     raw_live_claim_text = full_text
                     full_text = live_claim_guard.text
                     stripped = full_text.strip()
-                    if (
-                        os.environ.get("VIBEMIX_SVEN_PROBE_MODE", "").strip().lower()
-                        in ("1", "true", "yes", "on")
-                        and full_text
-                    ):
+                    if _sven_probe_mode_enabled() and full_text:
                         live_claim_guard = LiveClaimGuardResult(
                             text=full_text,
                             corrected=True,
@@ -4132,10 +4177,7 @@ class DJCoHostAgent(Agent):
                     citation_lint_reason = lint_result.reason
                     citation_lint_missing_payload = [list(t) for t in lint_result.missing]
 
-                    sven_probe_speak_uncited = (
-                        os.environ.get("VIBEMIX_SVEN_PROBE_MODE", "").strip().lower()
-                        in ("1", "true", "yes", "on")
-                    )
+                    sven_probe_speak_uncited = _sven_probe_mode_enabled()
                     if lint_result.valid or sven_probe_speak_uncited:
                         citation_action = "emit" if lint_result.valid else "emit_probe_uncited"
                         if sven_probe_speak_uncited and not lint_result.valid:

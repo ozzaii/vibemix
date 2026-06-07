@@ -39,6 +39,7 @@ import re
 import signal
 import sys
 import threading
+import time
 from collections import deque
 from collections.abc import Callable
 from datetime import datetime, timezone
@@ -281,15 +282,27 @@ def _build_tts_chain_or_mute(**kwargs: Any) -> Any:
         return _livekit_not_given()
 
 
+_TRUTHY_ENV_VALUES = ("1", "true", "yes", "on")
+_FALSEY_ENV_VALUES = ("0", "false", "no", "off")
+
+
+def _env_truthy(name: str) -> bool:
+    return os.environ.get(name, "").strip().lower() in _TRUTHY_ENV_VALUES
+
+
+def _sven_qa_mode_enabled() -> bool:
+    return _env_truthy("VIBEMIX_SVEN_PROBE_MODE") or _env_truthy("VIBEMIX_SVEN_QA_SET")
+
+
 def _chatterbox_start_warmup_timeout_s() -> float:
     """How long Start waits for local voice warmup before continuing."""
     raw = os.environ.get("VIBEMIX_CHATTERBOX_START_WARMUP_TIMEOUT_S", "").strip()
     if not raw:
-        return 90.0
+        return 0.0 if _sven_qa_mode_enabled() else 90.0
     try:
         return max(0.0, float(raw))
     except ValueError:
-        return 90.0
+        return 0.0 if _sven_qa_mode_enabled() else 90.0
 
 
 def _local_voice_ready_for_status() -> bool:
@@ -321,6 +334,62 @@ def _resample_pcm16_mono_bytes(pcm: bytes, *, source_sr: int, target_sr: int) ->
     samples = np.frombuffer(pcm, dtype="<i2").astype(np.float32) / 32767.0
     resampled = resample_audio(samples, source_sr=source_sr, target_sr=target_sr)
     return np.clip(resampled * 32767.0, -32767.0, 32767.0).astype("<i2").tobytes()
+
+
+async def _prime_live_voice_tts(
+    live_voice_tts: Any,
+    recorder: VoiceRecorder,
+    *,
+    timeout_s: float | None = None,
+) -> None:
+    """Warm and synth-prime Chatterbox without blocking capture or meters."""
+
+    wait_until_warm = getattr(live_voice_tts, "wait_until_warm", None)
+    synthesize_pcm = getattr(live_voice_tts, "synthesize_pcm", None)
+    if not callable(wait_until_warm) or not callable(synthesize_pcm):
+        return
+    started_at = time.monotonic()
+    try:
+        warmed = await asyncio.to_thread(wait_until_warm, timeout_s)
+        if not warmed:
+            warm_error = getattr(live_voice_tts, "prewarm_error", None)
+            try:
+                recorder.log_event(
+                    "chatterbox_background_prime",
+                    ok=False,
+                    reason="warm_timeout",
+                    error=repr(warm_error) if warm_error is not None else None,
+                    latency_s=round(time.monotonic() - started_at, 2),
+                )
+            except Exception:
+                pass
+            print(
+                "-> tts:   Chatterbox background warm still pending",
+                file=sys.stderr,
+                flush=True,
+            )
+            return
+        await asyncio.to_thread(synthesize_pcm, "Ready.", lambda _pcm: None)
+        latency_s = round(time.monotonic() - started_at, 2)
+        try:
+            recorder.log_event("chatterbox_background_prime", ok=True, latency_s=latency_s)
+        except Exception:
+            pass
+        print(f"-> tts:   Chatterbox background primed ({latency_s:.2f}s)", flush=True)
+    except asyncio.CancelledError:
+        raise
+    except Exception as exc:
+        try:
+            recorder.log_event(
+                "chatterbox_background_prime",
+                ok=False,
+                reason="exception",
+                error=repr(exc),
+                latency_s=round(time.monotonic() - started_at, 2),
+            )
+        except Exception:
+            pass
+        print(f"-> tts:   Chatterbox background prime failed: {exc!r}", file=sys.stderr, flush=True)
 
 
 def _build_learn_tutor_speak_audio(
@@ -2291,6 +2360,7 @@ async def main() -> None:
             else:
                 print("-> tts:   Chatterbox local only (provider=chatterbox-mlx)")
                 wait_until_warm = getattr(live_voice_tts, "wait_until_warm", None)
+                prewarm = getattr(live_voice_tts, "prewarm", None)
                 requires_live_prewarm = getattr(live_voice_tts, "requires_live_prewarm", None)
                 should_prewarm = (
                     bool(requires_live_prewarm())
@@ -2299,40 +2369,46 @@ async def main() -> None:
                 )
                 if callable(wait_until_warm) and should_prewarm:
                     warm_timeout_s = _chatterbox_start_warmup_timeout_s()
+                    if callable(prewarm):
+                        try:
+                            prewarm()
+                        except Exception as exc:
+                            print(f"-> tts:   Chatterbox prewarm start failed: {exc!r}", file=sys.stderr)
                     print(
                         "-> tts:   warming Chatterbox while capture arms "
                         f"(timeout={warm_timeout_s:.0f}s)",
                         flush=True,
                     )
-                    warmed = await asyncio.to_thread(wait_until_warm, warm_timeout_s)
-                    if warmed:
-                        print("-> tts:   Chatterbox warm", flush=True)
-                        synthesize_pcm = getattr(live_voice_tts, "synthesize_pcm", None)
-                        if callable(synthesize_pcm):
-                            try:
-                                await asyncio.to_thread(synthesize_pcm, "Ready.", lambda _pcm: None)
-                                print("-> tts:   Chatterbox synthesis primed", flush=True)
-                            except Exception as exc:
-                                print(
-                                    f"-> tts:   Chatterbox synthesis prime failed: {exc!r}",
-                                    file=sys.stderr,
-                                    flush=True,
-                                )
+                    if warm_timeout_s > 0:
+                        warmed = await asyncio.to_thread(wait_until_warm, warm_timeout_s)
+                        if warmed:
+                            print("-> tts:   Chatterbox warm", flush=True)
+                        else:
+                            warm_error = getattr(live_voice_tts, "prewarm_error", None)
+                            reason = f"; last error={warm_error!r}" if warm_error is not None else ""
+                            print(
+                                "-> tts:   Chatterbox still warming in background"
+                                f"{reason}",
+                                file=sys.stderr,
+                                flush=True,
+                            )
                     else:
-                        warm_error = getattr(live_voice_tts, "prewarm_error", None)
-                        reason = f"; last error={warm_error!r}" if warm_error is not None else ""
                         print(
-                            "-> tts:   Chatterbox still warming; first spoken line may be delayed"
-                            f"{reason}",
-                            file=sys.stderr,
+                            "-> tts:   Chatterbox warming in background; capture is not waiting",
                             flush=True,
                         )
+                    prime_task = asyncio.create_task(
+                        _prime_live_voice_tts(live_voice_tts, recorder, timeout_s=None)
+                    )
+                    cleanup_tasks.append(prime_task)
                 elif not should_prewarm:
                     print("-> tts:   live Chatterbox cache misses use local system voice")
 
-            anti_slop_flag = os.environ.get("VIBEMIX_ANTI_SLOP", "on").strip().lower()
-            anti_slop_enabled = anti_slop_flag not in ("off", "0", "false")
-            citation_lint_flag = os.environ.get("VIBEMIX_CITATION_LINT", "on").strip().lower()
+            anti_slop_default = "off" if _sven_qa_mode_enabled() else "on"
+            anti_slop_flag = os.environ.get("VIBEMIX_ANTI_SLOP", anti_slop_default).strip().lower()
+            anti_slop_enabled = anti_slop_flag not in (*_FALSEY_ENV_VALUES, "")
+            citation_lint_default = "off" if _sven_qa_mode_enabled() else "on"
+            citation_lint_flag = os.environ.get("VIBEMIX_CITATION_LINT", citation_lint_default).strip().lower()
             citation_lint_enabled = anti_slop_enabled and citation_lint_flag not in (
                 "off",
                 "0",
@@ -2479,7 +2555,7 @@ async def main() -> None:
                 session.output.audio = PlaybackQueueAudioOutput(
                     playback,
                     recorder,
-                    sample_rate=INPUT_SR_NATIVE,
+                    sample_rate=OUTPUT_SR,
                     buffer_segments=True,
                 )
                 if learn_voice_stream is not None:
@@ -2489,7 +2565,10 @@ async def main() -> None:
                     except Exception:
                         pass
                     learn_voice_stream = None
-                print(f"-> AI voice -> {output_device_label} @ {INPUT_SR_NATIVE}Hz (mixed)")
+                print(
+                    f"-> AI voice -> {output_device_label} @ {OUTPUT_SR}Hz "
+                    f"(mixed into {INPUT_SR_NATIVE}Hz passthrough)"
+                )
 
             await session.start(agent)
             print("-> agent started.")
