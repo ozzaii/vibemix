@@ -41,6 +41,7 @@ import sys
 import threading
 from collections import deque
 from collections.abc import Callable
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, ClassVar
 
@@ -900,6 +901,7 @@ def _input_callback_factory(
     controller_state: Any | None = None,
     source_sr: int = INPUT_SR_NATIVE,
     input_audio_processor: _InputAudioProcessor | None = None,
+    on_first_callback: Callable[[], None] | None = None,
 ):
     """Verbatim port of cohost_v4.py:912-945 input stream callback.
 
@@ -907,9 +909,10 @@ def _input_callback_factory(
     resample to 16k stays correct regardless of the user's loopback rate."""
 
     last_audio_context_at_s = -999.0
+    first_callback_seen = False
 
     def callback(indata, frames, time_info, status):
-        nonlocal last_audio_context_at_s
+        nonlocal first_callback_seen, last_audio_context_at_s
         if status:
             print(f"[input status] {status}", file=sys.stderr)
         if deck_audio_capture is not None:
@@ -970,6 +973,13 @@ def _input_callback_factory(
             )
 
         levels.update_music(state_pcm_48k)
+        if not first_callback_seen:
+            first_callback_seen = True
+            if on_first_callback is not None:
+                try:
+                    on_first_callback()
+                except Exception as exc:
+                    print(f"[input first-callback hook err] {exc}", file=sys.stderr)
 
     return callback
 
@@ -2119,6 +2129,136 @@ async def main() -> None:
 
             or_client = _openrouter_reaction_client_from_env()
 
+            capture_native_sr = _resolve_capture_native_sr(audio_capture_context)
+            input_audio_processor = _InputAudioProcessor(
+                audio_buf=audio_buf,
+                clean_audio_buf=clean_audio_buf,
+                recorder=recorder,
+                source_sr=capture_native_sr,
+            )
+            loop = asyncio.get_running_loop()
+            capture_device_label = input_device_name
+
+            def _mark_capture_started() -> None:
+                nonlocal live_session_active
+                if started_event.is_set():
+                    return
+                live_session_active = True
+                try:
+                    recorder.log_event(
+                        "capture_first_callback",
+                        device=capture_device_label,
+                        sample_rate=capture_native_sr,
+                        channels=deck_audio_routing.opened_channels,
+                    )
+                    recorder.log_event("session_lifecycle", state="started")
+                except Exception:
+                    pass
+                started_event.set()
+
+            def _on_first_input_callback() -> None:
+                loop.call_soon_threadsafe(_mark_capture_started)
+
+            def _set_input_stream(stream: Any, device_label: str | None = None) -> None:
+                nonlocal capture_device_label, input_stream
+                if device_label:
+                    capture_device_label = device_label
+                if run_stop_event.is_set() or stop_event.is_set():
+                    try:
+                        stream.stop()
+                        stream.close()
+                    except Exception:
+                        pass
+                    return
+                input_stream = stream
+                try:
+                    recorder.log_event(
+                        "capture_bound",
+                        device=capture_device_label,
+                        sample_rate=capture_native_sr,
+                        channels=deck_audio_routing.opened_channels,
+                    )
+                except Exception:
+                    pass
+                print(
+                    f"-> listening to {capture_device_label} @ {capture_native_sr}Hz "
+                    f"({deck_audio_routing.opened_channels}ch) -> audio_buf + clean_audio_buf"
+                )
+
+            def _set_input_stream_error(exc: BaseException) -> None:
+                try:
+                    tracer.error("input_stream_open_failed", err=repr(exc))
+                except Exception:
+                    pass
+                try:
+                    recorder.log_event(
+                        "capture_failed",
+                        device=input_device_name,
+                        sample_rate=capture_native_sr,
+                        channels=deck_audio_routing.opened_channels,
+                        error=repr(exc),
+                    )
+                except Exception:
+                    pass
+                if ipc_router is not None:
+                    try:
+                        asyncio.create_task(
+                            ipc_router.emit(
+                                {
+                                    "type": "ipc.error",
+                                    "ts": datetime.now(timezone.utc).isoformat(),
+                                    "payload": {
+                                        "reason": f"input capture failed: {type(exc).__name__}",
+                                        "original_type": "audio.capture",
+                                    },
+                                }
+                            )
+                        )
+                    except Exception:
+                        pass
+                print(f"-> input capture disabled: {exc}", file=sys.stderr, flush=True)
+                if not started_event.is_set():
+                    started_event.set()
+                run_stop_event.set()
+
+            def _open_input_stream_worker() -> None:
+                try:
+                    capture_input_idx = audio_backend.find_device(INPUT_DEVICE, "input")
+                    device_label = input_device_name
+                    try:
+                        import sounddevice as sd
+
+                        info = sd.query_devices(capture_input_idx)
+                        device_label = str(info.get("name") or input_device_name)
+                    except Exception:
+                        pass
+                    stream = audio_backend.open_capture(
+                        capture_input_idx,
+                        sample_rate=capture_native_sr,
+                        channels=deck_audio_routing.opened_channels,
+                        block_size=INPUT_CHUNK_FRAMES,
+                        callback=_input_callback_factory(
+                            levels,
+                            passthrough,
+                            mic,
+                            audio_buf,
+                            clean_audio_buf,
+                            recorder,
+                            deck_audio_capture,
+                            audio_capture_context,
+                            midi_macos.controller_state,
+                            source_sr=capture_native_sr,
+                            input_audio_processor=input_audio_processor,
+                            on_first_callback=_on_first_input_callback,
+                        ),
+                    )
+                except Exception as exc:
+                    loop.call_soon_threadsafe(_set_input_stream_error, exc)
+                    return
+                loop.call_soon_threadsafe(_set_input_stream, stream, device_label)
+
+            threading.Thread(target=_open_input_stream_worker, name="vibemix-input-open", daemon=True).start()
+
             try:
                 from vibemix.agent.chatterbox_tts import (
                     ChatterboxLocalTTS,
@@ -2160,7 +2300,7 @@ async def main() -> None:
                 if callable(wait_until_warm) and should_prewarm:
                     warm_timeout_s = _chatterbox_start_warmup_timeout_s()
                     print(
-                        "-> tts:   warming Chatterbox before live capture "
+                        "-> tts:   warming Chatterbox while capture arms "
                         f"(timeout={warm_timeout_s:.0f}s)",
                         flush=True,
                     )
@@ -2339,7 +2479,7 @@ async def main() -> None:
                 session.output.audio = PlaybackQueueAudioOutput(
                     playback,
                     recorder,
-                    sample_rate=OUTPUT_SR,
+                    sample_rate=INPUT_SR_NATIVE,
                     buffer_segments=True,
                 )
                 if learn_voice_stream is not None:
@@ -2489,69 +2629,6 @@ async def main() -> None:
                 ),
             )
 
-            capture_native_sr = _resolve_capture_native_sr(audio_capture_context)
-            input_audio_processor = _InputAudioProcessor(
-                audio_buf=audio_buf,
-                clean_audio_buf=clean_audio_buf,
-                recorder=recorder,
-                source_sr=capture_native_sr,
-            )
-
-            def _set_input_stream(stream: Any) -> None:
-                nonlocal input_stream
-                if run_stop_event.is_set() or stop_event.is_set():
-                    try:
-                        stream.stop()
-                        stream.close()
-                    except Exception:
-                        pass
-                    return
-                input_stream = stream
-                print(
-                    f"-> listening to {input_device_name} @ {capture_native_sr}Hz "
-                    f"({deck_audio_routing.opened_channels}ch) -> audio_buf + clean_audio_buf"
-                )
-
-            def _set_input_stream_error(exc: BaseException) -> None:
-                try:
-                    tracer.error("input_stream_open_failed", err=repr(exc))
-                except Exception:
-                    pass
-                print(f"-> input capture disabled: {exc}", file=sys.stderr, flush=True)
-
-            def _open_input_stream_worker() -> None:
-                try:
-                    stream = audio_backend.open_capture(
-                        input_idx,
-                        sample_rate=capture_native_sr,
-                        channels=deck_audio_routing.opened_channels,
-                        block_size=INPUT_CHUNK_FRAMES,
-                        callback=_input_callback_factory(
-                            levels,
-                            passthrough,
-                            mic,
-                            audio_buf,
-                            clean_audio_buf,
-                            recorder,
-                            deck_audio_capture,
-                            audio_capture_context,
-                            midi_macos.controller_state,
-                            source_sr=capture_native_sr,
-                            input_audio_processor=input_audio_processor,
-                        ),
-                    )
-                except Exception as exc:
-                    loop.call_soon_threadsafe(_set_input_stream_error, exc)
-                    return
-                loop.call_soon_threadsafe(_set_input_stream, stream)
-
-            threading.Thread(target=_open_input_stream_worker, name="vibemix-input-open", daemon=True).start()
-            live_session_active = True
-            try:
-                recorder.log_event("session_lifecycle", state="started")
-            except Exception:
-                pass
-            started_event.set()
             await run_stop_event.wait()
         except Exception:
             if not started_event.is_set():

@@ -60,6 +60,7 @@ from vibemix.agent.cache import GeminiContextCache
 from vibemix.agent.config import LLM_MODEL, OPENROUTER_LLM_MODEL
 from vibemix.agent.emote_parser import has_emote_tag, strip_emote_tags
 from vibemix.agent.language_guard import english_only_violation_matches
+from vibemix.agent.playback_sink import _resample_int16_mono_pcm
 from vibemix.agent.proxy_client import (
     classify_proxy_error,
     probe_proxy_health,
@@ -70,6 +71,8 @@ from vibemix.audio import (
     MIC_AUDIO_PART_PRESENCE_RMS,
     MIC_AUDIO_PART_RECENCY_S,
     MIC_AUDIO_PART_SECONDS,
+    INPUT_SR_NATIVE,
+    OUTPUT_SR,
     AudioBuffer,
     VoiceRecorder,
     pcm_to_wav,
@@ -136,6 +139,8 @@ if TYPE_CHECKING:  # pragma: no cover — typing-only
 SILENCE_TOKEN = "<silence/>"
 
 _GROUNDED_RECEIPT_EXTRA_KEYS = (
+    "energy_read_voice_line",
+    "move_grade_voice_line",
     "next_suggestion_voice_line",
     "transition_verdict_voice_line",
     "set_progress_voice_line",
@@ -2217,6 +2222,155 @@ class DJCoHostAgent(Agent):
                     stack.append(child)
         return False
 
+    def _direct_tts_synthesizer(self) -> tuple[Any, Any] | None:
+        """Return the first local TTS object with a direct PCM synthesis hook."""
+        seen: set[int] = set()
+        stack: list[Any] = [self._tts_inst]
+        while stack:
+            item = stack.pop()
+            if item is None:
+                continue
+            marker = id(item)
+            if marker in seen:
+                continue
+            seen.add(marker)
+            synthesize_pcm = getattr(item, "synthesize_pcm", None)
+            if callable(synthesize_pcm):
+                return item, synthesize_pcm
+            for child in getattr(item, "_tts_instances", ()) or ():
+                stack.append(child)
+            for attr in ("_tts", "tts"):
+                child = getattr(item, attr, None)
+                if child is not None:
+                    stack.append(child)
+        return None
+
+    def _probe_direct_voice_enabled(self) -> bool:
+        direct_override = os.environ.get("VIBEMIX_SVEN_PROBE_DIRECT_VOICE", "1")
+        if direct_override.strip().lower() in ("0", "false", "no", "off"):
+            return False
+        return os.environ.get("VIBEMIX_SVEN_PROBE_MODE", "").strip().lower() in (
+            "1",
+            "true",
+            "yes",
+            "on",
+        )
+
+    @staticmethod
+    def _probe_spoken_text(text: str) -> str:
+        """Remove citations/grounding receipts before direct probe playback."""
+        spoken = model_text_for_tts(text or "")
+        spoken = re.sub(r"\[[^\[\]]+:[^\[\]]+\]", " ", spoken)
+        spoken = re.sub(r"\s+", " ", spoken)
+        return spoken.strip()
+
+    @staticmethod
+    def _probe_playback_speed() -> float:
+        raw = os.environ.get("VIBEMIX_SVEN_PROBE_PLAYBACK_SPEED", "1.15")
+        try:
+            speed = float(raw)
+        except (TypeError, ValueError):
+            return 1.15
+        if speed < 0.75 or speed > 1.5:
+            return 1.15
+        return speed
+
+    @staticmethod
+    def _speed_int16_mono_pcm(pcm: bytes, speed: float) -> bytes:
+        if not pcm or abs(speed - 1.0) < 0.01:
+            return pcm
+        samples = np.frombuffer(pcm, dtype=np.int16)
+        if samples.size < 2:
+            return pcm
+        indexes = np.arange(0, samples.size, speed, dtype=np.float64).astype(np.int64)
+        indexes = indexes[indexes < samples.size]
+        if indexes.size == 0:
+            return pcm
+        return samples[indexes].astype(np.int16, copy=False).tobytes()
+
+    def _schedule_probe_direct_voice(
+        self,
+        text: str,
+        *,
+        event: str,
+        response_id: str,
+    ) -> None:
+        """Probe-mode rescue path: push local TTS PCM straight to playback.
+
+        This is intentionally gated by ``VIBEMIX_SVEN_PROBE_MODE``. It lets a
+        live QA run hear every emitted Sven line even if LiveKit's TTS output
+        adapter fails to deliver frames. The normal LiveKit path stays wired
+        and remains visible in logs for later cleanup.
+        """
+        if not self._probe_direct_voice_enabled():
+            return
+        spoken = self._probe_spoken_text(text)
+        if not spoken or self._playback is None:
+            return
+        synth_pair = self._direct_tts_synthesizer()
+        if synth_pair is None:
+            self._recorder.log_event(
+                "sven_probe_direct_voice_skipped",
+                event=event,
+                response_id=response_id,
+                reason="no_direct_tts_synthesizer",
+                chars=len(spoken),
+            )
+            return
+        tts_obj, synthesize_pcm = synth_pair
+        ref_path = getattr(tts_obj, "_ref_path", None)
+        synth_source = type(tts_obj).__name__
+
+        async def _run() -> None:
+            chunks: list[bytes] = []
+
+            def _on_pcm(pcm: bytes) -> None:
+                if pcm:
+                    chunks.append(pcm)
+
+            start = time.time()
+            try:
+                loop = asyncio.get_running_loop()
+                await loop.run_in_executor(None, lambda: synthesize_pcm(spoken, _on_pcm))
+                raw_pcm = b"".join(chunks)
+                source_sr = int(getattr(tts_obj, "sample_rate", OUTPUT_SR) or OUTPUT_SR)
+                raw_pcm = _resample_int16_mono_pcm(
+                    raw_pcm,
+                    source_sr=source_sr,
+                    target_sr=INPUT_SR_NATIVE,
+                )
+                speed = self._probe_playback_speed()
+                out_pcm = self._speed_int16_mono_pcm(raw_pcm, speed)
+                if out_pcm:
+                    self._playback.clear()
+                    self._playback.push(out_pcm)
+                    self._recorder.push_voice(out_pcm)
+                self._recorder.log_event(
+                    "sven_probe_direct_voice",
+                    event=event,
+                    response_id=response_id,
+                    source=synth_source,
+                    ref_path=str(ref_path) if ref_path else None,
+                    chars=len(spoken),
+                    chunks=len(chunks),
+                    pcm_bytes=len(out_pcm),
+                    source_sr=source_sr,
+                    target_sr=INPUT_SR_NATIVE,
+                    playback_speed=speed,
+                    latency_s=round(time.time() - start, 2),
+                )
+            except Exception as exc:
+                self._recorder.log_event(
+                    "sven_probe_direct_voice_error",
+                    event=event,
+                    response_id=response_id,
+                    error=repr(exc),
+                    chars=len(spoken),
+                    latency_s=round(time.time() - start, 2),
+                )
+
+        asyncio.create_task(_run())
+
     def set_next_event(self, ev: Event) -> None:
         self._pending_event = ev
         # Plan 19-05 — start the TTFT measurement window. Overwriting an
@@ -3787,6 +3941,19 @@ class DJCoHostAgent(Agent):
                     raw_live_claim_text = full_text
                     full_text = live_claim_guard.text
                     stripped = full_text.strip()
+                    if (
+                        os.environ.get("VIBEMIX_SVEN_PROBE_MODE", "").strip().lower()
+                        in ("1", "true", "yes", "on")
+                        and full_text
+                    ):
+                        live_claim_guard = LiveClaimGuardResult(
+                            text=full_text,
+                            corrected=True,
+                            emit_corrected=True,
+                            policy=live_claim_guard.policy,
+                            reason=live_claim_guard.reason,
+                            summary=live_claim_guard.summary,
+                        )
                     if live_claim_guard.emit_corrected and not re.search(
                         r"[A-Za-z0-9]",
                         model_text_for_tts(full_text),
@@ -3965,13 +4132,37 @@ class DJCoHostAgent(Agent):
                     citation_lint_reason = lint_result.reason
                     citation_lint_missing_payload = [list(t) for t in lint_result.missing]
 
-                    if lint_result.valid:
-                        citation_action = "emit"
+                    sven_probe_speak_uncited = (
+                        os.environ.get("VIBEMIX_SVEN_PROBE_MODE", "").strip().lower()
+                        in ("1", "true", "yes", "on")
+                    )
+                    if lint_result.valid or sven_probe_speak_uncited:
+                        citation_action = "emit" if lint_result.valid else "emit_probe_uncited"
+                        if sven_probe_speak_uncited and not lint_result.valid:
+                            try:
+                                self._recorder.log_event(
+                                    "citation_bypass",
+                                    response_id=response_id,
+                                    raw_text=full_text,
+                                    missing=citation_lint_missing_payload,
+                                    reason=lint_result.reason,
+                                    mode="sven_probe",
+                                    latency_s=round(elapsed, 2),
+                                )
+                            except Exception:
+                                pass
                         # Plan 41-04 — head_yielded means the streaming pipe
                         # already emitted the head + trailing chunks
                         # in-flight; the legacy re-yield from buffered_chunks
                         # would duplicate audio. Skip it.
-                        if direct_voice_skip_reason is not None:
+                        probe_direct_voice = (
+                            self._probe_direct_voice_enabled()
+                            and self._playback is not None
+                            and self._direct_tts_synthesizer() is not None
+                        )
+                        if probe_direct_voice:
+                            print("[ai_voice:probe-direct] suppress streaming TTS", flush=True)
+                        elif direct_voice_skip_reason is not None:
                             print(
                                 f"[ai_voice:skipped] reason={direct_voice_skip_reason}",
                                 flush=True,
@@ -3996,6 +4187,11 @@ class DJCoHostAgent(Agent):
                                 "ai_text",
                                 text=audience_text,
                                 latency_s=round(elapsed, 2),
+                            )
+                            self._schedule_probe_direct_voice(
+                                audience_text,
+                                event=ev_tag,
+                                response_id=response_id,
                             )
                             # WR-04 — stamp from event-fired set_seconds, not the
                             # post-stream/lint/bus set_seconds (multi-second drift).
@@ -4047,7 +4243,14 @@ class DJCoHostAgent(Agent):
                     # Plan 41-04 — when ``head_yielded`` is True the streaming
                     # path already emitted the chunks in-flight; skip the
                     # buffer re-yield to avoid duplicate audio.
-                    if not head_yielded:
+                    probe_direct_voice = (
+                        self._probe_direct_voice_enabled()
+                        and self._playback is not None
+                        and self._direct_tts_synthesizer() is not None
+                    )
+                    if probe_direct_voice:
+                        print("[ai_voice:probe-direct] suppress streaming TTS", flush=True)
+                    elif not head_yielded:
                         replay_chunks = (
                             [audience_text]
                             if live_claim_defer_stream or language_defer_stream
@@ -4063,6 +4266,11 @@ class DJCoHostAgent(Agent):
                             self._stripped_tracker.clear_last_unverified()
                         self._recorder.log_event(
                             "ai_text", text=audience_text, latency_s=round(elapsed, 2)
+                        )
+                        self._schedule_probe_direct_voice(
+                            audience_text,
+                            event=ev_tag,
+                            response_id=response_id,
                         )
                         # WR-04 — stamp from event-fired set_seconds.
                         self._record_said(

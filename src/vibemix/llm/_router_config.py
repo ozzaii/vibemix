@@ -40,7 +40,7 @@ _ROUTES: dict[str, tuple[str, ServiceTierName | None]] = {
     # but named separately so a future bench-proven deep-context swap is a
     # one-line router edit instead of an inline model literal.
     "live_coach_deep": ("gemini-3.5-flash", "STANDARD"),
-    "live_coach_openrouter": ("google/gemini-3.5-flash", None),
+    "live_coach_openrouter": ("google/gemini-3.5-flash:nitro", None),
     # --- Cost + capability study (2026-05-30) — candidate LIVE-BRAIN aliases.
     # The verified pricing table (``vibemix.library.pricing``) resolves each via
     # ``resolve_model`` so NO Gemini literal escapes this allowlisted file, and
