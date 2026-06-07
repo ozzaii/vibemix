@@ -60,6 +60,7 @@ from vibemix.agent.config import (
     INPUT_DEVICE,
     LLM_MODEL,
     MIC_DEVICE,
+    OPENROUTER_LLM_MODEL,
     OUTPUT_DEVICE,
 )
 from vibemix.agent.persona import SYSTEM_INSTRUCTION  # noqa: F401
@@ -137,6 +138,7 @@ AgentSession = None
 DJCoHostAgent = None
 PlaybackQueueAudioOutput = None
 build_llm = None
+build_or_client = None
 build_proxy_genai_client = None
 build_tts_chain = None
 get_or_create_install_uuid = None
@@ -214,6 +216,25 @@ def _ensure_proxy_client_dep() -> None:
         )
 
         build_proxy_genai_client = _build_proxy_genai_client
+
+
+def _ensure_openrouter_client_dep() -> None:
+    global build_or_client
+    if build_or_client is None:
+        from vibemix.agent.openrouter_llm import build_or_client as _build_or_client
+
+        build_or_client = _build_or_client
+
+
+def _openrouter_reaction_client_from_env() -> Any | None:
+    """Build the optional OpenRouter reaction brain without exposing the key."""
+    _or_key = os.environ.get("OPENROUTER_API_KEY", "").strip()
+    if not _or_key:
+        return None
+    _ensure_openrouter_client_dep()
+    client = build_or_client(_or_key)
+    print(f"-> brain: {OPENROUTER_LLM_MODEL} via OpenRouter (key from .env)")
+    return client
 
 
 def _ensure_live_session_deps() -> None:
@@ -2096,6 +2117,8 @@ async def main() -> None:
                 genai_client = build_proxy_genai_client(proxy_jwt, proxy_base_url)
                 llm_inst = build_llm(mode="proxy", proxy_base_url=proxy_base_url, jwt=proxy_jwt)
 
+            or_client = _openrouter_reaction_client_from_env()
+
             try:
                 from vibemix.agent.chatterbox_tts import (
                     ChatterboxLocalTTS,
@@ -2281,6 +2304,7 @@ async def main() -> None:
                 state=state,
                 recorder=recorder,
                 llm_inst=llm_inst,
+                or_client=or_client,
                 tts_inst=tts_inst,
                 cache=None,
                 ttft_meter=TTFTMeter(),

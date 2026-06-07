@@ -642,8 +642,11 @@ def _build_livekit_mocks(mocker):
 
     # build_llm + build_tts_chain → MagicMocks
     build_llm_mock = MagicMock(return_value=MagicMock())
+    or_client_mock = object()
+    build_or_client_mock = MagicMock(return_value=or_client_mock)
     build_tts_mock = MagicMock(return_value=MagicMock())
     mocker.patch.object(main_mod, "build_llm", build_llm_mock)
+    mocker.patch.object(main_mod, "build_or_client", build_or_client_mock)
     mocker.patch.object(main_mod, "build_tts_chain", build_tts_mock)
 
     # DJCoHostAgent + PlaybackQueueAudioOutput → MagicMocks
@@ -657,6 +660,8 @@ def _build_livekit_mocks(mocker):
         "AgentSession": agent_session_factory,
         "genai_client": genai_client_mock,
         "build_llm": build_llm_mock,
+        "build_or_client": build_or_client_mock,
+        "or_client": or_client_mock,
         "build_tts_chain": build_tts_mock,
         "DJCoHostAgent": agent_factory,
         "PlaybackQueueAudioOutput": sink_factory,
@@ -787,6 +792,7 @@ def test_smoke_03_full_wiring(monkeypatch, mocker, tmp_path):
 
     # (c) build_llm called with the dummy key in direct mode (Phase 5 explicit mode kwarg)
     livekit_mocks["build_llm"].assert_called_once_with("dummy-key", mode="direct")
+    livekit_mocks["build_or_client"].assert_called_once_with("dummy-or")
 
     # (d) build_tts_chain gets the local Chatterbox hook when available;
     # cloud keys stay out of voice.
@@ -806,6 +812,7 @@ def test_smoke_03_full_wiring(monkeypatch, mocker, tmp_path):
         assert agent_call.kwargs.get(kw) is not None, f"missing kwarg {kw}"
     assert agent_call.kwargs.get("recall") is None
     assert agent_call.kwargs.get("recall_enabled") is False
+    assert agent_call.kwargs.get("or_client") is livekit_mocks["or_client"]
     assert livekit_mocks["genai_client"].models.embed_content.call_count == 0
 
     # (f) AgentSession constructed with llm + tts
@@ -1080,6 +1087,8 @@ def test_smoke_04_no_openrouter_key(monkeypatch, mocker, tmp_path):
     asyncio.run(driver())
 
     _assert_tts_chain_boot_call(livekit_mocks["build_tts_chain"])
+    livekit_mocks["build_or_client"].assert_not_called()
+    assert livekit_mocks["DJCoHostAgent"].call_args.kwargs.get("or_client") is None
 
 
 def test_smoke_04b_missing_chatterbox_boots_muted_not_cloud_fallback(
