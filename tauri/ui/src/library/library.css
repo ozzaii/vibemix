@@ -1256,7 +1256,7 @@ body {
 }
 /* Quiet native-folder affordance at the left of the chat composer. */
 :is(body, .vmx-lib-app)[data-mode="chat"] #vmx-lib-chat-folder {
-  display: inline-flex;
+  display: inline-flex !important;
   align-items: center;
   justify-content: center;
   align-self: stretch;
