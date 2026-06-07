@@ -1170,8 +1170,8 @@ html[data-runtime="tauri"] .shell-main {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  min-height: 24px; /* WCAG 2.5.8 hit target; the dot+label center within it */
-  gap: 6px; /* deliberately tight (sub --sp-1): dot hugs its label */
+  min-height: 24px; /* WCAG 2.5.8 hit target; dots center within it */
+  gap: 6px;
   font-family: var(--type-mono);
   font-size: 10px;
   letter-spacing: 0.08em;
@@ -1231,6 +1231,11 @@ html[data-runtime="tauri"] .shell-main {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.shell-footer .status-label:empty,
+.shell-footer .library-freshness-label:empty,
+.shell-footer .voice-readiness-label:empty {
+  display: none;
 }
 .shell-footer .library-freshness-badge[data-state="ok"] .library-freshness-dot,
 .shell-footer .voice-readiness-badge[data-state="ok"] .voice-readiness-dot {

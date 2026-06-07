@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// Compact shell readout for the library freshness engine. The backend already
-// computes source-aware freshness; this badge makes that truth visible without
-// opening Settings or the Viber surface.
+// Compact shell signal for the library freshness engine. The backend already
+// computes source-aware freshness; this badge keeps that truth available as a
+// quiet dot without turning the footer into a status sentence.
 
 import {
   libraryStats,
@@ -44,6 +44,7 @@ export interface LibraryFreshnessBadgeOptions {
 }
 
 const DEFAULT_POLL_MS = 60_000;
+const QUIET_LABEL = "";
 
 function normalizeFreshnessStatus(stats: LibraryStats | null): string {
   const nested = stats?.library_freshness?.status;
@@ -98,11 +99,10 @@ export function libraryFreshnessBadgeModel(
   const setupCandidate = bestLibrarySetupCandidate(stats);
   if (setupCandidate) {
     const source = librarySetupCandidateLabel(setupCandidate.kind);
-    const label = setupCandidate.kind === "music_folder" ? "index music" : "import library";
     const reason = setupCandidate.reason ? ` · ${setupCandidate.reason}` : "";
     return {
       state: "setup",
-      label,
+      label: QUIET_LABEL,
       title: `Library setup: found ${source} at ${setupCandidate.path}${reason}`,
     };
   }
@@ -114,7 +114,7 @@ export function libraryFreshnessBadgeModel(
   const ageText = typeof age === "number" ? `, ${age}d cache` : "";
   return {
     state,
-    label: state === "unknown" ? "" : `library ${readableStatus(status)}`,
+    label: QUIET_LABEL,
     title: `Library freshness: ${readableStatus(reason)}${ageText}`,
   };
 }
@@ -195,7 +195,7 @@ export function mountLibraryFreshnessBadge(
     }
     renderBadge(badge, separator, {
       state: "indexing",
-      label: `indexing ${progress.done}/${progress.total}`,
+      label: QUIET_LABEL,
       title:
         "Library embedding locally: go run a set, it'll be ready when you're back",
     });

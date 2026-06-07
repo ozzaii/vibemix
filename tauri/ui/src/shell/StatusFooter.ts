@@ -3,7 +3,7 @@
 // The quiet floating session status (bottom-right, 10px). It is the honest
 // indicator that distinguishes "idle, no music yet" from "broken" (cardinal
 // invariant #5): the connection dot is steady-lit when connected, pulses while
-// reconnecting, dims when disconnected, and the label states the activation.
+// reconnecting, dims when disconnected, and the label states Deck activation.
 //
 // Activation is read-only here. The live session bridge owns activation and
 // connection; the footer must never simulate a live state.
@@ -29,18 +29,14 @@ const CONNECTION_LABEL: Record<ConnectionState, string> = {
   disconnected: "co-host offline",
 };
 
-const LOCAL_SURFACE_LABEL: Partial<Record<SurfaceId, string>> = {
-  learn: "learn local",
-  viber: "viber local",
-};
+const LOCAL_SURFACES = new Set<SurfaceId>(["learn", "viber"]);
 
 function footerLabel(
   activation: ActivationState,
   connection: ConnectionState,
   surface: SurfaceId,
 ): string {
-  const localLabel = LOCAL_SURFACE_LABEL[surface];
-  if (localLabel) return localLabel;
+  if (LOCAL_SURFACES.has(surface)) return "";
   return CONNECTION_LABEL[connection] || ACTIVATION_LABEL[activation];
 }
 
@@ -90,7 +86,10 @@ export function createStatusFooter(store: ShellStore): HTMLElement {
     label.textContent = nextLabel;
     footer.dataset.conn = model.connection;
     footer.dataset.surface = model.activeSurface;
-    footer.setAttribute("aria-label", `Session status: ${nextLabel}`);
+    footer.setAttribute(
+      "aria-label",
+      nextLabel ? `Session status: ${nextLabel}` : (nextTitle ?? "Session status"),
+    );
     if (nextTitle === null) {
       footer.removeAttribute("title");
     } else {

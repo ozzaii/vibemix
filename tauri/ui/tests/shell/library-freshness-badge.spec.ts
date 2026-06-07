@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
  *
- * The shell freshness badge is a glanceable product-truth readout: it consumes
+ * The shell freshness badge is a glanceable product-truth signal: it consumes
  * the existing library stats contract and never invents a good state when stats
  * cannot be read.
  */
@@ -41,7 +41,7 @@ describe("library freshness badge", () => {
           },
         }),
       ),
-    ).toMatchObject({ state: "ok", label: "library fresh" });
+    ).toMatchObject({ state: "ok", label: "" });
 
     expect(
       libraryFreshnessBadgeModel(
@@ -52,7 +52,7 @@ describe("library freshness badge", () => {
           library_age_days: 4,
         }),
       ),
-    ).toMatchObject({ state: "warn", label: "library stale" });
+    ).toMatchObject({ state: "warn", label: "" });
   });
 
   it("renders not-indexed and unreadable states without calling them fresh", async () => {
@@ -76,7 +76,7 @@ describe("library freshness badge", () => {
 
     expect(footer.querySelector(".footer-separator")).toBeTruthy();
     expect(handle.element.dataset.state).toBe("empty");
-    expect(handle.element.textContent).toBe("library not indexed");
+    expect(handle.element.textContent).toBe("");
     handle.teardown();
     expect(footer.querySelector(".library-freshness-badge")).toBeNull();
   });
@@ -109,7 +109,7 @@ describe("library freshness badge", () => {
     await handle.refresh();
 
     expect(handle.element.dataset.state).toBe("setup");
-    expect(handle.element.textContent).toBe("index music");
+    expect(handle.element.textContent).toBe("");
     expect(handle.element.title).toContain("found music folder");
     expect(handle.element.title).toContain("/Users/ozai/Downloads/Music");
   });
@@ -140,7 +140,7 @@ describe("library freshness badge", () => {
     await handle.refresh();
 
     expect(handle.element.dataset.state).toBe("empty");
-    expect(handle.element.textContent).toBe("library not indexed");
+    expect(handle.element.textContent).toBe("");
     handle.teardown();
   });
 
@@ -197,7 +197,7 @@ describe("library freshness badge", () => {
       cancelled: false,
     });
     expect(handle.element.dataset.state).toBe("indexing");
-    expect(handle.element.textContent).toBe("indexing 3/10");
+    expect(handle.element.textContent).toBe("");
     expect(handle.element.title).toContain("go run a set");
 
     const callsBefore = getStats.mock.calls.length;

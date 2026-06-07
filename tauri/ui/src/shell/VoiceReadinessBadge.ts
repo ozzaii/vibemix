@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// Compact shell readout for the local voice model. The real install/check
-// surface already lives in Viber; this badge only makes the fresh-machine truth
-// visible from the live deck and routes the user there.
+// Compact shell signal for the local voice model. The real install/check
+// surface already lives in Viber; this badge keeps the fresh-machine truth
+// available as a quiet dot and routes the user there.
 
 import {
   libraryModels,
@@ -38,6 +38,7 @@ export interface VoiceReadinessBadgeOptions {
 
 const DEFAULT_POLL_MS = 120_000;
 const VOICE_MODEL_IDS = new Set(["chatterbox-voice", "moss-tts"]);
+const QUIET_LABEL = "";
 
 function isVoiceModel(model: LibraryModelAsset): boolean {
   return VOICE_MODEL_IDS.has(model.id);
@@ -66,7 +67,7 @@ export function voiceReadinessBadgeModel(
     const voice = voiceModel(models);
     return {
       state: "warn",
-      label: "voice muted",
+      label: QUIET_LABEL,
       title: `Local voice is muted for this session; ${voiceSetupSummary(
         voice,
       )}. Subtitles stay visible.`,
@@ -100,7 +101,7 @@ export function voiceReadinessBadgeModel(
   if (voice.installed && !mismatched) {
     return {
       state: "ok",
-      label: "voice ready",
+      label: QUIET_LABEL,
       title: `Local voice ready${path}`,
     };
   }
@@ -108,14 +109,14 @@ export function voiceReadinessBadgeModel(
   if (mismatched) {
     return {
       state: installable ? "warn" : "fault",
-      label: installable ? "voice repair" : "voice manual",
+      label: QUIET_LABEL,
       title: `Local voice needs repair${missing}${path}`,
     };
   }
 
   return {
     state: installable ? "warn" : "fault",
-    label: installable ? "voice missing" : "voice manual",
+    label: QUIET_LABEL,
     title: `Local voice model missing${missing}${path}`,
   };
 }

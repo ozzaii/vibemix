@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
  *
- * The shell voice badge is the live-deck receipt for the local voice
+ * The shell voice badge is the live-deck signal for the local voice
  * requirement: a clean machine must not look fully ready when Sven cannot speak.
  */
 
@@ -49,7 +49,7 @@ describe("voice readiness badge", () => {
   it("maps the installed Chatterbox voice model into a terse ready state", () => {
     expect(voiceReadinessBadgeModel(payload())).toMatchObject({
       state: "ok",
-      label: "voice ready",
+      label: "",
     });
   });
 
@@ -69,14 +69,14 @@ describe("voice readiness badge", () => {
       ),
     ).toMatchObject({
       state: "ok",
-      label: "voice ready",
+      label: "",
     });
   });
 
   it("lets the live runtime muted state explain subtitles and setup readiness", () => {
     expect(voiceReadinessBadgeModel(payload(), undefined, "muted")).toMatchObject({
       state: "warn",
-      label: "voice muted",
+      label: "",
       title:
         "Local voice is muted for this session; voice setup is ready. Subtitles stay visible.",
     });
@@ -99,7 +99,7 @@ describe("voice readiness badge", () => {
       ),
     ).toMatchObject({
       state: "warn",
-      label: "voice missing",
+      label: "",
     });
   });
 
@@ -120,7 +120,7 @@ describe("voice readiness badge", () => {
       ),
     ).toMatchObject({
       state: "fault",
-      label: "voice manual",
+      label: "",
     });
   });
 
@@ -143,7 +143,7 @@ describe("voice readiness badge", () => {
       ),
     ).toMatchObject({
       state: "warn",
-      label: "voice muted",
+      label: "",
       title:
         "Local voice is muted for this session; voice setup is missing, missing 1 item. Subtitles stay visible.",
     });
@@ -177,14 +177,14 @@ describe("voice readiness badge", () => {
     expect(footer.querySelector(".footer-separator")).toBeTruthy();
     expect(handle.element.tagName).toBe("BUTTON");
     expect(handle.element.dataset.state).toBe("warn");
-    expect(handle.element.textContent).toBe("voice missing");
+    expect(handle.element.textContent).toBe("");
     expect(onOpenViber).toHaveBeenCalledOnce();
     handle.setVoiceStatus("muted");
     expect(handle.element.dataset.state).toBe("warn");
-    expect(handle.element.textContent).toBe("voice muted");
+    expect(handle.element.textContent).toBe("");
     handle.setVoiceStatus("ok");
     expect(handle.element.dataset.state).toBe("warn");
-    expect(handle.element.textContent).toBe("voice missing");
+    expect(handle.element.textContent).toBe("");
     handle.teardown();
     expect(footer.querySelector(".voice-readiness-badge")).toBeNull();
   });

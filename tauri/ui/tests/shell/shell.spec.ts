@@ -200,7 +200,7 @@ describe("DesktopShell", () => {
     expect(footer.getAttribute("title")).toContain("co-host cannot speak");
 
     shell.store.setActiveSurface("learn");
-    expect(label.textContent).toBe("learn local");
+    expect(label.textContent).toBe("");
     expect(footer.dataset.surface).toBe("learn");
     expect(footer.getAttribute("title")).toContain("on-screen practice");
 
@@ -212,16 +212,16 @@ describe("DesktopShell", () => {
     expect(label.textContent).toBe("co-host reconnecting");
 
     shell.store.setActiveSurface("learn");
-    expect(label.textContent).toBe("learn local");
+    expect(label.textContent).toBe("");
     expect(footer.getAttribute("title")).toContain("subtitles");
 
     shell.store.setConnection("connected");
     expect(footer.dataset.conn).toBe("connected");
-    expect(label.textContent).toBe("learn local");
+    expect(label.textContent).toBe("");
     expect(footer.getAttribute("title")).toContain("Learn status bar");
 
     shell.store.setActiveSurface("viber");
-    expect(label.textContent).toBe("viber local");
+    expect(label.textContent).toBe("");
     expect(footer.getAttribute("title")).toContain("local library");
 
     shell.store.setActiveSurface("deck");
