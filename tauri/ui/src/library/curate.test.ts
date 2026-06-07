@@ -134,6 +134,7 @@ function doMockApi(): void {
  *  here means mountLibrary wires + paints exactly as in the real window. */
 function mountSkeleton(): void {
   document.body.dataset.mode = "chat";
+  document.body.dataset.allowToolModes = "true";
   document.body.innerHTML = `
     <div class="vmx-lib-modeswitch">
       <button data-mode="search" aria-selected="false">Search</button>

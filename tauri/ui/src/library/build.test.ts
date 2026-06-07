@@ -363,6 +363,7 @@ function doMockApi(): void {
 /** Full library.html DOM skeleton (the ids/attrs index.ts queries for build). */
 function mountSkeleton(): void {
   document.body.dataset.mode = "chat";
+  document.body.dataset.allowToolModes = "true";
   document.body.innerHTML = `
     <div class="vmx-lib-app" data-auto-build-on-landing="true">
     <div class="vmx-lib-modeswitch">

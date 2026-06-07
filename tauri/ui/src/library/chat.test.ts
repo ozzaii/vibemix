@@ -481,8 +481,14 @@ function doMockApi(): void {
   });
 }
 
-function mountSkeleton(): void {
+interface MountChatOptions {
+  allowToolModes?: boolean;
+}
+
+function mountSkeleton(options: MountChatOptions = {}): void {
   document.body.dataset.mode = "chat";
+  if (options.allowToolModes) document.body.dataset.allowToolModes = "true";
+  else delete document.body.dataset.allowToolModes;
   document.body.innerHTML = `
     <div class="vmx-lib-modeswitch">
       <button data-mode="search" aria-selected="false">Search</button>
@@ -560,11 +566,11 @@ function mountSkeleton(): void {
     <svg id="vmx-lib-scope"></svg>`;
 }
 
-async function mountChat(): Promise<void> {
+async function mountChat(options: MountChatOptions = {}): Promise<void> {
   vi.resetModules();
   doMockApi();
   const { mountLibrary } = await import("./index.js");
-  mountSkeleton();
+  mountSkeleton(options);
   mountLibrary();
   for (let i = 0; i < 6; i++) await Promise.resolve();
 }
@@ -649,6 +655,33 @@ describe("chat - real runChat path", () => {
     );
   });
 
+  it("keeps stale tool-mode tabs from taking over the production Viber surface", async () => {
+    await mountChat();
+
+    const buildTab = document.querySelector<HTMLButtonElement>(
+      '.vmx-lib-modeswitch button[data-mode="build"]',
+    );
+    const musicTab = document.querySelector<HTMLButtonElement>(
+      '.vmx-lib-modeswitch button[data-mode="ingest"]',
+    );
+    expect(buildTab?.hidden).toBe(true);
+    expect(musicTab?.hidden).toBe(true);
+
+    buildTab?.click();
+    musicTab?.click();
+    for (let i = 0; i < 6; i++) await Promise.resolve();
+
+    expect(document.body.dataset.mode).toBe("chat");
+    expect(document.getElementById("vmx-lib-center-label")?.textContent).toBe(
+      "Viber",
+    );
+    expect(document.getElementById("vmx-lib-runbtn")?.textContent).toBe("Send");
+    expect(importMock).not.toHaveBeenCalled();
+    expect(document.getElementById("vmx-lib-rationale-body")?.textContent).not.toBe(
+      "No set built yet.",
+    );
+  });
+
   it("does not turn live deck readiness into a permanent chat cockpit", async () => {
     await mountChat();
 
@@ -709,7 +742,9 @@ describe("chat - real runChat path", () => {
     expect(emitIpcMock).not.toHaveBeenCalled();
   });
 
-  it("routes the add-music starter into ingest without starting indexing", async () => {
+  it("routes the add-music starter through the chat folder picker", async () => {
+    const picked = "/Users/kaan/Music/PSYMIND";
+    dialogOpenMock.mockResolvedValueOnce(picked);
     await mountChat();
 
     const addMusic = document.querySelector<HTMLButtonElement>(
@@ -717,25 +752,26 @@ describe("chat - real runChat path", () => {
     );
     expect(addMusic).not.toBeNull();
     addMusic?.click();
-    for (let i = 0; i < 4; i++) await Promise.resolve();
+    await new Promise((resolve) => setTimeout(resolve, 0));
 
-    expect(document.body.dataset.mode).toBe("ingest");
-    expect(
-      document
-        .querySelector<HTMLButtonElement>(
-          '.vmx-lib-modeswitch button[data-mode="ingest"]',
-        )
-        ?.getAttribute("aria-selected"),
-    ).toBe("true");
+    expect(document.body.dataset.mode).toBe("chat");
+    expect(dialogOpenMock).toHaveBeenCalledWith(
+      expect.objectContaining({ directory: true, multiple: false }),
+    );
     expect(document.getElementById("vmx-lib-center-label")?.textContent).toBe(
-      "Music",
+      "Viber",
     );
     expect(document.getElementById("vmx-lib-runbtn")?.textContent).toBe(
-      "▸ Index folder",
+      "Send",
     );
     expect(embedFolderMock).not.toHaveBeenCalled();
-    expect(importMock).not.toHaveBeenCalled();
-    expect(document.activeElement).toBe(document.getElementById("vmx-lib-folder"));
+    expect(importMock).toHaveBeenCalledWith(picked);
+    expect(
+      (document.getElementById("vmx-lib-folder") as HTMLInputElement).value,
+    ).toBe(picked);
+    expect(document.getElementById("vmx-lib-chat-thread")?.textContent).toContain(
+      `Indexing ${picked}`,
+    );
   });
 
   it("fills the music folder from the native Browse picker (F7)", async () => {
@@ -768,7 +804,7 @@ describe("chat - real runChat path", () => {
         "library.import failed: FileNotFoundError: '/missing' is not a directory.",
       ),
     );
-    await mountChat();
+    await mountChat({ allowToolModes: true });
 
     document.querySelector<HTMLButtonElement>('[data-mode-jump="ingest"]')?.click();
     for (let i = 0; i < 4; i++) await Promise.resolve();
@@ -801,7 +837,7 @@ describe("chat - real runChat path", () => {
         "library.import failed: VIBEMIX_CLAP_ONNX_DIR is not configured.",
       ),
     );
-    await mountChat();
+    await mountChat({ allowToolModes: true });
 
     document.querySelector<HTMLButtonElement>('[data-mode-jump="ingest"]')?.click();
     for (let i = 0; i < 4; i++) await Promise.resolve();
@@ -820,7 +856,7 @@ describe("chat - real runChat path", () => {
 
   it("surfaces a cached import receipt instead of a vague done state", async () => {
     importMock.mockResolvedValueOnce(true);
-    await mountChat();
+    await mountChat({ allowToolModes: true });
 
     document.querySelector<HTMLButtonElement>('[data-mode-jump="ingest"]')?.click();
     for (let i = 0; i < 4; i++) await Promise.resolve();
@@ -853,7 +889,7 @@ describe("chat - real runChat path", () => {
 
   it("sends a real import cancel and keeps the cancelled receipt visible", async () => {
     importMock.mockResolvedValueOnce(true);
-    await mountChat();
+    await mountChat({ allowToolModes: true });
 
     document.querySelector<HTMLButtonElement>('[data-mode-jump="ingest"]')?.click();
     for (let i = 0; i < 4; i++) await Promise.resolve();
@@ -2026,7 +2062,7 @@ describe("chat - real runChat path", () => {
         }),
     );
 
-    await mountChat();
+    await mountChat({ allowToolModes: true });
     const input = document.getElementById(
       "vmx-lib-chat",
     ) as HTMLTextAreaElement;

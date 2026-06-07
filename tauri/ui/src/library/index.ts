@@ -2494,6 +2494,14 @@ export function mountLibrary(root: ParentNode = document): void {
   const seedNameEl = $("vmx-lib-seed-name");
   const chatThread = $("vmx-lib-chat-thread");
   const chatHistory: LibraryChatTurn[] = [];
+  const appRoot = runBtn.closest<HTMLElement>(".vmx-lib-app");
+  const toolModesAllowed =
+    appRoot?.dataset.allowToolModes === "true" ||
+    (root instanceof Document && document.body.dataset.allowToolModes === "true");
+
+  function visibleMode(mode: LibraryMode): LibraryMode {
+    return toolModesAllowed || mode === "chat" ? mode : "chat";
+  }
 
   // restore initial field values from state
   qInput.value = state.query;
@@ -2505,12 +2513,16 @@ export function mountLibrary(root: ParentNode = document): void {
   seedNameEl.textContent = state.seed;
 
   function applyModeVisibility(): void {
-    const app = runBtn.closest<HTMLElement>(".vmx-lib-app");
-    app?.setAttribute("data-mode", state.mode);
+    appRoot?.setAttribute("data-mode", state.mode);
     if (root instanceof Document) {
       document.body.dataset.mode = state.mode;
     }
     $all(".vmx-lib-modeswitch button").forEach((b) => {
+      if (!toolModesAllowed && b.dataset.mode !== "chat") {
+        b.hidden = true;
+        b.setAttribute("aria-hidden", "true");
+        b.setAttribute("tabindex", "-1");
+      }
       b.setAttribute("aria-selected", String(b.dataset.mode === state.mode));
     });
     $all("[data-for]").forEach((el) => {
@@ -2568,8 +2580,8 @@ export function mountLibrary(root: ParentNode = document): void {
   }
 
   function canAutoBuildOnLanding(stats: LibraryStats): boolean {
-    const app = runBtn.closest<HTMLElement>(".vmx-lib-app");
-    if (app?.dataset.autoBuildOnLanding !== "true") return false;
+    if (!toolModesAllowed) return false;
+    if (appRoot?.dataset.autoBuildOnLanding !== "true") return false;
     if (stats.indexed <= 0) return false;
     if (stats.backend.trim().toLowerCase() === "unavailable") return false;
     if (stats.agent_ready === false) return false;
@@ -2620,6 +2632,7 @@ export function mountLibrary(root: ParentNode = document): void {
   }
 
   function activateMode(mode: LibraryMode): void {
+    mode = visibleMode(mode);
     const previousMode = state.mode;
     if (mode !== previousMode) cancelRun();
     state = setMode(state, mode);
@@ -3072,7 +3085,7 @@ export function mountLibrary(root: ParentNode = document): void {
   $all(".vmx-lib-modeswitch button").forEach((b) => {
     b.addEventListener("click", () => {
       userSelectedMode = true;
-      activateMode(libraryModeFromDataset(b.dataset.mode) ?? "search");
+      activateMode(visibleMode(libraryModeFromDataset(b.dataset.mode) ?? "chat"));
     });
   });
 
@@ -3168,6 +3181,10 @@ export function mountLibrary(root: ParentNode = document): void {
       const mode = libraryModeFromDataset(button.dataset.modeJump);
       if (mode) {
         userSelectedMode = true;
+        if (!toolModesAllowed && mode === "ingest") {
+          void pickChatFolder();
+          return;
+        }
         activateMode(mode);
       }
     });

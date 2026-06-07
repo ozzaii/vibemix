@@ -1155,6 +1155,14 @@ body {
 }
 :is(body, .vmx-lib-app)[data-mode="chat"] .vmx-lib-frame {
   grid-template-columns: minmax(0, 1fr);
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+  overflow: visible;
+}
+:is(body, .vmx-lib-app)[data-mode="chat"] .vmx-lib-frame::before,
+:is(body, .vmx-lib-app)[data-mode="chat"] .vmx-lib-frame::after {
+  display: none;
 }
 :is(body, .vmx-lib-app)[data-mode="chat"] .vmx-lib-panel:first-child {
   position: absolute;
@@ -1278,6 +1286,11 @@ body {
 :is(body, .vmx-lib-app)[data-mode="chat"] .vmx-lib-panel:nth-child(2) {
   grid-column: 1;
   border-left: 0;
+  height: 100%;
+  min-height: 0;
+  background: transparent;
+  box-shadow: none;
+  overflow: visible;
 }
 :is(body, .vmx-lib-app)[data-mode="chat"] .vmx-lib-panel:nth-child(3) {
   display: none;
@@ -1294,6 +1307,11 @@ body {
 :is(body, .vmx-lib-app)[data-mode="chat"] .vmx-lib-panel:nth-child(2) .vmx-lib-panel-bd {
   display: flex;
   flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  padding: 0;
+  overflow: visible;
+  background: transparent;
 }
 :is(body, .vmx-lib-app)[data-mode="chat"] .vmx-lib-chat-thread {
   display: flex;
@@ -1301,6 +1319,8 @@ body {
   align-items: center;
   gap: 18px;
   flex: 1;
+  height: 100%;
+  max-height: 100%;
   min-height: 0;
   padding: clamp(26px, 4vw, 64px) clamp(20px, 4vw, 48px) clamp(142px, 18vh, 190px);
   /* A lit recessed display slab (the deck's .vmx-voice material), NOT a flat
