@@ -49,13 +49,18 @@ REF_ENV = "VIBEMIX_CHATTERBOX_REF"
 MODEL_ENV = "VIBEMIX_CHATTERBOX_MODEL"
 TEMP_ENV = "VIBEMIX_CHATTERBOX_TEMP"
 MAX_TOKENS_ENV = "VIBEMIX_CHATTERBOX_MAX_TOKENS"
+STREAM_ENV = "VIBEMIX_CHATTERBOX_STREAM"
+STREAM_INTERVAL_ENV = "VIBEMIX_CHATTERBOX_STREAM_INTERVAL"
+STREAM_SMOOTH_MS_ENV = "VIBEMIX_CHATTERBOX_STREAM_SMOOTH_MS"
 LIVE_CACHE_ONLY_ENV = "VIBEMIX_CHATTERBOX_LIVE_CACHE_ONLY"
 SYSTEM_FALLBACK_ENV = "VIBEMIX_SYSTEM_TTS_FALLBACK"
 SYSTEM_FALLBACK_VOICE_ENV = "VIBEMIX_SYSTEM_TTS_VOICE"
+PCM_CACHE_ENV = "VIBEMIX_CHATTERBOX_PCM_CACHE"
 
 _DEFAULT_MODEL = CHATTERBOX_MODEL_REPO
 _DEFAULT_TEMP = 0.4  # Kaan-locked: tags fire as SOUND (not read literally), quality holds
 _DEFAULT_STREAM_INTERVAL = 0.5  # seconds of audio per streamed chunk (low TTFT)
+_DEFAULT_STREAM_SMOOTH_MS = 20.0
 _DEFAULT_MAX_TOKENS = 96
 _PCM_CACHE_LIMIT = 8
 # Default co-host voice ref = the Kaan-locked "pranker" voice (music-stripped clip,
@@ -100,6 +105,31 @@ def configured_max_tokens() -> int:
         except ValueError:
             pass
     return _DEFAULT_MAX_TOKENS
+
+
+def configured_streaming_enabled() -> bool:
+    """Enable true Chatterbox streaming unless an operator disables it."""
+    return _env_truthy(STREAM_ENV, default=True)
+
+
+def configured_stream_interval() -> float:
+    raw = os.environ.get(STREAM_INTERVAL_ENV, "").strip()
+    if raw:
+        try:
+            return max(0.1, min(2.0, float(raw)))
+        except ValueError:
+            pass
+    return _DEFAULT_STREAM_INTERVAL
+
+
+def configured_stream_smooth_ms() -> float:
+    raw = os.environ.get(STREAM_SMOOTH_MS_ENV, "").strip()
+    if raw:
+        try:
+            return max(0.0, min(80.0, float(raw)))
+        except ValueError:
+            pass
+    return _DEFAULT_STREAM_SMOOTH_MS
 
 
 def configured_model_revision(model_name: str | None = None) -> str | None:
@@ -149,13 +179,18 @@ def _env_truthy(name: str, *, default: bool = False) -> bool:
 
 
 def live_cache_only_enabled() -> bool:
-    """True when live speech must avoid fresh MLX Chatterbox synthesis."""
+    """True only for explicit operator/debug runs that avoid fresh MLX synthesis."""
     return _env_truthy(LIVE_CACHE_ONLY_ENV)
 
 
 def system_fallback_enabled() -> bool:
-    """True when cache misses may use the local macOS speech renderer."""
+    """True only when an operator explicitly allows the macOS speech renderer."""
     return _env_truthy(SYSTEM_FALLBACK_ENV)
+
+
+def pcm_cache_enabled() -> bool:
+    """True only for explicit Chatterbox exact-text PCM cache experiments."""
+    return _env_truthy(PCM_CACHE_ENV)
 
 
 def system_fallback_available() -> bool:
@@ -165,6 +200,16 @@ def system_fallback_available() -> bool:
         and sys.platform == "darwin"
         and Path("/usr/bin/say").exists()
     )
+
+
+def system_fallback_active_for_live() -> bool:
+    """Return True when cache misses are allowed to use macOS `say`.
+
+    The system renderer is intentionally a two-flag debug mode. A single stale
+    fallback flag must not make the product voice sound like the default macOS
+    narrator during a live set.
+    """
+    return live_cache_only_enabled() and system_fallback_available()
 
 
 def chatterbox_available() -> bool:
@@ -296,8 +341,6 @@ class _ChatterboxWorkerJob:
 class _MlxChatterboxEngine(ChatterboxEngine):
     """Real engine: ``mlx-audio`` Chatterbox-Turbo, ref-conditioned once."""
 
-    buffer_before_playback = True
-
     def __init__(
         self,
         model,
@@ -305,12 +348,18 @@ class _MlxChatterboxEngine(ChatterboxEngine):
         temperature: float,
         stream_interval: float,
         max_tokens: int,
+        *,
+        streaming: bool,
+        stream_smooth_ms: float,
     ) -> None:
         self._m = model
         self._ref = ref_path
         self._temperature = temperature
         self._stream_interval = stream_interval
         self._max_tokens = max_tokens
+        self._streaming = streaming
+        self._stream_smooth_ms = stream_smooth_ms
+        self.buffer_before_playback = not streaming
         self.sample_rate = NATIVE_SR
 
     @classmethod
@@ -330,24 +379,60 @@ class _MlxChatterboxEngine(ChatterboxEngine):
         model = load_model(model_name, **kwargs)
         # One-time conditional prime: pay the ref encode once, reuse for every line.
         model.prepare_conditionals(ref_path)
-        return cls(model, ref_path, temperature, _DEFAULT_STREAM_INTERVAL, configured_max_tokens())
+        return cls(
+            model,
+            ref_path,
+            temperature,
+            configured_stream_interval(),
+            configured_max_tokens(),
+            streaming=configured_streaming_enabled(),
+            stream_smooth_ms=configured_stream_smooth_ms(),
+        )
 
     def synthesize(self, text: str, on_pcm: Callable[[bytes], None]) -> None:
         import numpy as np
 
-        # ref_audio=None reuses the primed conditional. Use the one-shot path:
-        # Turbo's stream path repeatedly runs S3Gen over partial token windows,
-        # which is slower than real time on some Macs and causes audible buffer
-        # starvation when forwarded live.
+        interp_samples = max(4, int(self.sample_rate * self._stream_smooth_ms / 1000.0))
+        interp_curve = (
+            np.cos(np.linspace(0, np.pi / 2, interp_samples, dtype=np.float32)) ** 2
+            if self._streaming and self._stream_smooth_ms > 0
+            else None
+        )
+        prev_last: float | None = None
+
+        def _smooth_stream_boundary(audio: np.ndarray) -> np.ndarray:
+            nonlocal prev_last
+            if interp_curve is None or audio.size == 0:
+                return audio
+            audio_f = audio.astype(np.float32, copy=False)
+            if prev_last is not None and audio_f.size >= interp_samples:
+                discontinuity = float(audio_f[0]) - prev_last
+                audio_f = audio_f.copy()
+                audio_f[:interp_samples] -= discontinuity * interp_curve
+            prev_last = float(audio_f[-1])
+            return audio_f
+
+        kwargs = {
+            "temperature": self._temperature,
+            "max_tokens": self._max_tokens,
+        }
+        if self._streaming:
+            kwargs["stream"] = True
+            kwargs["streaming_interval"] = self._stream_interval
+        else:
+            # Non-streaming remains available for fallback experiments.
+            kwargs["stream"] = False
+
+        # ref_audio=None reuses the primed conditional. The default path streams
+        # chunks as they are generated, then lightly smooths chunk boundaries so
+        # live playback does not wait for the full utterance.
         for seg in self._m.generate(
             text,
-            temperature=self._temperature,
-            stream=False,
-            max_tokens=self._max_tokens,
+            **kwargs,
         ):
             audio = np.asarray(seg.audio, dtype=np.float32).flatten()
             if audio.size:
-                on_pcm(pcm16_mono_le(audio))
+                on_pcm(pcm16_mono_le(_smooth_stream_boundary(audio)))
 
 
 class ChatterboxLocalTTS(agents_tts.TTS):
@@ -371,6 +456,7 @@ class ChatterboxLocalTTS(agents_tts.TTS):
         self._model_name = model_name or configured_model()
         self._model_revision = configured_model_revision(self._model_name)
         self._temperature = temperature if temperature is not None else configured_temperature()
+        self._stream_audio = configured_streaming_enabled()
         self._engine: ChatterboxEngine | None = engine
         self._engine_lock = threading.Lock()
         self._synth_lock = threading.Lock()
@@ -401,6 +487,9 @@ class ChatterboxLocalTTS(agents_tts.TTS):
     @property
     def provider(self) -> str:
         return "chatterbox-mlx"
+
+    def stream_audio_enabled(self) -> bool:
+        return self._stream_audio
 
     def _get_engine(self) -> ChatterboxEngine:
         if self._engine is not None:
@@ -471,7 +560,7 @@ class ChatterboxLocalTTS(agents_tts.TTS):
                         if on_pcm_callback is not None:
                             on_pcm_callback(pcm)
 
-                    if live_cache_only_enabled() and system_fallback_available():
+                    if system_fallback_active_for_live():
                         fallback_pcm = _system_say_pcm(job.text)
                         if fallback_pcm:
                             _on_pcm(fallback_pcm)
@@ -528,8 +617,8 @@ class ChatterboxLocalTTS(agents_tts.TTS):
         return self._engine is not None and self._prewarm_error is None
 
     def requires_live_prewarm(self) -> bool:
-        """False when live cache misses use the fast local fallback."""
-        return not (live_cache_only_enabled() and system_fallback_available())
+        """False only when explicit debug fallback will handle cache misses."""
+        return not system_fallback_active_for_live()
 
     def _speech_cache_key(self, text: str) -> str:
         return " ".join((text or "").split())
@@ -564,6 +653,8 @@ class ChatterboxLocalTTS(agents_tts.TTS):
         best-effort and does not wait; callers still pass through the normal
         linter/LiveKit path before any cached audio can reach speakers.
         """
+        if not pcm_cache_enabled():
+            return False
         cache_key = self._speech_cache_key(text)
         if not cache_key:
             return False
@@ -583,14 +674,17 @@ class ChatterboxLocalTTS(agents_tts.TTS):
     def has_cached_text(self, text: str) -> bool:
         """True when ``text`` can be spoken without a fresh MLX synth job."""
         cache_key = self._speech_cache_key(text)
-        if cache_key and live_cache_only_enabled() and system_fallback_available():
+        if cache_key and system_fallback_active_for_live():
             return True
-        return bool(cache_key and self._cached_pcm(cache_key) is not None)
+        return bool(
+            cache_key and pcm_cache_enabled() and self._cached_pcm(cache_key) is not None
+        )
 
     def synthesize_pcm(self, text: str, on_pcm: Callable[[bytes], None]) -> None:
         """Synthesize mono PCM bytes for non-LiveKit sinks."""
         with self._synth_lock:
-            cache_key = self._speech_cache_key(text)
+            cache_enabled = pcm_cache_enabled()
+            cache_key = self._speech_cache_key(text) if cache_enabled else ""
             if cache_key:
                 cached = self._cached_pcm(cache_key)
                 if cached is not None:
@@ -608,7 +702,7 @@ class ChatterboxLocalTTS(agents_tts.TTS):
                             on_pcm(pcm)
                         return
 
-            cache_chunks: list[bytes] | None = [] if cache_key else None
+            cache_chunks: list[bytes] | None = [] if cache_enabled and cache_key else None
             job = _ChatterboxWorkerJob(
                 "synth",
                 text=text,
@@ -652,8 +746,10 @@ class _ChatterboxChunkedStream(agents_tts.ChunkedStream):
         loop = asyncio.get_running_loop()
         q: asyncio.Queue[object] = asyncio.Queue()
         engine = getattr(tts, "_engine", None)
-        buffer_before_playback = bool(
-            engine is None or getattr(engine, "buffer_before_playback", False)
+        buffer_before_playback = (
+            False
+            if tts.stream_audio_enabled()
+            else bool(engine is None or getattr(engine, "buffer_before_playback", False))
         )
         pending_pcm = bytearray()
 

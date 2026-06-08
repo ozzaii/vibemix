@@ -89,6 +89,8 @@ from vibemix.state.deck_context import (
 )
 from vibemix.ui_bus import SessionCitation
 
+from .energy_read_voice import build_energy_read_voice_line
+from .move_grade_voice import build_move_grade_voice_line
 from .set_plan_voice import build_set_progress_voice_line
 from .speak_gate import decide_speak_gate, grounded_voice_payload_keys
 from .suggestion_voice import build_next_suggestion_fast_response, build_next_suggestion_voice_line
@@ -114,6 +116,11 @@ NEXT_SUGGESTION_VOICE_WAIT_S = 1.25
 NEXT_SUGGESTION_GATE_RETRY_WAIT_S = 0.35
 _BEATMATCH_GRADED_EVENT = "BEATMATCH_GRADED"
 _BEATMATCH_GRADED_RECEIPT_FRESH_S = 2.0
+_TRUTHY_ENV = frozenset({"1", "true", "yes", "on"})
+
+
+def _sven_probe_mode_enabled() -> bool:
+    return os.environ.get("VIBEMIX_SVEN_PROBE_MODE", "").strip().lower() in _TRUTHY_ENV
 
 
 def _coach_playout_timeout_s() -> float:
@@ -578,6 +585,7 @@ async def coach_loop(
     last_citation_payload_publish_at = 0.0
     mic_active_frames = 0
     mic_silence_since = 0.0
+    sven_probe_mode = _sven_probe_mode_enabled()
 
     wired = cancel_gate is not None and ttft_meter is not None and playback is not None
     citation_wired = ipc_bus is not None and citation_telemetry is not None
@@ -622,6 +630,7 @@ async def coach_loop(
         timeout_s: float,
     ) -> tuple[str, ...]:
         if ev.type not in (
+            "HEARTBEAT",
             "PHASE",
             "TRACK_CHANGE",
             "TRANSITION_OPPORTUNITY",
@@ -646,6 +655,22 @@ async def coach_loop(
                 )
                 if transition_line:
                     ev.extra["transition_verdict_voice_line"] = transition_line
+                move_grade_line = build_move_grade_voice_line(
+                    current_suggestion,
+                    event_type=ev.type,
+                    evidence_registry=evidence_registry,
+                )
+                if move_grade_line:
+                    ev.extra["move_grade_voice_line"] = move_grade_line
+            energy_line = build_energy_read_voice_line(
+                current_suggestion,
+                event_type=ev.type,
+                evidence_registry=evidence_registry,
+                state=state,
+                audio_delta_items=render_audio_delta_items(state),
+            )
+            if energy_line:
+                ev.extra["energy_read_voice_line"] = energy_line
             voice_line = build_next_suggestion_voice_line(
                 current_suggestion,
                 event_type=ev.type,
@@ -723,10 +748,32 @@ async def coach_loop(
         )
         await _handle_live_skill_credits(beatmatch_credited)
 
-        # Don't fire while a generation is in-flight
+        # Don't fire while a generation is in-flight, except in Sven probe mode
+        # where newer evidence intentionally preempts older speech so QA can
+        # collect where the chain is useful or noisy.
         if trigger_state.get("in_flight"):
             age = now - trigger_state.get("in_flight_at", 0)
-            if age > 12.0:
+            if sven_probe_mode:
+                in_flight_handle = trigger_state.get("in_flight_handle")
+                try:
+                    if in_flight_handle is not None:
+                        in_flight_handle.interrupt(force=True)
+                except Exception as exc:
+                    _tr("error", "probe_interrupt", err=str(exc))
+                if playback is not None:
+                    try:
+                        playback.clear()
+                    except Exception as exc:
+                        _tr("error", "probe_playback_clear", err=str(exc))
+                try:
+                    await agent.invalidate_cache()
+                except Exception as exc:
+                    _tr("error", "probe_cache_invalidate", err=str(exc))
+                trigger_state["in_flight"] = False
+                trigger_state["in_flight_handle"] = None
+                trigger_state["in_flight_ev"] = None
+                _tr("ai_call", "probe_preempt_in_flight", age_s=round(age, 2))
+            elif age > 12.0:
                 _safe_print(f"\n[coach] in_flight stale {age:.1f}s — clearing", file=sys.stderr)
                 trigger_state["in_flight"] = False
                 _tr("ai_call", "in_flight_stale_clear", age_s=round(age, 2))
@@ -737,12 +784,12 @@ async def coach_loop(
                 continue
 
         # Don't fire while AI is talking; honor a cooldown after it stops
-        if levels.voice > AI_TALK_THRESHOLD:
+        if not sven_probe_mode and levels.voice > AI_TALK_THRESHOLD:
             last_ai_voice_at = now
             mic_active_frames = 0
             mic_silence_since = 0.0
             continue
-        if now - last_ai_voice_at < 7.0:
+        if not sven_probe_mode and now - last_ai_voice_at < 7.0:
             mic_active_frames = 0
             mic_silence_since = 0.0
             continue
@@ -939,6 +986,7 @@ async def coach_loop(
             continue
 
         if ev.type in (
+            "HEARTBEAT",
             "PHASE",
             "TRACK_CHANGE",
             "TRANSITION_OPPORTUNITY",
@@ -964,7 +1012,7 @@ async def coach_loop(
 
         if ev.type == "TRACK_CHANGE":
             _clear_agent_speak_fingerprints(agent)
-        recent_fps = _agent_recent_speak_fingerprints(agent)
+        recent_fps = () if sven_probe_mode else _agent_recent_speak_fingerprints(agent)
         speak_gate = decide_speak_gate(
             ev,
             manual=manual,
@@ -996,7 +1044,17 @@ async def coach_loop(
                     kaan_just_spoke=kaan_just_spoke,
                     recent_fingerprints=recent_fps,
                 )
-        if not speak_gate.should_speak:
+        probe_forced = sven_probe_mode and not speak_gate.should_speak
+        if probe_forced:
+            _tr(
+                "ai_call",
+                "probe_forced_speak_gate",
+                type=ev.type,
+                verdict=speak_gate.verdict,
+                reason=speak_gate.reason,
+                worthiness=speak_gate.worthiness,
+            )
+        if not speak_gate.should_speak and not probe_forced:
             grounded_keys = grounded_voice_payload_keys(ev)
             pill_route = (
                 "live_next_pill"
@@ -1064,6 +1122,8 @@ async def coach_loop(
             event_payload["coach_grounded_keys"] = list(grounded_keys)
             event_payload["coach_speak_gate_reason"] = speak_gate.reason
             event_payload["coach_speak_gate_worthiness"] = speak_gate.worthiness
+            if probe_forced:
+                event_payload["coach_sven_probe_forced"] = True
             audio_delta_items = render_audio_delta_items(state)
             moves = ev.extra.get("moves", []) if isinstance(ev.extra, dict) else []
             context_feed_contract = render_context_feed_contract(

@@ -230,6 +230,13 @@ def _ensure_openrouter_client_dep() -> None:
 
 def _openrouter_reaction_client_from_env() -> Any | None:
     """Build the optional OpenRouter reaction brain without exposing the key."""
+    # When the operator explicitly selects direct Gemini (VIBEMIX_LLM_MODE=direct),
+    # do NOT build the OpenRouter reaction brain — direct means direct, and a present
+    # OPENROUTER_API_KEY in .env must not silently override the chosen route. The
+    # OpenRouter path remains the live brain only under the proxy/default mode (its
+    # original purpose: a fallback when the direct Gemini key was unavailable).
+    if os.environ.get("VIBEMIX_LLM_MODE", "").strip().lower() == "direct":
+        return None
     _or_key = os.environ.get("OPENROUTER_API_KEY", "").strip()
     if not _or_key:
         return None
@@ -341,8 +348,13 @@ async def _prime_live_voice_tts(
     recorder: VoiceRecorder,
     *,
     timeout_s: float | None = None,
+    synth_prime: bool = False,
 ) -> None:
-    """Warm and synth-prime Chatterbox without blocking capture or meters."""
+    """Watch Chatterbox warmup, optionally synth-prime it off the live path.
+
+    This must stay opt-in for live QA: the throwaway text synth shares the same
+    worker as real Sven speech and can otherwise steal the first audible turn.
+    """
 
     wait_until_warm = getattr(live_voice_tts, "wait_until_warm", None)
     synthesize_pcm = getattr(live_voice_tts, "synthesize_pcm", None)
@@ -353,14 +365,14 @@ async def _prime_live_voice_tts(
         warmed = await asyncio.to_thread(wait_until_warm, timeout_s)
         if not warmed:
             warm_error = getattr(live_voice_tts, "prewarm_error", None)
+            payload = {
+                "ok": False,
+                "reason": "warm_timeout",
+                "error": repr(warm_error) if warm_error is not None else None,
+                "latency_s": round(time.monotonic() - started_at, 2),
+            }
             try:
-                recorder.log_event(
-                    "chatterbox_background_prime",
-                    ok=False,
-                    reason="warm_timeout",
-                    error=repr(warm_error) if warm_error is not None else None,
-                    latency_s=round(time.monotonic() - started_at, 2),
-                )
+                recorder.log_event("chatterbox_background_warm", **payload)
             except Exception:
                 pass
             print(
@@ -369,27 +381,35 @@ async def _prime_live_voice_tts(
                 flush=True,
             )
             return
-        await asyncio.to_thread(synthesize_pcm, "Ready.", lambda _pcm: None)
+        if synth_prime:
+            await asyncio.to_thread(synthesize_pcm, "Ready.", lambda _pcm: None)
         latency_s = round(time.monotonic() - started_at, 2)
         try:
-            recorder.log_event("chatterbox_background_prime", ok=True, latency_s=latency_s)
+            recorder.log_event(
+                "chatterbox_background_prime" if synth_prime else "chatterbox_background_warm",
+                ok=True,
+                latency_s=latency_s,
+                mode="text_prime" if synth_prime else "prewarm_only",
+            )
         except Exception:
             pass
-        print(f"-> tts:   Chatterbox background primed ({latency_s:.2f}s)", flush=True)
+        action = "primed" if synth_prime else "warm"
+        print(f"-> tts:   Chatterbox background {action} ({latency_s:.2f}s)", flush=True)
     except asyncio.CancelledError:
         raise
     except Exception as exc:
         try:
             recorder.log_event(
-                "chatterbox_background_prime",
+                "chatterbox_background_warm",
                 ok=False,
                 reason="exception",
                 error=repr(exc),
                 latency_s=round(time.monotonic() - started_at, 2),
+                mode="text_prime" if synth_prime else "prewarm_only",
             )
         except Exception:
             pass
-        print(f"-> tts:   Chatterbox background prime failed: {exc!r}", file=sys.stderr, flush=True)
+        print(f"-> tts:   Chatterbox background warm failed: {exc!r}", file=sys.stderr, flush=True)
 
 
 def _build_learn_tutor_speak_audio(
@@ -1167,6 +1187,10 @@ def _input_device_env_is_explicit() -> bool:
     return bool(str(os.environ.get("VIBEMIX_INPUT_DEVICE") or "").strip())
 
 
+def _output_device_env_is_explicit() -> bool:
+    return bool(str(os.environ.get("VIBEMIX_OUTPUT_DEVICE") or "").strip())
+
+
 def _deck_vision_capture_enabled() -> bool:
     return str(os.environ.get("VIBEMIX_DECK_VISION") or "").strip().lower() in {
         "1",
@@ -1293,6 +1317,20 @@ def _passthrough_callback_factory(
     bytes_per_frame = 2 * 4  # stereo float32 = 8 bytes/frame
     voice_ratio = INPUT_SR_NATIVE // OUTPUT_SR if INPUT_SR_NATIVE % OUTPUT_SR == 0 else 0
 
+    def _upsample_voice_to_output(voice_f: np.ndarray, frames: int) -> np.ndarray:
+        if voice_ratio <= 1:
+            out = voice_f[:frames]
+        elif voice_ratio == 2 and voice_f.size > 1:
+            out = np.empty(voice_f.size * 2, dtype=np.float32)
+            out[0::2] = voice_f
+            out[1:-1:2] = (voice_f[:-1] + voice_f[1:]) * 0.5
+            out[-1] = voice_f[-1]
+        else:
+            out = np.repeat(voice_f, voice_ratio)
+        if out.size < frames:
+            out = np.pad(out, (0, frames - out.size))
+        return out[:frames]
+
     def _mix_voice(arr: np.ndarray, frames: int) -> None:
         if voice_playback is None or voice_ratio <= 0:
             return
@@ -1304,9 +1342,7 @@ def _passthrough_callback_factory(
         if voice_i16.size == 0:
             return
         voice_f = voice_i16.astype(np.float32) / 32767.0
-        voice_f = np.repeat(voice_f, voice_ratio)[:frames]
-        if voice_f.size < frames:
-            voice_f = np.pad(voice_f, (0, frames - voice_f.size))
+        voice_f = _upsample_voice_to_output(voice_f, frames)
         arr[:, 0] = np.clip(arr[:, 0] + voice_f, -1.0, 1.0)
         arr[:, 1] = np.clip(arr[:, 1] + voice_f, -1.0, 1.0)
 
@@ -1391,8 +1427,9 @@ def _apply_packaged_defaults() -> None:
         cfg = load_config()
         tts_engine = str(getattr(cfg, "tts_engine", DEFAULT_TTS_ENGINE) or DEFAULT_TTS_ENGINE)
         os.environ.setdefault("VIBEMIX_TTS_ENGINE", tts_engine)
-        os.environ.setdefault("VIBEMIX_CHATTERBOX_LIVE_CACHE_ONLY", "on")
-        os.environ.setdefault("VIBEMIX_SYSTEM_TTS_FALLBACK", "on")
+        # Do not default live speech to macOS `say`: QA/release must hear the
+        # Chatterbox reference voice on cache misses. The fast system fallback
+        # remains available only when an operator explicitly opts in.
     except Exception as exc:  # pragma: no cover - defensive boot default
         print(f"-> tts engine seed skipped: {exc!r}", file=sys.stderr)
 
@@ -1902,12 +1939,15 @@ async def main() -> None:
     # Only fail when the machine has NO audio output at all — a different fault
     # than a missing BlackHole, so we do NOT print the BlackHole hint here.
     _persisted_output_idx: int | None = None
-    try:
-        _raw_out = _boot_settings_config.output_device_id
-        if _raw_out is not None and str(_raw_out).strip() != "":
-            _persisted_output_idx = int(_raw_out)
-    except Exception:
-        _persisted_output_idx = None
+    if _output_device_env_is_explicit():
+        print("-> output: VIBEMIX_OUTPUT_DEVICE overrides persisted output_device_id")
+    else:
+        try:
+            _raw_out = _boot_settings_config.output_device_id
+            if _raw_out is not None and str(_raw_out).strip() != "":
+                _persisted_output_idx = int(_raw_out)
+        except Exception:
+            _persisted_output_idx = None
     try:
         output_idx = audio_backend.find_output_device(_persisted_output_idx, OUTPUT_DEVICE)
     except RuntimeError as e:
@@ -2397,10 +2437,21 @@ async def main() -> None:
                             "-> tts:   Chatterbox warming in background; capture is not waiting",
                             flush=True,
                         )
+                    synth_text_prime = _env_truthy("VIBEMIX_CHATTERBOX_TEXT_PRIME")
                     prime_task = asyncio.create_task(
-                        _prime_live_voice_tts(live_voice_tts, recorder, timeout_s=None)
+                        _prime_live_voice_tts(
+                            live_voice_tts,
+                            recorder,
+                            timeout_s=None,
+                            synth_prime=synth_text_prime,
+                        )
                     )
                     cleanup_tasks.append(prime_task)
+                    if not synth_text_prime:
+                        print(
+                            "-> tts:   Chatterbox text prime disabled; watching warmup only",
+                            flush=True,
+                        )
                 elif not should_prewarm:
                     print("-> tts:   live Chatterbox cache misses use local system voice")
 
@@ -2552,11 +2603,22 @@ async def main() -> None:
                 session.output.set_audio_enabled(False)
                 print("-> AI voice output muted (no local TTS); stream not opened")
             else:
+                from vibemix.agent.chatterbox_tts import (
+                    configured_streaming_enabled as _cfg_streaming,
+                )
+
+                # Streaming-to-playback: when Chatterbox streams chunks
+                # (VIBEMIX_CHATTERBOX_STREAM, default on), push each frame to the live
+                # PlaybackQueue as it arrives so voice_playback_started fires on frame #1
+                # and first audio lands after the first ~0.5s chunk — instead of
+                # accumulating the whole utterance and releasing it at flush() (which
+                # held first-audio for the full ~2.5s synth). VIBEMIX_CHATTERBOX_STREAM=0
+                # reverts to the buffered, stutter-immune path with no other change.
                 session.output.audio = PlaybackQueueAudioOutput(
                     playback,
                     recorder,
                     sample_rate=OUTPUT_SR,
-                    buffer_segments=True,
+                    buffer_segments=not _cfg_streaming(),
                 )
                 if learn_voice_stream is not None:
                     try:
@@ -2577,7 +2639,7 @@ async def main() -> None:
                 output_idx,
                 sample_rate=INPUT_SR_NATIVE,
                 channels=2,
-                block_size=OUTPUT_BLOCKSIZE,
+                block_size=VOICE_BLOCKSIZE if _sven_qa_mode_enabled() else OUTPUT_BLOCKSIZE,
                 callback=_passthrough_callback_factory(
                     passthrough,
                     playback if not voice_muted else None,

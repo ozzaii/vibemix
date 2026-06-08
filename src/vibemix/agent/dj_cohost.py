@@ -3428,13 +3428,18 @@ class DJCoHostAgent(Agent):
                     f"\n[direct {ev_tag} #{invoke_n:04d}] grounded next-suggestion "
                     f"linter={linter_state} dump={invoke_dir.name}"
                 )
-            live_claim_defer_stream = should_defer_live_claim_stream(
-                live_claim_state,
-                live_claim_moves,
-                audio_capture_context=prompt_audio_capture_context,
-                audio_delta_items=live_claim_audio_delta,
-                deck_audio_parts_attached=deck_audio_parts_attached,
-                event_type=ev_tag,
+            anti_slop_runtime_enabled = _anti_slop_runtime_enabled()
+            live_claim_defer_stream = (
+                should_defer_live_claim_stream(
+                    live_claim_state,
+                    live_claim_moves,
+                    audio_capture_context=prompt_audio_capture_context,
+                    audio_delta_items=live_claim_audio_delta,
+                    deck_audio_parts_attached=deck_audio_parts_attached,
+                    event_type=ev_tag,
+                )
+                if anti_slop_runtime_enabled
+                else False
             )
 
             # === Chunk-by-chunk streaming pipe-through ===
@@ -3598,20 +3603,30 @@ class DJCoHostAgent(Agent):
                     print(txt, end="", flush=True)
                     full_text += txt
                     buffered_chunks.append(txt)
-                    source_detail_risky = has_unsupported_audio_source_detail_claim(
-                        full_text, live_claim_state, event_type=ev_tag
-                    ) or (
-                        not head_yielded
-                        and has_unsupported_audio_source_detail_mention(
-                            full_text,
-                            live_claim_state,
-                            event_type=ev_tag,
+                    source_detail_risky = (
+                        anti_slop_runtime_enabled
+                        and (
+                            has_unsupported_audio_source_detail_claim(
+                                full_text, live_claim_state, event_type=ev_tag
+                            )
+                            or (
+                                not head_yielded
+                                and has_unsupported_audio_source_detail_mention(
+                                    full_text,
+                                    live_claim_state,
+                                    event_type=ev_tag,
+                                )
+                            )
                         )
                     )
-                    advice_risky = not live_claim_moves and has_unsupported_no_move_coaching_advice(
-                        full_text
+                    advice_risky = (
+                        anti_slop_runtime_enabled
+                        and not live_claim_moves
+                        and has_unsupported_no_move_coaching_advice(full_text)
                     )
                     band_intensity_risky = (
+                        anti_slop_runtime_enabled
+                        and (
                         _unsupported_band_intensity_reason(
                             full_text,
                             live_claim_state,
@@ -3619,16 +3634,20 @@ class DJCoHostAgent(Agent):
                             event_type=ev_tag,
                         )
                         is not None
+                        )
                     )
-                    claim_guard_risky = should_defer_live_claim_text(
-                        full_text,
-                        live_claim_state,
-                        live_claim_moves,
-                        audio_capture_context=prompt_audio_capture_context,
-                        audio_delta_items=live_claim_audio_delta,
-                        deck_audio_parts_attached=deck_audio_parts_attached,
-                        judge_evidence_line=judge_evidence_line,
-                        event_type=ev_tag,
+                    claim_guard_risky = (
+                        anti_slop_runtime_enabled
+                        and should_defer_live_claim_text(
+                            full_text,
+                            live_claim_state,
+                            live_claim_moves,
+                            audio_capture_context=prompt_audio_capture_context,
+                            audio_delta_items=live_claim_audio_delta,
+                            deck_audio_parts_attached=deck_audio_parts_attached,
+                            judge_evidence_line=judge_evidence_line,
+                            event_type=ev_tag,
+                        )
                     )
                     if (
                         source_detail_risky
@@ -3886,7 +3905,7 @@ class DJCoHostAgent(Agent):
             # ---- Silence + slop gate (Phase 10) ----
             suppression: str | None = None
             slop_matches: list[str] = []
-            if _anti_slop_runtime_enabled():
+            if anti_slop_runtime_enabled:
                 if option_scaffold_suppressed:
                     suppression = "option_scaffold"
                 elif line_scaffold_suppressed:
@@ -3954,7 +3973,7 @@ class DJCoHostAgent(Agent):
 
             live_claim_guard = None
             raw_live_claim_text: str | None = None
-            if suppression is None:
+            if suppression is None and anti_slop_runtime_enabled:
                 try:
                     live_claim_guard = apply_live_claim_guard(
                         full_text,

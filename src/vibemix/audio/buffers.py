@@ -342,6 +342,7 @@ class PlaybackQueue:
 
     def __init__(self, levels: Levels) -> None:
         self._buffer = bytearray()
+        self._read_offset = 0
         self._lock = threading.Lock()
         self._levels = levels
 
@@ -352,7 +353,12 @@ class PlaybackQueue:
         under our lock, then update_voice without it) is preserved so
         the mic-gate sees the level update within one callback (v4:509-512).
         """
+        if not pcm:
+            return
         with self._lock:
+            if self._read_offset and self._read_offset >= len(self._buffer):
+                self._buffer.clear()
+                self._read_offset = 0
             self._buffer.extend(pcm)
         self._levels.update_voice(pcm)
 
@@ -362,11 +368,23 @@ class PlaybackQueue:
         Zero-pads on partial-fill (caller never branches on length).
         """
         with self._lock:
-            if not self._buffer:
+            available = len(self._buffer) - self._read_offset
+            if available <= 0:
+                self._buffer.clear()
+                self._read_offset = 0
                 self._levels.decay_voice()
                 return b"\x00" * n_bytes
-            chunk = bytes(self._buffer[:n_bytes])
-            del self._buffer[:n_bytes]
+            take = min(n_bytes, available)
+            start = self._read_offset
+            end = start + take
+            chunk = bytes(self._buffer[start:end])
+            self._read_offset = end
+            if self._read_offset >= len(self._buffer):
+                self._buffer.clear()
+                self._read_offset = 0
+            elif self._read_offset > 65536 and self._read_offset * 2 > len(self._buffer):
+                del self._buffer[: self._read_offset]
+                self._read_offset = 0
             if len(chunk) < n_bytes:
                 chunk += b"\x00" * (n_bytes - len(chunk))
             return chunk
@@ -377,5 +395,6 @@ class PlaybackQueue:
         instead of finishing. Decay voice level on the same tick so the
         mic-gate releases promptly."""
         with self._lock:
-            self._buffer = bytearray()
+            self._buffer.clear()
+            self._read_offset = 0
         self._levels.decay_voice()

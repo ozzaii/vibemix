@@ -36,6 +36,7 @@ import json
 import logging
 import os
 import re
+import shlex
 import shutil
 import sqlite3
 import subprocess
@@ -177,6 +178,11 @@ BUILD_SET_TIMEOUT_S = 180.0
 _MCP_STARTUP_TIMEOUT_S = 15
 _MCP_TOOL_TIMEOUT_S = 120
 _CODEX_PRE_TOOL_TIMEOUT_S = 45.0
+_REKORDBOX_MCP_STARTUP_TIMEOUT_S = 30
+_REKORDBOX_MCP_TOOL_TIMEOUT_S = 120
+_NUCLEAR_MCP_STARTUP_TIMEOUT_S = 30
+_NUCLEAR_MCP_TOOL_TIMEOUT_S = 120
+_NUCLEAR_MCP_DEFAULT_URL = "http://127.0.0.1:8800/mcp"
 
 _FALLBACK_CURVES: frozenset[str] = frozenset(
     {"opener", "peak_time", "after_hours", "festival"}
@@ -199,6 +205,37 @@ _BPM_RANGE_RE = re.compile(
 # Substrings in Codex stderr that mean "not authenticated" rather than a
 # genuine runtime error — used to surface the actionable `codex login` hint.
 _AUTH_HINTS = ("login", "log in", "auth", "sign in", "not authenticated", "401")
+
+_REKORDBOX_MCP_RULES = (
+    "REKORDBOX MCP (when tools are present): use it fully for local Rekordbox "
+    "database power — search_tracks, get_track_details, get_most_played_tracks, "
+    "get_top_rated_tracks, get_playlists, get_playlist_tracks, "
+    "get_history_sessions, get_session_tracks, get_recent_sessions, "
+    "search_history_sessions, get_history_stats, analyze_library, and "
+    "get_library_stats are strong taste/history/context signals. Use them "
+    "when the DJ asks about what they actually play, ratings, performance "
+    "history, playlists, or Rekordbox-side metadata. Mutation tools "
+    "(create/add/remove/delete/import/cleanup/remove_broken_tracks) are allowed "
+    "only when the DJ explicitly asks to change Rekordbox; then execute the "
+    "requested write and report the concrete result. For Vibemix-native set "
+    "prep/export, keep using Vibemix discover_pool / sequence_set / export_set "
+    "unless the DJ specifically asks for a direct Rekordbox database mutation.\n"
+)
+_NUCLEAR_MCP_RULES = (
+    "NUCLEAR MCP (when tools are present): use it fully for the local Nuclear "
+    "music player. First discover the surface with list_methods / "
+    "method_details, then call methods through the call tool. Strong domains: "
+    "Metadata.search for streaming/provider search, Dashboard.fetchTopTracks / "
+    "fetchTopArtists / fetchTopAlbums / fetchNewReleases for discovery, "
+    "Queue.getQueue / addToQueue / addNext / clearQueue for queue control, "
+    "Playback.play / pause / stop / toggle / seekTo / setVolume for playback, "
+    "Favorites.* for saved taste, Playlists.* for Nuclear playlists, and "
+    "Providers.list / get for active provider context. When the DJ asks to "
+    "hear, preview, queue, play, pause, save, or build from online music "
+    "sources, use Nuclear directly and report the concrete player result. "
+    "Destructive actions such as clearing the queue or deleting playlists are "
+    "allowed only when the DJ explicitly asks for that exact change.\n"
+)
 
 # Finder/Dock-launched macOS apps usually do not inherit the user's shell PATH,
 # so Homebrew/npm-installed Codex can be invisible to shutil.which("codex").
@@ -244,6 +281,8 @@ _NODE_GLOB_CANDIDATES = (
 # ``__getattr__`` so attribute access stays a plain string.
 _RULES_BLOCK = (
     "Use ONLY the provided tools.\n"
+    f"{_REKORDBOX_MCP_RULES}"
+    f"{_NUCLEAR_MCP_RULES}"
     "RULES (non-negotiable):\n"
     "1. You may ONLY put a track in a playlist if a prior search_vibe call "
     "returned its track_id in THIS run. Never invent a track_id, title, "
@@ -466,6 +505,102 @@ def build_prompt(theme: str) -> str:
     return f"{_system_prompt()}\n\nTheme: {theme.strip()}"
 
 
+def _env_truthy(name: str) -> bool:
+    return os.environ.get(name, "").strip().lower() not in {"", "0", "false", "no", "off"}
+
+
+def _split_env_args(raw: str) -> list[str]:
+    raw = raw.strip()
+    if not raw:
+        return []
+    try:
+        parsed = json.loads(raw)
+    except json.JSONDecodeError:
+        return shlex.split(raw)
+    if isinstance(parsed, list) and all(isinstance(item, str) for item in parsed):
+        return list(parsed)
+    return shlex.split(raw)
+
+
+def _common_uv_candidates() -> tuple[str, ...]:
+    return (
+        "uv",
+        "/opt/homebrew/bin/uv",
+        "/usr/local/bin/uv",
+        "~/.local/bin/uv",
+        "~/.cargo/bin/uv",
+    )
+
+
+def _find_uv() -> str | None:
+    found = shutil.which("uv")
+    if found:
+        return found
+    for raw in _common_uv_candidates()[1:]:
+        path = Path(raw).expanduser()
+        if path.exists() and os.access(path, os.X_OK):
+            return str(path)
+    return None
+
+
+def _default_rekordbox_mcp_repo() -> Path:
+    return Path.home() / ".cache" / "vibemix" / "rekordbox-mcp"
+
+
+def _rekordbox_mcp_config_from_env() -> tuple[str, list[str]] | None:
+    """Return the optional full-power Rekordbox MCP command for local Viber.
+
+    Env contract:
+    - ``VIBEMIX_REKORDBOX_MCP=1`` enables the second MCP server.
+    - ``VIBEMIX_REKORDBOX_MCP_COMMAND`` / ``..._ARGS`` override the spawn.
+    - otherwise, prefer a ``rekordbox-mcp`` binary on PATH, then a cloned repo
+      at ``~/.cache/vibemix/rekordbox-mcp`` (or ``..._CWD``) launched via uv.
+    """
+    if not (
+        _env_truthy("VIBEMIX_REKORDBOX_MCP")
+        or _env_truthy("VIBEMIX_REKORDBOX_MCP_ENABLED")
+    ):
+        return None
+
+    command = os.environ.get("VIBEMIX_REKORDBOX_MCP_COMMAND", "").strip()
+    raw_args = os.environ.get("VIBEMIX_REKORDBOX_MCP_ARGS", "")
+    if command:
+        return command, _split_env_args(raw_args)
+
+    binary = shutil.which("rekordbox-mcp")
+    if binary:
+        return binary, _split_env_args(raw_args)
+
+    cwd_raw = os.environ.get("VIBEMIX_REKORDBOX_MCP_CWD", "").strip()
+    repo = Path(cwd_raw).expanduser() if cwd_raw else _default_rekordbox_mcp_repo()
+    uv = _find_uv()
+    if uv and repo.exists():
+        args = ["run", "--project", str(repo), "rekordbox-mcp"]
+        args.extend(_split_env_args(raw_args))
+        return uv, args
+
+    return None
+
+
+def _nuclear_mcp_url_from_env() -> str | None:
+    """Return the optional streamable-HTTP Nuclear MCP endpoint for local Viber.
+
+    Nuclear is a desktop player, so its MCP endpoint is normally Mac-local:
+    ``http://127.0.0.1:8800/mcp``. ``VIBEMIX_NUCLEAR_MCP_URL`` can point at an
+    SSH tunnel or another reachable host when the Viber brain is not running on
+    the same machine as Nuclear.
+    """
+    url = os.environ.get("VIBEMIX_NUCLEAR_MCP_URL", "").strip()
+    enabled = (
+        _env_truthy("VIBEMIX_NUCLEAR_MCP")
+        or _env_truthy("VIBEMIX_NUCLEAR_MCP_ENABLED")
+        or bool(url)
+    )
+    if not enabled:
+        return None
+    return url or _NUCLEAR_MCP_DEFAULT_URL
+
+
 def build_argv(
     codex_path: str,
     *,
@@ -500,7 +635,7 @@ def build_argv(
         if bypass_sandbox
         else ["--sandbox", "read-only"]
     )
-    return [
+    argv = [
         codex_path,
         "exec",
         *sandbox_args,
@@ -519,8 +654,42 @@ def build_argv(
         f"{server}.tool_timeout_sec={_MCP_TOOL_TIMEOUT_S}",
         "-c",
         f'{server}.default_tools_approval_mode="auto"',  # no-op today (upstream bug)
-        prompt,
     ]
+    rekordbox_mcp = _rekordbox_mcp_config_from_env()
+    if rekordbox_mcp is not None:
+        rb_command, rb_args = rekordbox_mcp
+        rb_server = "mcp_servers.rekordbox_mcp"
+        argv.extend(
+            [
+                "-c",
+                f"{rb_server}.command={json.dumps(rb_command)}",
+                "-c",
+                f"{rb_server}.args={json.dumps(rb_args)}",
+                "-c",
+                f"{rb_server}.startup_timeout_sec={_REKORDBOX_MCP_STARTUP_TIMEOUT_S}",
+                "-c",
+                f"{rb_server}.tool_timeout_sec={_REKORDBOX_MCP_TOOL_TIMEOUT_S}",
+                "-c",
+                f'{rb_server}.default_tools_approval_mode="auto"',
+            ]
+        )
+    nuclear_mcp_url = _nuclear_mcp_url_from_env()
+    if nuclear_mcp_url is not None:
+        nuclear_server = "mcp_servers.nuclear"
+        argv.extend(
+            [
+                "-c",
+                f"{nuclear_server}.url={json.dumps(nuclear_mcp_url)}",
+                "-c",
+                f"{nuclear_server}.startup_timeout_sec={_NUCLEAR_MCP_STARTUP_TIMEOUT_S}",
+                "-c",
+                f"{nuclear_server}.tool_timeout_sec={_NUCLEAR_MCP_TOOL_TIMEOUT_S}",
+                "-c",
+                f'{nuclear_server}.default_tools_approval_mode="auto"',
+            ]
+        )
+    argv.append(prompt)
+    return argv
 
 
 def _validate_against_library(track_ids: list[str], library: RekordboxLibrary) -> list[str]:
@@ -1144,6 +1313,8 @@ def curate_with_codex(
 _BUILD_SET_RULES = (
     "You are preparing a DJ SET (an ordered, mixable sequence), not just a "
     "playlist. Use ONLY the provided tools.\n"
+    f"{_REKORDBOX_MCP_RULES}"
+    f"{_NUCLEAR_MCP_RULES}"
     "FAST PATH: for normal set prep, use one discover_pool call, one sequence_set "
     "call over the discovered pool, choose the first/best sequence_set candidate, "
     "and one export_set call. The expected tool tape is discover_pool → "
@@ -1822,6 +1993,8 @@ _CHAT_RULES_BLOCK = (
     "You are in an ongoing CHAT with a DJ — talk like a real friend in their "
     "ear: concrete, tight, no generic AI filler. Use ONLY the provided tools to "
     "ground facts.\n"
+    f"{_REKORDBOX_MCP_RULES}"
+    f"{_NUCLEAR_MCP_RULES}"
     "RULES (non-negotiable):\n"
     "1. Only name a track that a search_vibe / discover_pool call returned THIS "
     "run. Never invent a track, title, artist, BPM, or key.\n"

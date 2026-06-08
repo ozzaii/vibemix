@@ -802,6 +802,8 @@ class AICoach:
             receipt_lines = []
             receipt_keys = []
             for key in (
+                "energy_read_voice_line",
+                "move_grade_voice_line",
                 "next_suggestion_voice_line",
                 "set_progress_voice_line",
                 "transition_verdict_voice_line",
