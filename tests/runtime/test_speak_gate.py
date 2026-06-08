@@ -202,6 +202,64 @@ def test_spectrum_narration_event_with_grounded_voice_payload_reaches_sven() -> 
     assert decision.reason == "event_priority"
 
 
+def test_gate_classifies_every_known_event_type_no_silent_slop_hole() -> None:
+    # Coverage guard for the proven lever (friend = f(should_NOT %); the gate is
+    # the only lever). Every event type the gate assigns a base worthiness to must
+    # be either GATED (silent/hold on a bare payload) or explicitly allow-listed as
+    # an intentional bare-speak (a moment grounded by detection). A NEW event type
+    # added without classification would bare-pass to speech as soon as live audio
+    # nudges worthiness over the priority floor (base 0.20 + audible 0.06 + rms 0.03
+    # = 0.29 > 0.24) -- a silent narrator-slop regression. This forces the triage.
+    from vibemix.runtime import speak_gate as g
+
+    gated = set(g._DESCRIBE_BANK_EVENT_TYPES) | set(g._PRIORITY_EVENT_REQUIRED_EXTRA_KEYS)
+    # DROP (armed by drop prediction) and KEY_CLASH (a deterministic camelot clash)
+    # are grounded by detection and are the genuine in-the-moment calls; the live-
+    # claim guard still defends an unsupported harmonic claim at the response
+    # boundary. MANUAL / KAAN_SPOKE short-circuit before worthiness, so they never
+    # carry a base worthiness.
+    bare_speak_intentional = {"DROP", "KEY_CLASH"}
+    classified = gated | bare_speak_intentional
+    unclassified = set(g._EVENT_BASE_WORTHINESS) - classified
+
+    assert unclassified == set(), (
+        f"event types with a base worthiness but no gate classification: {sorted(unclassified)} "
+        "-- gate each (describe-bank / priority-required / spectrum-narration) or add it to the "
+        "intentional bare-speak allow-list with a grounding justification"
+    )
+    # spectrum-narration only TIGHTENS priority events; it must never widen the
+    # speaking surface beyond the priority-required set.
+    assert set(g._SPECTRUM_NARRATION_EVENT_TYPES) <= set(g._PRIORITY_EVENT_REQUIRED_EXTRA_KEYS)
+
+
+def test_every_describe_bank_type_silent_on_bare_payload() -> None:
+    from vibemix.runtime import speak_gate as g
+
+    for event_type in g._DESCRIBE_BANK_EVENT_TYPES:
+        decision = decide_speak_gate(_event(event_type))
+        assert decision.verdict == "silent", event_type
+        assert decision.reason == "describe_bank_only", event_type
+
+
+def test_every_priority_required_type_holds_on_missing_payload() -> None:
+    from vibemix.runtime import speak_gate as g
+
+    for event_type in g._PRIORITY_EVENT_REQUIRED_EXTRA_KEYS:
+        decision = decide_speak_gate(_event(event_type))
+        assert decision.verdict == "hold", event_type
+        assert decision.reason == "priority_missing_payload", event_type
+
+
+def test_intentional_bare_speak_types_speak_on_bare_payload() -> None:
+    # The allow-listed grounded moments earn a line even on a bare payload.
+    for event_type in ("DROP", "KEY_CLASH"):
+        decision = decide_speak_gate(
+            _event(event_type, state_values={"audible": True, "rms": 0.12})
+        )
+        assert decision.verdict == "speak", event_type
+        assert decision.reason == "event_priority", event_type
+
+
 def test_plain_track_change_stays_silent_by_default() -> None:
     decision = decide_speak_gate(_event("TRACK_CHANGE", {"new_track": "B"}))
 
