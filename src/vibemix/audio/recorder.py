@@ -47,6 +47,26 @@ from vibemix.audio.constants import INPUT_SR_TARGET, OUTPUT_SR
 # `session_json_version` field on every session.json write.
 SESSION_JSON_VERSION = "1.0"
 _WAV_BATCH_MAX_ITEMS = 24
+
+
+def _sven_probe_capture_active() -> bool:
+    """True when this capture runs under Sven probe / QA-set mode.
+
+    Probe mode (``VIBEMIX_SVEN_PROBE_MODE`` / ``VIBEMIX_SVEN_QA_SET``) FORCES
+    gated and guard-held lines to emit so an evaluator can score them — so a
+    probe capture's spoken set is NOT the shipped spoken set. Recording it on
+    the session lets the bench refuse to report a probe capture's friend /
+    should-NOT as shipped quality (the 2026-06-08 held-reply artifact: 181
+    silenced guard substitutions were graded as spoken only because probe mode
+    forced them audible). Mirrors the runtime gate's flags
+    (``agent.dj_cohost`` / ``runtime.coach``); kept a local env read so the
+    audio layer takes no runtime dependency.
+    """
+    truthy = {"1", "true", "yes", "on"}
+    return any(
+        (os.environ.get(flag) or "").strip().lower() in truthy
+        for flag in ("VIBEMIX_SVEN_PROBE_MODE", "VIBEMIX_SVEN_QA_SET")
+    )
 _WAV_BATCH_WAIT_S = 0.05
 _WAV_BATCH_MAX_BYTES = 256 * 1024
 
@@ -297,6 +317,10 @@ class VoiceRecorder:
             "input_wav_bytes": 0,
             "events_jsonl_bytes": 0,
             "crashed": False,
+            # True when probe/QA mode forced gated + guard-held lines to emit, so
+            # this capture's spoken set is NOT the shipped spoken set. The bench
+            # reads this to refuse reporting a probe capture as shipped quality.
+            "sven_probe_mode": _sven_probe_capture_active(),
         }
         # __init__ propagates atomic-write errors — a missing session.json
         # would break the sweep on the next boot. close() suppresses (best-

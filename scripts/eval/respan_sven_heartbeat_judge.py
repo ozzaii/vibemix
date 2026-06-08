@@ -89,6 +89,41 @@ def is_silenced_guard_substitution(line: str) -> bool:
     return line.strip() in SILENCED_GUARD_SUBSTITUTIONS
 
 
+def probe_capture_status(session: Path) -> str:
+    """Return 'probe' | 'shipped' | 'unknown' for a recorded session.
+
+    Probe / QA-set mode (``VIBEMIX_SVEN_PROBE_MODE`` / ``VIBEMIX_SVEN_QA_SET``)
+    FORCES gated and guard-held lines to emit so an evaluator can score them — so
+    a probe capture's spoken set is NOT the shipped spoken set, and friend /
+    should-NOT over it reflect FORCED output, not what ships. ``session.json``
+    self-declares this via ``sven_probe_mode`` (recorder >= 2026-06-08); older
+    recordings predate the field and read 'unknown' (treat as probe-suspect — the
+    whole pre-gate corpus was forced).
+    """
+    try:
+        meta = json.loads((session / "session.json").read_text())
+    except Exception:
+        return "unknown"
+    flag = meta.get("sven_probe_mode")
+    if flag is True:
+        return "probe"
+    if flag is False:
+        return "shipped"
+    return "unknown"
+
+
+def probe_caveat(status: str) -> str | None:
+    """A loud one-line caveat when a capture's lines are not shipped speech."""
+    if status == "shipped":
+        return None
+    what = "PROBE CAPTURE" if status == "probe" else "PROBE-STATUS UNKNOWN (legacy recording)"
+    return (
+        f"!! {what}: forced/held lines were recorded as spoken. friend / "
+        "should_NOT here reflect FORCED output, NOT the shipped spoken set — do "
+        "not read these as shipped quality. Use bench_sim_gemini.py for shipped reality."
+    )
+
+
 RESPAN_BASE = "https://api.respan.ai/api"
 GATEWAY = f"{RESPAN_BASE}/chat/completions"
 LOG_ENDPOINT = f"{RESPAN_BASE}/request-logs/create"  # SDK base_url bug → call directly via httpx

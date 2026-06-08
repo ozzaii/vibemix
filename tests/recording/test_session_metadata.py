@@ -83,6 +83,7 @@ def test_voice_recorder_writes_session_json_at_init(tmp_path: Path) -> None:
             "input_wav_bytes",
             "events_jsonl_bytes",
             "crashed",
+            "sven_probe_mode",
         }
         assert set(meta.keys()) == expected_keys, (
             f"session.json keys mismatch: extras={set(meta.keys()) - expected_keys}, "
@@ -103,10 +104,27 @@ def test_voice_recorder_writes_session_json_at_init(tmp_path: Path) -> None:
         assert meta["input_wav_bytes"] == 0
         assert meta["events_jsonl_bytes"] == 0
         assert meta["crashed"] is False
+        # No probe env set in this test → shipped capture.
+        assert meta["sven_probe_mode"] is False
         # started_at_iso parses (ISO-8601 with milliseconds + tz)
         assert isinstance(meta["started_at_iso"], str)
         datetime.fromisoformat(meta["started_at_iso"])
         assert isinstance(meta["started_at_unix"], (int, float))
+    finally:
+        rec.close()
+
+
+@pytest.mark.parametrize("flag", ["VIBEMIX_SVEN_PROBE_MODE", "VIBEMIX_SVEN_QA_SET"])
+def test_session_json_records_probe_capture(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, flag: str
+) -> None:
+    """A capture launched under probe / QA-set mode self-declares it on
+    session.json so the bench can refuse to report it as shipped quality."""
+    monkeypatch.setenv(flag, "1")
+    rec = VoiceRecorder(root=tmp_path)
+    try:
+        meta = _read_session_json(rec.session_dir)
+        assert meta["sven_probe_mode"] is True
     finally:
         rec.close()
 

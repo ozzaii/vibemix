@@ -150,3 +150,25 @@ def test_load_rows_skips_guard_silenced_held_reply(tmp_path) -> None:
     rows = judge.load_rows(tmp_path, set(), None)
 
     assert [r["line"] for r in rows] == ["Let it ride four bars, then snap it back."]
+
+
+def test_probe_capture_status_reads_session_json(tmp_path) -> None:
+    def _status(meta: dict | None) -> str:
+        d = tmp_path / ("probe" + str(meta))
+        d.mkdir()
+        if meta is not None:
+            (d / "session.json").write_text(json.dumps(meta))
+        return judge.probe_capture_status(d)
+
+    assert _status({"sven_probe_mode": True}) == "probe"
+    assert _status({"sven_probe_mode": False}) == "shipped"
+    assert _status({}) == "unknown"  # legacy recording, field absent
+    assert _status(None) == "unknown"  # no session.json at all
+
+
+def test_probe_caveat_loud_for_non_shipped() -> None:
+    assert judge.probe_caveat("shipped") is None
+    for status in ("probe", "unknown"):
+        caveat = judge.probe_caveat(status)
+        assert caveat is not None
+        assert "NOT" in caveat  # loud: not the shipped spoken set
