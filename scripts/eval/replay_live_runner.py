@@ -119,6 +119,11 @@ def run_live_replay_session(
         {
             "HOME": str(home_dir),
             "VIBEMIX_DEV_SIDECAR": "1",
+            # The app arms its start gate and waits for a Start click; a headless
+            # replay has no UI, so without this it sits idle and captures zero
+            # events. VIBEMIX_AUTOSTART fires exactly one session.start so the
+            # replayed set actually drives the live graph.
+            "VIBEMIX_AUTOSTART": "1",
             "VIBEMIX_TTS_ENGINE": "off",
             "VIBEMIX_REPLAY_SESSION": str(session_dir.resolve()),
             "VIBEMIX_WS_PORT": str(ws_port),

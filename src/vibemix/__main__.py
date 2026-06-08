@@ -41,7 +41,7 @@ import sys
 import threading
 import time
 from collections import deque
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, ClassVar
@@ -299,6 +299,41 @@ def _env_truthy(name: str) -> bool:
 
 def _sven_qa_mode_enabled() -> bool:
     return _env_truthy("VIBEMIX_SVEN_PROBE_MODE") or _env_truthy("VIBEMIX_SVEN_QA_SET")
+
+
+def _autostart_enabled() -> bool:
+    """Whether to auto-fire one ``session.start`` after the start gate arms.
+
+    Opt-in via ``VIBEMIX_AUTOSTART=1`` — for headless replay/soak QA that has no
+    UI to click Start. The packaged GUI never sets it (and ``open -a`` strips the
+    env), so in production a user click stays the only activation path; the live
+    co-host never self-activates behind the operator's back.
+    """
+    return _env_truthy("VIBEMIX_AUTOSTART")
+
+
+async def _autostart_session(
+    start_fn: Callable[[], Awaitable[None]],
+    *,
+    stop_event: asyncio.Event,
+    settle_s: float = 0.5,
+) -> None:
+    """Fire exactly one ``session.start`` for headless autostart runs.
+
+    Waits a short settle so the silent prewarm can land first (cold imports
+    ready), then activates — unless the app is already tearing down. A failed
+    activation is logged and swallowed: autostart is a QA convenience and must
+    never crash the app or wedge shutdown.
+    """
+    try:
+        if settle_s > 0:
+            await asyncio.sleep(settle_s)
+        if stop_event.is_set():
+            return
+        await start_fn()
+        print("-> autostart: session.start fired (VIBEMIX_AUTOSTART=1)")
+    except Exception as exc:  # noqa: BLE001 — autostart must never take down the app
+        print(f"[autostart err] {exc!r}", file=sys.stderr)
 
 
 def _chatterbox_start_warmup_timeout_s() -> float:
@@ -3443,6 +3478,14 @@ async def main() -> None:
     _background_tasks.add(housekeeping_task)
     housekeeping_task.add_done_callback(_background_tasks.discard)
     print("-> start gate: armed (idle; capture/reactions/model load wait for Start)")
+
+    if _autostart_enabled():
+        print("-> autostart: armed (VIBEMIX_AUTOSTART=1) — firing session.start once")
+        autostart_task = asyncio.create_task(
+            _autostart_session(_start_live_session, stop_event=stop_event)
+        )
+        _background_tasks.add(autostart_task)
+        autostart_task.add_done_callback(_background_tasks.discard)
 
     try:
         await stop_event.wait()

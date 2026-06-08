@@ -113,6 +113,9 @@ def test_run_live_replay_session_sets_env_and_reports_pass(tmp_path: Path) -> No
     assert env["VIBEMIX_DEBRIEF_PORT"] == "19100"
     assert env["VIBEMIX_TTS_ENGINE"] == "off"
     assert env["VIBEMIX_OUTPUT_DEVICE"] == "BlackHole 2ch"
+    # Without this, the replayed set sits at the armed start gate forever and the
+    # run captures zero events — the runner must auto-fire one session.start.
+    assert env["VIBEMIX_AUTOSTART"] == "1"
     assert result.max_music == 0.249
     assert result.audible_seen is True
     assert result.recording_input_duration_s == 2.0
