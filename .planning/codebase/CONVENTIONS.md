@@ -1,178 +1,124 @@
 # Coding Conventions
 
-**Analysis Date:** 2026-05-11
+**Analysis Date:** 2026-06-08
+
+vibemix is a polyglot tree: Python 3.12 under `src/vibemix/` (app logic), TypeScript/Vite under `tauri/ui/` (desktop webviews), Rust under `tauri/src-tauri/` (parent process), plus vanilla JS/HTML/CSS in `mascot.html`. Conventions below are split by language; the hard cross-cutting rules (model-router, optimistic repaint, shared-git-commit, `LC_ALL=C`) are called out explicitly because they are the ones that bite.
 
 ## Naming Patterns
 
-**Files:**
-- `snake_case.py` throughout — `cohost.py`, `cohost_v2.py`, `cohost_lk.py`, `generate_bat.py`
-- Leading underscore prefix = manual smoke-test scripts not intended for automated execution: `_test_tts.py`, `_test_multimodal.py`
-- No underscore prefix = lightweight integration smoke test meant to be run: `test_voice.py`
-- `.bak` suffix for superseded snapshots kept for reference: `cohost.streaming.py.bak`
+**Python (`src/vibemix/`):**
+- Modules + functions: `snake_case` (`music_state.py`, `event_detector.py`, `next_suggestion.py`).
+- Classes: `PascalCase` (`MusicState`, `RekordboxLibrary`, `ClapEmbedder`, `ModelRouter`).
+- Module constants: `UPPER_SNAKE_CASE` (`HEARTBEAT_SEC`, `PASSTHROUGH_GAIN`, `WS_HOST`, `WS_PORT`, `BUILD_SET_TIMEOUT_S`, `TRANSCRIPT_RING_CAP`).
+- Private helpers: `_prefixed` (`_to_service_tier`, `_python_gate_check`, `_router_config._ROUTES`). The leading underscore also marks "do not import across packages."
+- Module feature flags: `_HAS_*` (`_HAS_QUARTZ`, `_HAS_PIL` in `src/vibemix/platform/_screen_macos.py`). NOTE: newer platform backends prefer a capability-probe function `is_available()` over module-level `_HAS_*` flags (`src/vibemix/platform/screen.py`, `src/vibemix/platform/_audio_macos.py` both document dropping the v4 flags) — follow `is_available()` for new platform code; `_HAS_*` survives only where a hard import-time guard is genuinely needed.
+- Long-running async tasks: `*_loop` (`live_grade_loop`, `tick_loop` in `src/vibemix/learn/runtime.py`; `run_poll_loop`, `run_capture_loop` in `src/vibemix/platform/`; `_serve_loop` in `src/vibemix/debrief/main.py`).
+- Per-OS backend modules: `_<surface>_<os>.py` (`_audio_macos.py`, `_screen_windows.py`, `_track_macos.py`) under `src/vibemix/platform/`.
 
-**Functions:**
-- `snake_case` throughout — `find_device`, `start_input_stream`, `receive_audio`, `classify_phase`, `derive_audible_deck`
-- Private helper methods use single leading underscore: `_current_gain`, `_is_session_dead`, `_knob_label`, `_write_event_locked`, `_cooldown_ok`, `_fire`
-- Async coroutines named with `_loop` suffix for long-running background tasks: `trigger_loop`, `screen_capture_loop`, `track_poll_loop`, `diag_loop`, `ws_broadcast`
-- Module-level private helpers use `_` prefix: `_HAS_VISION`, `_HAS_WS`, `_HAS_QUARTZ`
-- Inner callback functions always named `callback` (defined inside stream factory functions)
-
-**Variables:**
-- `snake_case` — `input_idx`, `levels`, `audio_buf`, `trigger_state`, `stop_event`
-- Module-level constants in `UPPER_SNAKE_CASE` — `INPUT_SR_NATIVE`, `OUTPUT_SR`, `MIC_GAIN`, `SILENT_RMS`
-- Short temporary names for local signal processing: `rms`, `arr`, `pcm`, `spec`, `freqs`
-- Loop state dicts use string keys: `state["last_trigger"]`, `trigger_state["in_flight"]`
-
-**Types / Classes:**
-- `PascalCase` for all classes — `Levels`, `AudioBuffer`, `MicBuffer`, `PassthroughBuffer`, `PlaybackQueue`, `ScreenBuffer`, `VoiceRecorder`, `TurnHistory`, `MusicState`, `EventDetector`, `AICoach`, `TrackInfo`, `ControllerState`
-- Custom exceptions use `PascalCase` with `Exception` suffix: `SessionDead`
-- Dataclass fields use `snake_case` matching the pattern of other vars
+**TypeScript (`tauri/ui/src/`):**
+- Files: `kebab-case.ts` (`cohost-model.ts`, `event-ribbon.ts`, `render-loop.ts`); component/shell classes occasionally `PascalCase.ts` (`SessionLayout.ts`, `DesktopShell.ts`, `Sidebar.ts`).
+- Test files: `*.test.ts` (co-located unit) and `*.spec.ts` (DOM/integration), `*.dom.spec.ts` for explicitly-jsdom specs.
+- Interfaces/types: `PascalCase` (`SessionState`, `MetersTriple`, `StatusFlags`, `CohostReaction`).
+- Functions: `camelCase` (`setSessionState`, `appendTranscript`, `mountSessionLayout`, `renderSessionFrame`).
+- Test-only helpers carry the `_` prefix + `ForTests` suffix (`_resetSessionStateForTests` in `tauri/ui/src/session/state.ts`).
+- IPC envelopes: dotted `ipc.<domain>.<verb>` strings (`ipc.session.snapshot`, `ipc.settings.set`, `ipc.library.import_progress`, `ipc.session.set_mode`).
 
 ## Code Style
 
-**Formatting:**
-- No formatter config file present (no `.black`, `.ruff.toml`, `pyproject.toml`)
-- Consistent 4-space indentation observed throughout
-- 79-100 char informal line length — no enforced limit
-- Blank lines between top-level defs and class methods follow PEP 8 (2 between top-level, 1 between methods)
+**Python — ruff (`[tool.ruff]` in `pyproject.toml`):**
+- `target-version = "py312"`, `line-length = 100`, `src = ["src"]`.
+- Lint select: `["E4", "E7", "E9", "F", "B", "I", "UP", "RUF"]`. `E501` (line length) is ignored — the formatter owns wrapping, not the linter.
+- `RUF001/002/003` ignored: docstrings/comments intentionally carry Turkish text, sigma notation, and DJ-math glyphs.
+- Format: `quote-style = "double"`, `indent-style = "space"`, `docstring-code-format = true`.
+- Retired POC files (`cohost*.py`, `test_voice.py`, `generate_bat.py`) are blanket-ignored via `per-file-ignores` — do not add new code there; they are scrub-gated to stay deleted anyway.
 
-**Linting:**
-- No linting config detected (no `.flake8`, `.eslintrc`, `ruff.toml`)
-- Project relies on developer discipline, not automated enforcement
+**TypeScript:**
+- `tsc --noEmit` is the type gate (run as the first half of `npm run build`). No separate ESLint/Prettier config is checked in — `tsc` strictness + vitest are the discipline.
+- Strict null handling everywhere: optional fields are typed `T | null` and explicitly defaulted in `makeDefault()` so the render loop never reads `undefined` (`tauri/ui/src/session/state.ts`).
 
-## Import Organization
+## Type Hints (Python)
 
-**Order (observed across all main files):**
-1. `from __future__ import annotations` (only in `cohost_v2.py` and `cohost_lk.py`)
-2. stdlib imports — `asyncio`, `io`, `json`, `os`, `signal`, `sys`, `threading`, `time`, `wave`
-3. third-party imports — `numpy`, `sounddevice`, `dotenv`, `google.genai`, `scipy`, `livekit`
-4. Optional imports wrapped in `try/except ImportError` blocks to allow degraded mode
+- `from __future__ import annotations` is the house rule — present in 348 of 360 `src/vibemix/` modules. Add it to the top of every new module.
+- PEP 604 unions throughout: `ServiceTier | None`, `str | None`, `asyncio.Event | None`.
+- numpy arrays typed `np.ndarray`.
+- **No enforced mypy/pyright** — hints are documentation + IDE assist, not a CI gate. pydantic is banned for model-gen (jsonschema validates the IPC boundary instead; see `pyproject.toml` comment at the `jsonschema` dep). Do not reach for a runtime type-validation framework.
 
-**Optional import guard pattern (used consistently):**
+## Async vs Sync (Python)
+
+The threading model is load-bearing — get it wrong and you race the audio callback or wedge the event loop:
+- **asyncio main loop** owns AI calls, the ws bus, and all state loops. Entry: `asyncio.run(main())` in `src/vibemix/__main__.py`.
+- **sounddevice callbacks are synchronous** and run on OS audio threads (CoreAudio / WASAPI). Never `await` inside one; never block one.
+- **The MIDI listener runs on a daemon thread** (mido is blocking).
+- **Cross-thread state crosses via `threading.Lock`** inside the buffer classes — NOT async queues across the audio/event-loop boundary.
+- **Blocking work is offloaded** with `loop.run_in_executor(...)`.
+- **Long-running coroutines are named `*_loop`** and take a `stop_event: asyncio.Event` (see Shutdown).
+- A single in-flight Gemini generation is enforced by an `in_flight` flag with a stale-age force-clear; a per-loop exception must never leave that gate stuck.
+
+## DI Over Globals (Python)
+
+- State objects are allocated in `main()` (`src/vibemix/__main__.py`) and passed explicitly down the call tree. Do not reach for module-level mutable singletons.
+- The ONLY sanctioned module-level singletons are feature flags (`_HAS_*`) and frozen config tables (`ROUTER_PATHS`, `_ROUTES`).
+- TS mirror: `tauri/ui/src/session/state.ts` holds one `currentState` singleton, but it is write-restricted — only `ws-bridge.ts` writes, the rAF render loop reads. There is no pub/sub; see the optimistic-repaint rule below.
+
+## Cooperative Shutdown (Python)
+
+- Every long-running coroutine takes `stop_event: asyncio.Event` as a cooperative stop signal (`src/vibemix/__main__.py:566`, `:2181`; `learn/runtime.py` loops). Check it in the loop body; never rely on task cancellation alone.
+- Per-resource teardown errors are caught and bracket-tagged to stderr (`[close stream err]`, `[close mic err]`, `[close recorder err]`, …) so a failing close never blocks the rest of shutdown.
+
+## The Hard Model-Router Rule (CI grep-gated)
+
+**Zero hardcoded model literals in `src/vibemix/`.** Resolve every model id through `vibemix.llm.model_router`:
+
 ```python
-try:
-    import mss
-    from PIL import Image
-    _HAS_VISION = True
-except ImportError:
-    _HAS_VISION = False
-```
-Used for: `mss`/`PIL` (screen vision), `websockets` (mascot bus), `Quartz` (macOS window bounds in `cohost_lk.py` and `cohost_v2.py`).
-
-**Path Aliases:**
-- None. All imports are absolute package names.
-
-## Error Handling
-
-**Patterns:**
-
-1. **Bare `except Exception: pass`** — used in `VoiceRecorder` write methods (`cohost.py` lines 566–596) to ensure file writes never crash the audio hot path:
-```python
-with self._lock:
-    try:
-        self.voice_wav.writeframes(pcm_bytes)
-    except Exception:
-        pass
-```
-
-2. **Catch-and-log-then-reraise** — used for session-level errors that need reconnect logic:
-```python
-except Exception as e:
-    print(f"\n[receive err] {e} — will reconnect", file=sys.stderr)
-    recorder.log_event("session_error", error=str(e))
-    raise SessionDead(str(e)) from e
+from vibemix.llm.model_router import resolve, resolve_model
+model_id, tier = resolve("agent.cohost.realtime")   # (model_id, ServiceTier | None)
+model_id = resolve_model("library.embed")            # str only, no Gemini SDK import
 ```
 
-3. **Custom exception as signal** — `SessionDead` (`cohost.py` line 440) signals that the WebSocket session is gone and the caller should reconnect. Not a catch-all; raised deliberately.
+- The single allowlisted file that may carry a literal is `src/vibemix/llm/_router_config.py` (`_ROUTES`). Add a new path there and `resolve(...)` it — never inline `"gemini-…"` in code.
+- Enforced two ways that must stay in lockstep: the bash gate `scripts/release/check_no_hardcoded_model.sh` (GitHub Actions truth, `.github/workflows/model-literal-check.yml`) and the pytest mirror `tests/repo/test_model_literal_gate.py` (cross-platform, runs in the default suite). Banned pattern set: `gemini-3-flash`, `gemini-3-pro`, `gemini-embedding-`, `gemini-3.1-flash`, `gemini-2.5-flash`, `gemini-3.1-flash-live`.
+- Scope is `src/vibemix/` only — `tests/`, `scripts/`, `docs/` may carry literals (contract canaries, eval judges).
+- `resolve(path)` raises `RouterPathError` (a `KeyError` subclass) on an unknown path and lists every valid key in the message — let it raise, do not swallow.
 
-4. **`_is_session_dead` heuristic** — string inspection on exception messages to classify WebSocket close codes (`1000`, `1006`, `1007`, `1011`, `"closed"`, `"connectionclosed"`).
+## Logging Conventions
 
-5. **`RuntimeError` for unrecoverable config errors** — device lookup failure raises `RuntimeError(f"No {kind} device matching {name_substring!r}")`.
-
-6. **`sys.exit` for missing env vars** — smoke test scripts use `os.environ.get("GEMINI_API_KEY") or sys.exit("GEMINI_API_KEY missing")`.
-
-7. **Broad `except Exception` in WS handler** — swallowed silently in the websocket client set handler to prevent one client disconnect from crashing the server.
-
-**What is NOT caught:** `KeyboardInterrupt` — main coroutine registers a `signal.SIGINT` handler, not a try/except.
-
-## Logging
-
-**Framework:** `print()` to stdout/stderr only — no `logging` module anywhere.
-
-**Patterns:**
-- Startup info uses `->` prefix: `print(f"-> listening to {name} @ {sr}Hz")`
-- Error output goes to `sys.stderr`: `print(f"[receive err] {e}", file=sys.stderr)`
-- Error prefixes use bracketed category tags: `[input status]`, `[turn err]`, `[coach err]`, `[screen err]`, `[mic status]`
-- AI transcription output uses `AI> ` prefix: `print(f"\nAI> {txt}", flush=True)`
-- Trigger events use `\n` prefix to break out of overwrite line: `print(f"\n[trigger {tag}] ...")`
-- Live diagnostic uses `\r` overwrite: `sys.stdout.write(f"\r[live] music=...")` with `sys.stdout.flush()`
-- Structured event logging via `VoiceRecorder.log_event()` to `events.jsonl` — separate from console output
+- **Startup lines** are `print(f"-> ...")` (`src/vibemix/__main__.py`: `-> brain:`, `-> tts:`, `-> env:`). Diagnostic startup lines go to stderr with `flush=True`.
+- **Errors are bracket-tagged to stderr**: `print(..., file=sys.stderr)` with a `[<area> err]` tag (`[coach err]`, `[buf push err]`, `[close … err]`). The tag names the subsystem so a stderr scan is greppable.
+- **AI reactions are NOT logged to stderr** — they broadcast to the UI over the ws bus as `transcript_delta` (and `ipc.session.cohost-reaction` with citation strips). Keep reaction text off stderr.
+- **Structured per-session events** go to `events.jsonl` (one JSON object per line) for offline analysis (bench, debrief). A loop failure logs to BOTH stderr and `events.jsonl` and never wedges the `in_flight` gate.
 
 ## Comments
 
-**When to Comment:**
-- Inline comments explain *why* a value or gate exists, not what the code does — especially for audio DSP constants and thresholds
-- Multi-line inline comments on decisions that have been deliberately changed (e.g., AI talk gate removal at `cohost.py` lines 419–422)
-- Section dividers use `# ----` or `# =====` in `cohost_v2.py` and `cohost_lk.py`
+- Explain **why**, not what — especially DSP constants and thresholds (`HEARTBEAT_SEC=180.0`, `PASSTHROUGH_GAIN=0.0`, EMA/RMS windows). A bare magic number with no rationale is off-pattern.
+- Module docstrings describe **data flow** (e.g. `model_router.py`'s docstring states the resolution rules + the off-pattern warning).
+- Comments routinely cite the Phase/Plan that introduced a line (`Phase 12 Wave 3`, `Plan 41-01`) — this is the project's change-provenance idiom; keep it when editing those lines.
+- Prose authored into the repo (docstrings, UI copy, PR text) is subject to the `stop-slop` skill (`.claude/skills/stop-slop/SKILL.md`) — its phrase list also seeds the runtime co-host filter (`src/vibemix/prompts/negative_dict.py`).
 
-**Docstrings:**
-- Module-level docstrings present in all files — describes purpose and audio/data flow with ASCII diagrams where helpful
-- Class docstrings: single-line or short multi-line describing thread safety and role — present on most classes in `cohost.py`; absent or minimal on equivalent classes in `cohost_v2.py` (they carry forward without re-documenting)
-- Method docstrings: used on non-trivial methods (`snapshot_features`, `run_one_turn`, `start_input_stream`) but not on simple accessors (`push`, `pull`, `snapshot`)
-- Async loop functions (`trigger_loop`, `receive_audio`) have docstrings describing the trigger logic and reconnect strategy
-- No Google-style, NumPy-style, or Sphinx-style formatting — plain prose only
+## Frontend Conventions (`tauri/ui/`)
 
-**Style:** `"""One-liner or short paragraph."""` — no multi-section structured docstrings.
+**Optimistic repaint — mandatory for settings controls.** `tauri/ui/src/session/state.ts::setSessionState` has NO pub/sub and the settings drawer does NOT re-render on the `ipc.settings.state` echo. A control that waits for the round-trip looks dead ("no buttons work"). Flip `data-active` locally in the click handler (mirror `picker.ts::selectOption`); the ~3ms round-trip stays authoritative and self-corrects. Every mode/mood/skill rocker in `state.ts` documents this pattern inline ("writes locally then fires the envelope").
 
-## Function Design
+**IPC codegen is required after schema edits.** After editing `tauri/ui/src/ipc/messages.schema.json`, run `npm run codegen:ipc` (`node scripts/codegen-ipc.mjs`). The ajv validator is **pre-compiled** to `tauri/ui/src/ipc/validator.generated.mjs` — stale codegen silently rejects new fields. The `ipc-wiring-checker` skill (`.claude/skills/ipc-wiring-checker/`) covers the Python↔TS boundary; the Python side validates the same `messages.schema.json` (Draft-07) via `jsonschema`.
 
-**Size:**
-- Short utility functions: 5–15 lines (`find_device`, `_knob_label`, `_cooldown_ok`)
-- Medium business logic: 20–50 lines (`run_one_turn`, `detect`, `classify_phase`, `snapshot_features`)
-- Long orchestration coroutines: `trigger_loop` (cohost.py ~120 lines), `main` (cohost_v2.py ~200 lines) — not split into sub-functions
-- Audio stream callbacks defined as inner closures inside factory functions (`start_input_stream`, `start_passthrough_stream`, `start_playback_stream`)
+**One singleton, write-restricted.** `state.ts` holds `currentState`; only `ws-bridge.ts` writes it, the rAF render loop reads it. No per-component `setInterval`/`rAF` anywhere downstream — components diff previous vs new frame and mutate CSS variables. Append paths (`appendTranscript`, `appendMidiEvents`, `appendReaction`) ring-cap (`TRANSCRIPT_RING_CAP=200`, `MIDI_EVENT_RING_CAP=12`).
 
-**Parameters:**
-- Positional for required objects, keyword-only for tuning values: `snapshot_features(self, seconds: float = 7.0)`
-- Dependency injection over globals: `Levels`, `AudioBuffer`, `PlaybackQueue` etc. are always passed explicitly
-- `stop_event: asyncio.Event` passed to every long-running coroutine as cooperative shutdown signal
+**Design discipline** is enforced by the `frontend-enforcement` skill (`.claude/skills/frontend-enforcement/SKILL.md`): retro-futurist hardware aesthetic, 20/80 accent rule, textured material surfaces, no Inter/Roboto/system-ui, no generic AI slop. UI contracts live in `mocks/` (canonical: `vibemix-rebuild-session.html`, `vibemix-direction-final.html`).
 
-**Return Values:**
-- Explicit `None` return for early exits in guard clauses
-- Dict return for feature snapshots: `snapshot_features` returns `dict` with well-defined keys
-- `bytes` / `np.ndarray` for audio data
-- `bool` from `run_one_turn` to indicate success/failure
+## Shell-Numeric Gotcha (Turkish locale)
 
-## Module Design
+This Mac is Turkish-locale. Prefix any `awk`/`printf`/`bc` output that feeds `ffmpeg -ss` or numeric tooling with `LC_ALL=C` — otherwise the locale emits comma decimals (`117,37`) that ffmpeg cannot parse and clip renders fail SILENTLY. Already applied in `scripts/dist/sign_macos.sh` and `scripts/eval/clap_retrieval.py`; carry it into any new shell that pipes a computed float into a binary.
 
-**Exports:** No `__all__` defined. Each file is a standalone runnable script, not a library.
+## Shared-Git-Commit Hazard
 
-**Barrel Files:** Not applicable — no package structure. All code is flat in the project root.
+`git commit` is shared across concurrent Claude sessions on this tree (Kaan runs 2+ in parallel). `git commit` absorbs EVERY file staged across all sessions. Before committing, verify `git diff --cached --name-only` matches your intended set. `git reset --soft HEAD~1` keeps racing; the safe atomic message-only fix is `git commit --amend -m "..."` when nothing else is staged. For a shared file already carrying another session's hunks, write a filtered patch (your hunks only) and `git apply --cached --recount` (interactive `git add -p` is unavailable here). Commit identity: `Kaan Özkan <rahipdotaci@gmail.com>`.
 
-**Configuration:** All tuning constants defined as module-level `UPPER_SNAKE_CASE` at the top of each file. Env vars loaded at module level via `load_dotenv()`.
+## Function & Module Design
 
-**Versioning pattern:** New complete-rewrite versions get new files (`cohost_v2.py`, `cohost_lk.py`) rather than in-place modification. Old versions are kept as `.bak` or just left in place.
-
-## Type Hints
-
-**Usage:**
-- All public function signatures use type hints in `cohost.py` — `find_device(name_substring: str, kind: str) -> int`
-- `cohost_v2.py` uses `from __future__ import annotations` (line 18) enabling PEP 604 union syntax (`str | None`, `bytes | None`, `dict | None`)
-- Numpy arrays typed as `np.ndarray`, never as `list`
-- Forward references use string literal form where needed: `levels: "Levels"` in `cohost.py`
-- `cohost_lk.py` class methods mostly untyped internally; public function signatures have hints
-- `@dataclass` used only in `cohost_v2.py` for `MusicState` (line 965) and `Event` (line 1119)
-- No `mypy` or `pyright` config present — hints are documentation, not enforced
-
-## Async vs Sync
-
-**Model:**
-- Main loop is `asyncio` with `asyncio.run(main())`
-- Audio I/O callbacks are synchronous (sounddevice requires it) — called from separate OS audio threads
-- Shared state (buffers, levels) uses `threading.Lock` for thread safety between audio threads and asyncio event loop
-- Blocking operations offloaded via `loop.run_in_executor(None, fn)`: screen capture, track polling
-- Long-running background tasks registered as `asyncio.create_task(...)` at startup
+- Functions stay single-purpose; private helpers `_prefixed` decompose larger flows (see `model_router.resolve` delegating to `_to_service_tier`, `resolve_model`).
+- Modules export an explicit `__all__` where the public surface matters (`model_router.py`: `["ROUTER_PATHS", "RouterPathError", "resolve", "resolve_model"]`).
+- The `intel/` subpackage is import-light by contract: no model clients, no audio capture, no Tauri, no filesystem writes — keep new musical-intelligence primitives dependency-free.
+- Every Python source file opens with `# SPDX-License-Identifier: Apache-2.0` (Apache-2.0 is the client license; `__main__.py` carries the full header).
 
 ---
 
-*Convention analysis: 2026-05-11*
+*Convention analysis: 2026-06-08*

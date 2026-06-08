@@ -1,97 +1,42 @@
-<!-- refreshed: 2026-05-11 -->
+<!-- refreshed: 2026-06-08 -->
 # Architecture
 
-**Analysis Date:** 2026-05-11
+**Analysis Date:** 2026-06-08
 
 ## System Overview
 
+vibemix is a single packaged Python app (`src/vibemix/`) driven by an async
+orchestrator, wrapped in a Tauri desktop shell (`tauri/`) that spawns the Python
+process as a **sidecar** and talks to it over ONE WebSocket bus on
+`127.0.0.1:8765` (debrief uses `8766`). The Python side listens to the master
+audio output, watches the DJ app's screen, reads MIDI, derives musical state,
+and speaks back as Sven (the live co-host).
+
 ```text
 ┌──────────────────────────────────────────────────────────────────────┐
-│                         macOS Audio Layer                            │
-│   djay Pro ──► BlackHole 2ch (virtual cable)    MacBook Pro Mic      │
-└──────────────────┬───────────────────────────────────┬──────────────┘
-                   │ 48kHz stereo float32              │ 48kHz mono float32
-                   ▼                                   ▼
+│  Tauri desktop shell  `tauri/src-tauri/` (Rust parent process)         │
+│  main window + mascot + pill + debrief + learn windows                 │
+│  TS webview UI  `tauri/ui/src/`  (shell · session · library · mascot)  │
+└───────────────────────────────┬──────────────────────────────────────┘
+                                │  ws bus  127.0.0.1:8765  (debrief 8766)
+                                │  contract: `tauri/ui/src/ipc/messages.schema.json`
+                                ▼
 ┌──────────────────────────────────────────────────────────────────────┐
-│                       Audio Capture Layer                            │
-│  sounddevice InputStream callback                                    │
-│  → PassthroughBuffer (48k stereo, muted)                             │
-│  → resample 48k→16k mono int16                                       │
-│  → MicBuffer (gate: silent during AI talk)                           │
-│  → AudioBuffer (rolling ring: 12-140s of 16k PCM)                   │
-│  → Levels (smoothed EMA RMS: music / voice / mic)                    │
-│  → VoiceRecorder.push_input() (disk: input.wav)                      │
-└───────────────┬─────────────────────────────────────────────────────┘
-                │
-    ┌───────────┴──────────────────────────────────────────────────┐
-    │                      Sensing Layer                            │
-    │  AudioBuffer.snapshot_features()  → rms, bands, onsets, BPM  │
-    │  ScreenBuffer (mss JPEG @1fps, djay Pro window crop)          │
-    │  TrackInfo (nowplaying-cli poll @1Hz → track title)           │
-    │  ControllerState (mido DDJ-FLX4 MIDI @USB → knob/fader/play) │
-    └───────────┬──────────────────────────────────────────────────┘
-                │
-                ▼ (v2 only)
+│  Python sidecar — async orchestrator                                   │
+│  `src/vibemix/__main__.py::main()`  (asyncio.run)                      │
+├──────────────┬───────────────┬───────────────┬───────────────────────┤
+│  audio/      │  platform/    │  state/ (brain)│  agent/ (Sven)        │
+│  ring buffers│  per-OS       │  MusicState +  │  LiveKit RealtimeModel│
+│  `buffers.py`│  backends     │  refresh loop  │  `dj_cohost.py`       │
+└──────┬───────┴───────┬───────┴───────┬────────┴──────────┬────────────┘
+       │ OS audio       │ daemon thread │ asyncio loops     │ asyncio
+       │ callback       │ (MIDI, mido)  │ (state/coach/ws)  │
+       ▼                ▼               ▼                   ▼
 ┌──────────────────────────────────────────────────────────────────────┐
-│             MusicState  (single source of truth — v2)                │
-│  state_refresh_loop @10Hz writes:                                    │
-│    audible (debounced), rms, bands, onset_density, bpm,              │
-│    phase (silent/low/groove/build/drop/peak/breakdown),              │
-│    phase_history, energy_curve, long_arc,                            │
-│    audible_deck (A/B/mix/none), deck_confidence,                     │
-│    audible_track + confidence, track_history, recent_moves           │
-└───────────┬──────────────────────────────────────────────────────────┘
-            │
-            ▼
-┌──────────────────────────────────────────────────────────────────────┐
-│                     Event Detection Layer                             │
-│                                                                       │
-│  cohost.py     → trigger_loop() — heuristic thresholds on Levels     │
-│  cohost_lk.py  → trigger_loop() — same + controller-aware events     │
-│  cohost_v2.py  → EventDetector.detect() + coach_loop @10Hz           │
-│                   event types: TRACK_CHANGE / PHASE / LAYER_ARRIVAL  │
-│                                MIX_MOVE / HEARTBEAT / KAAN_SPOKE     │
-└───────────┬──────────────────────────────────────────────────────────┘
-            │ one event at a time (cooldown gated, in_flight locked)
-            ▼
-┌──────────────────────────────────────────────────────────────────────┐
-│                        AI Inference Layer                             │
-│                                                                       │
-│  cohost.py:                                                           │
-│    → run_one_turn(): Gemini 3 Flash multimodal (audio+JPEG+history)  │
-│      → text reaction → Gemini 3.1 TTS → 24kHz PCM                   │
-│                                                                       │
-│  cohost_lk.py / cohost_v2.py:                                        │
-│    → session.generate_reply(instructions=prompt)                     │
-│      LiveKit RealtimeModel wraps Gemini 2.5 Flash Native Audio       │
-│      (persistent WebSocket — audio in/out simultaneously)            │
-└───────────┬──────────────────────────────────────────────────────────┘
-            │ 24kHz mono int16 PCM chunks (streaming)
-            ▼
-┌──────────────────────────────────────────────────────────────────────┐
-│                        Playback Layer                                 │
-│  PlaybackQueue (thread-safe PCM ring)                                │
-│  sounddevice RawOutputStream @24kHz → External Headphones            │
-│  Levels.update_voice() → voice RMS used to gate mic input            │
-│  VoiceRecorder.push_voice() → disk: voice.wav                        │
-└──────────────────────────────────────────────────────────────────────┘
-            │
-            ▼
-┌──────────────────────────────────────────────────────────────────────┐
-│                      Frontend Bus (mascot.html)                      │
-│  ws_broadcast() @30fps → ws://127.0.0.1:8765                         │
-│  sends: {music, voice, [mic], [audible], [deck], [phase]}            │
-│  mascot.html: canvas sprite animation reacts to music/voice RMS      │
-│  v2 also receives: {action: "trigger"} for manual fire               │
-└──────────────────────────────────────────────────────────────────────┘
-            │
-            ▼ (always)
-┌──────────────────────────────────────────────────────────────────────┐
-│                     Recording Layer (disk)                            │
-│  recordings/<YYYYMMDD-HHMMSS>/                                       │
-│    input.wav   — 16kHz mono int16 (music+mic mix sent to Gemini)     │
-│    voice.wav   — 24kHz mono int16 (Gemini AI reply PCM)              │
-│    events.jsonl — session timeline: triggers, AI text, errors        │
+│  Cross-thread state via threading.Lock in buffer classes               │
+│  audio capture → lock-protected buffers → state_refresh_loop (10Hz,    │
+│  SOLE writer of MusicState) → EventDetector → AICoach.build_prompt →    │
+│  Gemini reaction → CitationLinter gate → local MOSS TTS → ws bus → UI   │
 └──────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -99,209 +44,306 @@
 
 | Component | Responsibility | File |
 |-----------|----------------|------|
-| `Levels` | Smoothed EMA RMS for music/voice/mic; shared gating state | all variants |
-| `AudioBuffer` | Rolling 16kHz int16 PCM ring; FFT feature extraction; BPM autocorr | all variants |
-| `MicBuffer` | 200ms mic ring; auto-mutes during AI talk + hold window | all variants |
-| `PassthroughBuffer` | 48kHz stereo ring for djay→speakers path (disabled at gain=0) | all variants |
-| `PlaybackQueue` | 24kHz PCM ring fed to sounddevice output callback | all variants |
-| `ScreenBuffer` | Latest JPEG of djay Pro window; updated ~1fps by mss | cohost.py, cohost_lk.py, cohost_v2.py |
-| `TrackInfo` | nowplaying-cli poll; current + previous track title | cohost_lk.py, cohost_v2.py |
-| `ControllerState` | Live DDJ-FLX4 MIDI decode; recent moves ring (12s) | cohost_lk.py, cohost_v2.py |
-| `MusicState` | Single source of truth dataclass; written by state_refresh_loop | cohost_v2.py only |
-| `EventDetector` | Reads MusicState diffs; emits typed events with cooldowns | cohost_v2.py only |
-| `AICoach` | Builds evidence+task prompt string per event type | cohost_v2.py only |
-| `VoiceRecorder` | Writes input.wav + voice.wav + events.jsonl per session | all variants |
-| `TurnHistory` | Text-only ring of last N user+model turns for context | cohost.py only |
-| `trigger_loop` | Event detection polling loop (v1/lk approach) | cohost.py, cohost_lk.py |
-| `run_one_turn` | Stateless Gemini HTTP call: multimodal LLM → TTS (cascade) | cohost.py only |
-| `ws_broadcast` | WebSocket server @30fps; feeds mascot.html; v2 receives manual trigger | all variants |
+| Async orchestrator | Boot, activate/stop live session, wire all loops, spawn ws bus | `src/vibemix/__main__.py` (`main()`, `_activate_session`) |
+| Audio ring buffers | Lock-protected PCM buffers across the audio-thread / event-loop boundary | `src/vibemix/audio/buffers.py` |
+| Platform firewall | Typing-only Protocols; per-OS audio/screen/MIDI/track backends | `src/vibemix/platform/audio.py` (+ `_audio_macos.py`, `_audio_windows.py`) |
+| MusicState (single source of truth) | The read-only evidence snapshot every consumer grounds against | `src/vibemix/state/music_state.py` |
+| State refresh loop (SOLE writer) | 10Hz writer of MusicState from DSP features | `src/vibemix/state/refresh.py` (`state_refresh_loop`, `_tick_once`) |
+| Event detector | Emits typed events with per-type cooldowns | `src/vibemix/state/event_detector.py` (`EventDetector.detect`) |
+| Coach (prompt builder) | Builds evidence-grounded prompts per event type | `src/vibemix/state/prompt_builder.py` (`AICoach.build_prompt`) |
+| Coach loop | Drives detect→prompt→agent each tick | `src/vibemix/runtime/coach.py` (`coach_loop`) |
+| Evidence registry | Backs citation grounding (`EVIDENCE_SOURCES`) | `src/vibemix/state/evidence_registry.py` |
+| Citation linter | Response-level binary anti-slop gate | `src/vibemix/coach/citation_linter.py`, called in `agent/dj_cohost.py::llm_node` |
+| Sven agent | LiveKit `RealtimeModel` session + Gemini reaction path | `src/vibemix/agent/dj_cohost.py` (`DJCoHostAgent`) |
+| Model router | Config-driven model resolution (no hardcoded literals) | `src/vibemix/llm/model_router.py` (`resolve`) |
+| ws bus | Single `websockets.serve` on 8765; snapshot + handler routing | `src/vibemix/runtime/ws_bus.py` (`ws_broadcast`, `IpcRouterBus`) |
+| Suggestion pill | "What's next" engine + SuggestionService | `src/vibemix/runtime/suggestion.py`, `src/vibemix/library/next_suggestion.py` |
 
+## Pattern Overview
 
-## Variant Overview
+**Overall:** Single-writer reactive pipeline behind a platform-backend firewall,
+fronted by a sidecar+webview desktop shell.
 
-Three active variants exist in the repo — they are not separate modules, each is a self-contained single-file program:
-
-### `cohost.py` — Mainline (stateless HTTP cascade)
-- **Gemini strategy:** Two-call cascade per turn: `gemini-3-flash-preview` (multimodal text) → `gemini-3.1-flash-tts-preview` (TTS)
-- **Session model:** Stateless HTTP. No persistent websocket. `TurnHistory` ring maintained in Python.
-- **Audio to Gemini:** Snapshot from `AudioBuffer` (7s PCM inline in request), not streaming
-- **Vision:** Screen JPEG inline in each request
-- **Trigger detection:** `trigger_loop()` — RMS delta + level-state transitions + mic detection
-- **Entry point:** `main()` at line ~1081, `asyncio.run(main())`
-
-### `cohost_lk.py` — LiveKit variant (streaming Live API)
-- **Gemini strategy:** `gemini-2.5-flash-native-audio-preview-12-2025` via LiveKit `RealtimeModel`. Persistent WebSocket. Audio streams in continuously via `session.push_audio(rtc.AudioFrame)`. Reactions triggered via `session.generate_reply(instructions=prompt)`.
-- **Session model:** One persistent session per run. Reconnects are not implemented (relies on LiveKit stability).
-- **Audio to Gemini:** Streaming 48kHz frames pushed from sounddevice callback in real time
-- **Vision:** Screen JPEG pushed to session via `session.push_video(rtc.VideoFrame)` ~1fps
-- **Trigger detection:** `trigger_loop()` — more elaborate than v1: level bands, controller moves (significance filtered), BPM, band-shift detection, heartbeat
-- **Response handler:** `on_gen` event listener on `session.on("generation_created")`
-- **Entry point:** `main()` at line ~1670
-
-### `cohost_v2.py` — Unified state architecture (latest)
-- **Gemini strategy:** Same as lk: `gemini-2.5-flash-native-audio-preview-12-2025` via LiveKit `RealtimeModel`
-- **Architecture improvement:** Single `MusicState` dataclass replaced scattered per-function state. `state_refresh_loop` @10Hz is the only writer. `EventDetector` reads diffs to emit typed `Event` objects. `AICoach` builds event-specific prompts.
-- **Controller:** DDJ-FLX4 MIDI decode shared with lk (same `ControllerState`, `_CC_MAP`, `_NOTE_MAP`)
-- **Track confidence:** `derive_audible_track()` cross-references nowplaying-cli with MIDI deck weights; emits `(unsure)` tag when confidence < 0.6, `unknown` when not determinable
-- **Entry point:** `main()` at line ~1605
-
-### `cohost.streaming.py.bak` — Archived streaming prototype
-- Oldest version. Used `gemini-3.1-flash-live-preview` with Gemini Live API directly (no LiveKit). Audio streamed via `session.send_client_content`. Abandoned due to 1007/1008 errors and `mutable_chat_context=False` on Gemini 3.1 (blocking generate_reply pattern).
-
-## Key Architectural Patterns
-
-### Pattern: Event-gated inference
-All variants follow: **sense → detect event → snapshot context → call AI → play audio**.
-The AI is never called on a timer. Every call is gated by: (1) a detected audio/MIDI event, (2) no in-flight generation, (3) AI not currently speaking, (4) per-type cooldown elapsed.
-
-```python
-# Shared in-flight lock pattern (all variants)
-trigger_state = {"in_flight": False, "in_flight_at": float}
-
-# cohost.py / cohost_lk.py
-if trigger_state.get("in_flight"):
-    age = now - trigger_state.get("in_flight_at", 0)
-    if age > 12.0:
-        trigger_state["in_flight"] = False  # stale guard
-    else:
-        continue  # skip this tick
-```
-
-### Pattern: Feedback suppression (mic gating)
-`MicBuffer._current_gain()` returns 0.0 when `Levels.voice > AI_TALK_THRESHOLD` or within `MIC_HOLD_AFTER_AI_MS` (350ms) after AI stops talking. This prevents Gemini's own voice output (coming through speakers/headphones) from leaking back into the mic and triggering spurious reactions.
-
-### Pattern: Audio evidence grounding
-Before every AI call, `AudioBuffer.snapshot_features()` extracts cheap numpy FFT features (rms, peak, band shares, onset density). These are serialized into the prompt as `[audio_evidence: ...]` or `hearing[...]` to prevent the model from hallucinating musical events that aren't in the signal.
-
-```python
-# cohost.py style
-feat_line = f"[audio_evidence: rms={feats['rms']} ... sub={feats['sub_bass_share']} ...]"
-framed_prompt = f"[last {audio_secs:.0f}s of audio + screen]\n{feat_line}\n{prompt}"
-```
-
-### Pattern: Thread/async boundary
-Audio capture (sounddevice callbacks) runs on sounddevice's real-time thread. All Python logic including AI calls runs on the asyncio event loop. The bridge is `threading.Lock`-protected buffer classes (`push`/`pull` methods) that are safe to call from either side.
-
-```python
-# Sounddevice callback (real-time thread) → pushes to thread-safe ring
-def callback(indata, frames, time_info, status):
-    audio_buf.push(pcm16)        # lock-protected push
-    levels.update_music(pcm16)   # lock-protected EMA update
-```
-
-## Data Flow
-
-### Primary Reaction Path (cohost.py)
-
-1. sounddevice callback fires at ~5ms intervals → `start_input_stream()` (`cohost.py:391`)
-2. Resample 48k→16k, push to `AudioBuffer` and `Levels`
-3. `trigger_loop()` polls `Levels` @200ms (`cohost.py:888`)
-4. On event detected, calls `run_one_turn()` (`cohost.py:674`)
-5. `run_one_turn()` snapshots `AudioBuffer.snapshot_bytes()` + `ScreenBuffer.latest()`
-6. Calls `client.models.generate_content_stream()` (LLM) → streams text
-7. Calls `client.models.generate_content_stream()` (TTS) with text → streams PCM
-8. PCM chunks pushed to `PlaybackQueue` as they arrive
-9. sounddevice output callback drains `PlaybackQueue` → headphones
-
-### Primary Reaction Path (cohost_v2.py)
-
-1. sounddevice callback → `start_input_to_session()` — pushes `rtc.AudioFrame` to LiveKit session (`cohost_v2.py:821`)
-2. `state_refresh_loop()` @100ms reads `AudioBuffer` features + MIDI + track → writes `MusicState` (`cohost_v2.py:1331`)
-3. `coach_loop()` @100ms calls `EventDetector.detect(state)` (`cohost_v2.py:1438`)
-4. On event: `AICoach.build_prompt(ev)` assembles evidence+task string (`cohost_v2.py:1320`)
-5. `session.generate_reply(instructions=prompt)` fires async (`cohost_v2.py:1523`)
-6. `on_gen` event handler fires → `consume_response()` drains `msg.audio_stream` → `PlaybackQueue` (`cohost_v2.py:940`)
-7. sounddevice output callback drains PCM → headphones
-
-### Mascot Frontend Path
-
-1. `ws_broadcast()` runs as asyncio task @30fps
-2. Snapshots `Levels` (+ `MusicState` in v2) → JSON broadcast to all connected WebSocket clients
-3. `mascot.html` JS receives `{music, voice}` → smoothed EMA → CSS vars `--music-scale`, `--voice-opacity`
-4. Canvas renders 36-frame sprite at BPM-responsive FPS (14-30fps); glowing aura reacts to voice level
-
-### Recording Path (runs continuously, all turns)
-
-- Every PCM chunk from BlackHole → `VoiceRecorder.push_input()` → `input.wav`
-- Every PCM chunk from Gemini reply → `VoiceRecorder.push_voice()` → `voice.wav`
-- Every trigger/AI text/error → `VoiceRecorder.log_event()` → `events.jsonl` (JSONL, timestamped from session start)
+**Key Characteristics:**
+- **Single-writer state** — only `state_refresh_loop` mutates `MusicState`;
+  every other component (event detector, coach, agent, learn, ws bus) reads.
+- **Platform firewall** — `__main__.py` is OS-agnostic; all OS-specific imports
+  live behind Protocols in `platform/` (enforced by `tests/test_platform.py`).
+- **Grounding-first** — nothing un-cited reaches the user's ears; the
+  `CitationLinter` strips an entire turn to silence if any atom is unbacked.
+- **Three execution domains** — OS audio threads (sounddevice callbacks), a MIDI
+  daemon thread (blocking mido), and the asyncio event loop, bridged only by
+  `threading.Lock`-protected buffers (no async queues across the boundary).
 
 ## Layers
 
-**Audio Capture Layer:**
-- Purpose: Convert physical audio signals to Python buffers
-- Implemented via: `sounddevice` callbacks (real-time thread)
-- Key path: `start_input_stream()` / `start_input_to_session()`
-- Outputs: `AudioBuffer`, `MicBuffer`, `PassthroughBuffer`, `Levels`
+**Capture (OS threads):**
+- Purpose: pull master audio, screen frames, MIDI, now-playing metadata.
+- Location: `src/vibemix/platform/`, `src/vibemix/audio/`.
+- Contains: sounddevice callbacks, Quartz/ScreenCaptureKit crop, mido listener.
+- Depends on: OS APIs (CoreAudio/WASAPI, Quartz, rtmidi).
+- Used by: writes into lock-protected buffers consumed by the state loop.
 
-**Sensing Layer:**
-- Purpose: Extract musical meaning from raw streams
-- Runs on: asyncio tasks (non-real-time, offloaded to executor for CPU work)
-- Key objects: `AudioBuffer.snapshot_features()`, `ScreenBuffer`, `TrackInfo`, `ControllerState`
-- Note: `ControllerState` is updated from a `threading.Thread` (mido is blocking-only)
+**State / brain (asyncio):**
+- Purpose: turn raw features into grounded musical evidence + typed events.
+- Location: `src/vibemix/state/`.
+- Contains: `MusicState`, refresh loop, event detector, evidence registry,
+  deck-aware state, harmonics, detectors, genre routing.
+- Depends on: buffers (read), `audio/` DSP helpers.
+- Used by: coach loop, agent, learn, ws bus.
 
-**State Layer (v2 only):**
-- Purpose: Unified, debounced musical state
-- File: `cohost_v2.py`, class `MusicState` (~line 965)
-- Writer: `state_refresh_loop()` @100ms — the ONLY writer
-- Consumers: `EventDetector`, `coach_loop`, `AICoach`
+**Reaction (asyncio):**
+- Purpose: build a grounded prompt, call Gemini, gate it, render speech.
+- Location: `src/vibemix/state/prompt_builder.py`, `src/vibemix/runtime/coach.py`,
+  `src/vibemix/agent/`, `src/vibemix/llm/`, `src/vibemix/coach/`, `src/vibemix/prompts/`.
+- Depends on: MusicState (read), EvidenceRegistry, model_router, local MOSS TTS.
+- Used by: ws bus (broadcasts `transcript_delta`).
 
-**Event Detection Layer:**
-- Purpose: Decide WHEN the AI should react
-- v1/lk: procedural heuristics in `trigger_loop()`
-- v2: `EventDetector.detect()` with typed events and per-type cooldowns
-- Event types (v2): `TRACK_CHANGE`, `PHASE`, `LAYER_ARRIVAL`, `MIX_MOVE`, `HEARTBEAT`, `KAAN_SPOKE`, `MANUAL`
+**Transport / UI (asyncio + Rust + webview):**
+- Purpose: one ws bus to the shell; render mascot, pill, session deck, library.
+- Location: `src/vibemix/runtime/ws_bus.py`, `src/vibemix/ui_bus/`, `tauri/`.
+- Depends on: everything above (read-only snapshots).
 
-**AI Inference Layer:**
-- Purpose: Generate text + audio reaction
-- cohost.py: Two Gemini HTTP calls per turn (LLM → TTS cascade), stateless
-- cohost_lk.py / v2: LiveKit `RealtimeModel` session, one persistent WebSocket, `generate_reply()`
-- All: single in-flight generation enforced by `trigger_state["in_flight"]` flag
+## Data Flow
 
-**Playback Layer:**
-- Purpose: Deliver AI voice to headphones in real time
-- `PlaybackQueue` → `sounddevice.RawOutputStream` @ 24kHz
-- `Levels.update_voice()` tracks AI speech RMS (used by mic gate)
+### Primary Reaction Path (the live co-host)
+
+1. OS audio thread pushes master PCM into a ring buffer (`src/vibemix/audio/buffers.py::AudioBuffer.push`).
+2. `state_refresh_loop` reads buffers, computes DSP features, and **writes**
+   `MusicState` (the only writer) at ~10Hz (`src/vibemix/state/refresh.py::_tick_once`).
+3. `coach_loop` asks the detector for an event (`src/vibemix/state/event_detector.py::EventDetector.detect`) — typed (`TRACK_CHANGE`, `PHASE`, `LAYER_ARRIVAL`, `MIX_MOVE`, `HEARTBEAT`, …) with per-type cooldowns.
+4. `AICoach.build_prompt` composes an evidence-grounded prompt for that event type (`src/vibemix/state/prompt_builder.py:1125`).
+5. `DJCoHostAgent.llm_node` runs the Gemini generation, then the silence/slop gate, then `CitationLinter.check(...)` (`src/vibemix/agent/dj_cohost.py:2733`).
+6. Any unbacked citation → the whole turn is stripped to silence (`_build_citation_strip`, `dj_cohost.py:1232`, `citation_strip` event logged, no audio).
+7. Surviving text → local MOSS TTS (`src/vibemix/agent/tts_chain.py`) → playback sink.
+8. Reaction text broadcasts to the UI over the ws bus as `transcript_delta` (`src/vibemix/runtime/ws_bus.py`), NOT stderr.
+
+### Suggestion (pill) Flow
+
+1. `SuggestionService` reads MusicState + library to compute "what's next" (`src/vibemix/runtime/suggestion.py::SuggestionService`).
+2. Mean-centered candidate scoring against the CLAP store (`src/vibemix/library/next_suggestion.py`).
+3. Emitted over the ws bus → rendered by the pill window (`tauri/ui/src/pill/`).
+
+### Session Lifecycle
+
+1. `main()` boots housekeeping and the ws bus first (`src/vibemix/__main__.py:1467`).
+2. `_start_live_session` creates a per-run `stop_event` and `_activate_session` task (`__main__.py:2845`).
+3. `_activate_session` spawns capture, screen, track-poll, deck-poll, `state_refresh_loop`, and `coach_loop` tasks bound to `run_stop_event` (`__main__.py:2180`).
+4. `_stop_live_session` sets the run stop event; every loop cooperatively exits.
+
+**State Management:**
+- `MusicState` is the single source of truth, written only by the refresh loop.
+- `LearnState` is the learn-package counterpart, sole writer `learn/runtime.py`.
+- Controller/MIDI state is written only by the MIDI listener thread.
+- Cross-thread sharing is via `threading.Lock` inside buffer classes — never
+  async queues across the audio/event-loop boundary.
+
+## Key Abstractions
+
+**MusicState:**
+- Purpose: the read-only evidence snapshot the co-host is allowed to talk about.
+- Examples: `src/vibemix/state/music_state.py`.
+- Pattern: single-writer; consumers read fields, never assign them.
+
+**EvidenceRegistry / EVIDENCE_SOURCES:**
+- Purpose: the set of citation source kinds a reaction may cite; backs grounding.
+- Examples: `src/vibemix/state/evidence_registry.py` (frozenset `EVIDENCE_SOURCES`).
+- Pattern: a citation grammar that the `CitationLinter` resolves against; the
+  registry regex alternation must be edited in lock-step with `EVIDENCE_SOURCES`.
+
+**Platform Protocols:**
+- Purpose: keep `__main__` OS-agnostic; `audio.py`/`midi.py`/`screen.py`/`track.py`
+  declare `Protocol`s, `_*_macos.py`/`_*_windows.py` implement them.
+- Examples: `src/vibemix/platform/audio.py`, `_audio_macos.py`, `_audio_windows.py`.
+- Pattern: runtime backend selection; the typing module imports zero OS modules.
+
+**Model router:**
+- Purpose: config-driven model resolution; zero hardcoded model literals (CI grep-gated).
+- Examples: `src/vibemix/llm/model_router.py::resolve`.
+- Pattern: always `model_router.resolve("<path>")`, never inline a model name.
+
+## Entry Points
+
+**Python sidecar:**
+- Location: `src/vibemix/__main__.py::main()` (run via `python -m vibemix`).
+- Triggers: spawned by the Tauri Rust parent (`tauri/src-tauri/src/sidecar.rs`).
+- Responsibilities: async orchestration of all capture/state/reaction/ws loops.
+
+**Tauri shell:**
+- Location: `tauri/src-tauri/src/main.rs` (Rust parent), `tauri/ui/src/main.ts` (webview).
+- Triggers: app launch; binds windows (main, mascot, pill, debrief, learn).
+- Responsibilities: spawn + supervise the sidecar, bridge ws, render UI.
+
+**Library CLI:**
+- Location: `python -m vibemix library <cmd>` routed through `src/vibemix/__main__.py`.
+- Triggers: developer/operator commands (ingest, search, curate, build-set).
 
 ## Architectural Constraints
 
-- **Threading model:** Two-thread hybrid. sounddevice callbacks run on OS audio thread. All asyncio logic (AI calls, WS, screen capture, state loops) runs on the Python event loop. MIDI listener runs on a third daemon thread (mido is blocking). Thread safety relies exclusively on `threading.Lock` in buffer classes — no async-safe queues between audio thread and event loop (direct lock-protected push is used instead).
-- **Single in-flight generation:** All variants enforce at most one active Gemini generation at a time via `trigger_state["in_flight"]`. New triggers detected while in-flight are either queued (cohost.py) or dropped (cohost_lk.py, cohost_v2.py).
-- **No retry/reconnect for Live API:** The LiveKit session is opened once in `main()`. If the session errors or drops, the program must be restarted. `cohost.py` implemented reconnect logic (it was the Live API variant before being refactored to stateless HTTP) but lk/v2 do not.
-- **macOS-only dependencies:** `mss` (screen capture via CoreGraphics), `Quartz` (`CGWindowListCopyWindowInfo` for djay window crop), `nowplaying-cli` (MediaPlayer framework). Will not run on Linux/Windows without replacement.
-- **Global state:** All state is held in objects allocated in `main()` and passed explicitly as arguments. No module-level mutable singletons except `_HAS_VISION`, `_HAS_WS`, `_HAS_QUARTZ` feature flags.
-- **Circular imports:** None — each variant is a single file.
+- **Threading:** asyncio main loop (`asyncio.run(main())`); sounddevice audio
+  callbacks run on OS audio threads (synchronous); the MIDI listener runs on a
+  daemon thread (mido is blocking). Blocking work is offloaded via
+  `loop.run_in_executor`. Cross-thread state crosses only through
+  `threading.Lock`-guarded buffers (`audio/buffers.py`).
+- **Single in-flight generation:** exactly one Gemini generation at a time,
+  guarded by an `in_flight` flag with a stale-age force-clear; a loop failure
+  never wedges the gate (errors caught per-loop, logged to stderr + `events.jsonl`).
+- **Single socket:** the mascot/wizard bus binds `127.0.0.1:8765` only; debrief
+  uses `8766`. Constants in `src/vibemix/audio/constants.py` (`WS_HOST`, `WS_PORT`).
+- **Global state:** the only module-level singletons are feature flags
+  (`_HAS_*`); all real state objects are allocated in `main()` and passed
+  explicitly (DI over globals).
+- **`intel/` is import-light:** no model clients, no audio capture, no Tauri,
+  no filesystem writes — pure musical-intelligence primitives.
+
+## Cardinal Invariants (TEST-ENFORCED — do not break)
+
+These five are the test-enforced spine of the "real DJ friend, no AI slop"
+promise. The `vibemix-grounding-review` skill runs them before any
+speech/timing change. A green feature test is NOT enough — these are
+cross-cutting.
+
+### Invariant #1 — Single-writer MusicState
+Only `state/refresh.py::state_refresh_loop` writes `MusicState`; everything else
+reads. `LearnState` writes are confined to `learn/runtime.py`/`learn/state.py`;
+the MIDI listener is the sole writer of controller state. A second writer races
+the source of truth and makes grounding non-deterministic.
+**Gate:** `tests/learn/test_runtime_invariants.py` (static grep reddens on any
+`MusicState.<field> =` under `learn/`), `tests/state/test_refresh.py`,
+`tests/state/test_music_state.py`.
+
+### Invariant #2 — Citation grounding (THE anti-slop release gate)
+Every citation a reaction emits must resolve in `EvidenceRegistry`. An un-cited
+or unbacked reaction is stripped to silence — `<silence/>` beats an invented
+citation. The chokepoint is `DJCoHostAgent.llm_node` running
+`CitationLinter.check(full_text, snapshot, mode="live")`; decision is
+**response-level binary** (one bad atom strips the whole turn, logs
+`citation_strip`, no audio). This is the single hard release gate.
+**Gate:** `tests/state/test_coach_anti_slop.py`, `tests/agent/test_citation_strip_emit.py`.
+
+### Invariant #3 — Trust the audio / no speculative phrasing
+Live audio evidence is authoritative; the co-host reacts to real detected
+events, never invents them. Two layers: a static AST gate keeps `learn/` from
+computing its own phrase structure (no `numpy.fft`/`scipy.signal`/`librosa.beat`/
+`librosa.onset` imports), and the post-hoc slop filter
+(`prompts/filter.py::filter_for_slop` vs `prompts/negative_dict.py`,
+≥40 phrases) nukes banned generic-AI phrasing → `<silence/>` + `slop_suppressed`.
+**Gate:** `tests/learn/test_no_speculative_phrase.py`, `tests/prompts/test_negative_dict.py`,
+`tests/state/test_hype_anti_slop.py`.
+
+### Invariant #4 — One socket
+The mascot/wizard bus binds `127.0.0.1:8765` only (never two listeners); debrief
+uses `8766`. No new `websockets.serve` that races the one bus; import `WS_PORT`,
+never hardcode. Two listeners on 8765 is the "VIBEMIX-CORE STOPPED" / empty-screen
+class of bug.
+**Gate:** `tests/learn/test_no_new_ws_port.py`, `tests/runtime/test_ws_bus.py`.
+
+### Invariant #5 — Idle ≠ fault
+`SessionLayout`'s grounding-failure timer runs ONLY while the co-host is ACTIVE.
+At idle, `grounded=false` is expected (no music to ground to) and must read as
+calm "silent", never flip the deck to a fake "AI SERVICE OFFLINE" fault with a
+blank hero. `GROUNDING_FAILURE_MS` = 5000; `screen=denied` is badge-only.
+**Gate (the one TypeScript invariant):** `tauri/ui/tests/session/grounding-failure.spec.ts`.
+
+> **Prompt composition contract:** `docs/PROMPT-COMPOSITION.md` is the single
+> named source for what enters the live prompt per event type (EventType ×
+> evidence-fields × citation-sources × recall-fragment × diet-mode × cooldown).
 
 ## Anti-Patterns
 
-### Heuristic trigger leaking prompt framing
-**What happens (cohost.py old / cohost_lk.py):** The trigger tag (`LEVEL→peak`, `EVENT`, `MIC`) is passed into the prompt as a hint (`[react]`, `[Kaan just spoke. Reply to him.]`).
-**Why it's wrong:** The model gets told what kind of event happened before it can listen, which biases it to confirm the trigger hypothesis even when the audio has moved on.
-**Do this instead:** cohost_v2.py's `AICoach.task_for_event()` passes only the *task* for each event type (what to focus on), not the musical claim. The audio + evidence packet is the ground truth.
+### Writing MusicState from a consumer
+**What happens:** A coach/agent/learn/new-detector path assigns a `MusicState`
+field directly to "fix" a value.
+**Why it's wrong:** It races the single writer (Invariant #1); the evidence the
+linter grounds against can flip mid-turn, so the co-host reacts to a state that
+never coherently existed.
+**Do this instead:** Compute it inside `state/refresh.py::_tick_once`; consumers
+read only. Local per-loop scratch state stays in the loop's local scope.
 
-### Feature extraction in trigger callback
-**What happens (cohost_lk.py trigger_loop ~line 1340):** `audio_buf.snapshot_features()` is called inline in the trigger polling loop, running FFT on every 0.5s tick.
-**Why it's wrong:** FFT on a 5s window is ~5-10ms of CPU. Running it synchronously inside the asyncio event loop blocks the loop.
-**Do this instead:** cohost_v2.py's `state_refresh_loop` runs this on a background async task; in cohost.py it's run at trigger-fire time only (lower frequency).
+### Speculative / predictive phrasing
+**What happens:** A prompt or learn module predicts structure ("the drop is
+coming", "breakdown in 16 beats") or a learn module imports an FFT/beat-tracking
+primitive to compute it.
+**Why it's wrong:** Speculation is hallucination with better grammar; it
+violates Invariant #3 and is exactly the slop Kaan blocks release on.
+**Do this instead:** Cite only observed events from `state/refresh.py` +
+`CueAnchor`; let the detector fire on real audio.
+
+### Hardcoding a model name or a ws port
+**What happens:** Inlining `"gemini-..."` in code, or `websockets.serve(..., 8765)`
+on a new surface.
+**Why it's wrong:** Breaks the model-router CI grep gate / Invariant #4; a second
+listener on 8765 silently eats reactions.
+**Do this instead:** `model_router.resolve("<path>")`; piggy-back the existing
+`ws_broadcast` producer and import `WS_PORT` from `audio/constants.py`.
+
+### Shipping a one-ended IPC type
+**What happens:** A new `ipc.*` type is declared in `messages.schema.json` and
+wired on only one end (sender or handler).
+**Why it's wrong:** It ships green (schema parity holds, `tsc` passes) but does
+nothing live — the "button does nothing / panel stays blank" bug.
+**Do this instead:** Wire BOTH ends and run the `ipc-wiring-checker` skill
+(`.claude/skills/ipc-wiring-checker/scripts/check_ipc_wiring.py`).
 
 ## Error Handling
 
-**Strategy:** Print-and-continue. Errors in buffer pushes, screen capture, MIDI, and WS are caught individually and logged to stderr. Critical errors in the AI call path are propagated up to the trigger/coach loop where `trigger_state["in_flight"]` is reset in a `finally` block.
+**Strategy:** Per-loop try/except; a loop failure is logged but never wedges the
+single in-flight Gemini gate or the whole orchestrator.
 
 **Patterns:**
-- `try/except Exception as e: print(..., file=sys.stderr)` — used everywhere
-- `finally: trigger_state["in_flight"] = False` — ensures new events can fire after any error
-- Stale in-flight guard: if `in_flight` age > 12s, force-cleared on next tick
-- `VoiceRecorder.log_event("session_error", ...)` / `"turn_error"` — errors captured in events.jsonl
+- Errors bracket-tagged to stderr (e.g. `[coach err]`) and written as structured
+  per-session events to `events.jsonl`.
+- AI reactions go to the UI over the ws bus (`transcript_delta`), not stderr.
+- Capture/permission failures should surface as `ipc.error` to the shell, not
+  stderr-only (stderr-only failures look identical to "still warming" → the
+  recurring go-live flail).
 
 ## Cross-Cutting Concerns
 
-**Logging:** `print()` to stdout/stderr + `VoiceRecorder.log_event()` to `events.jsonl`. No structured logging framework. `diag_loop()` prints live RMS meters to stdout using `\r` overwrites.
+**Logging:** startup lines `-> ...`; errors bracket-tagged to stderr; structured
+session events to `events.jsonl`; reactions over the ws bus.
+**Validation:** IPC frames validated against `tauri/ui/src/ipc/messages.schema.json`
+via a PRE-COMPILED ajv validator (`validator.generated.mjs`); Python side mirrors
+in `src/vibemix/ui_bus/` (`messages.py`, `validator.py`, `schemas/`).
+**Grounding:** the `CitationLinter` + `EvidenceRegistry` are the cross-cutting
+anti-slop spine; every speech surface (co-host, pill, learn tutor, debrief) must
+pass through it.
 
-**Validation:** None beyond `GEMINI_API_KEY` check at startup and device discovery assertions.
+## Tauri / TypeScript Frontend Architecture
 
-**Authentication:** `GEMINI_API_KEY` read from `.env` via `python-dotenv`. Passed directly to `genai.Client()` or `RealtimeModel()`.
+The shell is a TS webview (`tauri/ui/src/`) over a Rust parent
+(`tauri/src-tauri/src/`). The Rust side is mostly a generic
+`forward_ipc_to_sidecar` passthrough plus per-window commands.
+
+**Window topology** (each a Rust module + a TS surface):
+- Main shell — `tauri/src-tauri/src/main.rs` + `tauri/ui/src/shell/` (`DesktopShell.ts`, `Sidebar.ts`, `app.ts`, `surfaces.ts`).
+- Session deck — `tauri/ui/src/session/` (`SessionLayout.ts`, `render-loop.ts`, `ws-bridge.ts`, `cohost-model.ts`).
+- Mascot organism — `tauri/src-tauri/src/mascot_window.rs` + `tauri/ui/src/mascot/` (particle organism, layers, ws-client) and root `mascot.html`.
+- Pill — `tauri/src-tauri/src/pill_window.rs` + `tauri/ui/src/pill/` (`index.ts`, `next-suggestion.ts`, `state-machine.ts`).
+- Debrief — `tauri/src-tauri/src/debrief_window.rs` + `tauri/ui/src/debrief/` (ws on 8766).
+- Learn — `tauri/src-tauri/src/learn_window.rs` + `tauri/ui/src/learn/` (`SkillWall.ts`, controllers SVGs).
+- Library / Viber — `tauri/ui/src/library/` (`index.ts`, `api.ts`, `state-machine.ts`).
+- Wizard / onboarding — `tauri/ui/src/wizard/` (step-driven router).
+- Settings drawer — `tauri/ui/src/settings/` (`SettingsDrawer.ts`, `state.ts`).
+
+**IPC contract (the single source of truth for the wire):**
+- Types declared once in `tauri/ui/src/ipc/messages.schema.json` (88 `const`
+  types). A type is a real feature only when BOTH ends touch it.
+- TS client: `tauri/ui/src/ipc/client.ts` (`emitIpc` / `sendIpcRequest` /
+  `subscribeIpc`), validated by `tauri/ui/src/ipc/validator.generated.mjs`
+  (PRE-COMPILED — run `npm run codegen:ipc` after editing the schema or new
+  fields are rejected).
+- Python side: `register_handler("ipc.x.y", ...)` in `src/vibemix/runtime/ws_bus.py`
+  and outbound factory constants in `src/vibemix/ui_bus/messages.py` +
+  `ui_bus/learn_messages.py`.
+- Rust passthrough: `tauri/src-tauri/src/ws_client.rs` (`forward_ipc_to_sidecar`).
+- Wiring gate: `.claude/skills/ipc-wiring-checker/scripts/check_ipc_wiring.py`.
+
+**Frontend convention (load-bearing):** settings controls must repaint
+OPTIMISTICALLY — flip `data-active` locally in the click handler (the ~3ms
+round-trip stays authoritative and self-corrects); waiting on the
+`ipc.settings.state` echo looks dead.
 
 ---
 
-*Architecture analysis: 2026-05-11*
+*Architecture analysis: 2026-06-08*

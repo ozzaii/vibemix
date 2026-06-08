@@ -1,179 +1,426 @@
 # Codebase Concerns
 
-**Analysis Date:** 2026-05-11
+**Analysis Date:** 2026-06-08
 
-> **Framing note:** This is a fast-iteration prototype (single initial commit, ~2 days of iteration based on file timestamps). Concerns are framed to help future work, not to imply the code is broken. Many patterns that would be unacceptable in a production service are fine for a local-only personal tool.
+> Scope: full repo (`src/vibemix/` Python + `tauri/` desktop shell). Ground truth:
+> project `CLAUDE.md` (Constraints + Cardinal invariants + gotchas), the
+> `2026-06-08` handoff (`.planning/handoffs/2026-06-08-HANDOFF-NEXT-SESSION.md`),
+> and the three `2026-06-08` strategy packets. The signed DMG
+> (`dist/vibemix-0.0.1.dmg`) shipped from commit `8bc721ce`. This document
+> surfaces real risk for launch — it is not a reassurance doc.
+
+---
+
+## ⭐ The Core Product Risk — voice "AI slop" (the launch gate)
+
+This is the #1 risk and it is a **measured quality gap, not a code bug**. The
+product fails its own bar ("real DJ friend in your ear, no AI slop") if reactions
+feel scripted, late, hallucinated, or generic. Kaan will block release on this.
+
+**What it is:**
+- Bench-measured "friend" scores are LOW — the co-host reads as a **narrator, not a
+  friend**. The blind 2-judge panel over real labeled lines
+  (`.planning/packets/2026-06-02/CODEX_READY-SVEN-PROMPT-BENCH-MEASURED.md`) put
+  the best coach-identity prompt at `friend_not_narrator` ≈ 1.93 vs 1.14 baseline
+  (+0.79), but the handoff records live by-ear friend as low as **~0.09–1.2** —
+  "137-of-137 lines should-not-have-spoken = narrator" (memory
+  `project_autonomous_night_machine_2026_06_04`). The prompt axis has **plateaued**
+  (round-2 bench converged 1.97–2.08, all noise) — more prompt tuning yields
+  nothing; the next lever is perception + speak-gate, not prose.
+
+**Where the anti-slop machinery lives (and its fragility):**
+- `src/vibemix/state/evidence_registry.py` (28KB) — citation grounding store backing
+  Cardinal Invariant #2.
+- `src/vibemix/coach/citation_linter.py` (8.7KB) — strips any reaction whose
+  citation does not resolve in the registry down to the ack-bank fallback. This IS
+  the anti-slop release gate, but it is **double-edged**: it can over-strip a good
+  reaction to a bland ack, and during last QA it was **disabled**
+  (`VIBEMIX_ANTI_SLOP=off`, handoff line 43) to let Sven speak at all. The default
+  is ON (`dj_cohost.py:321` `default=not _sven_probe_mode_enabled()`), so the
+  ship config and the QA config diverge — a real "tested-with-the-gate-off" risk.
+- `src/vibemix/prompts/matrix.py` (`_ANTI_SLOP_FOOTER`, applied to every cell),
+  `src/vibemix/prompts/negative_dict.py` (the runtime slop phrase filter, seeded by
+  the `stop-slop` skill).
+
+**Tracking instrument (use it, don't eyeball):**
+- `src/vibemix/bench/` (`run.py`, `eval.py`, `matrix.py`, `assemble.py`, `cell.py`,
+  `review.py`, `respan.py`, `fixtures.py`) — the Phase-81 regression harness (real
+  Gemini + blind judge panel, friend/grounded/overall per line). Per the locked
+  philosophy (`project_vibemix_sven_prompt_philosophy`) slop is a
+  prompting+data+bench problem; fix by measuring, never by per-failure NOT-X bans.
+- **Risk:** the bench is a *dev/eval* harness (`bench/` is explicitly "NOT a runtime
+  feature" per CLAUDE.md). Green unit tests prove nothing here — only a bench score
+  + a live `drive-vibemix` proof + Kaan's ear gate the quality.
+
+**Fix approach (decided, not yet shipped):** local hi-fi EARS → rich musical TEXT →
+Gemini = brain. Gemini forces audio to 16kHz-mono so it is a mediocre listener; the
+ceiling is on the input side. See `.planning/packets/2026-06-08/LOCAL-HIFI-EARS-ARCHITECTURE.md`.
 
 ---
 
 ## Tech Debt
 
-**Three parallel cohost variants with diverged logic:**
-- Issue: `cohost.py` (Gemini 3 Flash + TTS, non-LiveKit), `cohost_v2.py` (Gemini 2.5 native audio via LiveKit, most evolved), and `cohost_lk.py` (intermediate LiveKit approach, same model as v2) are three independent files that share almost all primitives but have separately evolved. `MUSIC_GAIN_TO_GEMINI` is `2.5` in `cohost.py` and `cohost_lk.py` but `8.0` in `cohost_v2.py`. `AudioBuffer` is `130s` in `cohost_lk.py`, `140s` in `cohost_v2.py`. `SYSTEM_INSTRUCTION` differs significantly across all three — different genre tags (150-160 BPM vs 150-170 BPM), different behavioral constraints, different evidence packet formats.
-- Files: `cohost.py:75`, `cohost_v2.py:84`, `cohost_lk.py:117`, `cohost.py:82`, `cohost_v2.py:120`, `cohost_lk.py:126`
-- Impact: Tuning a parameter in one variant does not propagate to others. The active variant (`cohost_v2.py`) has a different gain, buffer size, and AI persona than the v1 reference.
-- Fix approach: Pick `cohost_v2.py` as the canonical file. Delete or archive `cohost.py` and `cohost_lk.py`. Extract shared primitives (`AudioBuffer`, `Levels`, `MicBuffer`, `PlaybackQueue`, `VoiceRecorder`, `ControllerState`) into a `primitives.py` module if a fourth variant is ever needed.
+**God-module: `__main__.py` is 8,914 lines.**
+- Files: `src/vibemix/__main__.py`
+- Impact: The async orchestrator (ported from the retired `cohost_v4.py`) holds
+  routing, mode resolution, capture wiring, genre dispatch, taste loading, and
+  service binding all in one module. Nearly every cross-cutting bug in this doc
+  threads through it (`:1525` downgrade, `:2576` cache, `:2504` suggestion binding,
+  `:1028` audio collapse, `:2459` anti-slop flag). High blast radius; hard to test
+  in isolation; concurrent-session merge conflicts concentrate here.
+- Fix approach: extract the mode/routing block, the service-binding block, and the
+  audio-callback block into `runtime/` submodules with explicit DI (the codebase
+  already prefers DI-over-globals per CLAUDE.md — apply it here).
 
-**`np.concatenate` ring-buffer pattern on every audio callback:**
-- Issue: `AudioBuffer.push()`, `MicBuffer.push()` in all three variants allocate a new numpy array on every call by doing `np.concatenate([self._buf, new_chunk])` followed by a trim slice. At 48kHz with 480-frame chunks this is ~100 allocs/sec, each copying the full ring.
-- Files: `cohost_v2.py:257`, `cohost_v2.py:392`, `cohost_lk.py:368`, `cohost_lk.py:553`, `cohost.py:215`, `cohost.py:246`
-- Impact: Unnecessary GC pressure during a latency-sensitive audio callback. Not crashing but generates allocator churn. CPython's GC pauses can cause audio dropouts.
-- Fix approach: Pre-allocate the ring buffer as a fixed-size `np.ndarray` and use a write-pointer with modular indexing, or use `collections.deque` for the int16 ring and only convert to ndarray on `snapshot_*` calls.
+**Other large modules (complexity hotspots):**
+- `src/vibemix/state/deck_context.py` (5,094 lines), `src/vibemix/library/codex_curate.py`
+  (4,939), `src/vibemix/agent/dj_cohost.py` (4,675), `src/vibemix/learn/runtime.py`
+  (4,476), `src/vibemix/eval/session_report.py` (2,946).
+- `tauri/ui/src/library/index.ts` (3,464), `tauri/ui/src/library/api.ts` (3,101),
+  `tauri/ui/src/learn/learn-window.ts` (2,760), `tauri/ui/src/pill/index.ts` (2,271).
+- Impact: each is a single-owner file that two concurrent Claude/Codex sessions
+  cannot edit without collision (see Process Risk below).
 
-**`trigger_state` dict shared between asyncio coroutines without an asyncio lock:**
-- Issue: `trigger_state = {"in_flight": False}` is mutated by both the `coach_loop` coroutine and by the `on_gen` callback (registered via `@session.on("generation_created")`). In `cohost_v2.py`, `on_gen` creates a new asyncio Task on every generation event and sets `trigger_state["in_flight"] = False` in its `finally` block, while `coach_loop` reads and writes the same dict without any lock. Since both run in the same event loop, CPython's GIL means individual dict mutations are atomic, but the check-then-set pattern (`if trigger_state.get("in_flight")` ... `trigger_state["in_flight"] = True`) is not atomic across awaits.
-- Files: `cohost_v2.py:1457-1531`, `cohost_v2.py:1674-1683`, `cohost_lk.py:1347-1597`
-- Impact: In practice this is low-risk because all mutations are in single-threaded asyncio, but if `session.on()` fires from a thread (LibKit internals), a double-trigger is possible.
-- Fix approach: Replace the `dict` with an `asyncio.Event` or `asyncio.Lock` and add an explicit note about which thread sets it.
+**Stale planning machinery.**
+- `.planning/` is 136MB; `.planning/eval-runs/` alone is 73MB and is **NOT
+  gitignored** (`git check-ignore` returns nothing) — ~250+ eval-run dirs show as
+  untracked `??` in `git status`, polluting every status and risking an accidental
+  bulk `git add`.
+- GSD was retired as a mandate (CLAUDE.md "Workflow") but the `.planning/`,
+  `/gsd-*` commands, and codebase maps remain present and partly stale. The
+  authoritative live work-queue moves often (currently the `2026-06-08` handoff).
+  Risk: a future session treats a superseded packet (e.g. `WIRE-THE-GOLD`,
+  `MASTER-ARRANGEMENT`) as authoritative TODOs. Fix: gitignore `eval-runs/`; keep
+  the handoff-of-the-day as the single source of truth.
 
-**No requirements.txt / pyproject.toml — dependency state is not reproducible:**
-- Issue: The `.venv` contains `google-genai==2.0.1`, `livekit==1.1.7`, `livekit-agents==1.5.8`, `livekit-plugins-google==1.5.8` etc., but there is no `requirements.txt` or `pyproject.toml`. The only install documentation is implicit in the import statements.
-- Files: (entire repo root — missing)
-- Impact: On a fresh machine or after `.venv` corruption, the exact package versions needed are unknown. Preview model names (`gemini-2.5-flash-native-audio-preview-12-2025`, `gemini-3-flash-preview`) may stop working at any time and you need the SDK version locked to know what was used.
-- Fix approach: `pip freeze > requirements.txt` in the venv, commit it. One command.
-
-**`cohost.streaming.py.bak` committed to git:**
-- Issue: A 856-line, 34KB backup file is tracked in git history. It represents the Gemini 3.1 Flash Live streaming approach that was superseded by the LiveKit variants.
-- Files: `cohost.streaming.py.bak`
-- Impact: Bloats the repo; confusing for anyone reading the file tree; `.bak` extension means Python won't run it but it adds noise.
-- Fix approach: `git rm cohost.streaming.py.bak` and commit. The history already preserves it if needed.
+**`orphans.csv` is a weak/stale signal.**
+- File: `.planning/codebase/orphans.csv` (96 rows, dated 2026-06-04).
+- It lists "zero-caller in codegraph", which catches **intra-module-only** symbols
+  (e.g. `intel/decision_runtime.py::validate_and_degrade` IS called at `:125`;
+  `transition_scorer.py::phrase_alignment_score` at `:347`; `learn/copy_truth.py::transcript_copy`
+  at `:39`) and re-exports — not true dead code. Several entries it flags have since
+  been wired (voice producers, pill feedback — see below). Treat it as a hint to
+  investigate, not a kill-list.
 
 ---
 
-## Known Bugs
+## WIRED-BUT-DARK — built + tested, not surfaced end-to-end
 
-**`_test_multimodal.py` hardcodes an absolute path to a specific session:**
-- Symptoms: Running `_test_multimodal.py` on any machine other than the original, or after a `recordings/` cleanup, fails immediately with a `FileNotFoundError`.
-- Files: `_test_multimodal.py:14`
-- Trigger: `python3 _test_multimodal.py` on a fresh clone or after pruning old recordings.
-- Workaround: Edit line 14 to point to an existing session directory before running.
+This is the second-largest risk class: a large amount of product is engineered and
+unit-green but does not reach the human. Confirmed-dark surfaces (high confidence):
 
-**`generate_bat.py` is misnamed — generates a bat mascot PNG, not a `.bat` script:**
-- Symptoms: The filename strongly implies a Windows batch-file generator. The actual function is calling Gemini's image generation API to produce the animated bat mascot asset.
-- Files: `generate_bat.py:1-64`
-- Trigger: Reading the filename without opening the file.
-- Workaround: Rename to `generate_bat_image.py` or `generate_mascot.py`.
+**Brain-switch UI (proxy ↔ direct + BYO key) — backend complete, UI DARK.**
+- Backend: handler `runtime/session_loop.py` (`set_brain`), persist
+  `runtime/config_store.py` (writes `.env` chmod 600), boot-load `__main__.py`.
+  Schema/redaction plumbed: `tauri/ui/src/ipc/messages.ts:384`,
+  `tauri/ui/src/ipc/client.ts:47` (redacts `gemini_api_key` in logs).
+- **Zero UI emitter:** grep of `tauri/ui/src/settings/` and `tauri/ui/src/shell/`
+  for `set_brain` returns nothing — no control sends `ipc.settings.set_brain`. A
+  non-dev cannot switch brains or enter a key. This blocks the entire tiering model.
+- Files: missing sender in `tauri/ui/src/settings/SettingsDrawer.ts`.
+
+**Gemini context caching disabled.**
+- `src/vibemix/__main__.py:2576` constructs the agent with `cache=None` → the full
+  system prompt re-uploads on every reaction (~0.5–1.5s wasted TTFT per call,
+  per handoff). Latency tax on the booth-critical path.
+
+**Opener-ack PCM cache built but gated off.**
+- `src/vibemix/agent/chatterbox_tts.py:191` — pre-rendered opener-ack PCM exists but
+  is disabled; defeats the "instant grounded 1-word ack" latency lever.
+
+**Anticipation / drop-prediction not closed to the prompt.**
+- `src/vibemix/state/drop_predict.py` (`predicted_drop_in_sec`,
+  `should_arm_drop_call`) is referenced by many modules (`refresh.py`,
+  `event_detector.py`, `speak_gate.py`, `prompt_builder.py`, `drop_display.py`,
+  `ws_bus.py`) but the lookahead→live-prompt anticipation path (fire-at-T scheduler,
+  two-clock model) is the **C9-gap** — the substrate exists, the booth-DJ
+  anticipation behavior is not wired (handoff line 35).
+
+**Latency band-aids that swallow real moments.**
+- `EVENT_GLOBAL_MIN_GAP=22s` + a 7s post-voice cooldown (handoff line 39) suppress
+  genuine events to mask the ~6.7s event→voice latency. They trade slop for
+  *missed reactions* — relax once latency drops.
+
+**Recently un-darkened (verify, do not re-flag as orphan):**
+- Pill explicit-feedback loop is now **wired** (commit `f87c0240`): UI emits over ws
+  (`tauri/ui/src/pill/index.ts:2054 onPeekPrimaryAction`) → Python receivers
+  `runtime/ws_bus.py:1128 choose_alternative` / `:1146 record_feedback`. The
+  consent-gated taste update (`update_taste_scores`) still defaults OFF.
+- Sven audio-coaching voice producers recovered + wired:
+  `runtime/energy_read_voice.py` + `runtime/move_grade_voice.py` are now consumed in
+  `runtime/coach.py:658-673` (no longer dangling against `speak_gate.py:24-25`).
+- `SuggestionService` is now bound at runtime (`__main__.py:2504`), not the old
+  permanent `None` — the pill display path lights up when `library.pkl` exists.
+- **Residual dark:** the learn move-grade is still computed-then-not-fully-surfaced
+  (`learn/runtime.py`); `move_grade` rides the IPC/library path
+  (`tauri/ui/src/library/api.ts:437`) but the live in-set grade → TS consumer is thin.
 
 ---
 
 ## Security Considerations
 
-**`.env` file is gitignored but was present at initial commit time — verify it was never staged:**
-- Risk: `.env` contains `GEMINI_API_KEY` (55 bytes — consistent with a single API key line). The `.gitignore` correctly lists `.env`, but the file exists on disk and there is only one commit. If the file was staged before `.gitignore` was written, it would be in git history.
-- Files: `.env` (present on disk), `.gitignore:1`
-- Current mitigation: `.gitignore` entry exists; `git ls-files` does not show `.env` in tracked files.
-- Recommendation: Run `git log --all --full-history -- .env` to confirm it was never committed. If clean, no action needed. Rotate the API key if there is any doubt.
+**API-key-in-binary — SOLVED, verified.**
+- Risk: a raw Gemini key shipped in the distributed binary (Kaan: "the
+  API-key-protection problem of the year").
+- Verified mitigation: the packaged proxy path carries **no real key**.
+  `src/vibemix/agent/proxy_client.py:33` builds the genai client with
+  `api_key="vibemix-proxy"` (dummy; proxy ignores `x-goog-api-key`) and a per-client
+  JWT in the `Authorization` header; the JWT is cached in the OS keychain
+  (`src/vibemix/agent/jwt_cache.py`), never embedded. Grep for `AIza[...]` literals
+  across `src/`, `tauri/`, `scripts/`, specs, and `pyproject.toml` returns
+  **nothing**. Direct mode requires the user's own `GEMINI_API_KEY`.
+- Residual: rate-limiting / per-client cost caps live on the Bravoh side
+  (`api.altidus.world`, not in this repo) — out of scope here but is the real
+  abuse-control surface.
 
-**Screen capture runs without user confirmation and captures the full primary display:**
-- Risk: `mss.grab(monitor[1])` captures the entire primary display at 1fps, including any visible content (terminal output with credentials, browser tabs, other apps). Frames are sent to Gemini API servers as JPEG.
-- Files: `cohost.py:607-627`, `cohost_v2.py:872-935`, `cohost_lk.py` (equivalent `screen_capture_loop`)
-- Current mitigation: `cohost_v2.py` uses `find_djay_window_bounds()` via Quartz to crop to just the djay Pro window when available, reducing exposure.
-- Recommendation: Log a startup notice when full-screen capture is active (i.e., when `find_djay_window_bounds()` returns `None`). Already mitigated in v2; `cohost.py` always captures full screen without djay crop.
+**🔑 Keystone TRUST bug — silent direct→proxy downgrade.**
+- Files: `src/vibemix/__main__.py:1525-1534` (confirmed: `if not api_key: ... mode =
+  "proxy"`).
+- Risk: a Pro who selects direct mode with a bad/empty key is **silently** flipped
+  to proxy, relaying 48s of master audio AND ~8s of booth-mic voice
+  (`agent/dj_cohost.py:3029-3055`, gated on recent speech) through Bravoh's server —
+  while believing they are private. This breaks any "your own key = private"
+  promise.
+- Current mitigation: none. `persist_brain_settings` does zero key validation.
+- Recommendation: validate the key at save-time (one cheap test call), refuse the
+  switch on bad/empty key, and fail loud mid-session — never silent-downgrade
+  (`.planning/packets/2026-06-08/ROUTING-PROXY-VS-DIRECT-DECISION.md` risk #2).
 
-**WebSocket mascot bus binds to `127.0.0.1` only — acceptable for local use:**
-- Risk: `ws://127.0.0.1:8765` is localhost-only. No authentication on the connection. The `cohost_lk.py` variant accepts `{action: "trigger"}` messages from any local WebSocket client, which can force an AI generation.
-- Files: `cohost_lk.py:1622-1647`, `cohost.py:1049-1062`
-- Current mitigation: Loopback-only binding limits exposure to the local machine.
-- Recommendation: Acceptable for a local dev tool. Document the trigger capability in a comment.
+**Disclosure honesty drift.**
+- `src/vibemix/runtime/sec_check.py:51-77` — endpoint drift
+  (`api.bravoh.altidus.world` → `api.altidus.world`) and it does not plainly state
+  that in proxy mode 48s master + sometimes 8s booth mic are uploaded, nor the
+  ~7-day local `audio.wav` retention (`agent/dj_cohost.py:2983-2997`). For a paid
+  product handling live mic audio this is a real privacy-disclosure gap.
+
+**`.env` handling — acceptable.**
+- `.env` (447 bytes) present at repo root; `.env`, `.env.*`, and `proxy/.env` are
+  all gitignored (`.gitignore:51-52,171`). Contents not read (privacy rule). Boot
+  loads via `python-dotenv`. The `set_brain` persist writes `.env` chmod 600.
+
+**Telegram bridge auth — fail-closed, but minimal.**
+- `src/vibemix/library/telegram_bridge.py` — v1 auth is a numeric chat-id allow-list
+  (`parse_allowed_chats`, `_ENV_ALLOWED=VIBEMIX_TELEGRAM_ALLOWED_CHATS`), explicitly
+  **fail-closed**: an empty/missing list authorizes nobody (`:82,:99`). Outbound
+  messages are path-scrubbed; each request runs the local Codex Viber under a
+  wall-clock timeout. Risk is acceptable for an optional opt-in surface, but the
+  allow-list IS the entire auth — there is no token-per-user or rate-limit; a leaked
+  bot token + a known allowed chat-id = full Viber access. Keep it opt-in/off by
+  default for v1.
+
+**`generic39` false-positive in the sign pipeline — process security risk.**
+- `scripts/dist/verify_binary.py:83,98,311` (`_include_generic39`). The secret
+  scanner flags 39-char `[A-Za-z0-9_-]` runs; bundled `transformers` identifiers
+  produce 505 benign hits → `verify_binary` exits 5 AFTER the DMG is already
+  notarized+stapled (the `8bc721ce` DMG is valid). Risk: the security gate
+  cries-wolf, training operators to ignore exit-5 — which would mask a *real* leak
+  next time. Fix: add a `_include_generic39` allowlist for vendored trees (NOT
+  auto-edited — it is a security gate, Kaan's call).
 
 ---
 
 ## Performance Bottlenecks
 
-**566MB of recording sessions accumulating with no cleanup:**
-- Problem: Every run of any variant creates a new timestamped directory in `recordings/` with `voice.wav`, `input.wav`, and `events.jsonl`. 96 sessions have accumulated in under 2 days totalling 566MB. At this rate a week of heavy use reaches 2-3GB.
-- Files: `cohost.py:538-543`, `cohost_v2.py:699-705`, `cohost_lk.py:940-946`; `recordings/` directory (96 subdirectories)
-- Cause: No retention policy, no cleanup on startup, `recordings/` is gitignored but not auto-pruned.
-- Improvement path: On `VoiceRecorder.__init__`, scan `recordings/` and delete sessions older than N days (e.g., 7). Or add a one-liner cleanup script. The `events.jsonl` files are the valuable artifact; the WAV files are large and often redundant.
+**Event→voice latency ~6.7s (the booth-critical path).**
+- Anatomy (`.planning/packets/2026-06-08/COHOST-LATENCY-PERCEPTION-STRATEGY.md`):
+  LLM ~3s ≈ TTS ~3s, serial, no caching — no single villain. The 8s audio window is
+  a continuous ring, not an accumulation wait.
+- Contributing files: `agent/dj_cohost.py:285-333` (48s audio Part, shrinkable to
+  6-8s for free), `__main__.py:2576` (`cache=None`, re-uploads system prompt),
+  `chatterbox_tts.py:191` (opener-ack cache gated off).
+- Improvement path: decouple WHEN-to-speak from WHAT-to-say (instant grounded
+  1-word ack via the non-LLM `say()` lane → perceived 6.7s → ~0.5s); enable context
+  cache; shrink the audio window.
 
-**7.5MB of PNG sprite assets tracked in git:**
-- Problem: `sprite-1.png` (2.3MB), `sprite-2.png` (2.5MB), `sprite-3.png` (2.3MB) are committed directly to git. `git clone` pulls all three.
-- Files: `sprite-1.png`, `sprite-2.png`, `sprite-3.png`
-- Cause: Committed in the initial commit with no LFS configuration.
-- Improvement path: Either add git-lfs tracking for `*.png`, or store them externally and reference a URL in `mascot.html`. For a local-only tool this is low priority but worsens clone time if the repo is shared.
+**Proxy SSE streaming UNVERIFIED — dominant launch risk for the proxy default.**
+- If `api.altidus.world`'s reverse proxy buffers the SSE response (`proxy_buffering
+  on` / missing `X-Accel-Buffering: no`), proxy TTFT collapses from first-token to
+  full-completion (multi-second) — catastrophic for booth latency. Unverifiable from
+  client code; gates the keyless-proxy-default decision
+  (`ROUTING-PROXY-VS-DIRECT-DECISION.md` risk #1).
 
-**`AudioBuffer` allocates a new numpy array on every push at ~100Hz:**
-- Problem: See the tech debt entry above. The allocation rate is bounded (ring size is capped) but each `np.concatenate` at 16kHz int16 with 140s ring = 2.24M samples × 2 bytes = ~4.5MB copied per push tick.
-- Files: `cohost_v2.py:255-259`, `cohost_lk.py:366-370`
-- Cause: Simple implementation; fine for a prototype.
-- Improvement path: Preallocate ring with write-pointer as described above.
+**PlaybackQueue O(n) front-delete on the audio thread.**
+- `src/vibemix/agent/buffers.py` (`PlaybackQueue.pull`) does a front-delete each pull
+  on the OS audio thread; `OUTPUT_BLOCKSIZE=256`. Flagged as a hardening target only
+  if voice stutter persists on a single device (memory
+  `project_inapp_ux_lane_verified_2026_06_07`, demonic-voice bundle). Fix: ring
+  buffer + bump blocksize to 1024.
 
 ---
 
 ## Fragile Areas
 
-**`find_device()` raises `RuntimeError` if audio device name doesn't match:**
-- Files: `cohost.py:139-149` (equivalent in all three variants)
-- Why fragile: Device names are hardcoded module-level constants (`INPUT_DEVICE = "BlackHole 2ch"`, `OUTPUT_DEVICE = "External Headphones"`, `MIC_DEVICE = "MacBook Pro Microphone"`). If the system audio setup changes (headphone jack pulled, device renamed, different Mac), the script crashes immediately at startup with a `RuntimeError` before any helpful context.
-- Safe modification: Wrap `find_device` calls in startup with a catch that lists available devices on failure — already partially done in the mic path (mic failure is non-fatal), but music input and output failures are fatal and unhelpful.
-- Test coverage: None.
+**Frozen-sidecar false-negative (the recurring trap).**
+- The bundled Python sidecar in `cargo tauri dev` and in the DMG is FROZEN — it lags
+  edited `src/vibemix/`. Verifying backend wiring against the bundled binary yields
+  false negatives (and false "fixed" claims). Safe modification: run `main()` on
+  current source (`uv run python -m vibemix`), never the bundled binary; grep the
+  build TOC (`build/vibemix-core.macos/*.toc`) to see what actually shipped
+  (`find dist/` misses pure-Python modules in the PYZ). The `.dmg` is rebuilt
+  separately from the loose `dist/vibemix-core` sidecar — a sidecar rebuild does NOT
+  refresh the DMG. (CLAUDE.md Commands.)
 
-**Preview model names will break when Google rotates them:**
-- Files: `cohost.py:58-59` (`gemini-3-flash-preview`, `gemini-3.1-flash-tts-preview`), `cohost_v2.py:71` and `cohost_lk.py:103` (`gemini-2.5-flash-native-audio-preview-12-2025`)
-- Why fragile: All model identifiers are preview endpoints. Google has historically deprecated preview model names with short notice. `gemini-2.5-flash-native-audio-preview-12-2025` includes a December-2025 date suffix suggesting it is time-limited.
-- Safe modification: When a model stops working, update the `MODEL` constant at the top of the active variant. Keep the other variants' model constants in sync.
-- Test coverage: `test_voice.py` and `_test_tts.py` would surface this immediately if run regularly.
+**BlackHole self-hearing / phantom-music trap.**
+- If system output or a Multi-Output device also feeds BlackHole, the co-host hears
+  its own voice as phantom music and reacts to it — directly violating Invariant #3
+  ("trust the audio"). Mitigation is **config, not code**: in Audio MIDI Setup route
+  only the DJ app into BlackHole. The deck passthrough ships silent
+  (`audio/constants.py PASSTHROUGH_GAIN=0.0`) precisely to avoid mirroring
+  BlackHole → speakers. Fragile because it depends on correct user audio routing.
 
-**`cohost_v2.py` `on_gen` callback creates an asyncio Task from a synchronous `session.on()` handler:**
-- Files: `cohost_v2.py:1674-1683`
-- Why fragile: `asyncio.create_task()` called from inside a synchronous callback that may be invoked from a LiveKit library thread. If the library calls the event handler from outside the event loop, `create_task` will raise `RuntimeError: no current event loop`. The code works today because the LiveKit Python SDK fires events on the asyncio thread, but this is not guaranteed by the API contract.
-- Safe modification: Capture the event loop at startup (`loop = asyncio.get_event_loop()`) and use `loop.call_soon_threadsafe(lambda: asyncio.ensure_future(runner()))`.
-- Test coverage: None.
+**Multi-Output aggregate-clock drift → voice stutter.**
+- `src/vibemix/platform/_audio_macos.py:738` self-warns on aggregate-device clock
+  drift. A Multi-Output device with members at mismatched rates / no Drift
+  Correction causes the stutter that has been mis-blamed on code. Safe fix:
+  single physical output device, or all members 48k + Drift Correction on. The
+  device-stability heuristic lives in `src/vibemix/audio/device_select.py`
+  (`is_unstable_output_device`, `is_explicit_multi_output_device`).
 
-**`MicBuffer` unbounded float32 accumulation before `pull()` is called:**
-- Files: `cohost_v2.py:370-407`, `cohost_lk.py:530-570`
-- Why fragile: `MicBuffer.push()` grows `self._buf` via `np.concatenate` and only trims when it exceeds `MAX_FRAMES` (200ms at 48kHz). `pull()` drains it. If `pull()` is never called (e.g., mic used only for level detection in `cohost_v2.py`), the buffer accumulates unchecked. In `cohost_v2.py` the `MicBuffer` is pushed but `pull()` is not called in the main audio loop (mic data goes to Gemini via the MIDI/LiveKit session, not via explicit `pull`). The `MAX_FRAMES` cap (`48000 * 200 // 1000 = 9600`) does bound it, so this is not actually a memory leak — but it's confusing.
-- Safe modification: Add a comment in `MicBuffer` clarifying whether `pull()` is the intended consumer or just `levels.update_mic()`.
+**Demonic/slow voice — config, not code (do NOT edit `dj_cohost.py:2373`).**
+- Memory `project_inapp_ux_lane_verified_2026_06_07` (demonic-voice bundle): the
+  finder-claimed `target_sr=48000` bug at `dj_cohost.py:2373` was REFUTED by
+  hand-read (it is already `OUTPUT_SR`=24000). Real causes ranked: doubled
+  probe-direct path racing one PlaybackQueue (mitigated by
+  `VIBEMIX_SVEN_PROBE_DIRECT_VOICE=0`), `VIBEMIX_SVEN_PROBE_PLAYBACK_SPEED`<1.0
+  (deliberate slow), and Multi-Output clock drift. Fragile because the symptom looks
+  like a code bug and invites a no-op edit.
+
+**Go-live warmup flail (capture opens AFTER a ~90s TTS warm).**
+- Memory `project_inapp_ux_lane_verified_2026_06_07` (go-live root-cause): activation
+  warms the local TTS for up to ~90s BEFORE opening audio capture
+  (`__main__.py:2160-2167`), then logs `session_lifecycle "started"` before the
+  capture stream binds (`:2549-2554`). For ~90s the app shows started+IDLE+music=0;
+  capture failure is stderr-only (no `ipc.error`). not-started / warming /
+  capture-failed look identical → operators relaunch into the same warmup and loop
+  for hours. Immediate unblock (zero code):
+  `VIBEMIX_CHATTERBOX_START_WARMUP_TIMEOUT_S=0`. Proper fix: open capture before
+  warmup, gate "started" on the first audio callback, emit `ipc.error` on
+  capture-fail, add an ARMED status.
+
+**Single-socket assumption (Invariant #4) + idle-grounding (Invariant #5).**
+- The mascot/wizard bus binds `127.0.0.1:8765` only (debrief `8766`). A leftover QA
+  engine on `:8765` silently steals the port — `pkill -f "python -m vibemix"` before
+  every relaunch (one instance only). `SessionLayout`'s grounding-failure timer must
+  run ONLY while the co-host is ACTIVE; counting idle `grounded=false` falsely flips
+  the deck to "AI service unreachable" with a blank hero (the recurring empty-screen
+  bug, test-guarded `tauri/ui/tests/session/grounding-failure.spec.ts`).
+
+**macOS-vs-Windows backend split.**
+- `src/vibemix/platform/` is the firewall keeping `__main__` OS-agnostic
+  (`_audio_macos.py`, WASAPI loopback for Windows, `_hid_macos.py`). Windows is a v1
+  target but the live QA loop runs on macOS only — the Windows audio/HID paths carry
+  the least real-rig coverage and are the most likely to surprise at launch
+  (`docs/windows-setup.md`).
 
 ---
 
-## Scaling Limits
+## Process Risk
 
-**Single-machine, single-user local tool — no scaling concerns apply.**
-The architecture intentionally relies on BlackHole virtual audio, a locally connected DDJ-FLX4, and macOS system APIs (Quartz, `nowplaying-cli`). There is no server, no database, no multi-user concern.
+**Shared `git commit` across concurrent Claude/Codex sessions.**
+- Kaan runs 2+ sessions in parallel; `git commit` absorbs EVERY staged file across
+  all sessions. `git reset --soft HEAD~1` keeps racing. Verify
+  `git diff --cached --name-only` matches intent BEFORE committing; for shared files
+  (`CLAUDE.md`) stage hunk-level via a filtered patch + `git apply --cached
+  --recount` (interactive `git add -p` is unavailable here). The god-modules above
+  (`__main__.py`, `dj_cohost.py`) are the worst collision targets. (CLAUDE.md
+  Conventions.)
 
----
+**23 active worktrees, 40 git branches.**
+- `.claude/worktrees/` holds 23 dirs; 40 branches exist. Audited 2026-06-07 (memory
+  `project_autonomous_night_machine_2026_06_04` worktree-retention audit) — hygiene
+  mostly good, but genuine work has been lost-then-recovered before (voice
+  producers, telemetry-consent IPC, vibe-search cache fix). Risk: a fix lands on a
+  worktree branch and never reaches ship (the dangling-producer pattern). Verify
+  ship state on `ux-redesign-impeccable`, not a worktree.
 
-## Dependencies at Risk
-
-**`google-genai==2.0.1` pinned in venv but not in any lockfile:**
-- Risk: The SDK's streaming and TTS interfaces changed significantly between 1.x and 2.x. Without a lockfile, a future `pip install google-genai` could pull 3.x and break the `inline_data` extraction pattern used in `cohost.py:827-838`.
-- Impact: `cohost.py`'s TTS drain loop and `_test_tts.py` would silently return empty audio.
-- Migration plan: Pin in `requirements.txt`. Monitor the SDK changelog when upgrading.
-
-**`livekit-agents==1.5.8` — rapidly evolving SDK:**
-- Risk: `livekit.plugins.google.realtime.RealtimeModel` and `generate_reply()` are used in `cohost_v2.py` and `cohost_lk.py`. The LiveKit agents SDK has had breaking API changes between minor versions (0.x → 1.x was a full rewrite). `1.5.x` may not be the current stable release.
-- Impact: Breaks the entire `cohost_v2.py` and `cohost_lk.py` variants (which are the active ones).
-- Migration plan: Pin `livekit-agents==1.5.8` and `livekit-plugins-google==1.5.8` in `requirements.txt`. Test after any upgrade.
-
----
-
-## Missing Critical Features
-
-**No requirements.txt — fresh install is undocumented:**
-- Problem: There is no documented install procedure. The only hint is `source .venv/bin/activate` in the run scripts, but `.venv` is gitignored. A collaborator or future-self on a new machine has no documented install path.
-- Blocks: Onboarding, disaster recovery.
-
-**No README or setup documentation:**
-- Problem: There is no `README.md`. The only prose documentation is in module docstrings at the top of each `.py` file. The audio routing requirement (BlackHole, Multi-Output Device, djay Pro setup) is described in `cohost.py:1-22` but nowhere else.
-- Blocks: Anyone trying to run this who didn't set it up themselves.
+**Ship built from an unpushed commit.**
+- The DMG was built from `8bc721ce`, a surgical 7-file `src/vibemix` snapshot that is
+  **NOT pushed** (handoff line 11). The shipped artifact's source-of-truth lives only
+  in local git — a `git gc` / disk loss risks orphaning the exact ship source. Push
+  or tag it.
 
 ---
 
 ## Test Coverage Gaps
 
-**No automated tests for any core logic:**
-- What's not tested: `AudioBuffer.snapshot_features()`, `AudioBuffer.estimate_bpm()`, `AudioBuffer.long_arc_curve()`, `ControllerState` CC/Note decoding, `EventDetector.detect()`, `AICoach.build_prompt()`, trigger logic, TurnHistory, PlaybackQueue drain behavior.
-- Files: All of `cohost.py`, `cohost_v2.py`, `cohost_lk.py`
-- Risk: Any refactor of the feature extraction or prompt-building code could silently produce garbage without detection.
-- Priority: Medium — the smoke tests (`test_voice.py`, `_test_tts.py`) cover the external API surface. The internal logic is pure Python and testable without audio hardware. `AudioBuffer.snapshot_features()` in particular has a number of edge cases (silent audio, short clips, zero-size arrays) that are worth unit-testing.
+**Quality is not unit-testable here.**
+- The product's #1 risk (friend-score slop) has NO unit gate — green tests "prove
+  NOTHING" (handoff line 8). The only real gates are the bench score
+  (`src/vibemix/bench/`), the `vibemix-grounding-review` skill, and Kaan's ear. A
+  PR can be fully green and still ship narrator slop.
 
-**`_test_multimodal.py` and `_test_tts.py` have leading underscores — ambiguous status:**
-- What's not tested: It's unclear whether these are intentionally excluded from test runners (the `_` prefix convention) or are just named that way. Neither pytest nor any other runner is configured, so the prefix has no mechanical effect.
-- Files: `_test_multimodal.py`, `_test_tts.py`
-- Risk: Someone setting up pytest would not auto-discover these.
-- Priority: Low — rename to `test_multimodal.py` / `test_tts.py` if a runner is ever configured.
+**The QA config diverges from the ship config.**
+- Live QA ran with `VIBEMIX_ANTI_SLOP=off` and a non-default model/probe env
+  (handoff line 43). The citation-linter strip (Invariant #2, the release gate) was
+  therefore NOT exercised in the proving session. "Tested" reactions were tested
+  with the gate off.
+
+**Windows backend under-tested on real rigs (see Fragile Areas).**
+
+**Frozen-sidecar masks integration regressions** — see Fragile Areas; backend wiring
+verified against the bundled binary can pass while current source is broken.
 
 ---
 
-*Concerns audit: 2026-05-11*
+## Dependencies at Risk
+
+**Unbacked CUE-DETR "parity verified" claim.**
+- The V2 perception moonshot depends on a torch→ONNX export of CUE-DETR; the in-tree
+  "parity verified" claim is **UNBACKED** — no first-party ONNX exists, the export +
+  parity is real work (handoff line 32, memory drop-in scout). Do not treat
+  structure-detection as shippable until the export lands. Gated, must not block v1.
+
+**`pyrekordbox==0.4.4` installed `--no-deps`.**
+- Rekordbox `collection.xml` import only; the SQLCipher path is explicitly unused
+  (`pyproject.toml` install-recipe comment). A pin + `--no-deps` install is fragile
+  across environments — a fresh install on a different rekordbox export schema could
+  silently mis-parse.
+
+**Local-AI extras silently fall back when missing.**
+- Plain `uv run python -m vibemix` prunes `onnxruntime`/`tokenizers`/`sentencepiece`
+  → CLAP / CUE / local-TTS features silently no-op with **no error** (CLAUDE.md
+  Commands). A packaged path that lost an extra ships a dark feature, not a crash —
+  hard to detect. The MOSS-TTS path reports `unavailable (MOSS local only; voice
+  muted, no cloud fallback)` rather than failing loud.
+
+---
+
+## Missing Critical Features (launch-relevant)
+
+- **No UI to switch brain / enter a key** (Brain-switch dark, above) — the entire
+  proxy↔direct tiering is unreachable by a non-dev.
+- **No mid-set cost-cap → upsell** (`agent/proxy_client.py:71-151`) — a proxy
+  cost-cap stall currently becomes silent mid-set silence (the worst booth failure)
+  with no path to "add your own key for uncapped".
+- **Anticipation/lookahead** — the booth-DJ "call the drop before it lands" behavior
+  is designed (`drop_predict.py` substrate) but not wired to the prompt (C9-gap).
+
+---
+
+## Marker Census (TODO / FIXME / HACK / XXX)
+
+Codebase hygiene is **good** — markers are sparse. Real markers (excluding
+`MIXXX`/word-boundary false matches):
+
+**Python (1 real):**
+- `src/vibemix/runtime/session_loop.py:20` — "EventDetector recent events (TODO —
+  Phase 12-04 glue)". Stale phase reference.
+
+**TypeScript (clustered, all benign-but-tracked):**
+- **Tauri capability allowlist (3):** `tauri/ui/src/settings/SettingsDrawer.ts:1276`
+  + `tauri/ui/src/settings/components/help-group.ts:15,43` — GitHub repo URL not yet
+  in the Tauri capability allowlist; `openGithubRepo()` is wired but blocked. One
+  note at `help-group.ts:236` flags an *earlier* TODO as already-stale ("this just
+  works").
+- **Phase 17 cohost-reconnect (3):** `tauri/ui/src/session/render-loop.ts:40,196,360`
+  — no dedicated `ipc.cohost.reconnect` route; session passes an empty `session_dir`.
+- **Recording restore (1):** `tauri/ui/src/settings/components/recording-browser.ts:349`
+  — `ipc.recordings.restore` IPC not yet built ("impeccable Wave 5.B").
+
+No `FIXME`/`HACK`/`XXX` markers in product code. The absence of markers does NOT mean
+absence of debt — the real debt (this doc) lives in *dark wiring* and *measured
+quality*, not in commented stubs.
+
+---
+
+*Concerns audit: 2026-06-08*

@@ -1,208 +1,239 @@
 # Codebase Structure
 
-**Analysis Date:** 2026-05-11
+**Analysis Date:** 2026-06-08
 
 ## Directory Layout
 
-```
+```text
 dj-set-ai/
-├── cohost.py               # Mainline v1 (47KB) — stateless Gemini HTTP cascade
-├── cohost_lk.py            # LiveKit variant (81KB) — streaming Live API, more sensors
-├── cohost_v2.py            # v2 unified-state (68KB) — MusicState + EventDetector
-├── cohost.streaming.py.bak # Archived streaming prototype (34KB) — do not run
-├── run.sh                  # Launch cohost.py + mascot.html
-├── run_v2.sh               # Launch cohost_v2.py + mascot.html
-├── run_lk.sh               # Launch cohost_lk.py + mascot.html
-├── mascot.html             # Animated frontend sprite (standalone HTML)
-├── sprite-1.png            # Bat mascot spritesheet — idle tier (2.3MB)
-├── sprite-2.png            # Bat mascot spritesheet — mid energy tier (2.5MB)
-├── sprite-3.png            # Bat mascot spritesheet — peak energy tier (2.3MB)
-├── generate_bat.py         # Gemini image gen helper — regenerates sprite art
-├── _test_multimodal.py     # Smoke test: sends recorded audio to Gemini, checks response
-├── _test_tts.py            # Smoke test: TTS API call
-├── test_voice.py           # Early voice test script
-├── .env                    # GEMINI_API_KEY (not committed)
-├── .gitignore
-├── .venv/                  # Python 3.14 virtualenv (not committed)
-├── __pycache__/            # Python bytecache for all three variants
-├── recordings/             # Session recordings — one subdirectory per run
-│   └── <YYYYMMDD-HHMMSS>/
-│       ├── input.wav       # 16kHz mono int16 — what Gemini heard
-│       ├── voice.wav       # 24kHz mono int16 — Gemini's reply
-│       └── events.jsonl    # Session timeline (triggers, AI text, errors)
-└── .planning/
-    └── codebase/           # GSD codebase map documents
+├── src/vibemix/            # The packaged Python app (entry: python -m vibemix)
+│   ├── __main__.py         # Async orchestrator — main() (the entry point, ~360KB)
+│   ├── _main_helpers.py    # main() helpers
+│   ├── voice_presets.py    # voice preset table
+│   ├── audio/              # capture/playback ring buffers, DSP, levels, cues, ws constants
+│   ├── platform/           # per-OS backends (the firewall keeping __main__ OS-agnostic)
+│   ├── state/              # THE BRAIN — MusicState + refresh loop + events + grounding
+│   │   ├── detectors/      # micro event detectors (kick swap, breakdown, phrase boundary…)
+│   │   └── genre/          # genre autodetect + per-genre profiles
+│   ├── agent/              # Sven: LiveKit RealtimeModel + Gemini reaction + local MOSS TTS
+│   │   └── moss_tts/       # local MOSS-TTS model cache mount (no .py — runtime assets)
+│   ├── llm/                # model_router (config-driven, no hardcoded literals) + thinking_gate
+│   ├── library/            # CLAP ONNX embeddings + sqlite-vec vibe search + Viber curator
+│   │   └── sources/        # crate importers (rekordbox, serato, traktor, virtualdj)
+│   ├── intel/              # pure musical-intelligence primitives (import-light, no I/O)
+│   ├── learn/              # the teaching engine (skill tree, lessons, practice loops)
+│   │   ├── assets/         # band exemplars (sub/low/mid/high)
+│   │   ├── transcripts/    # course/lesson transcripts
+│   │   └── vocals/         # tutor vocal assets
+│   ├── runtime/            # ws_bus, suggestion pill, session_loop, wizard, soak, ttft
+│   ├── coach/              # citation_linter + prompt_fragments (anti-slop)
+│   ├── prompts/            # slop filter, negative_dict, matrix, scorecard, turn_history
+│   ├── profile/            # long-term DJ profile (schema/storage/builder)
+│   ├── memory/             # local memory.db copilot store (sqlite-vec), gated off by default
+│   ├── debrief/            # post-session review engine (second window, port 8766)
+│   ├── events/             # event taxonomy
+│   │   └── genres/         # per-genre event tuning (house/techno/psytrance/…)
+│   ├── midi/               # MIDI decode + 10-controller profiles/ catalog
+│   │   └── profiles/       # controller MIDI maps
+│   ├── install/            # blackhole_probe + install helpers
+│   ├── ui_bus/             # Python side of the IPC contract (messages, validator, schemas/)
+│   ├── bench/              # Sven prompt bench (dev/eval harness, NOT a runtime feature)
+│   └── eval/               # session_report eval helper
+├── tauri/                  # desktop shell
+│   ├── ui/                 # TS webview frontend (Vite + TS)
+│   │   └── src/            # shell / session / library / mascot / learn / pill / ipc / …
+│   └── src-tauri/          # Rust parent process (sidecar supervisor + windows)
+│       ├── src/            # main.rs, sidecar.rs, ws_client.rs, *_window.rs, *_cmds.rs
+│       └── binaries/       # PyInstaller-frozen sidecar bundle (BUILD ARTIFACT — not source)
+├── tests/                  # pytest suite (mirrors src/vibemix/ subpackages)
+├── tauri/ui/tests/         # vitest specs for the TS frontend
+├── docs/                   # design, install, prompts, security, library, ship runbooks
+├── mocks/                  # HTML visual contracts (the design source of truth for UI)
+├── .planning/              # GSD planning home (ROADMAP, REQUIREMENTS, codebase maps, packets)
+├── packaging/ installer/   # packaging + installer scaffolds
+├── proxy/ native/ spikes/  # Bravoh-side keyless proxy, native spikes, parked experiments
+├── pyproject.toml          # hatchling project + dependency pins
+├── uv.lock                 # uv lockfile (authoritative)
+├── vibemix-core.macos.spec # PyInstaller spec (macOS) — auto-bundles vibemix.* submodules
+├── vibemix-core.windows.spec # PyInstaller spec (Windows)
+├── mascot.html             # live Canvas-2D overlay wired to runtime.ws_bus (NOT a POC)
+└── CLAUDE.md               # project ground truth (architecture + invariants)
 ```
 
 ## Directory Purposes
 
-**Root (source files):**
-- Purpose: All source code lives at the project root — no subdirectories for source
-- Contains: Three cohost variants, three launch scripts, frontend HTML + spritesheets, two test scripts, one utility script
-- Key files: `cohost_v2.py` (newest), `cohost_lk.py` (most sensors), `cohost.py` (simplest/most reliable)
+**`src/vibemix/state/` — the brain:**
+- Purpose: single source of truth + grounding.
+- Contains: `music_state.py` (`MusicState`), `refresh.py` (sole writer,
+  `state_refresh_loop`), `event_detector.py` (typed events + cooldowns),
+  `evidence_registry.py` (`EVIDENCE_SOURCES`), `prompt_builder.py` (`AICoach`),
+  deck-aware state (`deck_state.py`, `deck_context.py`, `deck_poller.py`,
+  `deck_vision.py`), `harmonics.py` (Camelot), `phase.py`, `genre_router.py`,
+  plus `detectors/` and `genre/`.
+- Key files: `src/vibemix/state/refresh.py`, `src/vibemix/state/music_state.py`,
+  `src/vibemix/state/event_detector.py`, `src/vibemix/state/evidence_registry.py`.
 
-**`recordings/`:**
-- Purpose: Automatic per-session recording for post-analysis and debugging
-- Contains: One subdirectory per run, named `YYYYMMDD-HHMMSS` (e.g. `20260510-141722`)
-- Each session: `input.wav` (what Gemini heard), `voice.wav` (Gemini's reply), `events.jsonl` (JSONL timeline)
-- Generated: Yes — created at startup by `VoiceRecorder.__init__()`, writable at runtime
-- Committed: No (should be in `.gitignore`)
-- Note: Sessions accumulate; no automatic cleanup
+**`src/vibemix/platform/` — the OS firewall:**
+- Purpose: keep `__main__` OS-agnostic; all OS imports live here.
+- Contains: typing-only Protocol modules (`audio.py`, `midi.py`, `screen.py`,
+  `track.py`, `permissions.py`, `windows.py`) + `_*_macos.py` / `_*_windows.py`
+  implementations + `_audio_replay.py` (recorded-session replay backend).
+- Key files: `src/vibemix/platform/audio.py` (Protocol), `_audio_macos.py`, `_audio_windows.py`.
 
-**`.venv/`:**
-- Purpose: Python 3.14 virtualenv with all dependencies
-- Generated: Yes — `python -m venv .venv && pip install -r requirements.txt` (no requirements.txt present; deps installed manually)
-- Committed: No
+**`src/vibemix/agent/` — Sven:**
+- Purpose: live co-host LiveKit session + Gemini reaction + local speech.
+- Key files: `dj_cohost.py` (`DJCoHostAgent`, `llm_node`), `tts_chain.py`,
+  `chatterbox_tts.py`, `playback_sink.py`, `proxy_client.py`, `persona.py`.
 
-**`.planning/codebase/`:**
-- Purpose: GSD codebase map documents consumed by planner/executor
-- Committed: Yes
+**`src/vibemix/library/` — CLAP + Viber:**
+- Purpose: on-device CLAP ONNX embeddings, sqlite-vec vibe search, Viber curator.
+- Key files: `clap_engine.py`, `index_sqlite_vec.py`/`index_numpy.py`,
+  `next_suggestion.py` (pill engine), `toolset.py`/`codex_curate.py`/
+  `mcp_server.py`/`telegram_bridge.py` (Viber), `cue_detr.py`/`cue_engine.py`.
+
+**`src/vibemix/runtime/` — transport + loops:**
+- Purpose: the ws bus, suggestion pill, session lifecycle, dev harnesses.
+- Key files: `ws_bus.py` (single 8765 serve, `ws_broadcast`, `IpcRouterBus`),
+  `coach.py` (`coach_loop`), `suggestion.py` (`SuggestionService`),
+  `session_loop.py`, `wizard.py`, `speak_gate.py`.
+
+**`tauri/ui/src/` — TS webview:**
+- Purpose: the visible app shell.
+- Contains: `shell/`, `session/`, `library/`, `mascot/`, `learn/`, `pill/`,
+  `debrief/`, `wizard/`, `settings/`, `overlay/`, `runtime/`, and the `ipc/`
+  contract.
+- Key files: `tauri/ui/src/main.ts`, `tauri/ui/src/shell/DesktopShell.ts`,
+  `tauri/ui/src/session/SessionLayout.ts`, `tauri/ui/src/ipc/client.ts`.
+
+**`tauri/src-tauri/src/` — Rust parent:**
+- Purpose: spawn/supervise the Python sidecar, own native windows.
+- Key files: `main.rs`, `sidecar.rs`, `ws_client.rs` (`forward_ipc_to_sidecar`),
+  `mascot_window.rs`, `pill_window.rs`, `debrief_window.rs`, `learn_window.rs`,
+  `library_cmds.rs`, `wizard_cmds.rs`.
 
 ## Key File Locations
 
-**Entry Points (all via `asyncio.run(main())`):**
-- `cohost.py:1172` — `if __name__ == "__main__": asyncio.run(main())`
-- `cohost_lk.py:1806` — same pattern
-- `cohost_v2.py:1733` — same pattern
-
-**Core Async Main Functions:**
-- `cohost.py:1081` — `async def main()` — wires all buffers + streams + tasks
-- `cohost_lk.py:1670` — `async def main()`
-- `cohost_v2.py:1605` — `async def main()`
-
-**Audio I/O:**
-- `cohost.py:391` — `start_input_stream()` — sounddevice input callback (BlackHole)
-- `cohost.py:479` — `start_passthrough_stream()` — djay→speakers passthrough output
-- `cohost.py:508` — `start_playback_stream()` — AI voice 24kHz output
-- `cohost_v2.py:821` — `start_input_to_session()` — pushes `rtc.AudioFrame` to LiveKit session
-- `cohost_v2.py:783` — `start_passthrough_stream()` (same pattern as v1)
-- `cohost_v2.py:806` — `start_playback_stream()` (same pattern as v1)
-
-**LLM Call Sites:**
-- `cohost.py:745` — `client.models.generate_content_stream()` (LLM, inside `run_one_turn()`)
-- `cohost.py:753` — `client.models.generate_content_stream()` (TTS, inside `run_one_turn()`)
-- `cohost_lk.py:1592` — `session.generate_reply(instructions=prompt)`
-- `cohost_v2.py:1523` — `session.generate_reply(instructions=prompt)`
-
-**Event/Trigger Detection:**
-- `cohost.py:888` — `async def trigger_loop()` — RMS delta + mic + level-state heuristics
-- `cohost_lk.py:1289` — `async def trigger_loop()` — same + band-shift, controller, heartbeat
-- `cohost_v2.py:1125` — `class EventDetector` with `detect()` method
-- `cohost_v2.py:1438` — `async def coach_loop()` — polls EventDetector @10Hz
-
-**State Objects:**
-- `cohost.py:151` — `class Levels`
-- `cohost.py:187` — `class MicBuffer`
-- `cohost.py:233` — `class AudioBuffer`
-- `cohost.py:323` — `class ScreenBuffer`
-- `cohost.py:366` — `class PlaybackQueue`
-- `cohost.py:531` — `class VoiceRecorder`
-- `cohost_v2.py:456` — `class TrackInfo`
-- `cohost_v2.py:540` — `class ControllerState` (MIDI decode)
-- `cohost_v2.py:965` — `@dataclass class MusicState` (v2 unified state)
-
-**Prompt/System Instructions:**
-- `cohost.py:82` — `SYSTEM_INSTRUCTION` — "drunk buddy in the booth" persona
-- `cohost_lk.py:126` — `SYSTEM_INSTRUCTION` — "studio friend, free tek, honest feedback"
-- `cohost_v2.py:120` — `SYSTEM_INSTRUCTION` — "latency-aware, past tense, Hard Tek / Acidcore"
-
-**Frontend:**
-- `mascot.html` — Self-contained HTML + JS, no build step. Opens as `file://` URL.
-- `mascot.html:192` — `connect()` — WebSocket reconnect loop to `ws://127.0.0.1:8765`
-- `mascot.html:99` — Sprite sheet definitions (3 tiers, 36 frames, 6 columns)
-
-**Testing:**
-- `_test_multimodal.py` — Hardcoded to `recordings/20260510-132307/input.wav`; sends 15s to `gemini-3-flash-preview`
-- `_test_tts.py` — TTS smoke test
-- `test_voice.py` — Early voice/TTS exploration
+**Entry Points:**
+- `src/vibemix/__main__.py`: `main()` async orchestrator (`python -m vibemix`).
+- `tauri/src-tauri/src/main.rs`: Rust parent; spawns the sidecar.
+- `tauri/ui/src/main.ts`: webview bootstrap.
 
 **Configuration:**
-- `cohost.py:58-80` — Top-level constants (device names, SR, gains, thresholds)
-- `cohost_lk.py:102-124` — Same layout
-- `cohost_v2.py:70-113` — Same + event engine tuning constants
+- `pyproject.toml`: hatchling project, dependency pins, pytest markers.
+- `uv.lock`: authoritative lockfile.
+- `.env` (repo root): `GEMINI_API_KEY` (Sven live brain only). Existence only —
+  never read contents.
+- `src/vibemix/audio/constants.py`: `WS_HOST`, `WS_PORT` (8765), audio gains.
+- `tauri/src-tauri/tauri.conf.json5`: Tauri window/app config.
+- `tauri/ui/src/ipc/messages.schema.json`: the IPC contract (88 types).
+
+**Core Logic:**
+- `src/vibemix/state/refresh.py`: the single writer of `MusicState`.
+- `src/vibemix/state/event_detector.py`: typed event emission + cooldowns.
+- `src/vibemix/agent/dj_cohost.py`: Gemini reaction + CitationLinter gate.
+- `src/vibemix/runtime/ws_bus.py`: the single 8765 bus.
+
+**Testing:**
+- `tests/`: pytest, mirrors subpackages (`tests/state/`, `tests/agent/`,
+  `tests/learn/`, `tests/library/`, `tests/runtime/`, …).
+- `tauri/ui/tests/`: vitest specs (e.g. `tests/session/grounding-failure.spec.ts`).
 
 ## Naming Conventions
 
-**Files:**
-- `cohost.py` — base name = purpose (co-host script)
-- `cohost_<suffix>.py` — suffix encodes variant: `_lk` (LiveKit), `_v2` (version 2)
-- `cohost.*.py.bak` — `.bak` suffix = archived/retired, do not run
-- `_test_*.py` — leading underscore = dev-only test scripts, not part of the system
-- `generate_*.py` — utility/generator scripts (one-shot tools)
-- `run*.sh` — launch scripts named to match their target cohost variant
-- `sprite-<N>.png` — numbered sprite sheets (energy tiers 1=idle, 2=mid, 3=peak)
+**Files (Python):**
+- `snake_case.py` modules. Private/OS-specific backends are `_prefixed`
+  (`_audio_macos.py`, `_midi_windows.py`). Long-running async tasks are `*_loop`.
 
-**Functions:**
-- `start_*_stream()` — functions that open and return a sounddevice stream
-- `*_loop()` — async functions meant to run as asyncio tasks indefinitely
-- `*_callback` — sounddevice audio thread callbacks (inner functions)
-- `snapshot_*()` — non-destructive read of a buffer's current state
-- `push()` / `pull()` — write/read for thread-safe buffer classes
-- `find_device()` — device lookup helpers
+**Files (TS):**
+- `PascalCase.ts` for component classes/surfaces (`SessionLayout.ts`,
+  `DesktopShell.ts`, `Sidebar.ts`); `kebab-case.ts` for modules
+  (`ws-client.ts`, `render-loop.ts`, `next-suggestion.ts`); `*.test.ts` /
+  `*.spec.ts` for tests.
 
-**Classes:**
-- PascalCase throughout: `Levels`, `AudioBuffer`, `MicBuffer`, `PlaybackQueue`, `VoiceRecorder`, `MusicState`, `EventDetector`, `AICoach`, `ControllerState`, `TrackInfo`
+**Files (Rust):**
+- `snake_case.rs`; per-window modules `*_window.rs`; per-area commands `*_cmds.rs`.
 
-**Constants:**
-- SCREAMING_SNAKE_CASE: `INPUT_SR_NATIVE`, `SILENT_RMS`, `HEARTBEAT_SEC`, `SYSTEM_INSTRUCTION`
-- Grouped at top of file with `# ---- Category ----` comments
+**Code:**
+- Python: `snake_case` functions/modules, `PascalCase` classes,
+  `UPPER_SNAKE_CASE` constants, `_prefixed` privates, `_HAS_*` feature flags.
+- IPC types: dotted `ipc.<area>.<verb>` literals in the schema.
 
-**Events (v2):**
-- Typed string constants: `"TRACK_CHANGE"`, `"PHASE"`, `"LAYER_ARRIVAL"`, `"MIX_MOVE"`, `"HEARTBEAT"`, `"KAAN_SPOKE"`, `"MANUAL"`
-
-**Event log kinds (events.jsonl):**
-- snake_case: `"trigger"`, `"ai_text"`, `"turn_complete"`, `"session_error"`, `"tts_done"`, `"generation_created"`, `"event"`, `"session_start"`
+**Directories:**
+- lowercase single-word subpackages (`state`, `agent`, `library`).
 
 ## Where to Add New Code
 
-**New trigger event type:**
-- v2: Add to `MIN_EVENT_GAP_PER_TYPE` dict (`cohost_v2.py:105`), add detection branch in `EventDetector.detect()` (`cohost_v2.py:1143`), add task string in `AICoach.task_for_event()` (`cohost_v2.py:1288`)
+**New live co-host behavior (speech/events):**
+- Event type / cooldown: `src/vibemix/state/event_detector.py`.
+- Prompt per event type: `src/vibemix/state/prompt_builder.py` (`AICoach`).
+- Tests: `tests/state/`. RUN the `vibemix-grounding-review` skill (Invariants #1–#3).
 
-**New audio feature:**
-- Add to `AudioBuffer.snapshot_features()` in the relevant variant file (e.g. `cohost_v2.py:261`)
-- Add to `AICoach.evidence_line()` output string (`cohost_v2.py:1237`) if it should reach the prompt
+**New state field:**
+- Add the field to `src/vibemix/state/music_state.py`, write it ONLY inside
+  `src/vibemix/state/refresh.py::_tick_once` (Invariant #1). Consumers read only.
 
-**New sensor / external signal:**
-- Create a thread-safe class like `TrackInfo` or `ControllerState`
-- Wire into `state_refresh_loop()` (`cohost_v2.py:1331`) as a new field on `MusicState`
-- Start its polling task in `main()`
+**New OS-specific capability:**
+- Declare the Protocol in the typing module (`src/vibemix/platform/<area>.py`),
+  implement in `_<area>_macos.py` and `_<area>_windows.py`. Keep the typing
+  module free of OS imports (`tests/test_platform.py` enforces this).
 
-**New MIDI CC or note mapping (DDJ-FLX4):**
-- `_CC_MAP` dict (`cohost_v2.py:504`) for continuous controls
-- `_NOTE_MAP` dict (`cohost_v2.py:513`) for buttons/pads
-- Add handling in `ControllerState.handle_msg()` (`cohost_v2.py:576`)
+**New IPC-wired control (button/panel):**
+- Declare the type in `tauri/ui/src/ipc/messages.schema.json`, run
+  `npm run codegen:ipc`. Wire BOTH ends: TS sender via `emitIpc`/`sendIpcRequest`
+  (`tauri/ui/src/ipc/client.ts`) AND Python `register_handler` in
+  `src/vibemix/runtime/ws_bus.py` (or an outbound constant in
+  `src/vibemix/ui_bus/messages.py`). Run the `ipc-wiring-checker` skill.
 
-**New WebSocket message type (mascot → backend):**
-- Add parsing in `ws_broadcast()` handler inner function (`cohost_v2.py:1560`)
-- Currently only `{action: "trigger"}` is handled
+**New UI surface:**
+- TS under the matching `tauri/ui/src/<area>/`; if it needs its own native
+  window, add a `*_window.rs` module + register it in `tauri/src-tauri/src/main.rs`.
+- Honor the optimistic-repaint convention for settings-style controls.
 
-**New recording field:**
-- Add a `log_event()` call in `VoiceRecorder` (`cohost_v2.py:757`) or add a new WAV file in `VoiceRecorder.__init__()`
+**New library / Viber capability:**
+- `src/vibemix/library/`; crate importers under `library/sources/`.
 
-**New cohost variant:**
-- Copy `cohost_v2.py` as the base (most complete)
-- Name as `cohost_<descriptor>.py`
-- Add corresponding `run_<descriptor>.sh`
+**New musical-intelligence primitive:**
+- `src/vibemix/intel/` — keep it import-light (no model clients, no audio
+  capture, no Tauri, no filesystem writes).
+
+**New teaching content/logic:**
+- `src/vibemix/learn/`; transcripts under `learn/transcripts/`, exemplar audio
+  under `learn/assets/`. Learn may NOT compute its own phrase structure
+  (Invariant #3) and writes only `LearnState` (Invariant #1).
+
+**Shared helpers / utilities:**
+- Audio DSP: `src/vibemix/audio/`. Prompt/anti-slop: `src/vibemix/prompts/`,
+  `src/vibemix/coach/`. Model resolution: ALWAYS `src/vibemix/llm/model_router.py`.
 
 ## Special Directories
 
-**`recordings/`:**
-- Purpose: Runtime-generated session archives
-- Generated: Yes, at every startup
-- Committed: No (large WAV files)
-- Contents: timestamped subdirs with `input.wav`, `voice.wav`, `events.jsonl`
+**`tauri/src-tauri/binaries/vibemix-core-*/`:**
+- Purpose: PyInstaller-frozen Python sidecar bundle.
+- Generated: Yes (BUILD ARTIFACT). Lags edited `src/` — verify backend wiring by
+  running `main()` on current source, not the bundled binary.
+- Committed: present in tree but not hand-edited source.
 
-**`__pycache__/`:**
-- Purpose: Python bytecode cache for cohost.py, cohost_lk.py, cohost_v2.py
-- Generated: Yes
-- Committed: No
+**`src/vibemix/agent/moss_tts/`:**
+- Purpose: local MOSS-TTS model mount; no `.py` source.
+- Generated/cached: the model itself lives under `~/.cache/vibemix/moss-tts-onnx/`.
 
-**`.venv/`:**
-- Purpose: Isolated Python 3.14 environment
-- Generated: Yes
-- Committed: No
-- Key packages present: `google-genai`, `livekit`, `livekit-agents`, `livekit-plugins-google`, `sounddevice`, `numpy`, `scipy`, `mido`, `websockets`, `mss`, `Pillow`, `pyobjc-framework-Quartz`, `python-dotenv`
+**`mocks/`:**
+- Purpose: HTML visual contracts (the design source of truth). Canonical:
+  `vibemix-rebuild-session.html` (app shell), `vibemix-direction-final.html`
+  (visual language). Treated as the visual contract by `frontend-enforcement`.
+- Generated: No. Committed: Yes.
+
+**`.planning/`:**
+- Purpose: GSD source of truth — `ROADMAP.md`, `REQUIREMENTS.md`, `PROJECT.md`,
+  `STATE.md`, `codebase/*.md` (these maps), `research/`, `packets/`, `phases/`,
+  `handoffs/`.
+- Committed: Yes.
+
+**`~/.cache/vibemix/` (runtime, off-tree):**
+- Purpose: on-disk model + library state — `clap-onnx/`, `moss-tts-onnx/`,
+  `library-clap.db` (sqlite-vec), `embeddings.db`, `library.pkl`, `memory.db`.
+- Generated: Yes. Committed: No.
 
 ---
 
-*Structure analysis: 2026-05-11*
+*Structure analysis: 2026-06-08*
