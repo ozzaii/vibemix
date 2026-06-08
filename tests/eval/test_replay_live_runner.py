@@ -35,7 +35,8 @@ def test_discover_sessions_finds_direct_and_nested(tmp_path: Path) -> None:
     assert discover_sessions(tmp_path) == [direct, nested]
 
 
-def test_run_live_replay_session_sets_env_and_reports_pass(tmp_path: Path) -> None:
+def test_run_live_replay_session_sets_env_and_reports_pass(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.delenv("VIBEMIX_BPM_CONFIDENCE_FLOOR", raising=False)
     session = tmp_path / "corpus" / "set-one"
     session.mkdir(parents=True)
     _write_wav(session / "input.wav")
@@ -116,6 +117,9 @@ def test_run_live_replay_session_sets_env_and_reports_pass(tmp_path: Path) -> No
     # Without this, the replayed set sits at the armed start gate forever and the
     # run captures zero events — the runner must auto-fire one session.start.
     assert env["VIBEMIX_AUTOSTART"] == "1"
+    # Without this the saved master audio never crosses the 0.70 BPM floor, no
+    # beatgrid locks, and Sven never reacts to the replayed set.
+    assert env["VIBEMIX_BPM_CONFIDENCE_FLOOR"] == "0.05"
     assert result.max_music == 0.249
     assert result.audible_seen is True
     assert result.recording_input_duration_s == 2.0

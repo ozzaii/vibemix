@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import io
 import math
+import os
 import wave
 
 import numpy as np
@@ -28,6 +29,25 @@ _BPM_LO_LAG: int = 30
 _BPM_HI_LAG: int = 60
 _BPM_CONFIDENCE_FLOOR: float = 0.70
 _BPM_CURVATURE_SHARP_PEAK: float = 0.28
+
+
+def _resolve_bpm_confidence_floor() -> float:
+    """The confidence below which ``estimate_bpm`` floors to 0.0.
+
+    Defaults to ``_BPM_CONFIDENCE_FLOOR`` (0.70) — the live product's deliberately
+    high bar against public BPM wobble. Replay/QA runs may relax it via
+    ``VIBEMIX_BPM_CONFIDENCE_FLOOR`` so a recorded set's saved master audio (which
+    under-confidences vs the live audio_buf it came from) can still lock a BPM and
+    drive events for benching. The packaged product never sets the env; a garbage
+    or empty value falls back to the default.
+    """
+    raw = os.environ.get("VIBEMIX_BPM_CONFIDENCE_FLOOR", "").strip()
+    if not raw:
+        return _BPM_CONFIDENCE_FLOOR
+    try:
+        return float(raw)
+    except ValueError:
+        return _BPM_CONFIDENCE_FLOOR
 
 
 def snapshot_features(buf: AudioBuffer, seconds: float = 5.0) -> dict:
@@ -184,7 +204,7 @@ def estimate_bpm(buf: AudioBuffer, seconds: float = 6.0) -> float:
     ``estimate_bpm_with_confidence`` when the ambiguity score matters.
     """
     bpm, confidence = estimate_bpm_with_confidence(buf, seconds=seconds)
-    if confidence < _BPM_CONFIDENCE_FLOOR:
+    if confidence < _resolve_bpm_confidence_floor():
         return 0.0
     return round(bpm, 1)
 

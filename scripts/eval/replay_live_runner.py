@@ -130,6 +130,15 @@ def run_live_replay_session(
             "VIBEMIX_DEBRIEF_PORT": str(debrief_port),
         }
     )
+    # Replay's saved master audio under-confidences vs the live audio_buf it was
+    # captured from, so the live 0.70 BPM-confidence floor never locks a BPM —
+    # no beatgrid, no musical events, Sven never reacts (the same recorded set
+    # that fired 74 events live replays silent). Relax the floor for replay so
+    # the recording drives reactions. setdefault → an explicit operator value
+    # still wins. NOTE: this is a relaxed-perception measurement (representative
+    # for friend/persona/gate; BPM may be a harmonic), not a pixel-perfect live
+    # proxy — see .planning/eval-runs/REPLAY-MEASUREMENT-WALL-2026-06-09.md.
+    env.setdefault("VIBEMIX_BPM_CONFIDENCE_FLOOR", "0.05")
     if config.output_device:
         env["VIBEMIX_OUTPUT_DEVICE"] = config.output_device
     env["PYTHONPATH"] = _prepend_pythonpath(config.repo_root / "src", env.get("PYTHONPATH"))
