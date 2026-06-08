@@ -1,6 +1,8 @@
 # SPDX-License-Identifier: Apache-2.0
 from __future__ import annotations
 
+import json
+
 from scripts.eval import respan_sven_heartbeat_judge as judge
 
 
@@ -94,3 +96,57 @@ def test_describe_bank_census_replay_silence_summary_fails_kept_rows() -> None:
 
     assert summary["pass"] is False
     assert "kept_for_judge 1 > 0" in summary["failures"]
+
+
+def test_is_silenced_guard_substitution_detects_all_held_replies() -> None:
+    # The live-claim guard replaces an unproven outcome claim with one of these
+    # deterministic held replies AND leaves emit_corrected=False (the shipped
+    # default) — so the runtime SILENCES them; they are never spoken. The recorded
+    # response.txt still carries the substituted text, so the loader must not grade
+    # them as spoken lines. Corpus-verified (2026-06-08): 140/144 such guard events
+    # stripped, 0 organic. Import the canonical constants so the judge can never
+    # drift out of sync with the runtime's held replies.
+    from vibemix.state import deck_context as dc
+
+    held = [
+        dc.LIVE_TRANSITION_HELD_REPLY,
+        dc.LIVE_CANDIDATE_HELD_REPLY,
+        dc.LIVE_MOVE_EFFECT_HELD_REPLY,
+        dc.LIVE_COACHING_ADVICE_HELD_REPLY,
+        dc.LIVE_AUDIO_SOURCE_DETAIL_HELD_REPLY,
+        dc.LIVE_TRACK_IDENTITY_HELD_REPLY,
+        dc.LIVE_JUDGE_OVERPRAISE_HELD_REPLY,
+    ]
+    assert judge.SILENCED_GUARD_SUBSTITUTIONS == frozenset(held)
+    for reply in held:
+        assert judge.is_silenced_guard_substitution(reply)
+        assert judge.is_silenced_guard_substitution(f"  {reply}  ")  # whitespace-tolerant
+
+
+def test_is_silenced_guard_substitution_passes_organic_line() -> None:
+    assert not judge.is_silenced_guard_substitution(
+        "Let it ride four bars, then snap it back on the phrase."
+    )
+    assert not judge.is_silenced_guard_substitution("")
+    # A line that merely mentions a transition is still an organic spoken line.
+    assert not judge.is_silenced_guard_substitution("That transition landed clean.")
+
+
+def test_load_rows_skips_guard_silenced_held_reply(tmp_path) -> None:
+    from vibemix.state import deck_context as dc
+
+    inv = tmp_path / "invocations"
+
+    def _mk(name: str, event: str, line: str) -> None:
+        d = inv / name
+        d.mkdir(parents=True)
+        (d / "meta.json").write_text(json.dumps({"event": event}))
+        (d / "response.txt").write_text(line)
+
+    _mk("0001_PHASE", "PHASE", "Let it ride four bars, then snap it back.")  # organic → judged
+    _mk("0002_PHASE", "PHASE", dc.LIVE_TRANSITION_HELD_REPLY)  # guard-silenced → skip
+    _mk("0003_HEARTBEAT", "HEARTBEAT", "")  # already-silent → skip
+
+    rows = judge.load_rows(tmp_path, set(), None)
+
+    assert [r["line"] for r in rows] == ["Let it ride four bars, then snap it back."]

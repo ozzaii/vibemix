@@ -53,6 +53,41 @@ import httpx  # vibemix core dep; run via `uv run python …`
 from vibemix.llm.model_router import resolve_model
 from vibemix.runtime.speak_gate import decide_speak_gate
 from vibemix.state import Event, MusicState
+from vibemix.state.deck_context import (
+    LIVE_AUDIO_SOURCE_DETAIL_HELD_REPLY,
+    LIVE_CANDIDATE_HELD_REPLY,
+    LIVE_COACHING_ADVICE_HELD_REPLY,
+    LIVE_JUDGE_OVERPRAISE_HELD_REPLY,
+    LIVE_MOVE_EFFECT_HELD_REPLY,
+    LIVE_TRACK_IDENTITY_HELD_REPLY,
+    LIVE_TRANSITION_HELD_REPLY,
+)
+
+# The live-claim guard replaces an unproven outcome claim with one of these
+# deterministic held replies and leaves emit_corrected=False (the shipped
+# default), so the runtime SILENCES them — they never reach TTS. But the recorded
+# `response.txt` still carries the substituted text, so a naive loader would grade
+# a silenced safety substitution as a friend-0 "spoken" line and tank the score.
+# Corpus-verified 2026-06-08: of 144 such guard events, 140 stripped (silenced),
+# only 4 emitted. We import the canonical constants (not copies) so this set can
+# never drift out of sync with the runtime's held replies.
+SILENCED_GUARD_SUBSTITUTIONS = frozenset(
+    {
+        LIVE_TRANSITION_HELD_REPLY,
+        LIVE_CANDIDATE_HELD_REPLY,
+        LIVE_MOVE_EFFECT_HELD_REPLY,
+        LIVE_COACHING_ADVICE_HELD_REPLY,
+        LIVE_AUDIO_SOURCE_DETAIL_HELD_REPLY,
+        LIVE_TRACK_IDENTITY_HELD_REPLY,
+        LIVE_JUDGE_OVERPRAISE_HELD_REPLY,
+    }
+)
+
+
+def is_silenced_guard_substitution(line: str) -> bool:
+    """True when a recorded response is a guard-silenced held reply, not a spoken line."""
+    return line.strip() in SILENCED_GUARD_SUBSTITUTIONS
+
 
 RESPAN_BASE = "https://api.respan.ai/api"
 GATEWAY = f"{RESPAN_BASE}/chat/completions"
@@ -235,6 +270,12 @@ def load_rows(session: Path, events: set[str], limit: int | None) -> list[dict]:
         line = resp_p.read_text().strip()
         if not line:
             silent += 1  # already-silent: the system chose silence here
+            continue
+        if is_silenced_guard_substitution(line):
+            # Guard-silenced held reply: the shipped runtime substituted this
+            # deterministic safety line and did NOT speak it (emit_corrected=False).
+            # Judging it as a spoken line scores a silence as friend-0 slop.
+            silent += 1
             continue
         prompt_p = d / "prompt.txt"
         prompt_text = prompt_p.read_text(errors="ignore") if prompt_p.exists() else None
