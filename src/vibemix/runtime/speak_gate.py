@@ -55,6 +55,25 @@ _PRIORITY_EVENT_REQUIRED_EXTRA_KEYS: dict[str, tuple[str, ...]] = {
     "REENTRY_KICK_LAND": ("kill_age_s", "sub_at_reentry", "beat_phase"),
 }
 
+# Spectrum-delta events describe a spectral change (kick brightness, onset
+# density, distortion chain, acid formant) but carry no inherent "what to do".
+# Measured (BENCH-AUDIT-2026-06-08, 77 lines / 8 recorded sessions): spoken on a
+# bare delta they re-judge as pure narration — friend_not_narrator ~0.13,
+# should_NOT_have_spoken ~97% (KICK_SWAP 0.12, KICK_DENSITY_SHIFT 0.15). They
+# only earn a line when paired with a forward-coachable anchor (a real move, or a
+# grounded deterministic voice payload). A bare spectral delta is silence — the
+# SAME anti-slop rule the describe-bank set already follows, and the "rare +
+# earned voice" design thesis. Genuine structural moments (BREAKDOWN_KICK_KILL /
+# REENTRY_KICK_LAND / TRANSITION_OPPORTUNITY / DROP) keep the bare priority ladder.
+_SPECTRUM_NARRATION_EVENT_TYPES = frozenset(
+    {
+        "KICK_DENSITY_SHIFT",
+        "KICK_SWAP",
+        "DISTORTION_CLIMB",
+        "ACID_LINE_ENTRY",
+    }
+)
+
 _EVENT_BASE_WORTHINESS: dict[str, float] = {
     "HEARTBEAT": 0.02,
     "PHASE": 0.12,
@@ -121,6 +140,20 @@ def _has_required_priority_payload(ev: Event) -> bool:
         return True
     extra = ev.extra if isinstance(ev.extra, dict) else {}
     return all(_payload_value_present(extra.get(key)) for key in required_keys)
+
+
+def _has_forward_anchor(ev: Event) -> bool:
+    """True when a spectrum event also carries something forward to COACH.
+
+    A forward anchor is either a real controller move (``moves``) or any grounded
+    deterministic voice payload (next-suggestion / cue-lookahead / transition
+    verdict). Without one, a spectrum delta is pure narration (see
+    ``_SPECTRUM_NARRATION_EVENT_TYPES``) and the gate silences it.
+    """
+    if _has_grounded_voice_payload(ev):
+        return True
+    extra = ev.extra if isinstance(ev.extra, dict) else {}
+    return _payload_value_present(extra.get("moves"))
 
 
 def grounded_voice_payload_keys(ev: Event) -> tuple[str, ...]:
@@ -241,6 +274,12 @@ def decide_speak_gate(
         return SpeakGateDecision("speak", "grounded_voice_payload", worthiness=worthiness)
     if not _has_required_priority_payload(ev):
         return SpeakGateDecision("hold", "priority_missing_payload", worthiness=worthiness)
+    if ev.type in _SPECTRUM_NARRATION_EVENT_TYPES and not _has_forward_anchor(ev):
+        # A bare spectral delta is narration, not coaching — silence it (the
+        # describe-bank rule extended to spectrum events; BENCH-AUDIT-2026-06-08).
+        return SpeakGateDecision(
+            "silent", "spectrum_narration_no_anchor", worthiness=worthiness
+        )
     if worthiness < WORTHINESS_MIN_PRIORITY:
         return SpeakGateDecision("hold", "priority_below_floor", worthiness=worthiness)
     return SpeakGateDecision("speak", "event_priority", worthiness=worthiness)

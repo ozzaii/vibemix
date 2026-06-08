@@ -150,21 +150,56 @@ def test_priority_event_without_detector_payload_holds() -> None:
         assert decision.reason == "priority_missing_payload"
 
 
-def test_priority_event_with_detector_payload_reaches_sven() -> None:
-    kick_swap = decide_speak_gate(
+def test_spectrum_narration_event_bare_delta_stays_silent() -> None:
+    # A spectral delta with no forward-coachable anchor is pure narration —
+    # measured friend ~0.13 / should_NOT ~97% (BENCH-AUDIT-2026-06-08). The gate
+    # silences it, the same anti-slop rule the describe-bank set follows.
+    cases = {
+        "KICK_SWAP": {"prev_centroid_hz": 120.0, "new_centroid_hz": 180.0, "delta_hz": 60.0},
+        "KICK_DENSITY_SHIFT": {"prev_density": 6.0, "new_density": 4.5, "delta": -1.5},
+        "DISTORTION_CLIMB": {"chain_position": "master", "distortion_db": 6.0},
+        "ACID_LINE_ENTRY": {"formant_hz": 800.0, "resonance_q": 4.0},
+    }
+    for event_type, extra in cases.items():
+        decision = decide_speak_gate(_event(event_type, extra))
+        assert decision.verdict == "silent", event_type
+        assert decision.reason == "spectrum_narration_no_anchor", event_type
+
+
+def test_spectrum_narration_event_with_move_anchor_reaches_sven() -> None:
+    # A spectrum event paired with a real controller move has something forward
+    # to coach — it earns the line.
+    decision = decide_speak_gate(
         _event(
-            "KICK_SWAP",
-            {"prev_centroid_hz": 120.0, "new_centroid_hz": 180.0, "delta_hz": 60.0},
+            "KICK_DENSITY_SHIFT",
+            {
+                "prev_density": 6.0,
+                "new_density": 4.5,
+                "delta": -1.5,
+                "moves": ["A_low: flat->kill (big twist)"],
+            },
         )
     )
-    density = decide_speak_gate(
-        _event("KICK_DENSITY_SHIFT", {"prev_density": 6.0, "new_density": 4.5, "delta": -1.5})
+
+    assert decision.verdict == "speak"
+    assert decision.reason == "event_priority"
+
+
+def test_spectrum_narration_event_with_grounded_voice_payload_reaches_sven() -> None:
+    decision = decide_speak_gate(
+        _event(
+            "KICK_SWAP",
+            {
+                "prev_centroid_hz": 120.0,
+                "new_centroid_hz": 180.0,
+                "delta_hz": 60.0,
+                "next_suggestion_voice_line": "[track:track-42] [mix:next_suggestion=track-42]",
+            },
+        )
     )
 
-    assert kick_swap.verdict == "speak"
-    assert kick_swap.reason == "event_priority"
-    assert density.verdict == "speak"
-    assert density.reason == "event_priority"
+    assert decision.verdict == "speak"
+    assert decision.reason == "event_priority"
 
 
 def test_plain_track_change_stays_silent_by_default() -> None:
