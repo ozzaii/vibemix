@@ -27,17 +27,23 @@ export function createSidebar(store: ShellStore): HTMLElement {
 
   const brand = document.createElement("div");
   brand.className = "sb-brand";
-  // Two-tone lockup: "vibe" in ink, "mix" lit in brand rose. The split is
-  // cosmetic only — the syllables sit flush so the mark still reads as one
-  // lowercase word ("vibemix"), but the second syllable can carry the identity
-  // color the way the ear and the active nav glyph do.
+  // The mock's brand-mark: a machined 30px tile holding the rose "v" monogram,
+  // with the listening ear as a badge on its corner (a tiny ring whose inner
+  // dot pulses with the amp). The two-tone wordmark sits beside it; at the
+  // collapsed 72px rail the wordmark hides and the tile alone carries the
+  // identity. The monogram is aria-hidden — the wordmark text stays the
+  // accessible brand name.
   brand.innerHTML =
-    '<span class="sb-ear" aria-hidden="true"></span>' +
-    '<span class="sb-wordmark"><span class="wm-vibe">vibe</span><span class="wm-mix">mix</span></span>' +
-    // Collapsed-rail mark: the wordmark hides at 72px, so a rose "v" monogram
-    // keeps the identity (and becomes the lone breathing sign-of-life). It is
-    // aria-hidden — the wordmark text stays the accessible brand name.
-    '<span class="sb-monogram" aria-hidden="true">v</span>';
+    '<span class="sb-mark" aria-hidden="true">' +
+    '<span class="sb-monogram" aria-hidden="true">v</span>' +
+    '<span class="sb-ear"></span>' +
+    "</span>" +
+    '<span class="sb-wordmark"><span class="wm-vibe">vibe</span><span class="wm-mix">mix</span></span>';
+
+  // Mono section label above the nav — the mock's quiet engraved index tab.
+  const navSection = document.createElement("div");
+  navSection.className = "sb-section";
+  navSection.textContent = "surfaces";
 
   const nav = document.createElement("nav");
   nav.className = "sb-nav";
@@ -61,17 +67,50 @@ export function createSidebar(store: ShellStore): HTMLElement {
     return { id: surface.id, el: item };
   });
 
+  // TONIGHT — the mock's session strip, kept honest: the one live item shows
+  // only while a session is actually live (CSS gates on #shell-root
+  // [data-state]); "all sessions" is a real route into the debrief surface.
+  const tonightSection = document.createElement("div");
+  tonightSection.className = "sb-section";
+  tonightSection.textContent = "tonight";
+  const sessions = document.createElement("div");
+  sessions.className = "sb-sessions";
+  sessions.innerHTML =
+    '<div class="sb-session-item sb-session-live">' +
+    '<span class="sb-session-title">live session</span>' +
+    '<span class="sb-session-meta"><span class="sb-live-dot" aria-hidden="true"></span>on air</span>' +
+    "</div>";
+  const sessionsAll = document.createElement("button");
+  sessionsAll.type = "button";
+  sessionsAll.className = "sb-sessions-all";
+  sessionsAll.textContent = "all sessions ›";
+  sessionsAll.setAttribute("aria-label", "All sessions — open debrief");
+  sessionsAll.addEventListener("click", () => store.setActiveSurface("debrief"));
+
   const foot = document.createElement("div");
   foot.className = "sb-foot";
-  // A static lit rose dot: the sidebar's sign-of-life that the co-host is awake.
-  // No caps label — the dot carries the state; the word read as a false control.
+  // The co-host presence slab (the mock's cohost-pill): names who's with you
+  // AND states what it is doing, honestly from activation — ready / listening
+  // / live. Warms to the rose slab only when actually live in your ear.
   foot.innerHTML =
-    '<div class="sb-cohost" data-wire="shell.cohost-pill" aria-label="Co-host">' +
+    '<div class="sb-cohost" data-wire="shell.cohost-pill" aria-label="Co-host Sven">' +
     '<span class="sb-ear" aria-hidden="true"></span>' +
+    '<span class="sb-cohost-name">sven</span>' +
+    '<span class="sb-cohost-state">ready</span>' +
     "</div>";
 
-  sidebar.append(collapse, brand, nav, foot);
+  sidebar.append(
+    collapse,
+    brand,
+    navSection,
+    nav,
+    tonightSection,
+    sessions,
+    sessionsAll,
+    foot,
+  );
 
+  const cohostState = foot.querySelector<HTMLElement>(".sb-cohost-state");
   const render = (): void => {
     const state = store.getState();
     const active = state.settingsOpen ? "settings" : state.activeSurface;
@@ -81,6 +120,17 @@ export function createSidebar(store: ShellStore): HTMLElement {
       } else {
         item.el.removeAttribute("aria-current");
       }
+    }
+    // Honest presence wording straight from activation — never claims "live"
+    // while idle (cardinal invariant #5: idle is calm, not a fault).
+    const presence =
+      state.activation === "live"
+        ? "live"
+        : state.activation === "listening"
+          ? "listening"
+          : "ready";
+    if (cohostState && cohostState.textContent !== presence) {
+      cohostState.textContent = presence;
     }
   };
   store.subscribe(render);

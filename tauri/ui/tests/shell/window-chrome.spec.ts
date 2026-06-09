@@ -44,7 +44,7 @@ describe("main window chrome", () => {
     expect(tokens).toContain("overlay titlebar");
   });
 
-  it("spends native material and demotes sidebar accelerator digits at rest", () => {
+  it("spends native material and seats the accelerator keycaps on the rows", () => {
     const shell = readUi("src/shell/shell.css");
     const chromeBlock = shell.match(/\.shell-chrome \{[\s\S]*?\n\}/)?.[0] ?? "";
     const sidebarBlock = shell.match(/\.shell-sidebar \{[\s\S]*?\n\}/)?.[0] ?? "";
@@ -52,8 +52,12 @@ describe("main window chrome", () => {
     expect(shell).toContain("box-shadow:\n    var(--bevel-raised)");
     expect(sidebarBlock).not.toContain("border-right: 1px solid var(--border-default)");
     expect(chromeBlock).not.toContain("border-bottom: 1px solid var(--border-subtle)");
-    expect(shell).toContain(".sb-nav-item .sb-kbd::before");
-    expect(shell).toContain(".sb-nav-item:hover .sb-kbd");
-    expect(shell).toContain(".sb-nav-item:focus-visible .sb-kbd");
+    // Pink-mock 1:1 (fable pass 2026-06-10): the accelerator is a machined
+    // keycap ALWAYS seated on the row — gradient face + top specular — not a
+    // hover-reveal pill. Active row tints the cap brand.
+    const kbdBlock = shell.match(/\.sb-nav-item \.sb-kbd \{[\s\S]*?\n\}/)?.[0] ?? "";
+    expect(kbdBlock).toContain("linear-gradient(180deg, var(--void-12) 0%, var(--void-8) 100%)");
+    expect(kbdBlock).not.toContain("font-size: 0");
+    expect(shell).toContain('.sb-nav-item[aria-current="true"] .sb-kbd');
   });
 });

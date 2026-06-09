@@ -109,6 +109,48 @@ html[data-runtime="tauri"] .shell-main {
   letter-spacing: 0.08em;
   color: var(--text-muted);
 }
+/* Right cluster: the command-palette affordance + the clock. */
+.shell-chrome__right {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  height: 100%;
+}
+/* The visible front door to the command palette. Quiet at rest (it must not
+ * compete with the deck), it warms on hover/focus like a real key cap catching
+ * light. no-drag so the click lands instead of moving the window. */
+.shell-cmdk {
+  -webkit-app-region: no-drag;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 18px;
+  padding: 0 7px;
+  border-radius: 999px;
+  border: 1px solid var(--border-subtle);
+  background: rgba(255, 255, 255, 0.022);
+  color: var(--text-muted);
+  font-family: var(--type-mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  transition:
+    color 160ms var(--ease-brand),
+    border-color 160ms var(--ease-brand),
+    background 160ms var(--ease-brand);
+}
+.shell-cmdk:hover,
+.shell-cmdk:focus-visible {
+  color: var(--text-secondary);
+  border-color: var(--border-default);
+  background: rgba(255, 255, 255, 0.045);
+}
+.shell-cmdk__hint { text-transform: lowercase; }
+.shell-cmdk__keys {
+  font-family: var(--type-mono);
+  font-size: 10px;
+  color: var(--text-tertiary);
+}
 
 /* ── Body — the fixed-furniture / swappable-interior frame ───────────────── */
 .shell-body {
@@ -127,8 +169,12 @@ html[data-runtime="tauri"] .shell-main {
   width: var(--sidebar-w);
   display: flex;
   flex-direction: column;
+  /* Neutral machined slab. The rose 90deg wash that used to ride here was a rose
+   * FILL on a large surface (the one thing DESIGN §2 says rose must never be) and
+   * stacked a 4th simultaneous rose mark onto the panel that should spend it most
+   * sparingly. The sidebar's rose signature now lives only where it is documented:
+   * the right-edge LED seam, the breathing brand ear, and the "mix" wordmark. */
   background:
-    linear-gradient(90deg, rgba(255, 165, 223, 0.052) 0%, transparent 38%),
     linear-gradient(180deg, rgba(255, 255, 255, 0.044) 0%, transparent 18%, rgba(0, 0, 0, 0.20) 100%),
     rgba(34, 29, 32, 0.82);
   -webkit-backdrop-filter: blur(24px) saturate(1.16);
@@ -179,18 +225,63 @@ html[data-runtime="tauri"] .shell-main {
   box-shadow: 0 0 6px var(--brand-40);
   flex: 0 0 auto;
 }
-/* The brand ear breathes only while NOT live: it signals "co-host awake,
- * waiting". Once live, the deck's tail cursor is the screen's single breathing
- * sign-of-life, so the ear steadies to a static lit dot (PRODUCT principle 3:
- * never two breathing marks on screen at once). */
-#shell-root:not([data-state="live"]) .sb-brand .sb-ear {
-  animation: shell-breathe 2.4s var(--ease-brand) infinite;
+/* The brand-mark tile (pink-mock 1:1): a 30px machined chip holding the rose
+ * monogram, the ear riding its corner as a tiny ring badge. The identity reads
+ * as a physical object on the slab, not loose glyphs in a row. */
+.sb-mark {
+  position: relative;
+  flex: 0 0 auto;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  background:
+    radial-gradient(circle at 30% 25%, var(--brand-22), var(--brand-06) 70%),
+    var(--void-8);
+  border: 1px solid var(--brand-35);
+  display: grid;
+  place-items: center;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.10),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.25);
+}
+/* Inside the tile the ear becomes the corner badge: a void ring whose inner
+ * dot carries the amp pulse. Overrides the bare lit-dot form above. */
+.sb-mark .sb-ear {
+  position: absolute;
+  bottom: -2px;
+  right: -2px;
+  width: 10px;
+  height: 10px;
+  background: var(--void-0);
+  border: 1px solid var(--brand-35);
+  box-shadow: none;
+  display: grid;
+  place-items: center;
+}
+.sb-mark .sb-ear::after {
+  content: "";
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: var(--brand);
+  box-shadow: 0 0 4px var(--brand-50);
+}
+/* The brand ear's inner dot breathes only while NOT live: it signals "co-host
+ * awake, waiting". Once live, the deck's tail cursor is the screen's single
+ * breathing sign-of-life (PRODUCT principle 3: never two breathing marks). */
+#shell-root:not([data-state="live"]) .sb-mark .sb-ear::after {
+  animation: sb-ear-amp 1.4s ease-in-out infinite;
 }
 /* Reconnecting takes attention priority: the conn-dot pulses, so the brand ear
  * yields its breath here too — keeps exactly one breathing mark on screen in
  * every reachable state (live -> tail cursor, reconnecting -> conn-dot, else
  * -> brand ear). */
-#shell-root[data-conn="reconnecting"] .sb-brand .sb-ear { animation: none; }
+#shell-root[data-conn="reconnecting"] .sb-mark .sb-ear::after { animation: none; }
+@keyframes sb-ear-amp {
+  0%, 100% { transform: scale(0.6); opacity: 0.5; }
+  35%      { transform: scale(1.15); opacity: 1; }
+  60%      { transform: scale(0.75); opacity: 0.7; }
+}
 .sb-brand .sb-wordmark {
   /* The shell's single persistent brand mark (the session titlebar is folded
    * away, so this is THE trademark). Lowercase, not corporate caps — the young,
@@ -211,20 +302,114 @@ html[data-runtime="tauri"] .shell-main {
 .sb-brand .wm-vibe { color: var(--text-primary); }
 .sb-brand .wm-mix { color: var(--brand); }
 
-/* Collapsed-rail monogram — hidden while the wordmark shows; it only appears at
- * 72px (see the collapsed block below), where it carries the identity AND the
- * breath. Rose, in the wordmark face, so it reads as the same brand mark shrunk. */
+/* The monogram lives inside the brand tile at every width — at the collapsed
+ * 72px rail the tile alone carries the identity (wordmark hides). */
 .sb-brand .sb-monogram {
-  display: none;
+  display: block;
   font-family: var(--type-display);
-  font-variation-settings: "wdth" 92, "wght" 700;
-  font-size: 22px;
+  font-variation-settings: "wdth" 92, "wght" 800;
+  font-size: 15px;
   line-height: 1;
   color: var(--brand);
+  text-shadow: 0 0 8px var(--brand-22);
 }
 
+/* Mono section labels — the mock's engraved index tabs above nav + sessions. */
+.sb-section {
+  flex: 0 0 auto;
+  padding: 16px 14px 6px;
+  font-family: var(--type-mono);
+  font-size: 9px;
+  font-weight: 500;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--text-disabled);
+  white-space: nowrap;
+  transition: opacity 150ms var(--ease-brand);
+}
+
+/* TONIGHT sessions — honest strip: the live item paints only while a session
+ * is actually on air; "all sessions ›" routes to the real debrief surface. */
+.sb-sessions { flex: 0 0 auto; padding: 0 var(--sp-2); }
+.sb-session-item {
+  position: relative;
+  display: none;
+  flex-direction: column;
+  gap: 3px;
+  padding: 9px 12px;
+  border-radius: var(--r-sm);
+}
+#shell-root[data-state="live"] .sb-session-item.sb-session-live {
+  display: flex;
+  background: linear-gradient(180deg, var(--brand-10) 0%, var(--brand-04) 100%);
+  padding-left: 14px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.2);
+}
+#shell-root[data-state="live"] .sb-session-item.sb-session-live::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 12px;
+  bottom: 12px;
+  width: 2px;
+  border-radius: 0 1px 1px 0;
+  background: var(--brand);
+  box-shadow: 0 0 5px var(--brand-50);
+}
+.sb-session-title {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sb-session-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--type-mono);
+  font-size: 9px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--brand-glow);
+}
+.sb-live-dot {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--brand);
+  box-shadow: 0 0 4px var(--brand-50);
+}
+.sb-sessions-all {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px 0;
+  font-family: var(--type-mono);
+  font-size: 9px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--text-disabled);
+  cursor: pointer;
+  text-align: left;
+  transition: color 150ms var(--ease-brand);
+}
+.sb-sessions-all::before {
+  content: "";
+  width: 14px;
+  height: 1px;
+  background: var(--border-default);
+  transition: background 150ms var(--ease-brand);
+}
+.sb-sessions-all:hover { color: var(--brand); }
+.sb-sessions-all:hover::before { background: var(--brand-35); }
+
 .sb-nav {
-  flex: 1 1 auto;
+  flex: 0 0 auto;
   display: flex;
   flex-direction: column;
   gap: 4px; /* deliberately tight: a dense nav stack, not airy rows */
@@ -298,120 +483,135 @@ html[data-runtime="tauri"] .shell-main {
 /* "You are here" wins on WEIGHT too, not just a -10 vs -04 fill — the active
  * label read near-identical to its siblings at a glance (impeccable layout). */
 .sb-nav-item[aria-current="true"] .sb-label { font-weight: 600; }
+/* The accelerator as a machined KEYCAP, always seated on the row (pink-mock
+ * 1:1): a real raised cap — gradient face, top specular, drop seat — not a
+ * hover reveal. The kbd is part of the instrument's silkscreen. */
 .sb-nav-item .sb-kbd {
   position: relative;
-  flex: 0 0 14px;
-  width: 14px;
-  height: 20px;
-  display: grid;
-  place-items: center;
-  overflow: hidden;
+  flex: 0 0 auto;
+  padding: 2px 6px;
   font-family: var(--type-mono);
-  font-size: 0;
-  letter-spacing: 0;
-  color: transparent;
-  border-radius: 999px;
-  transition:
-    flex-basis 180ms var(--ease-brand),
-    width 180ms var(--ease-brand),
-    background 180ms var(--ease-brand),
-    box-shadow 180ms var(--ease-brand),
-    color 180ms var(--ease-brand),
-    font-size 180ms var(--ease-brand);
-}
-/* No resting mark. A native sidebar (Finder, Mail, Music) shows nothing on the
- * right of a nav row at rest; the persistent rose pip read as stray clutter on
- * every row. The accelerator digit still reveals on hover/focus (below) as the
- * power-user affordance, and the Cmd+K palette is its permanent cheat-sheet. */
-.sb-nav-item .sb-kbd::before {
-  display: none;
-}
-.sb-nav-item:hover .sb-kbd,
-.sb-nav-item:focus-visible .sb-kbd {
-  flex-basis: 24px;
-  width: 24px;
-  font-size: 10px;
-  /* --text-muted (not --text-disabled): the accelerator is informational, so
-   * it must clear 4.5:1 when intentionally revealed. */
-  color: var(--text-muted);
-  background: rgba(255, 222, 242, 0.038);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  color: var(--text-disabled);
+  border: 1px solid var(--border-subtle);
+  border-radius: 3px;
+  background: linear-gradient(180deg, var(--void-12) 0%, var(--void-8) 100%);
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.4);
   box-shadow:
-    var(--shadow-inset),
-    0 1px 0 rgba(255, 255, 255, 0.018);
+    0 1px 0 rgba(0, 0, 0, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.25);
+  transition: color 180ms var(--ease-brand), border-color 180ms var(--ease-brand);
 }
-.sb-nav-item:hover .sb-kbd::before,
-.sb-nav-item:focus-visible .sb-kbd::before {
-  opacity: 0;
-  transform: scaleX(0.4);
+.sb-nav-item[aria-current="true"] .sb-kbd {
+  color: var(--brand);
+  border-color: var(--brand-22);
 }
 
 .sb-foot {
   flex: 0 0 auto;
+  margin-top: auto;
   padding: var(--sp-3);
   box-shadow: inset 0 1px 0 rgba(255, 222, 242, 0.052);
 }
+/* The co-host presence SLAB (pink-mock cohost-pill): a full-width machined key
+ * seated at the sidebar foot. Recessed void metal at rest; the whole slab
+ * warms to the rose-lit material only when the co-host is actually live in
+ * your ear. A specular top line says "physical key", not "badge". */
 .sb-cohost {
+  position: relative;
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: var(--sp-2);
-  height: 32px;
-  padding: 0 var(--sp-3);
+  width: 100%;
+  padding: 11px 12px;
   border-radius: var(--r-sm);
-  background: var(--brand-04);
-  border: 1px solid var(--brand-12);
+  overflow: hidden;
+  background: linear-gradient(180deg, var(--void-12) 0%, var(--void-8) 100%);
+  border: 1px solid var(--border-default);
   font-family: var(--type-mono);
   font-size: 10px;
-  letter-spacing: 0.12em;
+  font-weight: 600;
+  letter-spacing: 0.22em;
   text-transform: uppercase;
-  color: var(--text-secondary);
+  color: var(--text-muted);
   white-space: nowrap;
-  /* Paint-only transition (no layout props) so the pill warms smoothly as the
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.4),
+    inset 0 2px 4px rgba(0, 0, 0, 0.3);
+  /* Paint-only transition (no layout props) so the slab warms smoothly as the
    * co-host comes alive, instead of snapping. */
   transition: background 240ms var(--ease-brand), border-color 240ms var(--ease-brand),
-    color 240ms var(--ease-brand);
+    color 240ms var(--ease-brand), box-shadow 240ms var(--ease-brand);
 }
-/* The co-host foot pill carries an honest activation state — quiet at idle,
- * warming as it starts listening, fully present once it is live in your ear.
- * This is the persistent "who's with you" mark: it stays lit while you browse
- * Viber or Learn, so the co-host never silently disappears. It mirrors the
- * deck energy-field step (0.5 -> 0.85) and adds NO new animation: the deck tail
- * cursor stays the screen's single live breath, so the pill's ear only
- * brightens, it never pulses (PRODUCT principle 3: one breathing mark at once). */
-#shell-root[data-state="listening"] .sb-cohost { border-color: var(--brand-22); }
+.sb-cohost::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 10%;
+  right: 10%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+  opacity: 0.4;
+  transition: opacity 240ms var(--ease-brand);
+}
+/* Honest activation: quiet at idle, edges warming while listening, the full
+ * rose slab only when live. The ear never pulses here (PRODUCT principle 3:
+ * the deck tail cursor is the screen's single live breath). */
+.sb-cohost .sb-ear { width: 5px; height: 5px; box-shadow: none; background: var(--text-disabled); }
+#shell-root[data-state="listening"] .sb-cohost { border-color: var(--brand-22); color: var(--text-secondary); }
+#shell-root[data-state="listening"] .sb-cohost .sb-ear { background: var(--brand); box-shadow: 0 0 4px var(--brand-40); }
 #shell-root[data-state="live"] .sb-cohost {
-  background: var(--brand-08);
-  border-color: var(--brand-40);
-  color: var(--brand);
+  background: linear-gradient(180deg, var(--brand-22) 0%, var(--brand-10) 50%, var(--brand-06) 100%);
+  border-color: var(--brand-35);
+  color: var(--text-primary);
+  text-shadow: var(--text-emboss);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.18),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.45),
+    inset 0 0 24px var(--brand-06),
+    0 1px 0 rgba(255, 255, 255, 0.04),
+    0 6px 18px rgba(176, 112, 160, 0.18);
 }
+#shell-root[data-state="live"] .sb-cohost::before { opacity: 1; }
 #shell-root[data-state="live"] .sb-cohost .sb-ear {
-  box-shadow: 0 0 10px var(--brand-65), 0 0 3px var(--brand);
+  background: var(--brand);
+  box-shadow: 0 0 8px var(--brand-50);
 }
+/* The co-host's name — the "who" in "who's with you"; the state word beside it
+ * says what it is doing (ready / listening / live), straight from activation. */
+.sb-cohost-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sb-cohost-state { color: inherit; opacity: 0.75; }
 
-/* Collapsed rail — labels + kbd hide, glyphs center, the wordmark gives way to
- * the "v" monogram. The leading ear hides too: the monogram becomes the single
- * collapsed brand mark (and carries the breath), so a dot + a letter don't stack
- * in the narrow rail. */
+/* Collapsed rail — labels + kbd + sections + sessions hide, glyphs center, and
+ * the brand TILE alone carries the identity (its corner ear keeps the breath). */
 #shell-root[data-collapsed="true"] .sb-label,
 #shell-root[data-collapsed="true"] .sb-kbd,
-#shell-root[data-collapsed="true"] .sb-wordmark,
-#shell-root[data-collapsed="true"] .sb-brand .sb-ear { display: none; }
-#shell-root[data-collapsed="true"] .sb-monogram { display: block; }
-/* Not-live, the collapsed monogram inherits the breath the ear had — the lone
- * sign-of-life on the rail. Steadies when live (deck tail cursor takes over). */
-#shell-root[data-collapsed="true"]:not([data-state="live"]) .sb-monogram {
-  animation: shell-breathe 2.4s var(--ease-brand) infinite;
-}
-#shell-root[data-collapsed="true"][data-conn="reconnecting"] .sb-monogram { animation: none; }
+#shell-root[data-collapsed="true"] .sb-cohost-name,
+#shell-root[data-collapsed="true"] .sb-cohost-state,
+#shell-root[data-collapsed="true"] .sb-section,
+#shell-root[data-collapsed="true"] .sb-sessions,
+#shell-root[data-collapsed="true"] .sb-sessions-all,
+#shell-root[data-collapsed="true"] .sb-wordmark { display: none; }
 #shell-root[data-collapsed="true"] .sb-nav-item { justify-content: center; padding: 0; }
 #shell-root[data-collapsed="true"] .sb-brand { justify-content: center; padding: 0; }
-/* Collapsed, the co-host foot pill is just its lit ear, centered — drop the
- * chip box so a lone dot doesn't sit in an empty pill. */
+/* Collapsed, the co-host foot slab is just its lit ear, centered — drop the
+ * key box so a lone dot doesn't sit in an empty slab. */
 #shell-root[data-collapsed="true"] .sb-cohost {
   justify-content: center;
-  padding: 0;
+  padding: 8px 0;
   background: transparent;
   border-color: transparent;
+  box-shadow: none;
 }
+#shell-root[data-collapsed="true"] .sb-cohost::before { display: none; }
 
 .sb-collapse {
   position: absolute;
@@ -499,12 +699,59 @@ html[data-runtime="tauri"] .shell-main {
   inset: 0;
   z-index: var(--z-base);
   pointer-events: none;
-  opacity: 0;
-  background: radial-gradient(130% 80% at 50% 122%, var(--brand-16), transparent 62%);
-  transition: opacity 600ms var(--ease-brand);
+  /* A powered CDJ at rest still catches light — the stage is never a dead black
+   * void. It reads as a deep machined chamber: a warm rose deck-light pools up
+   * from below (the lit faceplate), the crown darkens into shadow (chamber
+   * depth), so the stage has real dimension instead of a flat fill. Static at
+   * idle (resting, NOT breathing — the tail cursor stays the sole rhythmic
+   * mark); ramps up as the co-host wakes and goes live. */
+  opacity: 0.38;
+  background:
+    radial-gradient(135% 80% at 50% 122%, var(--brand-16) 0%, transparent 58%),
+    radial-gradient(150% 70% at 50% -8%, rgba(0, 0, 0, 0.34) 0%, transparent 52%);
+  transition: opacity 700ms var(--ease-brand);
 }
-#shell-root[data-state="listening"] .deck-energy { opacity: 0.5; }
-#shell-root[data-state="live"] .deck-energy { opacity: 0.85; }
+/* Disconnected: the stage rests a touch lower, honest that nothing is flowing
+ * yet (invariant #5 — calm, not a fault). */
+#shell-root[data-conn="disconnected"] .deck-energy { opacity: 0.3; }
+#shell-root[data-state="listening"] .deck-energy { opacity: 0.62; }
+#shell-root[data-state="live"] .deck-energy { opacity: 0.9; }
+
+/* ── The living organism — the deck's face ────────────────────────────────
+ * The real ParticleOrganism engine (curl drift + rose→gold additive bloom)
+ * mounted full-bleed as the deck backdrop: vibemix's one face, the 20% that
+ * carries 80% of the room's life. Sits above the energy floor, below the stage
+ * text. PRESENCE is GROUNDED in real state — it sleeps (dim) while the audio
+ * engine is disconnected, wakes on connect, and is full when live — so the face
+ * never fakes life it hasn't earned (cardinal invariants #3 trust-the-audio / #5
+ * idle≠fault). CSS drives only the global opacity; the curl + bloom are the
+ * engine's, caused by real signals. */
+.deck-organism {
+  position: absolute;
+  inset: 0;
+  z-index: var(--z-base);
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  /* Awake-but-resting baseline once connected. The data-conn/data-state rules
+   * below dim it to sleep or raise it to full. Long ease so waking reads as the
+   * face stirring, not a hard flip. */
+  opacity: 0.78;
+  transition: opacity 1100ms var(--ease-brand);
+}
+/* Sleeping: the audio engine is unreachable, so the face rests dim. Honest at
+ * idle (invariant #5) — it is calm, not broken. */
+#shell-root[data-conn="disconnected"] .deck-organism { opacity: 0.42; }
+#shell-root[data-conn="reconnecting"] .deck-organism { opacity: 0.6; }
+/* Awake + listening for the first move. */
+#shell-root[data-state="listening"] .deck-organism { opacity: 0.92; }
+/* Live: full presence, blooming on real events. */
+#shell-root[data-state="live"] .deck-organism { opacity: 1; }
+/* Reduced motion: a still, dim presence rather than a frozen bright cloud. The
+ * engine itself disables bloom under reduced motion; this keeps it recessive. */
+@media (prefers-reduced-motion: reduce) {
+  .deck-organism { opacity: 0.5 !important; transition: none; }
+}
 
 /* The tail cursor — the co-host's "speaking" mark, and the ONLY motion on the
  * deck when live. An eased fade on the LED-pulse cadence, not a hard square
@@ -538,6 +785,54 @@ html[data-runtime="tauri"] .shell-main {
 }
 .deck-idle { color: var(--text-tertiary); }
 .deck-live-line { color: var(--text-primary); display: none; }
+/* Flagship idle composition — the engraved deck glyph + a grounded co-host sub,
+ * giving the home the same dignity as every other surface's empty state (it was
+ * the barest screen in the app). Both ride with the idle/listening hero and clear
+ * out the instant the deck goes live, so the live line owns the stage alone. */
+.deck-glyph {
+  display: flex;
+  justify-content: center;
+  margin-bottom: var(--sp-4);
+  font-size: 42px;
+  line-height: 1;
+  color: var(--text-disabled);
+}
+/* When the live organism backs the deck, IT is the face — the static engraved
+ * glyph would be a second, dead face competing with it. Hide it. Falls back
+ * automatically: no WebGL → no [data-organism] flag → the glyph stays. */
+#shell-root[data-organism="live"] .deck-glyph { display: none; }
+/* Legibility scrim — a soft radial darken under the hero text so the serif reads
+ * cleanly over the glowing face without a hard plate. Only when the organism is
+ * actually behind it; the plain-glyph fallback needs no scrim. The text sits in
+ * z-stage above this ::before. */
+#shell-root[data-organism="live"] .deck-stage::before {
+  content: "";
+  position: absolute;
+  inset: -12% -8%;
+  z-index: -1;
+  pointer-events: none;
+  background: radial-gradient(
+    62% 56% at 50% 52%,
+    var(--surface-void) 0%,
+    color-mix(in srgb, var(--surface-void) 55%, transparent) 42%,
+    transparent 72%
+  );
+}
+.deck-idle-sub {
+  margin: var(--sp-4) auto 0;
+  max-width: 46ch;
+  font-family: var(--type-body);
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+/* Connection-aware idle copy: the co-host only claims to be listening when the
+ * audio engine is actually reachable. Offline it tells the truth (and the sub
+ * says how to wake it) instead of saying "listening" while the footer reads
+ * "co-host offline". Driven by the root data-conn flag — no JS branch. */
+.deck-idle__off { display: none; }
+#shell-root[data-conn="disconnected"] .deck-idle__on { display: none; }
+#shell-root[data-conn="disconnected"] .deck-idle__off { display: inline; }
 .deck-scene {
   margin-top: var(--sp-5);
   display: flex;
@@ -566,6 +861,8 @@ html[data-runtime="tauri"] .shell-main {
 #shell-root[data-state="idle"] .deck-scene { display: none; }
 #shell-root[data-state="listening"] .deck-scene { opacity: 0.9; }
 #shell-root[data-state="live"] .deck-idle { display: none; }
+#shell-root[data-state="live"] .deck-glyph,
+#shell-root[data-state="live"] .deck-idle-sub { display: none; }
 #shell-root[data-state="live"] .deck-live-line { display: block; }
 #shell-root[data-state="live"] .deck-scene { opacity: 1; }
 
@@ -633,7 +930,12 @@ html[data-runtime="tauri"] .shell-main {
   line-height: 1.2;
   letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: var(--brand);
+  /* Quiet spec-sheet label, not an accent. Rose is the sign-of-life budget
+   * (focus ring, active nav, citation chip, tail cursor); spending it on three
+   * static proof labels sprawls the accent past its documented use and pulls the
+   * eye away from what actually breathes. Mono + tracking already carries the
+   * instrument-panel voice; ink-60 keeps it recessive. */
+  color: var(--text-tertiary);
 }
 .se-proof dd {
   font-size: 12px;
@@ -1068,8 +1370,14 @@ html[data-runtime="tauri"] .shell-main {
   display: flex;
   flex-direction: column;
   min-height: 0;
+  overflow: hidden;
 }
-.surface--deck .vmx-session { height: 100%; } /* fill the stage, not the viewport */
+.surface--deck .vmx-session {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+} /* fill the stage, not the viewport */
 /* The session grid is `titlebar | modebar | 1fr stage | statusbar`. Folded, we
  * display:none the titlebar + modebar (shell chrome owns them) — but display:none
  * drops them from grid auto-flow, so the stage shifts up into the fixed titlebar
@@ -1093,6 +1401,68 @@ html[data-runtime="tauri"] .shell-main {
  * already own status; left visible, the row un-hides on status alerts and lands
  * at the deck foot under the shell footer. Suppress it only in the folded deck. */
 .surface--deck .vmx-statusrow { display: none; }
+
+/* The armed Deck hero ships from the standalone session surface, where it can
+ * spend viewport-width type. Folded into the shell it must fit the recessed
+ * stage by HEIGHT first, otherwise the serif title overflows upward into the
+ * window chrome after state repaint. Keep the deck calm: no scrollbars, no
+ * clipped headline, one contained slab. */
+.surface--deck .vmx-stage,
+.surface--deck .vmx-deck,
+.surface--deck .vmx-deck__speak {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.surface--deck .vmx-deck {
+  padding: clamp(14px, 2vh, 24px) clamp(20px, 4vw, 64px);
+}
+
+.surface--deck .vmx-session[data-runstate="armed"] .vmx-deck__speak {
+  padding-block: clamp(10px, 2vh, 22px);
+}
+
+.surface--deck .vmx-session[data-runstate="armed"] .vmx-armed {
+  box-sizing: border-box;
+  max-height: 100%;
+  gap: clamp(16px, 3vh, 36px);
+  padding:
+    clamp(16px, 3vh, 34px)
+    clamp(4px, 1.6vw, 18px)
+    clamp(18px, 3.2vh, 38px);
+  overflow: hidden;
+}
+
+.surface--deck .vmx-armed__copy {
+  gap: clamp(10px, 1.8vh, 16px);
+}
+
+.surface--deck .vmx-armed__title {
+  max-width: min(12ch, 100%);
+  font-size: clamp(40px, 7vh, 66px);
+  line-height: 0.98;
+}
+
+.surface--deck .vmx-armed__lead {
+  max-width: min(46ch, 100%);
+  font-size: clamp(14px, 1.8vh, 16px);
+  line-height: 1.45;
+}
+
+.surface--deck .vmx-armed__context {
+  margin-top: clamp(6px, 1.2vh, 12px);
+  padding-top: clamp(8px, 1.4vh, 14px);
+  gap: clamp(14px, 2.5vw, 34px);
+}
+
+.surface--deck .vmx-armed__module {
+  gap: clamp(8px, 1.6vh, 14px);
+}
+
+.surface--deck .vmx-armed__start {
+  min-height: clamp(52px, 7vh, 62px);
+  padding: clamp(13px, 2vh, 17px) clamp(30px, 4vw, 38px);
+}
 
 /* ── Grounding panel — contextual right drawer. ──────────────────────────── */
 .shell-panel {
@@ -1266,16 +1636,21 @@ html[data-runtime="tauri"] .shell-main {
 .shell-footer[data-conn="reconnecting"] {
   color: var(--led-warn);
 }
+/* Disconnected at idle is the EXPECTED resting state, not a fault (cardinal
+ * invariant #5 + StatusFooter docstring "dims when disconnected"). It reads as a
+ * quiet, powered-down indicator — muted ink + a dim unlit dot — never the
+ * fault-red glow that screams "broken" before the user has even started a set.
+ * Genuine faults live on the crash banner and alert tiles, not this status line. */
 .shell-footer[data-conn="disconnected"] {
-  color: var(--led-fault);
+  color: var(--text-muted);
 }
-.shell-footer[data-conn="reconnecting"] .conn-dot,
-.shell-footer[data-conn="disconnected"] .conn-dot {
+.shell-footer[data-conn="reconnecting"] .conn-dot {
   box-shadow: 0 0 8px currentColor;
 }
 .shell-footer[data-conn="disconnected"] .conn-dot {
-  background: var(--led-fault);
-  opacity: 1;
+  background: var(--text-disabled);
+  opacity: 0.7;
+  box-shadow: none;
 }
 
 #shell-root[data-surface="learn"] .shell-footer[data-conn="disconnected"] {
