@@ -18,10 +18,16 @@ from pathlib import Path
 import keyring
 import keyring.errors
 
+from vibemix.agent.keyring_guard import KEYRING_TIMEOUT_S, bounded_keyring_call
+
 log = logging.getLogger("vibemix.install_uuid")
 
 _SERVICE = "vibemix"
 _ACCOUNT_UUID = "install_uuid"
+# Module-level so tests (and a desperate operator REPL) can shrink it; a locked
+# login keychain blocks keyring calls forever, and KeyringTimeout lands in the
+# same except-paths as any other KeyringError → file fallback.
+_KEYRING_TIMEOUT_S = KEYRING_TIMEOUT_S
 
 
 def _fallback_path() -> Path:
@@ -81,7 +87,9 @@ def get_or_create_install_uuid() -> str:
     # Step 1: Try keyring
     if not force_file:
         try:
-            existing = keyring.get_password(_SERVICE, _ACCOUNT_UUID)
+            existing = bounded_keyring_call(
+                keyring.get_password, _SERVICE, _ACCOUNT_UUID, timeout_s=_KEYRING_TIMEOUT_S
+            )
             if _is_valid_uuid_hex(existing):
                 return existing  # type: ignore[return-value]
         except keyring.errors.KeyringError as e:
@@ -96,7 +104,13 @@ def get_or_create_install_uuid() -> str:
     if file_value:
         if not force_file:
             try:
-                keyring.set_password(_SERVICE, _ACCOUNT_UUID, file_value)
+                bounded_keyring_call(
+                    keyring.set_password,
+                    _SERVICE,
+                    _ACCOUNT_UUID,
+                    file_value,
+                    timeout_s=_KEYRING_TIMEOUT_S,
+                )
             except keyring.errors.KeyringError:
                 pass
         return file_value
@@ -106,7 +120,13 @@ def get_or_create_install_uuid() -> str:
     wrote_keyring = False
     if not force_file:
         try:
-            keyring.set_password(_SERVICE, _ACCOUNT_UUID, new_uuid)
+            bounded_keyring_call(
+                keyring.set_password,
+                _SERVICE,
+                _ACCOUNT_UUID,
+                new_uuid,
+                timeout_s=_KEYRING_TIMEOUT_S,
+            )
             wrote_keyring = True
         except keyring.errors.KeyringError as e:
             log.warning(

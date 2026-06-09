@@ -18,6 +18,8 @@ import jwt as pyjwt
 import keyring
 import keyring.errors
 
+from vibemix.agent.keyring_guard import bounded_keyring_call
+
 log = logging.getLogger("vibemix.jwt_cache")
 
 _SERVICE = "vibemix"
@@ -46,7 +48,7 @@ def _needs_refresh(token: str | None) -> bool:
 
 def _read_cached_jwt() -> str | None:
     try:
-        return keyring.get_password(_SERVICE, _ACCOUNT_JWT)
+        return bounded_keyring_call(keyring.get_password, _SERVICE, _ACCOUNT_JWT)
     except keyring.errors.KeyringError as e:
         log.warning("keyring read of cached JWT failed: %s", e.__class__.__name__)
         return None
@@ -54,7 +56,7 @@ def _read_cached_jwt() -> str | None:
 
 def _cache_jwt(token: str) -> None:
     try:
-        keyring.set_password(_SERVICE, _ACCOUNT_JWT, token)
+        bounded_keyring_call(keyring.set_password, _SERVICE, _ACCOUNT_JWT, token)
     except keyring.errors.KeyringError as e:
         log.warning(
             "keyring write of JWT failed: %s — JWT will be re-fetched next launch",
