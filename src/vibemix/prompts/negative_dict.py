@@ -103,14 +103,85 @@ NEGATIVE_PHRASES: tuple[str, ...] = (
     # Vague declaratives
     "the implications are significant",
     "the stakes are high",
+    # AI self-disclosure variants (2) — complete the "as an AI" concept (the
+    # other surface forms a model slips into). Appended at the END so the
+    # index-based bucket slicing in agent/_streaming_pipe.py (<16 / >=32) stays
+    # valid; landing in the head-gate set (>=32) is intended — a reaction must
+    # never OPEN with an AI self-disclosure. The regex below is
+    # contraction-tolerant, so "I'm an AI" is caught by the "I am an AI" entry.
+    "as a language model",
+    "I am an AI",
 )
 
-# Compiled regex: word-boundary + alternation, case-insensitive.
-# Word boundary semantics: ``\b`` is a unicode-aware word boundary in re.
-# - "amazing" matches "Amazing!" but NOT "amazingly" (right boundary breaks).
-# - Multi-word phrases like "as an AI" use spaces, which are non-word chars,
-#   so boundary checks naturally work at start/end of each phrase.
+# Contraction/expansion tolerance — a banned phrase must match whether the
+# model emits the contracted ("I'm here to help") or expanded ("I am here to
+# help") surface form. The old literal ``re.escape`` regex was contraction-
+# blind, so a one-token expansion ("I am here to help", "I do not have", "I am
+# an AI") silently defeated the backstop (default-slop-sweep finding). One
+# generalizing normalization fixes this for EVERY existing phrase at once — it
+# is NOT a per-failure phrase ban. (expanded, contracted) pairs:
+_CONTRACTION_PAIRS: tuple[tuple[str, str], ...] = (
+    ("I am", "I'm"),
+    ("I will", "I'll"),
+    ("I have", "I've"),
+    ("I would", "I'd"),
+    ("do not", "don't"),
+    ("does not", "doesn't"),
+    ("did not", "didn't"),
+    ("is not", "isn't"),
+    ("are not", "aren't"),
+    ("was not", "wasn't"),
+    ("were not", "weren't"),
+    ("cannot", "can't"),
+    ("will not", "won't"),
+    ("would not", "wouldn't"),
+    ("should not", "shouldn't"),
+    ("could not", "couldn't"),
+    ("you are", "you're"),
+    ("we are", "we're"),
+    ("they are", "they're"),
+    ("it is", "it's"),
+    ("that is", "that's"),
+    ("there is", "there's"),
+    ("here is", "here's"),
+    ("let us", "let's"),
+)
+
+_CONTRACTION_RES: tuple[tuple[re.Pattern[str], str], ...] = tuple(
+    (re.compile(r"\b" + re.escape(contracted) + r"\b", re.IGNORECASE), expanded)
+    for expanded, contracted in _CONTRACTION_PAIRS
+)
+
+
+def expand_contractions(text: str) -> str:
+    """Canonicalize contractions to their expanded form ("I'm" -> "I am").
+
+    Used only to BUILD ``NEGATIVE_REGEX`` below — the regex itself carries the
+    contraction alternation, so consumers (filter_for_slop, reaction-reel
+    grade) match raw text directly and downstream text is never mutated.
+    """
+    for pat, expanded in _CONTRACTION_RES:
+        text = pat.sub(expanded, text)
+    return text
+
+
+def _phrase_pattern(phrase: str) -> str:
+    """Build a contraction-tolerant regex fragment for one banned phrase: the
+    phrase is canonicalized to its expanded form, then each expansion is widened
+    to an alternation that also matches the contracted form. So "I'm here to
+    help" yields ``(?:I\\ am|I'm) here to help`` and matches either surface."""
+    pat = re.escape(expand_contractions(phrase))
+    for expanded, contracted in _CONTRACTION_PAIRS:
+        esc = re.escape(expanded)
+        if esc in pat:
+            pat = pat.replace(esc, "(?:" + esc + "|" + re.escape(contracted) + ")")
+    return pat
+
+
+# Compiled regex: word-boundary + alternation, case-insensitive, contraction-
+# tolerant (see above). Word boundary semantics: ``\b`` is a unicode-aware word
+# boundary in re — "amazing" matches "Amazing!" but NOT "amazingly".
 NEGATIVE_REGEX: re.Pattern[str] = re.compile(
-    r"\b(?:" + "|".join(re.escape(p) for p in NEGATIVE_PHRASES) + r")\b",
+    r"\b(?:" + "|".join(_phrase_pattern(p) for p in NEGATIVE_PHRASES) + r")\b",
     re.IGNORECASE,
 )

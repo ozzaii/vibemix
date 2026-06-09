@@ -127,3 +127,60 @@ def test_filter_10_natural_adverbs_do_not_false_positive(clean_text: str) -> Non
     text, matches = filter_for_slop(clean_text)
     assert text == clean_text, f"false positive on natural speech: matches={matches}"
     assert matches == []
+
+
+# ---------------------------------------------------------------------------
+# Assistant-voice / AI self-disclosure coverage (default-slop-sweep finding)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "I am here to help you read this set",  # expanded form of banned "I'm here to help"
+        "I do not have a clear read on that kick yet",  # expanded "I don't have"
+    ],
+)
+def test_filter_11_expanded_contraction_forms_caught(text: str) -> None:
+    """A banned phrase stored as a contraction ("I'm here to help") must ALSO
+    suppress its expanded surface form ("I am here to help"). The regex was
+    contraction-blind (literal re.escape), so the model could defeat the
+    backstop with a one-token expansion. ONE generalizing normalization closes
+    this for every existing phrase."""
+    out, matches = filter_for_slop(text)
+    assert out == "<silence/>", f"expanded assistant-voice slipped: {text!r}"
+    assert len(matches) >= 1
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "I'm an AI but that kick hits",
+        "I am an AI, here's what I hear",
+        "as a language model I can tell the lows are stacking",
+    ],
+)
+def test_filter_12_ai_self_disclosure_family_caught(text: str) -> None:
+    """AI self-disclosure variants must suppress — "as an AI" was banned but the
+    close siblings ("I'm an AI", "I am an AI", "as a language model") slipped.
+    Catastrophic immersion-break if ever voiced; never natural DJ-friend speech."""
+    out, matches = filter_for_slop(text)
+    assert out == "<silence/>", f"AI self-disclosure slipped: {text!r}"
+    assert len(matches) >= 1
+
+
+@pytest.mark.parametrize(
+    "clean",
+    [
+        "I can't get enough of this groove",  # can't->cannot, not banned
+        "that drop just hit, I'm loving the bassline",  # I'm->I am, "I am loving" not banned
+        "it's not letting up, the energy is wild",  # it's->it is, not banned
+    ],
+)
+def test_filter_13_contraction_normalization_no_false_positive(clean: str) -> None:
+    """The contraction normalization must NOT false-positive on natural speech
+    whose expanded form is not banned — and the ORIGINAL text (not the
+    normalized form) passes through unchanged."""
+    out, matches = filter_for_slop(clean)
+    assert out == clean, f"false positive on natural speech: matches={matches}"
+    assert matches == []
