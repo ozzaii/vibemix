@@ -266,6 +266,29 @@ def decide_speak_gate(
         and event_speak_fingerprint(ev) in recent_fingerprints
     ):
         return SpeakGateDecision("silent", "repeat_of_recent", worthiness=worthiness)
+    # Cross-type repeat guard: the SAME deterministic spoken payload (e.g.
+    # "Artist - Title next.") can be attached to two DIFFERENT event types — a
+    # PHASE then, ~20s later, a TRANSITION_OPPORTUNITY. Their full fingerprints
+    # differ (the ``type=`` prefix, and the describe-bank ``bands=`` segment the
+    # priority event lacks), so the exact-match check above misses it and the
+    # listener hears the identical line twice — broken-record slop, the
+    # "scripted/robotic" failure the product treats as a blocker. Suppress only
+    # when the same payload atom was voiced under a DIFFERENT event type; a
+    # SAME-type repeat is left to the band-aware exact check above, which
+    # deliberately re-speaks when the spectral context (``bands=``) is fresh.
+    # The atom is encoded exactly as ``event_speak_fingerprint`` builds it and
+    # matched as a whole ``|``-delimited segment (no prefix false-positives).
+    if recent_fingerprints:
+        payload = _grounded_voice_payload(ev)
+        if payload is not None:
+            payload_atom = f"payload={payload[0]}:{payload[1]}"
+            this_type_atom = f"type={ev.type}"
+            for fp in recent_fingerprints:
+                segments = fp.split("|")
+                if payload_atom in segments and this_type_atom not in segments:
+                    return SpeakGateDecision(
+                        "silent", "repeat_of_recent", worthiness=worthiness
+                    )
     if ev.type in _DESCRIBE_BANK_EVENT_TYPES:
         if not _has_grounded_voice_payload(ev):
             return SpeakGateDecision("silent", "describe_bank_only", worthiness=worthiness)

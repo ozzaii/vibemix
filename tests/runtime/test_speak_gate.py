@@ -133,6 +133,50 @@ def test_structural_events_keep_existing_speech_path() -> None:
     assert decision.reason == "event_priority"
 
 
+def test_same_payload_across_event_types_suppressed_as_repeat() -> None:
+    """Broken-record guard (default-slop-sweep finding): the SAME deterministic
+    spoken line ("Artist - Title next.") attached to two different event types
+    must not be voiced twice. The full event fingerprints differ (type= prefix +
+    bands= segment), so the exact-match repeat check misses it — only a
+    type-independent payload check catches the broken record."""
+    line = "Daft Punk - Around the World next."
+    spoken_phase = _event(
+        "PHASE",
+        {"prev_phase": "build", "new_phase": "peak", "next_suggestion_voice_line": line},
+        state_values={"audible": True, "rms": 0.12, "buildup_score": 0.5},
+    )
+    # That PHASE line was just spoken -> its fingerprint is in recent memory.
+    recent = (event_speak_fingerprint(spoken_phase),)
+    # A later TRANSITION_OPPORTUNITY carries the SAME suggestion line and would
+    # otherwise reach 'speak' (priority payload + audible clears the floor).
+    transition = _event(
+        "TRANSITION_OPPORTUNITY",
+        {"a_side": "5A", "a_camelot": "5A", "b_side": "8B", "b_camelot": "8B", "clash": "low", "next_suggestion_voice_line": line},
+        state_values={"audible": True, "rms": 0.12},
+    )
+    decision = decide_speak_gate(transition, recent_fingerprints=recent)
+    assert decision.verdict == "silent"
+    assert decision.reason == "repeat_of_recent"
+
+
+def test_different_payload_across_event_types_still_speaks() -> None:
+    """Guard rail: a DIFFERENT spoken line across event types is NOT muted by the
+    payload-repeat check — only a byte-identical line is a broken record."""
+    spoken_phase = _event(
+        "PHASE",
+        {"prev_phase": "build", "new_phase": "peak", "next_suggestion_voice_line": "Track A next."},
+        state_values={"audible": True, "rms": 0.12, "buildup_score": 0.5},
+    )
+    recent = (event_speak_fingerprint(spoken_phase),)
+    transition = _event(
+        "TRANSITION_OPPORTUNITY",
+        {"a_side": "5A", "a_camelot": "5A", "b_side": "8B", "b_camelot": "8B", "clash": "low", "next_suggestion_voice_line": "Track B next."},
+        state_values={"audible": True, "rms": 0.12},
+    )
+    decision = decide_speak_gate(transition, recent_fingerprints=recent)
+    assert decision.verdict == "speak"
+
+
 def test_priority_event_in_dead_air_holds_below_floor() -> None:
     decision = decide_speak_gate(_event("MIX_MOVE", {"moves": ["eq_low:A"]}))
 
