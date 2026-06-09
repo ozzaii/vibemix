@@ -272,14 +272,9 @@ def _forward_body(
 ) -> str:
     arc = (arc_clause or "").casefold()
     phase = str(getattr(state, "phase", "") or "").strip().casefold()
-    if "lifting" in arc or "building" in arc:
-        return "lifting the next phrase without rushing it"
-    if "settling" in arc or "settled" in arc:
-        return "holding the groove steady"
-    if phase in {"build", "buildup", "rise"}:
-        return "setting up the next lift"
-    if phase in {"breakdown", "low", "groove"}:
-        return "letting the current space breathe"
+    # Deltas first (iter6a): a measured live delta is fresher and more specific
+    # than the windowed arc or the phase label — a settling arc + "sub fell"
+    # is an earned "leave low-end space" nudge, not a steady read.
     for raw in deltas:
         text = str(raw).casefold()
         if ("sub energy" in text or "low energy" in text or "rms" in text) and "fell" in text:
@@ -290,6 +285,14 @@ def _forward_body(
             return "using the added brightness as the forward cue"
         if ("mid energy" in text or "high energy" in text or "brightness" in text) and "fell" in text:
             return "keeping the top-end space intentional"
+    if "lifting" in arc or "building" in arc:
+        return "lifting the next phrase without rushing it"
+    if "settling" in arc or "settled" in arc:
+        return "holding the groove steady"
+    if phase in {"build", "buildup", "rise"}:
+        return "setting up the next lift"
+    if phase in {"breakdown", "low", "groove"}:
+        return "letting the current space breathe"
     if phrase_clause is not None:
         return "the current phrase direction"
     return "the current master-mix energy"

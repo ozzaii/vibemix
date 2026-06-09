@@ -108,6 +108,52 @@ def test_breathing_space_read_still_yields_receipt() -> None:
     assert "letting the current space breathe" in line
 
 
+def test_settling_arc_with_sub_fell_delta_yields_earned_receipt() -> None:
+    """Deltas outrank arcs: a settling arc + a live 'sub fell' delta is NOT a
+    steady read — the delta carries the point ('leave low-end space'). Before
+    the iter6a reorder this combination hit the settled branch first and was
+    silenced as filler, shadowing an EARNED line (auditor follow-up a)."""
+    reg = EvidenceRegistry()
+    line = build_energy_read_voice_line(
+        None,
+        event_type="PHASE",
+        evidence_registry=reg,
+        state=_state(curve=[0.50, 0.50, 0.40, 0.40]),  # settling arc
+        audio_delta_items=["sub energy fell 0.21 -> 0.09"],
+    )
+    assert isinstance(line, str)
+    assert "leaving low-end space before the next push" in line
+    assert "energy" in reg.snapshot()
+
+
+def test_lifting_arc_with_sub_rose_delta_prefers_delta_body() -> None:
+    """Same precedence on the lifting side: the measured delta is fresher and
+    more specific than the windowed arc, so its body leads the nudge."""
+    line = build_energy_read_voice_line(
+        None,
+        event_type="PHASE",
+        evidence_registry=EvidenceRegistry(),
+        state=_state(curve=[0.30, 0.30, 0.45, 0.50]),  # lifting arc
+        audio_delta_items=["sub energy rose 0.10 -> 0.24"],
+    )
+    assert isinstance(line, str)
+    assert "controlling the added weight in the next phrase" in line
+
+
+def test_unmatched_deltas_fall_to_no_info_body_and_stay_silent() -> None:
+    """Auditor follow-up (b): pin the third no-info body. Deltas that match no
+    rule ('stereo width rose'), no arc, no phase read → 'the current
+    master-mix energy' → held silent like the other no-info bodies."""
+    line = build_energy_read_voice_line(
+        None,
+        event_type="PHASE",
+        evidence_registry=EvidenceRegistry(),
+        state=_state(phase=""),
+        audio_delta_items=["stereo width rose 0.40 -> 0.55"],
+    )
+    assert line is None
+
+
 def test_settled_read_with_transition_context_keeps_receipt() -> None:
     """A scorer-transition receipt survives a settled arc — the point is the
     suggested track, not the steady read."""
