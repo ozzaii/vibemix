@@ -22,6 +22,18 @@ if TYPE_CHECKING:  # pragma: no cover - typing only
     from vibemix.state.evidence_registry import EvidenceRegistry
 
 _CITATION_BODY_RE = re.compile(r"^[^\s,\]]+$")
+
+# The measured-filler forward bodies (iter3/iter4 judge runs, 2026-06-09/10):
+# "holding the groove steady" produced every friend-0 filler line; the two
+# fallbacks carry zero information by construction. Kept in lock-step with
+# the _forward_body rule table below.
+_STEADY_NO_INFO_BODIES = frozenset(
+    {
+        "holding the groove steady",
+        "the current phrase direction",
+        "the current master-mix energy",
+    }
+)
 _VOICE_EVENT_TYPES = frozenset(
     {"HEARTBEAT", "PHASE", "TRACK_CHANGE", "TRANSITION_OPPORTUNITY"}
 )
@@ -56,6 +68,15 @@ def build_energy_read_voice_line(
         str(transition["candidate_id"]) if transition is not None else _audio_only_candidate_id(state)
     )
     forward_body = _forward_body(deltas, arc_clause, phrase_clause, state)
+    # Iter5 (2026-06-10 bench campaign): the steady/no-information bodies no
+    # longer earn a VOICE receipt on their own. Judge-measured on both corpora:
+    # every spoken steady line scored friend 0 / should_speak False ("generic
+    # filler telling the DJ to do nothing"). A receipt exists to carry a point;
+    # "keep doing what you're doing" is not one. Change reads (lifting /
+    # breathing space / delta-driven) and scorer-transition receipts — the
+    # lines the judge marked should_speak=True — pass through unchanged.
+    if transition is None and forward_body in _STEADY_NO_INFO_BODIES:
+        return None
     digest = _receipt_digest(
         candidate_id=candidate_id,
         deltas=deltas,

@@ -560,8 +560,10 @@ def test_nudge_atom_round_trips_real_producer_output() -> None:
 
     state = MusicState()
     state.audible = True
-    state.phase = "groove"
-    state.energy_curve = [0.50, 0.50, 0.40, 0.40]  # settling arc → steady nudge
+    state.phase = "build"
+    state.energy_curve = [0.30, 0.30, 0.45, 0.50]  # lifting arc → change nudge
+    # (a settling arc no longer yields a receipt at all — iter5 holds the
+    # steady/no-info bodies from the voice path entirely)
 
     line = build_energy_read_voice_line(
         None,
@@ -573,9 +575,9 @@ def test_nudge_atom_round_trips_real_producer_output() -> None:
 
     ev = _event(
         "PHASE",
-        {"prev_phase": "drop", "new_phase": "groove", "energy_read_voice_line": line},
+        {"prev_phase": "groove", "new_phase": "build", "energy_read_voice_line": line},
         state_values={"audible": True, "rms": 0.12},
     )
     atom = event_speak_fingerprint(ev).split("|")
     nudges = [seg for seg in atom if seg.startswith("nudge=")]
-    assert nudges == ["nudge=holding the groove steady"]
+    assert nudges == ["nudge=lifting the next phrase without rushing it"]
