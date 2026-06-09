@@ -1,13 +1,17 @@
 # SPDX-License-Identifier: Apache-2.0
 """Phase 33 / Plan 33-09 — API-key entry surface assertion.
 
-Original memory rule (project_one_click_install_hard_req): vibemix shipped with
+Original memory rule (project_one_click_install_hard_req): vibemix ships with
 no UI surface that accepts a Gemini API key from the user.
 
-Kaan D2 updated the product policy: direct mode may expose exactly one BYO key
-surface in the Settings BRAIN group, because democratizing Sven for users who
-bring their own Gemini key is now intentional. The field must stay masked,
-write-only, redacted by IPC logging, and scoped to settings only.
+Policy history: Kaan D2 briefly allowed exactly one BYO key surface (the
+Settings BRAIN group). That drawer was deliberately deleted in `d056a391`
+(2026-06-06 settings purge), and on 2026-06-09 Kaan locked the product as
+PROXY-ONLY — users are served through the Bravoh proxy (altidus); direct mode
+is a dev-only `.env` path with zero UI surface. This gate therefore enforces
+the original zero-surface rule again. The backend `ipc.settings.set_brain`
+handler and its IPC-log redaction rule stay as defensive depth — they are not
+a license to rebuild the drawer.
 
 This gate greps the Tauri UI source tree (and the install docs) for
 any non-approved key-entry surface:
@@ -56,7 +60,8 @@ EXCLUDED_PATHS = (
     "tauri/ui/src/crash-banner.ts",
 )
 
-ALLOWED_BYO_KEY_SURFACE = "tauri/ui/src/settings/components/brain-group.ts"
+# The deleted D2-era BYO surface. Its ABSENCE is now part of the gate.
+DELETED_BYO_KEY_SURFACE = "tauri/ui/src/settings/components/brain-group.ts"
 IPC_CLIENT = REPO_ROOT / "tauri" / "ui" / "src" / "ipc" / "client.ts"
 
 # Regex catalogue.
@@ -101,10 +106,6 @@ def _match_in_file(path: Path) -> list[tuple[int, str, str]]:
     return matches
 
 
-def _is_allowed_byo_key_surface(path: Path) -> bool:
-    return path.relative_to(REPO_ROOT).as_posix() == ALLOWED_BYO_KEY_SURFACE
-
-
 def test_no_api_key_input_field_in_wizard_or_settings() -> None:
     """Grep every wizard + settings TS file for API-key entry surfaces."""
     offenders: list[tuple[Path, list[tuple[int, str, str]]]] = []
@@ -114,7 +115,7 @@ def test_no_api_key_input_field_in_wizard_or_settings() -> None:
         if "wizard/" not in rel and "settings/" not in rel:
             continue
         matches = _match_in_file(path)
-        if matches and not _is_allowed_byo_key_surface(path):
+        if matches:
             offenders.append((path, matches))
     assert not offenders, _format_offenders(offenders)
 
@@ -125,26 +126,25 @@ def test_no_api_key_label_text_anywhere_in_ui() -> None:
     offenders: list[tuple[Path, list[tuple[int, str, str]]]] = []
     for path in _scan_files():
         matches = _match_in_file(path)
-        if matches and not _is_allowed_byo_key_surface(path):
+        if matches:
             offenders.append((path, matches))
     assert not offenders, _format_offenders(offenders)
 
 
-def test_byo_key_surface_is_single_masked_write_only_and_redacted() -> None:
-    """The D2 BYO exception is one scoped Settings field, not a free pass."""
-    path = REPO_ROOT / ALLOWED_BYO_KEY_SURFACE
-    body = path.read_text(encoding="utf-8")
+def test_byo_key_drawer_stays_deleted_and_ipc_log_stays_redacted() -> None:
+    """Proxy-only product (Kaan 2026-06-09): the D2-era BYO key drawer must
+    NOT come back via a stray git add, and the defensive IPC-log redaction
+    for `ipc.settings.set_brain` must survive as long as the message type
+    exists in the schema."""
+    assert not (REPO_ROOT / DELETED_BYO_KEY_SURFACE).exists(), (
+        f"{DELETED_BYO_KEY_SURFACE} was deleted in d056a391 (proxy-only product); "
+        "restoring a key-entry UI needs an explicit product decision, not a revert."
+    )
     ipc_client = IPC_CLIENT.read_text(encoding="utf-8")
-
-    assert not FORBIDDEN_PATTERNS[0].search(body), "brain group contains a full Gemini key"
-    assert body.count('keyWrap.dataset.wire = "settings.brain.key"') == 1
-    assert body.count('input.type = "password"') == 1
-    assert 'input.autocomplete = "off"' in body
-    assert "input.spellcheck = false" in body
-    assert 'input.setAttribute("aria-label", "Gemini API key")' in body
-    assert "{ mode: \"direct\", gemini_api_key: key }" in body
-    assert "clearInput: true" in body
-    assert '"ipc.settings.set_brain": ["gemini_api_key"]' in ipc_client
+    assert '"ipc.settings.set_brain": ["gemini_api_key"]' in ipc_client, (
+        "IPC log redaction for set_brain removed — if the message type still "
+        "exists, the redaction must stay (defense in depth)."
+    )
 
 
 def _format_offenders(
