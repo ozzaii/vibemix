@@ -173,6 +173,76 @@ def test_estimate_bpm_suppresses_ambiguous_two_tempo_lock() -> None:
     assert estimate_bpm(buf, seconds=6.0) == 0.0
 
 
+def _degraded_real_world_beat_buffer(
+    *,
+    bpm: float = 128.0,
+    seconds: float = 8.0,
+    sr: int = 16000,
+    seed: int = 7,
+) -> AudioBuffer:
+    """A varying-amplitude kick train + aperiodic mid-rate bursts (hats /
+    vocals stand-in) over a noise floor — reproduces the confidence regime
+    REAL master audio lives in, unlike the clean pulse fixtures above.
+    Calibration on three real recorded sets (2026-06-09, sessions
+    20260603-112321 / 20260602-143905 / 20260603-175859): confidence median
+    0.07-0.10 / max 0.53, peak energy 0.12-0.23 / max 0.72 — 0% of 1500+
+    loud windows ever reached the old flat 0.70 floor. This fixture lands at
+    confidence ~0.15 / peak energy ~0.16 (seed 7) — squarely in that regime."""
+    rng = np.random.default_rng(seed)
+    t = np.arange(int(sr * seconds), dtype=np.float32) / sr
+    sig = rng.normal(0.0, 0.05, t.size).astype(np.float32)
+    period = 60.0 / bpm
+    k = 0
+    while True:
+        i = int(k * period * sr)
+        if i >= t.size:
+            break
+        dur_k = int(0.10 * sr)
+        env = np.exp(-np.linspace(0.0, 8.0, dur_k)).astype(np.float32)
+        amp = 0.4 + 0.4 * rng.random()  # kicks breathe — no two hits identical
+        kick = amp * np.sin(2 * np.pi * 55.0 * np.arange(dur_k) / sr).astype(np.float32) * env
+        end = min(i + dur_k, t.size)
+        sig[i:end] += kick[: end - i]
+        k += 1
+    # Aperiodic mid-rate bursts decorrelate the RMS envelope the way real
+    # percussion/vocals do — this is what keeps peak energy at real-music
+    # levels instead of the ~0.9 a bare pulse train produces.
+    for _ in range(int(seconds * 8)):
+        i = int(rng.random() * (t.size - sr // 20))
+        dur_b = sr // 20
+        burst = (
+            (0.15 + 0.25 * rng.random())
+            * rng.normal(0.0, 1.0, dur_b).astype(np.float32)
+            * np.hanning(dur_b).astype(np.float32)
+        )
+        sig[i : i + dur_b] += burst
+    buf = AudioBuffer(seconds=seconds + 4, sr=sr)
+    buf.push(np.clip(sig * 32767.0, -32768, 32767).astype(np.int16))
+    return buf
+
+
+def test_estimate_bpm_locks_on_degraded_real_world_beat() -> None:
+    """The flat 0.70 confidence floor zeroed `state.bpm` on EVERY real session
+    from 2026-06-05 (f22d0b99) to 06-09 — ~100 live sessions, `null -> 0.0`,
+    never a lock — because real master audio's normalized autocorr peak energy
+    tops out near 0.5, not the ~0.9 of clean synthetic pulses. A beat that is
+    audibly unmistakable but acoustically dirty MUST still lock."""
+    buf = _degraded_real_world_beat_buffer()
+    bpm = estimate_bpm(buf, seconds=6.0)
+    assert bpm > 0.0, "degraded-but-real beat must not be floored to 0"
+    assert abs(bpm - 128.0) < 3.0
+
+
+def test_estimate_bpm_white_noise_stays_zero() -> None:
+    """Relaxing the real-world lane must NOT let beatless broadband noise
+    (crowd noise between tracks) publish a BPM."""
+    rng = np.random.default_rng(11)
+    pcm = np.clip(rng.normal(0.0, 0.1, 16000 * 6) * 32767.0, -32768, 32767).astype(np.int16)
+    buf = AudioBuffer(seconds=8.0, sr=16000)
+    buf.push(pcm)
+    assert estimate_bpm(buf, seconds=6.0) == 0.0
+
+
 # ===== FEAT-08: estimate_bpm short buffer returns 0.0 =====
 
 

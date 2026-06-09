@@ -1,17 +1,16 @@
 # SPDX-License-Identifier: Apache-2.0
 """Env-overridable BPM confidence floor (replay/QA measurement knob).
 
-`estimate_bpm` floors its output to 0.0 when the autocorrelation confidence is
-below 0.70 — a deliberately high bar so the *public* BPM counter never wobbles
-on ambiguous material. That floor is correct for the live product, but it blocks
-replay-driven QA: a recorded set's saved master audio under-confidences relative
-to the live audio_buf it was captured from (see
-`.planning/eval-runs/REPLAY-MEASUREMENT-WALL-2026-06-09.md`), so BPM never locks,
-no musical events fire, and Sven never reacts — nothing to bench.
+`estimate_bpm` floors its output to 0.0 below a confidence bar. Since the
+2026-06-09 calibration the default bar is lane-split (see the calibration
+note in `audio/features.py`): strict 0.70 for synthetic-strength periodicity
+(keeps the merged-two-tempo suppress), calibrated 0.06 for real-world music
+(the flat 0.70 had zeroed `state.bpm` on every real session since
+2026-06-05; history in `.planning/eval-runs/REPLAY-MEASUREMENT-WALL-2026-06-09.md`).
 
-`VIBEMIX_BPM_CONFIDENCE_FLOOR` lets a replay/QA run relax that floor so the same
-recorded audio that produced 74 events LIVE can drive events on replay. The
-product never sets it (default stays 0.70); only the replay runner does.
+`VIBEMIX_BPM_CONFIDENCE_FLOOR`, when set, replaces the floor for BOTH lanes —
+an explicit replay/QA knob beats the lane split. The packaged product never
+sets it.
 """
 
 from __future__ import annotations

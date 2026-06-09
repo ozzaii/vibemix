@@ -27,27 +27,61 @@ from vibemix.audio.constants import SILENT_RMS
 _BPM_ENV_FPS: float = 100.0
 _BPM_LO_LAG: int = 30
 _BPM_HI_LAG: int = 60
-_BPM_CONFIDENCE_FLOOR: float = 0.70
+# ---------------------------------------------------------------------------
+# Two-lane confidence floor — calibrated on real recorded sets (2026-06-09).
+#
+# The flat 0.70 floor shipped 2026-06-05 (f22d0b99) was tuned on clean
+# synthetic pulse trains (confidence ~0.88) and silently zeroed `state.bpm`
+# on EVERY real session for four days: real master audio's normalized
+# autocorr peak energy tops out near 0.5, so the multiplicative confidence
+# never reaches 0.70 on music that isn't a metronome. Measured class table
+# (median/max over 1500+ loud 6s windows, 3 sessions + synthetic fixtures):
+#
+#   real set music      conf 0.07-0.10 / 0.53   peak_energy 0.12-0.23 / 0.72
+#   white noise (crowd) conf 0.047    / 0.092   peak_energy 0.079     / 0.13
+#   speech              conf 0.016    / 0.121   (live path freezes BPM during
+#                                                AI talk anyway)
+#   merged two-tempo    conf 0.661              peak_energy 0.822
+#   clean pulse train   conf 0.880              peak_energy 0.909
+#
+# Real music and the synthetic fixtures live in DISJOINT peak-energy ranges
+# (max 0.72 vs 0.82+), so the floor is lane-split on peak energy:
+#   - strong lane (pe >= 0.75): the original 0.70 bar — keeps the merged
+#     two-tempo suppress that motivated f22d0b99.
+#   - real-world lane (pe < 0.75): 0.06 — above speech p90 (0.049) and
+#     white-noise median (0.047); passes ~75% of loud real-music windows.
+#     Residual single-window noise locks are absorbed downstream by
+#     refresh.py's `_stabilize_bpm` ring median + far-switch rejection.
+# ---------------------------------------------------------------------------
+_BPM_CONFIDENCE_FLOOR: float = 0.06
+_BPM_STRONG_PERIODICITY_PE: float = 0.75
+_BPM_STRONG_CONFIDENCE_FLOOR: float = 0.70
 _BPM_CURVATURE_SHARP_PEAK: float = 0.28
 
 
-def _resolve_bpm_confidence_floor() -> float:
-    """The confidence below which ``estimate_bpm`` floors to 0.0.
-
-    Defaults to ``_BPM_CONFIDENCE_FLOOR`` (0.70) — the live product's deliberately
-    high bar against public BPM wobble. Replay/QA runs may relax it via
-    ``VIBEMIX_BPM_CONFIDENCE_FLOOR`` so a recorded set's saved master audio (which
-    under-confidences vs the live audio_buf it came from) can still lock a BPM and
-    drive events for benching. The packaged product never sets the env; a garbage
-    or empty value falls back to the default.
-    """
+def _explicit_bpm_floor_env() -> float | None:
+    """The operator's explicit ``VIBEMIX_BPM_CONFIDENCE_FLOOR`` override, or
+    None when unset/garbage. When set, it replaces the floor for BOTH lanes —
+    an explicit replay/QA knob beats the lane split."""
     raw = os.environ.get("VIBEMIX_BPM_CONFIDENCE_FLOOR", "").strip()
     if not raw:
-        return _BPM_CONFIDENCE_FLOOR
+        return None
     try:
         return float(raw)
     except ValueError:
-        return _BPM_CONFIDENCE_FLOOR
+        return None
+
+
+def _resolve_bpm_confidence_floor() -> float:
+    """The real-world-lane confidence floor for ``estimate_bpm``.
+
+    Defaults to ``_BPM_CONFIDENCE_FLOOR`` (0.06, calibration above). Replay/QA
+    runs may override it via ``VIBEMIX_BPM_CONFIDENCE_FLOOR``; the packaged
+    product never sets the env; a garbage or empty value falls back to the
+    default.
+    """
+    env = _explicit_bpm_floor_env()
+    return _BPM_CONFIDENCE_FLOOR if env is None else env
 
 
 def snapshot_features(buf: AudioBuffer, seconds: float = 5.0) -> dict:
@@ -200,11 +234,24 @@ def estimate_bpm(buf: AudioBuffer, seconds: float = 6.0) -> float:
     Returns a float ~100-200 BPM (lag 30-60 frames @ 100Hz envelope) or 0.0
     on insufficient or ambiguous data.
 
+    The publish floor is lane-split on normalized peak energy (see the
+    calibration note at the top of this module): synthetic-strength
+    periodicity keeps the strict 0.70 anti-ambiguity bar; real-world music
+    uses the calibrated 0.06 bar. An explicit
+    ``VIBEMIX_BPM_CONFIDENCE_FLOOR`` env replaces the floor for both lanes.
+
     Compatibility wrapper for callers that only accept a float. Use
     ``estimate_bpm_with_confidence`` when the ambiguity score matters.
     """
-    bpm, confidence = estimate_bpm_with_confidence(buf, seconds=seconds)
-    if confidence < _resolve_bpm_confidence_floor():
+    bpm, confidence, peak_energy = _estimate_bpm_components(buf, seconds=seconds)
+    floor = _explicit_bpm_floor_env()
+    if floor is None:
+        floor = (
+            _BPM_STRONG_CONFIDENCE_FLOOR
+            if peak_energy >= _BPM_STRONG_PERIODICITY_PE
+            else _BPM_CONFIDENCE_FLOOR
+        )
+    if confidence < floor:
         return 0.0
     return round(bpm, 1)
 
@@ -219,16 +266,29 @@ def estimate_bpm_with_confidence(buf: AudioBuffer, seconds: float = 6.0) -> tupl
     competing-peak separation so broad or multi-tempo windows can be held as
     ``0.0`` by the compatibility wrapper instead of becoming public BPM drift.
     """
+    bpm, confidence, _peak_energy = _estimate_bpm_components(buf, seconds=seconds)
+    return (bpm, confidence)
+
+
+def _estimate_bpm_components(
+    buf: AudioBuffer, seconds: float = 6.0
+) -> tuple[float, float, float]:
+    """``(bpm, confidence, peak_energy)`` — the full estimator output.
+
+    ``peak_energy`` (best autocorr peak / zero-lag energy) is the lane
+    selector for ``estimate_bpm``'s publish floor; it is module-private so
+    the public two-tuple API stays pinned.
+    """
     sr = buf._sr
     n = int(sr * seconds)
     arr_int16 = buf.snapshot(n)
     arr = arr_int16.astype(np.float32) / 32768.0
     if arr.size < sr * 2:
-        return (0.0, 0.0)
+        return (0.0, 0.0, 0.0)
     frame = sr // int(_BPM_ENV_FPS)
     n_frames = arr.size // frame
     if n_frames < 100:
-        return (0.0, 0.0)
+        return (0.0, 0.0, 0.0)
     env = np.array(
         [float(np.sqrt(np.mean(arr[i * frame : (i + 1) * frame] ** 2))) for i in range(n_frames)]
     )
@@ -236,17 +296,18 @@ def estimate_bpm_with_confidence(buf: AudioBuffer, seconds: float = 6.0) -> tupl
     ac = np.correlate(env, env, mode="full")
     ac = ac[ac.size // 2 :]
     if _BPM_HI_LAG >= ac.size:
-        return (0.0, 0.0)
+        return (0.0, 0.0, 0.0)
     segment = ac[_BPM_LO_LAG:_BPM_HI_LAG]
     if segment.size == 0 or segment.max() <= 0:
-        return (0.0, 0.0)
+        return (0.0, 0.0, 0.0)
     best_lag = _BPM_LO_LAG + int(np.argmax(segment))
     refined_lag = _parabolic_peak_lag(ac, best_lag)
     if refined_lag <= 0.0:
-        return (0.0, 0.0)
+        return (0.0, 0.0, 0.0)
     bpm = 60.0 * _BPM_ENV_FPS / refined_lag
     confidence = _bpm_peak_confidence(ac, best_lag, _BPM_LO_LAG, _BPM_HI_LAG)
-    return (round(float(bpm), 1), round(float(confidence), 4))
+    peak_energy = max(0.0, min(1.0, float(ac[best_lag]) / max(float(ac[0]), 1e-9)))
+    return (round(float(bpm), 1), round(float(confidence), 4), peak_energy)
 
 
 def _parabolic_peak_lag(ac: np.ndarray, lag: int) -> float:
