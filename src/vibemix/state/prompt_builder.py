@@ -882,6 +882,27 @@ class AICoach:
         if t == "PHASE":
             new = ev_extra.get("new_phase", "?")
             prev = ev_extra.get("prev_phase", "?")
+            energy_line = ev_extra.get("energy_read_voice_line")
+            if isinstance(energy_line, str) and energy_line.strip():
+                # Iter6b (2026-06-10 bench): with a receipt attached, the
+                # feel-read invitation below competed with the receipt hint
+                # ("the nudge IS your point") and the model picked narration —
+                # the one bad iter5-midi line voiced the fader slam + levels
+                # (judge: "mostly narrates… instead of coaching"). Since the
+                # speak gate only passes PHASE with this receipt, the feel-read
+                # text only ever reached the model when it was wrong. Same
+                # receipt-aware base pattern as TRACK_CHANGE above.
+                return _with_grounded_receipts(
+                    f"Phase shifted: {prev}→{new}. You have a grounded forward "
+                    "energy read. Lead with its instruction — what to hold, "
+                    "cut, leave, or set up over the next bars — in "
+                    "friend-at-the-booth words, and copy the receipt's "
+                    "citations exactly. The moves and level changes you heard "
+                    "are the context you build on; the listener was there for "
+                    "them, so spend your words on the next bars. If the read "
+                    "does not match what you are hearing, output a single "
+                    "space to stay silent."
+                )
             # The evidence-poor exit is SILENCE (the single-space contract the
             # TRACK_CHANGE judge branch already uses), NOT a "sound-only read"
             # license: the first end-to-end shipped judge run (2026-06-09,

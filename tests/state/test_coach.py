@@ -659,6 +659,38 @@ def test_task_phase_fallback_when_extras_missing():
     assert "Phase shifted: ?→?." in out
 
 
+def test_task_phase_with_energy_receipt_leads_with_instruction():
+    """Iter6b (2026-06-10 bench): the one bad iter5-midi PHASE line was
+    narration — "You slammed that fader over and the sub took completely
+    over…" (judge: "mostly narrates… instead of coaching"). Root cause: the
+    base task invites a feel-read while the receipt hint says the nudge is the
+    point — two competing directives, and the model picked narration. The
+    speak gate only passes PHASE with a grounded receipt attached, so the
+    feel-read invitation only ever reached the model when it was wrong.
+    Receipt-carrying PHASE now leads with the instruction (the TRACK_CHANGE
+    receipt-aware house pattern); the receipt-less text is unchanged."""
+    receipt = (
+        "Energy-read receipt: source=master_mix. The master-mix read points "
+        "toward leaving low-end space before the next push. "
+        "Copy these citations exactly: [energy:master_read=x_aaaa]."
+    )
+    out = AICoach.task_for_event(
+        _ev(
+            "PHASE",
+            {
+                "prev_phase": "build",
+                "new_phase": "peak",
+                "energy_read_voice_line": receipt,
+            },
+        )
+    )
+    assert "Phase shifted: build→peak." in out
+    assert "Lead with its instruction" in out
+    assert "FEELS like, not the label." not in out
+    # _with_grounded_receipts still appends the receipt + citation steer.
+    assert receipt in out
+
+
 def test_task_layer_arrival_exact_string():
     out = AICoach.task_for_event(_ev("LAYER_ARRIVAL"))
     assert out == (
