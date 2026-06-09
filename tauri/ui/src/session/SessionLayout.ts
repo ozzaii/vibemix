@@ -232,10 +232,13 @@ const LAYOUT_CSS = `
     height: 100vh;
     position: relative;
     overflow: hidden;
-    background:
-      linear-gradient(112deg, rgba(255, 165, 223, 0.040), transparent 34%),
-      linear-gradient(180deg, rgba(255, 251, 244, 0.016), transparent 24%),
-      var(--void-5);
+    /* THE ROOM (fable pass 2026-06-09): the deck sits inside the lit obsidian
+     * scene tokens.css already stages — one rose key-light top-left, a faint
+     * gold counter-warmth, a top sheen, a floor vignette. The previous flat
+     * void-5 + 4% rose wash read as grey mauve (the "washed-out soup" Kaan
+     * called pre-fable slop); --scene-lit is the cinematic room the design
+     * system promised and the deck never used. */
+    background: var(--scene-lit);
   }
   .vmx-session[data-statusrow="alert"] {
     grid-template-rows: var(--titlebar-h) 1fr var(--statusbar-h);
@@ -249,10 +252,11 @@ const LAYOUT_CSS = `
     position: absolute;
     inset: 0;
     pointer-events: none;
+    /* One soft lift where the voice lives — the scene's vignette does the rest.
+     * The old double wash (center glow + floor rose) fought --scene-lit and
+     * flattened the room back toward grey. */
     background:
-      radial-gradient(92% 76% at 50% 44%, rgba(255, 222, 242, 0.038), transparent 62%),
-      linear-gradient(180deg, transparent 0%, rgba(255, 165, 223, 0.030) 100%);
-    opacity: 0.9;
+      radial-gradient(72% 56% at 38% 56%, rgba(255, 222, 242, 0.020), transparent 64%);
   }
   .vmx-deck {
     position: relative;
@@ -345,7 +349,7 @@ const LAYOUT_CSS = `
   }
   /* persistent low-ink at rest (reachable mid-set), full on hover/focus.
    * Real mute also bound to the push-to-mute hotkey (session-shortcuts.ts). */
-  .vmx-deck__controls { display: flex; gap: var(--sp-2); opacity: 0.58; transition: opacity 180ms ease-out; }
+  .vmx-deck__controls { display: flex; gap: var(--sp-2); opacity: 0.58; transition: opacity 180ms ease-out; margin-left: auto; }
   .vmx-deck:hover .vmx-deck__controls, .vmx-deck:focus-within .vmx-deck__controls { opacity: 1; }
   .vmx-deck__controls button {
     font-family: var(--type-display);
@@ -518,6 +522,15 @@ const LAYOUT_CSS = `
       0 1px 0 rgba(176, 112, 160, 0.20),
       0 22px 58px rgba(0, 0, 0, 0.58);
   }
+  .vmx-armed__title em {
+    font-style: italic;
+    font-weight: 400;
+    color: var(--brand);
+    text-shadow:
+      0 1px 0 rgba(176, 112, 160, 0.35),
+      0 0 24px var(--brand-22),
+      0 0 48px var(--brand-12);
+  }
   .vmx-armed__lead {
     max-width: 48ch;
     margin: 0;
@@ -578,28 +591,41 @@ const LAYOUT_CSS = `
     letter-spacing: 0.04em;
     color: var(--silk-22);
   }
-  /* Start: the primary ship action. Rose primary, with a physical press bloom. */
+  /* Start: the one rose-lit physical control on the idle deck — the mock's
+   * cohost-pill material: brand gradient slab, machined specular top line,
+   * pressed-metal shadow stack. Ink text (not rose-on-rose) so it reads as a
+   * lit key, not a tinted outline. */
   .vmx-armed__start {
     position: relative;
     isolation: isolate;
     overflow: hidden;
-    font-family: var(--type-display);
-    font-variation-settings: 'wdth' 88, 'wght' 600;
-    font-size: 16px; letter-spacing: 0.26em; text-transform: uppercase;
-    color: var(--amber-pale);
-    min-height: 68px;
-    padding: 18px 38px;
-    border: 1px solid var(--amber-40); border-radius: var(--rad-sm);
+    font-family: var(--type-mono);
+    font-weight: 600;
+    font-size: 13px; letter-spacing: 0.3em; text-transform: uppercase;
+    color: var(--text-primary);
+    text-shadow: var(--text-emboss);
+    min-height: 60px;
+    padding: 18px 44px;
+    border: 1px solid var(--brand-35); border-radius: var(--rad-md);
     background:
-      linear-gradient(180deg, rgba(255, 165, 223, 0.13), rgba(255, 165, 223, 0.03) 58%, rgba(0, 0, 0, 0.24)),
-      rgba(2, 3, 6, 0.62);
+      linear-gradient(180deg, var(--brand-22) 0%, var(--brand-10) 50%, var(--brand-06) 100%),
+      linear-gradient(180deg, var(--void-12), var(--void-8));
     box-shadow:
-      inset 0 1px 0 rgba(255, 251, 244, 0.05),
-      inset 0 -1px 0 var(--amber-22),
-      inset 0 0 20px rgba(255, 165, 223, 0.10),
-      0 18px 46px rgba(0, 0, 0, 0.56);
+      inset 0 1px 0 rgba(255, 255, 255, 0.18),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.45),
+      inset 0 0 24px var(--brand-06),
+      0 1px 0 rgba(255, 255, 255, 0.04),
+      0 6px 18px rgba(176, 112, 160, 0.18),
+      0 16px 38px rgba(0, 0, 0, 0.42);
     cursor: pointer;
     transition: color var(--motion-step) var(--ease-brand), border-color var(--motion-step) var(--ease-brand), box-shadow var(--motion-step) var(--ease-brand), filter var(--motion-step) var(--ease-brand), transform var(--motion-step) var(--ease-brand);
+  }
+  .vmx-armed__start::after {
+    content: "";
+    position: absolute;
+    top: 0; left: 10%; right: 10%;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
   }
   .vmx-armed__start::before {
     content: "";
@@ -612,12 +638,8 @@ const LAYOUT_CSS = `
     transition: opacity var(--motion-step) var(--ease-brand), transform var(--motion-step) var(--ease-brand);
   }
   .vmx-armed__start:hover {
-    color: var(--amber); border-color: var(--amber); filter: brightness(1.08);
-    box-shadow:
-      inset 0 1px 0 rgba(255, 251, 244, 0.06),
-      inset 0 -1px 0 var(--amber-40),
-      inset 0 0 26px rgba(255, 165, 223, 0.15),
-      0 8px 26px rgba(0, 0, 0, 0.55);
+    filter: brightness(1.12);
+    border-color: var(--brand-50);
   }
   .vmx-armed__start:hover::before,
   .vmx-armed__start:focus-visible::before {
@@ -637,6 +659,60 @@ const LAYOUT_CSS = `
     from { opacity: 0.46; transform: translate3d(-8px, 5px, 0) scale(0.992); }
     to { opacity: 0.76; transform: translate3d(8px, -5px, 0) scale(1.006); }
   }
+  /* THE SIGN OF LIFE (direction-final contract): a hairline frame seats the
+   * idle deck like the front panel of a powered instrument, and ONE slow brand
+   * light travels its perimeter — the gentle pulse of a CDJ sitting idle.
+   * Armed-only: when the deck goes live the voice + meter are the life. */
+  .vmx-armed__frame {
+    position: absolute;
+    inset: clamp(10px, 2.4vh, 26px) clamp(2px, 1.2vw, 16px);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--r-md);
+    pointer-events: none;
+    z-index: -1;
+    overflow: hidden;
+  }
+  /* The traveling light is the conic's FROM angle animating via @property —
+   * never transform:rotate on the masked element (rotating the element rotates
+   * its ring mask too, which streaks the light diagonally across the panel). */
+  @property --vmx-sweep {
+    syntax: "<angle>";
+    initial-value: 0deg;
+    inherits: false;
+  }
+  .vmx-armed__frame::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding: 1px;
+    background: conic-gradient(
+      from var(--vmx-sweep) at 50% 50%,
+      transparent 0%,
+      transparent 38%,
+      var(--brand-22) 47%,
+      var(--brand-50) 50%,
+      var(--brand-22) 53%,
+      transparent 62%,
+      transparent 100%
+    );
+    -webkit-mask:
+      linear-gradient(rgba(0, 0, 0, 1) 0 0) content-box,
+      linear-gradient(rgba(0, 0, 0, 1) 0 0);
+    -webkit-mask-composite: xor;
+            mask:
+      linear-gradient(rgba(0, 0, 0, 1) 0 0) content-box,
+      linear-gradient(rgba(0, 0, 0, 1) 0 0);
+            mask-composite: exclude;
+    animation: vmx-perimeter var(--motion-border-sweep) linear infinite;
+  }
+  @keyframes vmx-perimeter { to { --vmx-sweep: 360deg; } }
+  @media (prefers-reduced-motion: reduce) {
+    .vmx-armed__frame::before { animation: none; opacity: 0.5; }
+  }
+  /* The idle deck has no live signal — the master meter is runtime telemetry.
+   * Showing its empty groove at armed read as a stray progress bar. */
+  .vmx-session[data-runstate="armed"] .vmx-deck__foot { opacity: 0; visibility: hidden; }
   @media (prefers-reduced-motion: reduce) {
     .vmx-session[data-runstate="armed"] .vmx-armed { animation: none; }
     .vmx-armed__field { animation: none; }
@@ -655,7 +731,10 @@ const LAYOUT_CSS = `
     position: relative;
     display: flex;
     flex-direction: column;
-    justify-content: flex-end;
+    /* With the slab gone the voice commands the vertical centre of the open void
+     * instead of hugging the floor (which left a bare dead zone above it). The
+     * rose key-light below follows it up so the glow haloes the line. */
+    justify-content: center;
     gap: var(--sp-3);
     min-width: 0;
     width: auto;
@@ -665,38 +744,34 @@ const LAYOUT_CSS = `
     padding: clamp(28px, 4.5vw, 52px);
     border: 0;
     border-radius: var(--rad-md);
-    /* The deck display — a lit machined slab, not an empty dark box (2026-05-30
-     * level-up). One soft rose key-light pools where the spoken line sits
-     * (bottom-left), a top sheen catches the lip, the floor falls into shadow.
-     * The co-host's voice now reads as glowing up out of the obsidian. */
+    /* BOLD REDESIGN (2026-06-08, Kaan "go bold"): the glass slab is GONE. The
+     * co-host's voice now lives full-bleed on the raw obsidian void — the
+     * bravoh-grade-pink contract's actual signature, far more cinematic than a
+     * voice boxed in a tile. All that remains is a soft rose key-light pooling up
+     * from the floor where the line sits, bleeding edgelessly into the void. No
+     * bevel, no box, no frame: the void IS the stage, the voice glows out of it. */
     background:
-      radial-gradient(88% 86% at 14% 102%, rgba(255, 165, 223, 0.145), transparent 58%),
-      radial-gradient(64% 52% at 92% 0%, rgba(255, 255, 255, 0.034), transparent 62%),
-      linear-gradient(180deg, rgba(255, 251, 244, 0.034), transparent 28%, rgba(0, 0, 0, 0.20)),
-      rgba(255, 251, 244, 0.026);
-    box-shadow:
-      var(--bevel-raised),
-      inset 0 0 58px rgba(0, 0, 0, 0.18),
-      0 2px 0 rgba(0, 0, 0, 0.44),
-      0 26px 78px -18px rgba(0, 0, 0, 0.54),
-      0 0 96px -34px rgba(255, 165, 223, 0.18);
-    overflow: hidden;
+      radial-gradient(70% 78% at 24% 50%, rgba(255, 165, 223, 0.115), transparent 64%);
+    overflow: visible;
   }
-  /* The engraved inner faceplate (2026-05-30 level-up): an inset machined frame
-   * + a top sheen, lifted from near-invisible (0.010-0.035 alpha) to read as
-   * a real precision deck face. The frame catches a 0.5px lip. */
-  .vmx-voice::before {
+  /* The engraved inner faceplate is retired with the slab (bold redesign):
+   * a machined frame only makes sense around a box, and the box is gone. The
+   * voice sits on the open void now. */
+  .vmx-voice::before { display: none; }
+  /* Cursor-lit (mock contract): a 320px rose halo follows the pointer across
+   * the voice — the co-host noticing your hand. Hover-only, 4% alpha. */
+  .vmx-voice::after {
     content: "";
     position: absolute;
-    inset: 12px;
-    border-radius: calc(var(--rad-md) - 4px);
-    background:
-      linear-gradient(180deg, rgba(255, 251, 244, 0.030) 0%, transparent 18%, transparent 100%);
-    box-shadow:
-      inset 0 1px 0 rgba(255, 210, 240, 0.055),
-      inset 0 -1px 0 rgba(0, 0, 0, 0.36);
+    inset: -16px -24px;
+    background: radial-gradient(320px circle at var(--mx, 50%) var(--my, 50%), var(--brand-04), transparent 60%);
+    border-radius: 18px;
+    opacity: 0;
+    transition: opacity 0.6s var(--ease-brand);
     pointer-events: none;
+    z-index: 0;
   }
+  .vmx-voice:hover::after { opacity: 1; }
   /* (One-Rose) The hero slab carries a single decorative texture — the ::before
    * faceplate. The old ::after dot-matrix grille was a SECOND non-load-bearing
    * texture competing for the slab's one-rose budget; cut so the spoken line and
@@ -713,12 +788,43 @@ const LAYOUT_CSS = `
     font-family: var(--type-serif);
     font-weight: 400;
     font-size: clamp(18px, 1.7vw, 22px); line-height: 1.32; letter-spacing: 0;
+    margin: 0;
     transition: color 700ms ease-out;
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: min(58ch, 100%);
   }
   .vmx-ghost--g2 { color: var(--text-disabled); opacity: 0.7; }
   .vmx-ghost--g1 { color: var(--text-muted); }
   .vmx-claim { display: flex; flex-direction: column; align-items: flex-start; gap: var(--sp-3); margin-top: var(--sp-2); }
+  /* BOLD REDESIGN: the instrument readout crowning the voice — BPM · KEY laid
+   * horizontally just above the spoken line (the bravoh-grade-pink mock's
+   * framing). A quiet mono context strip; the serif voice below stays the hero.
+   * The min-width:0 drops the foot-grid sizing so the values hug their content. */
+  /* THE SCENE LINE (fable pass): the mock's single mono telemetry row crowning
+   * the voice — a 32px brand hairline leads in, dot separators between reads.
+   * Small, tracked-out, deliberate: the serif voice below is the hero; this is
+   * the instrument quietly stating what it hears. */
+  .vmx-voice__readout {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    margin-bottom: clamp(24px, 4.5vh, 52px);
+  }
+  .vmx-voice__readout::before {
+    content: "";
+    width: 32px;
+    height: 1px;
+    background: var(--brand-22);
+  }
+  .vmx-voice__readout .vmx-read { min-width: 0; }
+  .vmx-voice__readout .vmx-read + .vmx-read::before {
+    content: "";
+    width: 3px;
+    height: 3px;
+    border-radius: 50%;
+    background: var(--border-strong);
+    align-self: center;
+    margin-right: 14px;
+  }
   /* The co-host SPEAKING — set in the one warm human face of the system
    * (Instrument Serif, the documented hero voice per DESIGN.md §3). The impl
    * had been rendering this in condensed Saira display, which read industrial /
@@ -728,12 +834,13 @@ const LAYOUT_CSS = `
   .vmx-now {
     font-family: var(--type-serif);
     font-weight: 400;
-    font-size: clamp(44px, 5.6vw, 78px); line-height: 1.02; letter-spacing: 0;
-    color: var(--text-primary); text-wrap: balance; max-width: 18ch;
-    text-shadow:
-      0 1px 0 rgba(176, 112, 160, 0.20),
-      0 2px 1px rgba(20, 16, 18, 0.5),
-      0 18px 46px rgba(0, 0, 0, 0.55);
+    /* Editorial scale per the mock's cohost-line: 44-72px at 1.1 leading, NOT
+     * the 96px billboard that forced 17ch wrapping. A friend leaning in, not a
+     * headline shouting. */
+    font-size: clamp(44px, 5.6vw, 72px); line-height: 1.1; letter-spacing: -0.018em;
+    margin: 0;
+    color: var(--text-primary); text-wrap: balance; max-width: min(920px, 100%);
+    text-shadow: var(--text-3d);
     transition: color 700ms ease-out;
     /* The hero is the one unbounded text object: a long live line ran off the
        slab and clipped mid-word. Hold it to three lines, then ellipsis. */
@@ -770,8 +877,38 @@ const LAYOUT_CSS = `
   /* THE RECEIPT — rule draws L→R, cite ignites at its terminus [signature] */
   .vmx-receipt {
     display: flex; align-items: center; gap: var(--sp-3);
-    width: min(44ch, 100%); max-width: 680px;
+    width: min(52ch, 100%); max-width: 720px;
+    margin-top: var(--sp-4);
     transition: opacity 700ms ease-out;
+  }
+  /* The evidence chip: ONE machined glass slab holding the waveform emblem and
+   * the cite — the mock's receipt, with its left brand-bar. The rule terminates
+   * here; the chip is the claim's physical proof object. */
+  .vmx-receipt__chip {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 14px;
+    padding: 10px 16px 10px 18px;
+    border: 1px solid var(--border-default);
+    border-radius: var(--r-sm);
+    background:
+      linear-gradient(180deg, var(--brand-08) 0%, var(--brand-04) 40%, transparent 100%),
+      linear-gradient(180deg, var(--void-8) 0%, var(--void-5) 100%);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.06),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.4),
+      0 1px 0 rgba(255, 255, 255, 0.02),
+      0 4px 14px rgba(0, 0, 0, 0.35);
+  }
+  .vmx-receipt__chip::before {
+    content: "";
+    position: absolute;
+    left: 0; top: 9px; bottom: 9px;
+    width: 2px;
+    background: var(--brand);
+    box-shadow: 0 0 6px var(--brand-50);
+    border-radius: 0 1px 1px 0;
   }
   .vmx-receipt[hidden] { display: none; }
   .vmx-receipt__rule {
@@ -781,35 +918,59 @@ const LAYOUT_CSS = `
     transform: scaleX(0); transform-origin: left;
   }
   .vmx-receipt[data-arrived="true"] .vmx-receipt__rule { animation: vmx-draw 520ms cubic-bezier(0.22, 1, 0.36, 1) 360ms forwards; }
+  /* The cited moment's waveform — the mock's receipt signature. Not data: a
+   * material emblem that this cite IS an audio moment, breathing at phrase
+   * tempo beside the timestamp. */
+  .vmx-receipt__wave {
+    display: flex; align-items: center; gap: 2px; height: 20px; flex: none;
+  }
+  .vmx-receipt__wave span {
+    width: 2.5px; border-radius: 1.25px;
+    background: var(--brand); opacity: 0.55;
+    animation: vmx-wave 1.8s ease-in-out infinite;
+  }
+  .vmx-receipt__wave span:nth-child(3) {
+    /* silk alias (= the brightest warm off-white): the v5 legacy-token gate
+     * greedily matches the bare v6 text-ladder names, so session CSS reads
+     * the alias. */
+    background: var(--silk); opacity: 0.95;
+    box-shadow: 0 0 6px var(--brand-50);
+  }
+  @keyframes vmx-wave {
+    0%, 100% { transform: scaleY(0.4); }
+    50%      { transform: scaleY(1); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .vmx-receipt__wave span { animation: none; transform: scaleY(0.7); }
+  }
+  /* The cite lives INSIDE the chip slab now — bare lit mono text, no second
+   * border-in-border. Ignite plays on the text alone; the slab stays steady. */
   .vmx-cite {
     flex: none; display: inline-flex; align-items: center; gap: 6px;
-    font-family: var(--type-mono); font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase;
-    color: var(--amber-pale); border: 1px solid var(--amber-22); border-radius: var(--rad-sm);
-    padding: 5px 10px;
-    background:
-      linear-gradient(180deg, rgba(255, 251, 244, 0.026), transparent 44%, rgba(0, 0, 0, 0.22)),
-      rgba(255, 165, 223, 0.045);
+    font-family: var(--type-mono); font-size: 11px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--text-secondary); border: 0; border-radius: var(--rad-sm);
+    padding: 0;
+    background: transparent;
     cursor: pointer;
-    text-shadow: 0 0 5px var(--amber-22);
-    box-shadow:
-      inset 0 1px 0 rgba(255, 251, 244, 0.034),
-      inset 0 -1px 0 var(--amber-22),
-      inset 0 0 12px rgba(255, 165, 223, 0.075);
+    font-variant-numeric: tabular-nums;
+    text-shadow: var(--text-emboss);
   }
   .vmx-receipt[data-arrived="true"] .vmx-cite { animation: vmx-ignite 380ms cubic-bezier(0.16, 1, 0.3, 1) 900ms both; }
-  .vmx-cite:hover { border-color: var(--amber-40); background: rgba(255, 165, 223, 0.09); }
+  .vmx-cite:hover { color: var(--brand-glow); text-shadow: 0 0 8px var(--brand-22); }
   .vmx-cite:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
   @keyframes vmx-draw { to { transform: scaleX(1); } }
   @keyframes vmx-ignite {
-    0% { opacity: 0; color: var(--silk-40); border-color: var(--glass-edge); background: transparent; text-shadow: none; box-shadow: none; }
-    55% { opacity: 1; color: var(--amber); border-color: var(--amber-65); background: rgba(255, 165, 223, 0.10); text-shadow: 0 0 8px var(--amber-65); box-shadow: var(--glow-soft); }
-    100% { opacity: 1; color: var(--amber-pale); border-color: var(--amber-22); background: rgba(255, 165, 223, 0.04); text-shadow: 0 0 6px var(--amber-22); box-shadow: none; }
+    0% { opacity: 0; color: var(--silk-40); text-shadow: none; }
+    55% { opacity: 1; color: var(--amber); text-shadow: 0 0 8px var(--amber-65); }
+    100% { opacity: 1; color: var(--text-secondary); text-shadow: var(--text-emboss); }
   }
 
   /* --- FOOT: one steady master readout (BPM · key · live level) --- */
   .vmx-deck__foot {
     display: grid;
-    grid-template-columns: minmax(12ch, max-content) minmax(9ch, max-content) minmax(120px, 1fr);
+    /* BPM/KEY moved up to crown the voice; the foot is now the level meter alone,
+     * spanning full width like the mock's phrase strip. */
+    grid-template-columns: 1fr;
     align-items: center;
     gap: clamp(14px, 2.4vw, 40px);
     margin: 0 clamp(0px, 1.2vw, 18px);
@@ -821,59 +982,71 @@ const LAYOUT_CSS = `
     box-shadow: inset 0 1px 0 rgba(255, 222, 242, 0.052);
   }
   .vmx-read { display: flex; align-items: baseline; gap: var(--sp-2); min-width: 0; overflow: visible; white-space: nowrap; }
-  .vmx-read[data-readout="bpm"] { min-width: 12ch; }
-  .vmx-read[data-readout="key"] { min-width: 9ch; }
+  .vmx-read[data-readout="bpm"] { min-width: 9ch; }
+  .vmx-read[data-readout="key"] { min-width: 6ch; }
   .vmx-read__lab {
-    font-family: var(--type-display); font-variation-settings: 'wdth' 85, 'wght' 600;
-    font-size: 9px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--silk-22);
+    font-family: var(--type-mono);
+    font-size: 10px; font-weight: 500; letter-spacing: 0.32em; text-transform: uppercase;
+    color: var(--text-disabled);
   }
-  /* BPM and key read at ONE mono scale (was 22 vs 18, near-equal-weight mush);
-   * the numerics carry the read, the 9px labels stay dim. Key keeps amber — the
-   * one quarantined heat hue — so it still reads as the second value, by HUE not
-   * size (impeccable layout pass, hierarchy fix). */
+  /* Scene-line values: one mono scale, tracked like the mock's "130 bpm · 8A".
+   * BPM reads in quiet ink; KEY ignites in brand — the harmonic fact is the
+   * one the co-host acts on, so it carries the single accent (by hue, small). */
   .vmx-read__num {
-    font-family: var(--type-mono); font-weight: 500; font-size: 20px; letter-spacing: 0.02em;
+    font-family: var(--type-mono); font-weight: 700; font-size: 13px; letter-spacing: 0.06em;
     font-variant-numeric: tabular-nums;
-    color: var(--silk); transition: color 700ms ease-out;
-    display: inline-block; min-width: 6ch; overflow: visible;
+    color: var(--text-tertiary); transition: color 700ms ease-out;
+    display: inline-block; min-width: 5ch; overflow: visible;
+    text-shadow: var(--text-emboss);
   }
   .vmx-read__key {
-    font-family: var(--type-mono); font-weight: 500; font-size: 20px; letter-spacing: 0.04em;
-    color: var(--amber-pale); transition: color 700ms ease-out;
-    display: inline-block; min-width: 5ch; overflow: visible;
+    font-family: var(--type-mono); font-weight: 700; font-size: 13px; letter-spacing: 0.06em;
+    color: var(--brand); transition: color 700ms ease-out;
+    display: inline-block; min-width: 4ch; overflow: visible;
+    text-shadow: var(--text-emboss);
   }
+  /* THE MASTER GROOVE (fable pass): the 14px segmented bar read as a cheap
+   * dotted progress strip — the loudest slop tell on the deck. Rebuilt as the
+   * mock's phrase hairline: a 4px machined groove recessed into the obsidian,
+   * the live level as a soft rose wash inside it, the peak as a lit playhead
+   * orb riding above. Same wires (.vmx-fmeter__fill width / __peak left). */
   .vmx-fmeter {
-    position: relative; height: 14px; border-radius: var(--rad-sm);
-    background: var(--void-1); border: 1px solid var(--glass-edge);
+    position: relative; height: 4px; border-radius: 2px;
+    background: linear-gradient(180deg, var(--void-0) 0%, var(--void-8) 100%);
     box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.035),
-      inset 0 -1px 0 rgba(0, 0, 0, 0.72),
-      inset 0 0 8px rgba(0, 0, 0, 0.78);
-    overflow: hidden;
-    isolation: isolate;
-  }
-  .vmx-fmeter::after {
-    content: "";
-    position: absolute;
-    inset: 1px;
-    background:
-      repeating-linear-gradient(90deg, transparent 0 11px, rgba(0, 0, 0, 0.56) 11px 13px),
-      linear-gradient(180deg, rgba(255, 255, 255, 0.060), transparent 45%, rgba(0, 0, 0, 0.20));
-    pointer-events: none;
-    z-index: 3;
+      inset 0 1px 2px rgba(0, 0, 0, 0.55),
+      inset 0 -1px 0 rgba(255, 255, 255, 0.04),
+      0 1px 0 rgba(255, 255, 255, 0.03);
+    overflow: visible;
+    margin: 5px 0 7px;
   }
   .vmx-fmeter__fill {
-    position: absolute; inset: 1px; width: 0%; border-radius: 1px;
-    background: linear-gradient(90deg, var(--amber-40), var(--amber-78) 80%, var(--amber));
+    position: absolute; inset: 0; width: 0%; border-radius: 2px;
+    background: linear-gradient(90deg, var(--brand-10), var(--brand-22) 70%, var(--brand-35));
     transition: background 700ms ease-out;
-    box-shadow: 0 0 14px var(--amber-22);
+    box-shadow: 0 0 12px var(--brand-08);
     z-index: 1;
   }
   .vmx-fmeter__peak {
-    position: absolute; top: 1px; bottom: 1px; left: 0; width: 2px;
-    background: var(--amber-pale); transition: opacity 700ms ease-out;
-    box-shadow: 0 0 8px var(--amber-65);
+    position: absolute; top: -5px; bottom: -5px; left: 0; width: 1.5px;
+    background: var(--brand);
+    transition: opacity 700ms ease-out;
+    box-shadow: 0 0 6px var(--brand-50);
     z-index: 4;
+  }
+  .vmx-fmeter__peak::before {
+    content: "";
+    position: absolute;
+    top: -4px; left: 50%;
+    width: 7px; height: 7px;
+    transform: translateX(-50%);
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, var(--brand-glow), var(--brand) 60%, var(--brand-press) 100%);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.4),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.3),
+      0 0 8px var(--brand),
+      0 0 14px var(--brand-50);
   }
 
   /* === status row — silk-dim when fine; lights red on a dropped input === */
@@ -1183,6 +1356,13 @@ export function mountSessionLayout(
   speak.className = "vmx-deck__speak";
   const voice = document.createElement("div");
   voice.className = "vmx-voice";
+  // Cursor-lit voice (mock contract): track the pointer into --mx/--my so the
+  // ::after halo follows the hand. Pointer-event only — never on the rAF path.
+  voice.addEventListener("mousemove", (e: MouseEvent) => {
+    const rect = voice.getBoundingClientRect();
+    voice.style.setProperty("--mx", `${(((e.clientX - rect.left) / rect.width) * 100).toFixed(1)}%`);
+    voice.style.setProperty("--my", `${(((e.clientY - rect.top) / rect.height) * 100).toFixed(1)}%`);
+  });
   const ghost2 = document.createElement("p");
   ghost2.className = "vmx-ghost vmx-ghost--g2";
   const ghost1 = document.createElement("p");
@@ -1202,11 +1382,34 @@ export function mountSessionLayout(
   const rule = document.createElement("span");
   rule.className = "vmx-receipt__rule";
   rule.setAttribute("aria-hidden", "true");
+  // The cited moment's waveform emblem (fable pass): five bars breathing at
+  // phrase tempo beside the cite. Decorative material, never data — heights
+  // and delays are fixed so it can't pretend to plot the real signal.
+  const wave = document.createElement("span");
+  wave.className = "vmx-receipt__wave";
+  wave.setAttribute("aria-hidden", "true");
+  for (const [h, delay] of [
+    [7, 0],
+    [11, 0.12],
+    [17, 0.24],
+    [9, 0.36],
+    [12, 0.48],
+  ] as const) {
+    const bar = document.createElement("span");
+    bar.style.height = `${h}px`;
+    bar.style.animationDelay = `${delay}s`;
+    wave.append(bar);
+  }
   const cite = document.createElement("button");
   cite.type = "button";
   cite.className = "vmx-cite";
   cite.dataset.wire = "session.citation";
-  receipt.append(rule, cite);
+  // One glass slab holds the wave emblem + cite — the proof object the
+  // signature rule terminates at.
+  const receiptChip = document.createElement("span");
+  receiptChip.className = "vmx-receipt__chip";
+  receiptChip.append(wave, cite);
+  receipt.append(rule, receiptChip);
   const dropSlot = document.createElement("div");
   dropSlot.className = "vmx-drop-slot";
   dropSlot.dataset.wire = "session.drop";
@@ -1223,6 +1426,12 @@ export function mountSessionLayout(
   const armedField = document.createElement("div");
   armedField.className = "vmx-armed__field";
   armedField.setAttribute("aria-hidden", "true");
+  // The sign of life (direction-final): a hairline frame seating the idle deck
+  // + ONE slow brand light traveling its perimeter (tokens.css .border-anim,
+  // 22s). The session deck's single allowed sweep, armed-only.
+  const armedFrame = document.createElement("div");
+  armedFrame.className = "vmx-armed__frame";
+  armedFrame.setAttribute("aria-hidden", "true");
   const armedCopy = document.createElement("div");
   armedCopy.className = "vmx-armed__copy";
   const armedEyebrow = document.createElement("span");
@@ -1230,7 +1439,13 @@ export function mountSessionLayout(
   armedEyebrow.textContent = "armed and waiting";
   const armedTitle = document.createElement("h1");
   armedTitle.className = "vmx-armed__title";
-  armedTitle.textContent = "I'm awake before the first bar.";
+  // The one charisma beat at idle: the moment the co-host is waiting for
+  // ignites in rose italic (mirrors the live hero's em treatment). Static
+  // copy, built node-wise — no innerHTML.
+  armedTitle.append(document.createTextNode("I'm awake before the "));
+  const armedEm = document.createElement("em");
+  armedEm.textContent = "first bar";
+  armedTitle.append(armedEm, document.createTextNode("."));
   const armedLead = document.createElement("p");
   armedLead.className = "vmx-armed__lead";
   armedLead.textContent =
@@ -1270,7 +1485,7 @@ export function mountSessionLayout(
   armedNote.className = "vmx-armed__note";
   armedNote.textContent = "Stands by until you go live.";
   armedModule.append(armedKicker, startBtn, armedNote);
-  armed.append(armedField, armedCopy, armedModule);
+  armed.append(armedFrame, armedField, armedCopy, armedModule);
 
   speak.append(voice, armed);
   deck.append(speak);
@@ -1280,6 +1495,15 @@ export function mountSessionLayout(
   foot.className = "vmx-deck__foot";
   const { wrap: bpmWrap, value: bpm } = makeReadout("bpm");
   const { wrap: keyWrap, value: key } = makeReadout("key", true);
+  // BOLD REDESIGN (2026-06-08): the instrument readout (BPM · KEY) now CROWNS the
+  // voice from above — the bravoh-grade-pink mock's structure — instead of sitting
+  // stranded at the foot. The render-loop writes `bpm`/`key` by ref (see the
+  // update fn), so relocating the wrappers keeps them live with ZERO wiring
+  // change. The foot keeps the level meter, now full-width like the mock's strip.
+  const readoutFrame = document.createElement("div");
+  readoutFrame.className = "vmx-voice__readout";
+  readoutFrame.append(bpmWrap, keyWrap);
+  claim.prepend(readoutFrame);
   const fmeter = document.createElement("div");
   fmeter.className = "vmx-fmeter";
   fmeter.dataset.wire = "session.meter";
@@ -1289,7 +1513,7 @@ export function mountSessionLayout(
   const meterPeak = document.createElement("div");
   meterPeak.className = "vmx-fmeter__peak";
   fmeter.append(meterFill, meterPeak);
-  foot.append(bpmWrap, keyWrap, fmeter);
+  foot.append(fmeter);
   deck.append(foot);
 
   stage.append(deck);
@@ -1376,6 +1600,38 @@ function makeLiveLabel(
   el.className = `vmx-live__s vmx-live__s--${kind}`;
   el.textContent = text;
   return el;
+}
+
+/** Render the co-host's spoken line with its charisma intact: inline timecodes
+ *  (M:SS / MM:SS, e.g. "02:14") lift into a lit mono cite (`.num`) the way the
+ *  bravoh-grade-pink contract sets them, the rest stays plain serif prose. This
+ *  is the difference between a flat sentence and a co-host pointing at a moment.
+ *
+ *  Grounding-safe (it only reformats a timecode already in the real reaction
+ *  text, never fabricates one) and XSS-safe: built node-by-node with text nodes,
+ *  never innerHTML, so AI-authored reaction text can never inject markup — the
+ *  only element we create is the known `.num` span. `el.textContent` still
+ *  concatenates back to the raw line, so the caller's skip-if-unchanged guard
+ *  and the aria-live announcement both keep working. */
+export function setVoiceLine(el: HTMLElement, text: string): void {
+  el.replaceChildren();
+  if (!text) return;
+  const re = /\b\d{1,2}:\d{2}\b/g;
+  let last = 0;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text)) !== null) {
+    if (m.index > last) {
+      el.appendChild(document.createTextNode(text.slice(last, m.index)));
+    }
+    const num = document.createElement("span");
+    num.className = "num";
+    num.textContent = m[0];
+    el.appendChild(num);
+    last = m.index + m[0].length;
+  }
+  if (last < text.length) {
+    el.appendChild(document.createTextNode(text.slice(last)));
+  }
 }
 
 function makeReadout(label: string, isKey = false): { wrap: HTMLElement; value: HTMLElement } {
@@ -1513,7 +1769,9 @@ function applyState(mounted: Mounted, next: SessionState, isMount: boolean): voi
   // placeholder, NOT a fabricated reaction). Real lines replace it the instant
   // the co-host speaks. Live mode keeps "" (a live deck always has a line).
   const nowText = nowLine ? nowLine.text : mode === "silent" ? IDLE_HERO_LINE : "";
-  if (mounted.now.textContent !== nowText) mounted.now.textContent = nowText;
+  // textContent of the built line concatenates to nowText, so this guard still
+  // holds (skip the DOM rebuild when the line is unchanged).
+  if (mounted.now.textContent !== nowText) setVoiceLine(mounted.now, nowText);
   if (!nowLine && mode === "silent") {
     const idle = idleReadinessLines(next);
     setGhostText(mounted.ghosts[0], idle.action);
