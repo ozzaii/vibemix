@@ -114,23 +114,23 @@ live proxy (see "next lever" below).
 
 > **Session-update (2026-06-09, HEAD `520fa96d`):** a 9-agent `verify→design→red-team` workflow
 > (`wqfexzazk`) re-checked all three against HEAD before any edit (the META-LESSON in practice).
-> Result: **(b) LANDED** as `520fa96d`; **(a)** a fresh trace reported *already-fixed* (CONFLICTS
-> with the prior "unfixed" claim below — UNRESOLVED, confirm by direct read + by-ear, do NOT re-fix
-> blind); **(c)** the `runtime/coach.py` gate fix is **correct-but-INERT** (not landed) — the real
+> Result: **(b) LANDED** as `520fa96d`; **(a) CONFLICT RESOLVED by direct read** — the architectural
+> warm-before-capture bug is FIXED at HEAD (capture-first, commit `493de2f9`); the fresh trace's
+> *already-fixed* was correct and the prior "unfixed" claim was stale (residual cold-start silence =
+> warm-latency / depleted key, by-ear only, no blind fix — see **(a)** below);
+> **(c)** the `runtime/coach.py` gate fix is **correct-but-INERT** (not landed) — the real
 > default-path late-blurt was traced (`wmncmazdh` → `real_unguarded_default`) and **FIXED in `3b0cddc6`**
 > (TDD freshness guard in `dj_cohost.py`, commit-aware so it never cuts a timely line; probe-direct
 > path `wqncga9ou` is a separate still-open NON-default bug). See **(c)** below for the full writeup.
 
-**(a) Cold-start silence** — `src/vibemix/__main__.py` — ⚠️ **STATUS CONFLICT, UNRESOLVED**
-- The 2026-06-09 trace agent returned `no_already_fixed` (i.e. the warm-before-capture mechanism
-  appears already addressed at HEAD). The prior line-level claim below said unfixed. NEITHER was
-  re-confirmed by a direct human read this session. **Before touching: read the warm/capture order
-  in `__main__.py` yourself + confirm by-ear; do not trust either report.** Prior claim, for reference:
-- warm default 90.0s: `:339-347` (`_chatterbox_start_warmup_timeout_s()`, 0.0 only in Sven-QA).
-- capture thread spawned & flips session to "started" BEFORE TTS warm: `:2392` (+ `_mark_capture_started` `:2286-2302` sets `live_session_active=True`).
-- warm await only gates up to the 90s timeout, then proceeds even when "Chatterbox still warming in background": `:2453-2476` (await at `:2458`).
-- `coach_loop` (reaction generator) starts AFTER the warm block: `:2772`. There is **no hold/queue** — first reactions generated while TTS is still cold are dropped, not held.
-- **Smallest fix:** hold/queue the first generated reaction until `wait_until_warm()` returns, instead of generate-and-drop. Dev-only unblock (masks, not a fix): `VIBEMIX_CHATTERBOX_START_WARMUP_TIMEOUT_S=0`.
+**(a) Cold-start silence** — `src/vibemix/__main__.py` — ✅ **CONFLICT RESOLVED by direct read (2026-06-09): the architectural warm-before-capture bug is FIXED at HEAD; residual silence is warm-latency / depleted key, NOT a code bug to blind-fix.**
+- **Direct-read verdict (capture-first IS in, commit `493de2f9` "prove capture-first Sven voice path"):**
+  - The capture worker thread is spawned at `:2404` (`threading.Thread(target=_open_input_stream_worker, …).start()`) — **BEFORE** the Chatterbox warm block at `:2445-2474`. So capture arms concurrently with (slightly ahead of) the warm; the music writer is live as soon as the device opens.
+  - "started" / `live_session_active=True` is now gated on the **first input callback** (`_on_first_input_callback` `:2303` → `_mark_capture_started` `:2286-2301`, logs `capture_first_callback` + `session_lifecycle started`, sets `started_event`), NOT on thread spawn. The banner wording is now "warming Chatterbox **while capture arms**" (`:2453`).
+  - Capture failure now emits **`ipc.error`** (`:2347-2362`, reason "input capture failed", `original_type: audio.capture`) + logs `capture_failed` + sets `started_event` (`:2364`). No longer stderr-only.
+  - → The fresh trace's `no_already_fixed` was CORRECT; the prior "unfixed" line-claim was STALE (older state). The "smallest fix" suggested below is OBSOLETE — do not implement it.
+- **Residual to confirm by-ear ONLY (no blind code change):** any "2-4 min of silence" a human still hears at cold start is now most likely (i) Chatterbox warm latency keeping voice muted until warm (`await wait_until_warm` up to `VIBEMIX_CHATTERBOX_START_WARMUP_TIMEOUT_S`, `:2458`) — the agent/session build at `:2671` proceeds after that wait — and/or (ii) the depleted Gemini key (429 → empty reactions → nothing to voice). Both are warm/key confounds, not the capture/started architecture. Verify with Kaan + a funded key before treating as a bug; building the agent before warm is a design tradeoff (voice not ready), not a clean fix.
+- Dev-only unblock to isolate warm-latency from the rest: `VIBEMIX_CHATTERBOX_START_WARMUP_TIMEOUT_S=0` (capture is not waiting on warm; banner `:2470-2474`).
 
 **(b) Fresh-user empty deck** — ✅ **LANDED 2026-06-09 as `520fa96d`** (`tauri/ui/src/wizard/router.ts`)
 - Fix: `finishLaunchStep()` now calls a module-private `maybeAutoIngestLibrary()` BEFORE
