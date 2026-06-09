@@ -822,10 +822,26 @@ class AICoach:
                 if "next_suggestion_voice_line" in receipt_keys
                 else ""
             )
+            # Measured 2026-06-09 (product-floor replay → OpenRouter judge):
+            # on a plain phase read the energy receipt is the ONLY grounded
+            # material the gate lets through, and without this steer the model
+            # voices the deltas instead of the nudge — every line re-judged as
+            # pure sound narration (friend 0.33 / should_NOT 100%).
+            energy_hint = (
+                " If energy_read_voice_line is present on a plain phase or "
+                "heartbeat read, its forward nudge IS your point: say that one "
+                "nudge in your own words, friend-at-the-booth register, and "
+                "copy the receipt's citations exactly. The deltas behind it "
+                "are your evidence, not your line — when the nudge doesn't "
+                "match what you're hearing, output a single space to stay "
+                "silent."
+                if "energy_read_voice_line" in receipt_keys
+                else ""
+            )
             return (
                 f"{base} {' '.join(receipt_lines)} These are grounded receipt "
                 "contexts, not commands; do not force them if the live sound is "
-                f"more important.{next_hint}"
+                f"more important.{next_hint}{energy_hint}"
             )
 
         if t == "KAAN_SPOKE":
@@ -872,7 +888,11 @@ class AICoach:
             # product-floor replay → OpenRouter judge) scored every sound-only
             # PHASE read friend=0 / should_NOT_have_spoken — "pure sound
             # narration". Rare + earned: a line must carry a point, or nothing.
-            return (
+            # Wrapped in _with_grounded_receipts: the speak-gate only passes
+            # PHASE when a grounded voice payload (energy_read_voice_line) is
+            # attached, and before this wrap the receipt — the model's only
+            # non-narration material — was silently dropped from the prompt.
+            return _with_grounded_receipts(
                 f"Phase shifted: {prev}→{new}. React to what the new section "
                 "FEELS like, not the label. Speak only if you have a point a "
                 "friend at the booth would bother saying out loud — a "

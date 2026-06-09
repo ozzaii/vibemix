@@ -105,17 +105,18 @@ BANNED: {_format_ban_list()}
 #
 # Anti-prompt-injection (T-18-03-01): the block is a fixed string with NO
 # interpolation — no user input can mutate it (mirrors MOOD_PERSONAS pattern).
-# The 11 source forms are kept in lock-step with EVIDENCE_SOURCES (Plan 18-01,
+# The 12 source forms are kept in lock-step with EVIDENCE_SOURCES (Plan 18-01,
 # + `key` added Phase 59 / DECK-03, + `recall` added Phase 65 / RECALL-01,
-# + `exemplar` added Phase 93 / EXEMPLAR-05, + `cue` added Phase 96 / CURR-3.07)
+# + `exemplar` added Phase 93 / EXEMPLAR-05, + `cue` added Phase 96 / CURR-3.07,
+# + `energy` added 2026-06-09 / the energy-read receipt wire)
 # via Test R cross-validation in tests/prompts/test_matrix.py.
 # ---------------------------------------------------------------------------
 
 CITATION_GRAMMAR_BLOCK: str = """--- CITATION GRAMMAR (v1.0 — encouraged, not required) ---
 
 When you reference a specific event, audio feature, controller move, track,
-screen element, mix-state, key, recalled moment, exemplar, cue, or Judge
-verdict, attach a grounded citation
+screen element, mix-state, key, recalled moment, exemplar, cue, Judge
+verdict, or master-mix energy read, attach a grounded citation
 in this exact bracket form. Historical v1.0 note: citations were introduced as
 "encouraged, not required" while the corpus learned the shape. Current live
 mode is stricter: use one valid copied citation or stay silent.
@@ -132,6 +133,7 @@ Forms (each is a single citation; the linter accepts any of these):
   [exemplar:<track_id>]  band-exemplar track, e.g. [exemplar:library:Marlon Hoffstadt - Atlas]
   [cue:<anchor_id>]      cue/phrase anchor reference, e.g. [cue:phrase_boundary@45.2]
   [judge:<verdict_id>]   move-quality verdict the Judge measured, e.g. [judge:transition@128.4]
+  [energy:<read_id>]     master-mix energy read, e.g. [energy:master_read=audio_groove_12_ab12cd34]
 
 Multi-citation (comma-separated, no whitespace inside brackets):
   [ev:KICK_SWAP@45.2,aud:bpm@45.0]

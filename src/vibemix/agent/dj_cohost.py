@@ -1348,6 +1348,12 @@ def _build_citation_strip(
         # ``if not timestamps: continue`` guard with strip == [] (same
         # final state as the linter whole-turn strip — defense in depth
         # at two tiers).
+        # 2026-06-09 (receipt-wire fix) — ``energy`` stays OUT of this chip
+        # allow-list on purpose (same class as ``aud``/``track``/``screen``):
+        # the energy receipt's ``master_read=<id>_<digest>`` body carries no
+        # DJ-action verb worth a chip. It still validates in the linter and
+        # is stripped from TTS via EVIDENCE_CITATION_RE; it just renders no
+        # chip. Pinned by tests/state/test_energy_citation_schema_mirror.py.
         if source not in ("ev", "mix", "midi", "key", "recall", "exemplar", "cue", "judge"):
             continue
         # Registry lookup uses the body verbatim (KEY@t form). Drop the

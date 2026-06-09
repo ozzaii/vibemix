@@ -130,6 +130,91 @@ def test_build_prompt_phase_grounded_with_corpus_footer():
     assert "evidence_corpus[ev=2,aud=0,mix=1]" in prompt
 
 
+def test_build_prompt_phase_energy_receipt_reaches_prompt_and_leads():
+    """A PHASE event carrying an ``energy_read_voice_line`` receipt must hand
+    that receipt to the brain and steer the line to BE its forward nudge.
+
+    Measured (2026-06-09, product-floor replay → OpenRouter judge): the gate
+    only passes PHASE with this receipt attached, but the PHASE task tail never
+    wrapped ``_with_grounded_receipts`` — the receipt (and its [energy:...]
+    citations) was silently dropped, the model was left with raw audio numbers,
+    and all 8 spoken lines re-judged as pure sound narration (friend 0.33,
+    should_NOT 100%). This pins the wire: receipt text + citations reach the
+    prompt, and the prompt asks for the nudge, not a sound description."""
+    state = _grounded_state(bpm=128.0, rms=0.06)
+    receipt = (
+        "Energy-read receipt: source=master_mix. The master-mix read points "
+        "toward holding the groove steady. Copy these citations exactly: "
+        "[energy:master_read=audio_groove_12_abcd1234]."
+    )
+    ev = Event(
+        "PHASE",
+        state,
+        extra={
+            "prev_phase": "build",
+            "new_phase": "drop",
+            "energy_read_voice_line": receipt,
+        },
+    )
+    prompt = AICoach.build_prompt(ev, registry_snapshot=_nonempty_snapshot())
+
+    # The receipt text and its exact citation reach the brain.
+    assert "Energy-read receipt: source=master_mix" in prompt
+    assert "[energy:master_read=audio_groove_12_abcd1234]" in prompt
+    # The steer: the receipt's forward nudge IS the line; deltas are evidence.
+    assert "forward nudge IS your point" in prompt
+    assert "your evidence, not your line" in prompt
+    # The silence exit survives as the final contract.
+    assert prompt.endswith("output a single space to stay silent.")
+
+
+def test_energy_receipt_citation_round_trip_linter_and_tts():
+    """The ``[energy:...]`` citation the energy-read receipt instructs the
+    model to copy must complete the full anti-slop round trip: a registered
+    energy key validates in the CitationLinter (existence-only), a fabricated
+    one strips the turn, and the TTS sanitizer removes the bracket before
+    Chatterbox speaks. Measured hole (2026-06-09 slop audit): ``energy`` was
+    missing from EVIDENCE_SOURCES/_SOURCE_ALT, so the atom parsed to zero
+    citations — invisible to the linter AND unstripped by the TTS path —
+    and Chatterbox would have spoken the raw bracket aloud."""
+    from vibemix.agent.tts_sanitizer import model_text_for_tts
+    from vibemix.coach.citation_linter import CitationLinter
+
+    reg = EvidenceRegistry()
+    reg.write("energy", "master_read=audio_groove_12_abcd1234", 48.0)
+    snap = reg.snapshot()
+    linter = CitationLinter()
+
+    reply = (
+        "Hold the groove steady through this one. "
+        "[energy:master_read=audio_groove_12_abcd1234]"
+    )
+    result = linter.check(reply, snap, mode="live")
+    assert result.valid is True  # registered receipt key resolves
+
+    fabricated = linter.check(
+        "Push it. [energy:master_read=zzz_never_written]", snap, mode="live"
+    )
+    assert fabricated.valid is False  # invented energy key strips the turn
+    assert ("energy", "master_read=zzz_never_written") in fabricated.missing
+
+    spoken = model_text_for_tts(reply)
+    assert "[" not in spoken and "]" not in spoken  # bracket never reaches TTS
+    assert "Hold the groove steady" in spoken
+
+
+def test_build_prompt_phase_without_receipt_unchanged():
+    """A receipt-less PHASE prompt keeps the existing task tail untouched —
+    the wrapper is a no-op when no grounded voice payload is attached (this is
+    also the gate-silenced path; it only fires from manual/QA bypasses)."""
+    state = _grounded_state()
+    ev = Event("PHASE", state, extra={"prev_phase": "build", "new_phase": "drop"})
+    prompt = AICoach.build_prompt(ev, registry_snapshot=_nonempty_snapshot())
+    assert "React to what the new section" in prompt
+    assert "Energy-read receipt" not in prompt
+    assert prompt.endswith("output a single space to stay silent.")
+
+
 def test_build_prompt_mix_move_grounded_with_task_tail():
     """A MIX_MOVE coach prompt: grounded evidence_line + the MIX_MOVE task tail
     (change-point grounding on the move's audible result) + the evidence-corpus

@@ -139,6 +139,7 @@ EVIDENCE_SOURCES: frozenset[str] = frozenset(
         "exemplar",
         "cue",
         "judge",
+        "energy",
     }
 )
 
@@ -187,13 +188,25 @@ EVIDENCE_SOURCES: frozenset[str] = frozenset(
 # whitespace/comma/bracket and the inner colon(s) survive as the verdict_id body
 # (same posture as recall/key/exemplar/cue).
 #
+# ``energy`` (2026-06-09 receipt-wire fix — the master-mix energy read) is the
+# same silent-poisoning-hole pair as ``recall``/``exemplar``/``cue``/``judge``:
+# it MUST join this alternation in the SAME commit it joins EVIDENCE_SOURCES —
+# otherwise the ``[energy:<read_id>]`` atom the energy-read receipt
+# (runtime/energy_read_voice.py) instructs the model to copy is never matched
+# by parse_citations: invisible to the CitationLinter AND never stripped by
+# the TTS sanitizer (strip_citations_for_tts reuses EVIDENCE_CITATION_RE), so
+# Chatterbox would speak the raw bracket aloud. ``_INNER_ATOM`` stays
+# UNCHANGED — an ``energy:master_read=audio_groove_12_ab12cd34`` body has no
+# whitespace/comma/bracket, so the full ``master_read=<id>_<digest>`` body
+# survives as the read_id (same posture as recall/key/exemplar/cue/judge).
+#
 # ASYMMETRY (intentional, do NOT "fix"): ``memory/ingest.py``'s copy of this
-# alternation stays at 7 sources — ``recall``, ``exemplar``, ``cue``, AND
-# ``judge`` are RETRIEVAL/narration-time, never ingest-time (a stored past
-# reaction never cited recall / exemplar / cue / judge itself; the Judge writes
-# its evidence at narration time), so the ingest-time extractor must not
-# whitelist them.
-_SOURCE_ALT = "ev|aud|midi|track|screen|mix|key|recall|exemplar|cue|judge"
+# alternation stays at 7 sources — ``recall``, ``exemplar``, ``cue``,
+# ``judge``, AND ``energy`` are RETRIEVAL/narration-time, never ingest-time (a
+# stored past reaction never cited recall / exemplar / cue / judge itself; the
+# Judge and the energy-read receipt write their evidence at narration time),
+# so the ingest-time extractor must not whitelist them.
+_SOURCE_ALT = "ev|aud|midi|track|screen|mix|key|recall|exemplar|cue|judge|energy"
 _INNER_ATOM = rf"(?:{_SOURCE_ALT}):[^\s,\]]+"
 
 #: Compiled regex matching the LOCKED EBNF grammar:
@@ -201,7 +214,7 @@ _INNER_ATOM = rf"(?:{_SOURCE_ALT}):[^\s,\]]+"
 #:   citation := '[' atom ( ',' atom )* ']'
 #:   atom     := source ':' body
 #:   source   := 'ev' | 'aud' | 'midi' | 'track' | 'screen' | 'mix' | 'key'
-#:             | 'recall' | 'exemplar' | 'cue' | 'judge'
+#:             | 'recall' | 'exemplar' | 'cue' | 'judge' | 'energy'
 #:   body     := one-or-more chars excluding whitespace, ']', ','
 #:   key-body := <deck> ':' <camelot>   # e.g. "A:8A" — deck ∈ {A,B,C,D},
 #:                                       # camelot ∈ 1A..12B (Phase 59 DECK-03)
@@ -217,8 +230,12 @@ _INNER_ATOM = rf"(?:{_SOURCE_ALT}):[^\s,\]]+"
 #:   judge-body := <verdict_id>          # e.g. "transition@128.4" or
 #:                                        # "8A>9A@128.4" — full body survives
 #:                                        # parse_citations (v11.0 the Vibe Judge)
+#:   energy-body := <read_id>            # e.g. "master_read=audio_groove_12_ab12cd34"
+#:                                        # or "energy_risk=<flag>" — full body
+#:                                        # survives parse_citations (2026-06-09
+#:                                        # receipt-wire fix)
 #:
-#: Matches the 11 single-citation forms + the comma-joined multi-citation
+#: Matches the 12 single-citation forms + the comma-joined multi-citation
 #: form in one pass. Empty ``[]`` is rejected (body requires at least one
 #: char). Whitespace inside brackets is rejected.
 EVIDENCE_CITATION_RE: re.Pattern[str] = re.compile(

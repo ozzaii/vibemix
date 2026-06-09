@@ -207,7 +207,7 @@ def test_evidence_10_regex_rejects_empty_GROUND02_DLOCKED() -> None:
 # Test 11 — EVIDENCE_SOURCES constant — GROUND-02
 # --------------------------------------------------------------------------- #
 def test_evidence_11_sources_constant_locked_GROUND02() -> None:
-    """EVIDENCE_SOURCES is a frozenset of exactly the 11 source identifiers.
+    """EVIDENCE_SOURCES is a frozenset of exactly the 12 source identifiers.
 
     Phase 59 (DECK-03) added the dedicated ``key`` harmonic source to the
     original 7 CONTEXT.md sources. Phase 65 (RECALL-01) added ``recall`` —
@@ -217,16 +217,33 @@ def test_evidence_11_sources_constant_locked_GROUND02() -> None:
     that grounds Course 3 proactive count-ins. v11.0 (the Vibe Judge) adds
     ``judge`` — the deterministic move-quality verdict the co-host voices
     (existence-only, mirrors ``recall``/``exemplar``/``cue``/``key``/``track``).
+    2026-06-09 (receipt-wire fix) adds ``energy`` — the master-mix energy-read
+    receipt key written by runtime/energy_read_voice.py at receipt-build time
+    (existence-only, narration-time, no chip; see
+    tests/state/test_energy_citation_schema_mirror.py).
 
     The frozenset is the schema-mirror source-of-truth — the regex
     alternation, EBNF docstring, prompt grammar block and citation-strip
-    whitelist all carry ``judge`` in lock-step. (Adding it here but
+    whitelist all move in lock-step. (Adding a source here but
     NOT to ``_SOURCE_ALT`` would be the silent poisoning hole the
-    milestone exists to prevent.)
+    milestone exists to prevent — exactly the hole the ``energy`` fix closed.)
     """
     assert isinstance(EVIDENCE_SOURCES, frozenset)
     assert EVIDENCE_SOURCES == frozenset(
-        {"ev", "aud", "midi", "track", "screen", "mix", "key", "recall", "exemplar", "cue", "judge"}
+        {
+            "ev",
+            "aud",
+            "midi",
+            "track",
+            "screen",
+            "mix",
+            "key",
+            "recall",
+            "exemplar",
+            "cue",
+            "judge",
+            "energy",
+        }
     )
 
 
