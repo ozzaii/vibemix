@@ -348,4 +348,92 @@ describe("first-run continuity smoke (POLISH-03)", () => {
     expect(hasEnabledForwardControl(primary())).toBe(true);
   });
 
+  it("Open vibemix auto-ingests the detected source when un-indexed (B_fresh_user_empty_deck)", async () => {
+    // Fresh user: a library source was auto-detected (status "ready") but the
+    // user never clicked "Index this" (indexed === 0). Clicking "Open vibemix"
+    // must route that detected source through the real import seam — otherwise
+    // the deck + what-next pill open empty (the SuggestionService stays dark
+    // because deck_library is None). The wizard must still complete.
+    const action = {
+      type: "ipc.library.import",
+      payload: {
+        path: "/Users/ozai/Music/Engine Library/Database2/m.db",
+      },
+    };
+    getDevSurface().setState({
+      currentStep: "library-feed",
+      libraryFeed: {
+        status: "ready",
+        indexed: 0,
+        candidates: [
+          {
+            kind: "engine_database",
+            path: action.payload.path,
+            import_action: action,
+          },
+        ],
+      },
+    });
+    renderCurrentStep();
+
+    const openCta = Array.from(primary().querySelectorAll("button")).find((b) =>
+      (b.textContent ?? "").toLowerCase().includes("open vibemix"),
+    );
+    expect(openCta).toBeDefined();
+    expect(openCta!.disabled).toBe(false);
+
+    // Isolate THIS click's call (mocks aren't reset between tests, and another
+    // test routes the same path via "Index this").
+    vi.mocked(libraryImportFromAction).mockClear();
+    openCta!.click();
+    // finishLaunchStep + the fire-and-forget auto-ingest both resolve through
+    // mocked seams; flush the microtask queue so the import call lands.
+    for (let i = 0; i < 6; i++) await Promise.resolve();
+
+    // RED before the fix: finishLaunchStep only persisted prefs + completed the
+    // wizard, never touching the import path → 0 calls.
+    expect(libraryImportFromAction).toHaveBeenCalledWith(
+      action,
+      action.payload.path,
+    );
+    // Fire-and-surface-progress: the wizard is NOT blocked on the import.
+    expect(currentStep()).toBe("done");
+  });
+
+  it("Open vibemix does NOT auto-ingest when a source is already indexed", async () => {
+    // Returning user with tracks already in the library: opening the deck must
+    // not re-fire an import (no surprise re-index, no wasted work).
+    getDevSurface().setState({
+      currentStep: "library-feed",
+      libraryFeed: {
+        status: "done",
+        indexed: 142,
+        candidates: [
+          {
+            kind: "engine_database",
+            path: "/Users/ozai/Music/Engine Library/Database2/m.db",
+            import_action: {
+              type: "ipc.library.import",
+              payload: {
+                path: "/Users/ozai/Music/Engine Library/Database2/m.db",
+              },
+            },
+          },
+        ],
+      },
+    });
+    renderCurrentStep();
+
+    const openCta = Array.from(primary().querySelectorAll("button")).find((b) =>
+      (b.textContent ?? "").toLowerCase().includes("open vibemix"),
+    );
+    expect(openCta).toBeDefined();
+    vi.mocked(libraryImportFromAction).mockClear();
+    openCta!.click();
+    for (let i = 0; i < 6; i++) await Promise.resolve();
+
+    expect(libraryImportFromAction).not.toHaveBeenCalled();
+    expect(currentStep()).toBe("done");
+  });
+
 });

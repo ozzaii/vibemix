@@ -779,7 +779,29 @@ async function persistLaunchPreferences(): Promise<void> {
   ]);
 }
 
+/** Fresh-user safety net: a user who never clicked "Index this" but had a
+ *  library source auto-detected would otherwise open the deck with an empty
+ *  library — the deck stays bare and the what-next pill is dark (the sidecar's
+ *  SuggestionService is gated on `deck_library is not None`, which is built
+ *  once at session activation from an existing library.pkl). Kick the detected
+ *  source off as they open the deck so the index exists for the next
+ *  activation — and for this one only if the import finishes before they go
+ *  live (the live SuggestionService is not re-built mid-session). Fire-and-
+ *  forget: do NOT block wizard completion on a multi-minute CLAP embed. No-op
+ *  when tracks already exist / an import is in flight, or when no source was
+ *  detected (the user picks a folder later from the deck). */
+function maybeAutoIngestLibrary(): void {
+  const feed = wizardState.libraryFeed;
+  if (feed.indexed > 0 || feed.status === "indexing" || feed.status === "done") {
+    return;
+  }
+  const candidate = feed.candidates[0];
+  if (!candidate) return;
+  void startLibraryFeedImport(candidate);
+}
+
 async function finishLaunchStep(): Promise<void> {
+  maybeAutoIngestLibrary();
   await persistLaunchPreferences();
   await completeWizard();
 }
