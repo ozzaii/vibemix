@@ -333,6 +333,27 @@ def _runtime_coach_audio_seconds() -> float:
     return float(min(max(seconds, 3.0), COACH_AUDIO_SECONDS))
 
 
+def _stale_reaction_age_budget_s() -> float:
+    """Late-line-blurt freshness budget (Invariant #3 — trust the audio).
+
+    A reaction whose triggering event fired longer than this many seconds ago is
+    stale: its moment in the set is gone, so voicing it now blurts an
+    out-of-context line. Default 12.0s mirrors coach_loop's in-flight
+    stale-clear threshold (runtime/coach.py:776) — if an in-flight generation
+    older than 12s is already force-cleared, a reaction whose event fired >12s
+    ago is stale enough never to reach TTS. Tuned far above normal Gemini+TTS
+    latency (~1-3s) so a timely line is never dropped, and well under the 60s
+    COACH_PLAYOUT_TIMEOUT_S. Override: ``VIBEMIX_STALE_REACTION_AGE_BUDGET_S``.
+    """
+    raw = os.environ.get("VIBEMIX_STALE_REACTION_AGE_BUDGET_S", "").strip()
+    if not raw:
+        return 12.0
+    try:
+        return max(1.0, float(raw))
+    except (TypeError, ValueError):
+        return 12.0
+
+
 def _has_grounded_receipt_extra(extra: dict[str, Any]) -> bool:
     return any(
         isinstance(extra.get(key), str) and bool(str(extra.get(key)).strip())
@@ -1840,6 +1861,11 @@ class DJCoHostAgent(Agent):
         # handler called `_recall.clear()` to ensure nothing leaks.
         self._recall_task: asyncio.Task | None = None
         self._pending_event: Event | None = None
+        # Late-line-blurt guard (Invariant #3): monotonic stamp of the moment the
+        # current pending event fired, written by set_next_event. llm_node reads
+        # it to drop a reaction whose generation only resolves after the
+        # freshness budget. None = no stamp yet (guard disabled, fail-open).
+        self._pending_event_fired_monotonic: float | None = None
         self._ai_text_history: collections.deque = collections.deque(maxlen=10)
         self._recent_speak_fingerprints: collections.deque = collections.deque(maxlen=4)
         # ipc.session.snapshot transcript sink (see __init__ kwarg docstring).
@@ -2406,6 +2432,11 @@ class DJCoHostAgent(Agent):
 
     def set_next_event(self, ev: Event) -> None:
         self._pending_event = ev
+        # Late-line-blurt guard — stamp the event-fired moment so llm_node can
+        # measure reaction age and drop a line whose moment has passed. The
+        # Event itself carries no monotonic clock, which is exactly why this
+        # event-fired boundary (not the Event) is the correct seam to stamp.
+        self._pending_event_fired_monotonic = time.monotonic()
         # Plan 19-05 — start the TTFT measurement window. Overwriting an
         # existing pending pointer is intentional (the previous event was
         # preempted via CancelGate or failed via TimeoutError).
@@ -2758,6 +2789,15 @@ class DJCoHostAgent(Agent):
         ev_set_seconds: float | None = (
             float(getattr(ev.state, "set_seconds", 0.0) or 0.0) if ev is not None else None
         )
+        # Late-line-blurt freshness guard (Invariant #3 — trust the audio).
+        # ``event_fired_monotonic`` is the set_next_event stamp; a generation
+        # that only resolves after ``stale_age_budget`` is a now-stale reaction
+        # and must not reach TTS. Captured into a local BEFORE the recall-pull
+        # ``finally`` nulls the instance attr, so this turn's guard is unaffected
+        # by the reset. None (agent built outside a coach loop / no stamp)
+        # disables the guard — fail-open, never over-drop a timely line.
+        event_fired_monotonic = self._pending_event_fired_monotonic
+        stale_age_budget = _stale_reaction_age_budget_s()
         recall_moments: list = []
         try:
             # Phase 65 Plan 04 (RECALL-01/02) — pull the off-loop recall
@@ -2888,6 +2928,12 @@ class DJCoHostAgent(Agent):
             # success and exception paths so the agent's one-event-per-turn
             # model holds even if recall pull/registration raises.
             self._pending_event = None
+            # Late-line-blurt guard — clear the event-fired stamp on the same
+            # boundary (this turn already captured it into a local above, so
+            # the active guard is unaffected). Restores fail-open: a future
+            # non-coach_loop generation that fires WITHOUT a fresh stamp can
+            # never be muted by a stale leftover age.
+            self._pending_event_fired_monotonic = None
 
         # Phase 77 review WR-03 — wrap the stream/emit body so the
         # turn-end recall + grounding latch clears ALWAYS run, even if
@@ -3485,6 +3531,10 @@ class DJCoHostAgent(Agent):
             # lines never enter TTS.
             citation_lint_defer_stream = self._linter_wired
             language_defer_stream = False
+            # Latches once the reaction ages past the freshness budget before
+            # the head commits; holds the head and drives the post-stream
+            # "stale" suppression.
+            freshness_expired = False
             language_matches: tuple[str, ...] = ()
             tts_yielded_any = False
             tts_yielded_ends_space = False
@@ -3671,6 +3721,21 @@ class DJCoHostAgent(Agent):
                     if language_defer_stream:
                         continue
                     if citation_lint_defer_stream:
+                        continue
+                    # Late-line-blurt guard (Invariant #3 — trust the audio):
+                    # once this reaction is older than the freshness budget,
+                    # hold the head so stale audio never reaches TTS. Latches;
+                    # the post-stream gate logs + suppresses. Arms ONLY before
+                    # the head commits (``not head_yielded``) — a line already
+                    # speaking on time finishes rather than being cut.
+                    if (
+                        not head_yielded
+                        and not freshness_expired
+                        and event_fired_monotonic is not None
+                        and time.monotonic() - event_fired_monotonic > stale_age_budget
+                    ):
+                        freshness_expired = True
+                    if freshness_expired:
                         continue
                     # Chunk-by-chunk yield with bracket-balance clipping.
                     # Before the speed-gate clears we hold every chunk
@@ -3936,6 +4001,23 @@ class DJCoHostAgent(Agent):
                 except Exception:
                     pass
 
+            # Late-line-blurt guard — post-stream authority (commit-aware).
+            # Re-checks age so the wired/citation-buffered path AND short
+            # single-chunk responses (which never reach the mid-stream head
+            # gate) are still dropped when stale. Arms ONLY while
+            # ``not head_yielded`` — a line already speaking on time finishes
+            # rather than being cut mid-delivery (the 'spoke-then-cut' artifact
+            # is worse than a clean drop). Independent of the anti-slop flag:
+            # this is timing, not content — a stale reaction is suppressed
+            # regardless of what it says.
+            if (
+                not head_yielded
+                and event_fired_monotonic is not None
+                and time.monotonic() - event_fired_monotonic > stale_age_budget
+            ):
+                freshness_expired = True
+                suppression = "stale"
+
             # Plan 20-01 meta.json fields — initialized here so the dump
             # path at the bottom can reference them regardless of which
             # branch ran. "skip" means the wired path was not taken (legacy
@@ -4090,6 +4172,24 @@ class DJCoHostAgent(Agent):
                 print("[ai_text] <silence/> (suppressed)", flush=True)
                 if head_yielded:
                     _push_silence_pad_and_cancel("silence")
+            elif suppression == "stale":
+                # Late-line-blurt suppression — the reaction's moment has passed.
+                # By construction the commit-aware gates only set "stale" while
+                # the head was NEVER yielded, so there is nothing in TTS to cancel
+                # (no silence-pad needed); the line is simply dropped.
+                self._recorder.log_event(
+                    "stale_suppressed",
+                    event=ev_tag,
+                    age_s=(
+                        round(time.monotonic() - event_fired_monotonic, 2)
+                        if event_fired_monotonic is not None
+                        else None
+                    ),
+                    budget_s=stale_age_budget,
+                    response_chars=len(full_text),
+                    latency_s=round(elapsed, 2),
+                )
+                print("[ai_text] <stale reaction suppressed>", flush=True)
             elif suppression == "slop":
                 self._recorder.log_event(
                     "slop_suppressed",

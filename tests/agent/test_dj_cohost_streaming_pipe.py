@@ -34,6 +34,7 @@ the streaming-pipe assertions check ORDER + EMISSION, not absolute ms.
 from __future__ import annotations
 
 import asyncio
+import time
 from pathlib import Path
 from typing import Any
 
@@ -452,6 +453,122 @@ def test_pitfall_1_citation_period_no_premature_yield(mocker, tmp_path) -> None:
     # Head yielded only when bracket closed + boundary period seen.
     # First chunk (with citation period) must NOT have been emitted alone.
     assert chunks[0] != "Killer drop building up [ev:kick@2.5"
+
+
+def test_stale_reaction_dropped_not_spoken(mocker, tmp_path) -> None:
+    """Late-line-blurt guard (Invariant #3 — trust the audio): a reaction
+    whose triggering event fired longer than the freshness budget ago is
+    DROPPED, never voiced — even though the text is clean (not slop, not
+    silence, fully speakable).
+
+    Reproduces the confirmed DEFAULT-path blurt: E fires (``set_next_event``
+    stamps the moment), then Gemini+TTS only resolve N >> budget seconds later
+    on a quiet set where no superseding event can preempt. The stale head must
+    never reach TTS, so it is held instead of streamed.
+    """
+    agent, gen, recorder, state = _build_agent_legacy(mocker, tmp_path)
+    mocker.patch("vibemix.agent.dj_cohost.snapshot_wav", return_value=b"FAKEWAV")
+    mocker.patch.object(AICoach, "build_prompt", return_value="EVIDENCE: x")
+    gen.aio.models.generate_content_stream = mocker.AsyncMock(
+        return_value=_async_iter(
+            [
+                "This is a long enough opener. ",
+                "Then a tail.",
+                " Closing.",
+            ]
+        )
+    )
+    ev = Event(type="HEARTBEAT", state=state, extra={})
+    agent.set_next_event(ev)
+    # The generation resolves long after its budget: push the event-fired stamp
+    # far into the past so the reaction age is unambiguously expired before
+    # llm_node would commit any audio (no superseding event = quiet-set blurt).
+    agent._pending_event_fired_monotonic = time.monotonic() - 600.0
+    chunks = _drive(agent)
+    # DROPPED — the stale line is never voiced.
+    assert chunks == []
+    kinds = [k for k, _ in recorder.events]
+    assert "stale_suppressed" in kinds
+    # The head never reached TTS, so no silence-pad cancel was needed.
+    assert "streaming_cancel" not in kinds
+
+
+def test_timely_reaction_not_dropped_by_freshness_guard(mocker, tmp_path) -> None:
+    """Safety rail (anti-over-suppression): a fresh reaction whose event fired
+    ~now still streams and speaks in full. The age budget must NEVER mute a
+    timely line — proves the ``set_next_event`` stamp is recent on the live
+    path and the headroom (12s vs ~1-3s latency) holds."""
+    agent, gen, recorder, state = _build_agent_legacy(mocker, tmp_path)
+    mocker.patch("vibemix.agent.dj_cohost.snapshot_wav", return_value=b"FAKEWAV")
+    mocker.patch.object(AICoach, "build_prompt", return_value="EVIDENCE: x")
+    gen.aio.models.generate_content_stream = mocker.AsyncMock(
+        return_value=_async_iter(
+            [
+                "This is a long enough opener. ",
+                "Then a tail.",
+                " Closing.",
+            ]
+        )
+    )
+    ev = Event(type="HEARTBEAT", state=state, extra={})
+    agent.set_next_event(ev)  # fresh stamp — age ~0, far under the budget
+    chunks = _drive(agent)
+    assert "".join(chunks) == "This is a long enough opener. Then a tail. Closing."
+    kinds = [k for k, _ in recorder.events]
+    assert "stale_suppressed" not in kinds
+
+
+def test_committed_head_then_stale_still_finishes(mocker, tmp_path) -> None:
+    """Commit-aware freshness gate: a line whose head committed WITHIN budget
+    must finish even if the stream only completes past budget — it is NEVER cut
+    mid-delivery. The 'spoke-then-cut' artifact (a silence-pad cancel pushed
+    onto a line already speaking) is worse than a clean drop, so the post-stream
+    stale gate arms ONLY while ``not head_yielded``.
+
+    Deterministic clock: the head commits at age 5s (< 12s budget), then the
+    clock jumps past budget while the tail streams — no wall-clock sleep.
+    """
+    agent, gen, recorder, state = _build_agent_legacy(mocker, tmp_path)
+    mocker.patch("vibemix.agent.dj_cohost.snapshot_wav", return_value=b"FAKEWAV")
+    mocker.patch.object(AICoach, "build_prompt", return_value="EVIDENCE: x")
+
+    clock = {"t": 1000.0}
+    mocker.patch("vibemix.agent.dj_cohost.time.monotonic", lambda: clock["t"])
+
+    async def _streaming():
+        clock["t"] = 1005.0  # age 5s < 12s budget → head commits on time
+        yield type("Chunk", (), {"text": "This is a long enough opener. "})()
+        clock["t"] = 1100.0  # age 100s > budget — but head already committed
+        yield type("Chunk", (), {"text": "Then a tail."})()
+        yield type("Chunk", (), {"text": " Closing."})()
+
+    gen.aio.models.generate_content_stream = mocker.AsyncMock(return_value=_streaming())
+    ev = Event(type="HEARTBEAT", state=state, extra={})
+    agent.set_next_event(ev)  # stamps the clock at 1000.0
+    chunks = _drive(agent)
+    # The line that started on time finishes in full — never cut.
+    assert "".join(chunks) == "This is a long enough opener. Then a tail. Closing."
+    kinds = [k for k, _ in recorder.events]
+    assert "stale_suppressed" not in kinds
+    assert "streaming_cancel" not in kinds
+
+
+def test_pending_event_fired_stamp_resets_after_turn(mocker, tmp_path) -> None:
+    """Fail-open hardening: the event-fired stamp is cleared at turn end (the
+    same ``finally`` that nulls ``_pending_event``), so a future non-coach_loop
+    generation that fires without a fresh stamp can never be muted by a stale
+    leftover age."""
+    agent, gen, _, state = _build_agent_legacy(mocker, tmp_path)
+    mocker.patch("vibemix.agent.dj_cohost.snapshot_wav", return_value=b"FAKEWAV")
+    mocker.patch.object(AICoach, "build_prompt", return_value="EVIDENCE: x")
+    gen.aio.models.generate_content_stream = mocker.AsyncMock(
+        return_value=_async_iter(["This is a long enough opener. ", "Then a tail."])
+    )
+    ev = Event(type="HEARTBEAT", state=state, extra={})
+    agent.set_next_event(ev)
+    assert agent._pending_event_fired_monotonic is not None
+    _drive(agent)
+    assert agent._pending_event_fired_monotonic is None
 
 
 def test_phase_40_three_part_contract_preserved(mocker, tmp_path) -> None:
