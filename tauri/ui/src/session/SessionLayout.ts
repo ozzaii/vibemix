@@ -181,6 +181,7 @@ export interface Mounted {
   cite: HTMLElement;
   bpm: HTMLElement;
   key: HTMLElement;
+  track: HTMLElement;
   meterFill: HTMLElement;
   meterPeak: HTMLElement;
   statusInputs: {
@@ -982,8 +983,25 @@ const LAYOUT_CSS = `
     box-shadow: inset 0 1px 0 rgba(255, 222, 242, 0.052);
   }
   .vmx-read { display: flex; align-items: baseline; gap: var(--sp-2); min-width: 0; overflow: visible; white-space: nowrap; }
+  .vmx-read[hidden] { display: none; }
   .vmx-read[data-readout="bpm"] { min-width: 9ch; }
   .vmx-read[data-readout="key"] { min-width: 6ch; }
+  /* The now-playing read: a real track name is prose, not telemetry — body
+   * face, sentence case, ellipsized; the dim mono "now" key stays the label. */
+  .vmx-read[data-readout="track"] { min-width: 0; }
+  .vmx-read[data-readout="track"] .vmx-read__num {
+    font-family: var(--type-body);
+    font-weight: 500;
+    font-size: 13px;
+    letter-spacing: 0;
+    text-transform: none;
+    color: var(--text-secondary);
+    min-width: 0;
+    max-width: 34ch;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
   .vmx-read__lab {
     font-family: var(--type-mono);
     font-size: 10px; font-weight: 500; letter-spacing: 0.32em; text-transform: uppercase;
@@ -1502,7 +1520,13 @@ export function mountSessionLayout(
   // change. The foot keeps the level meter, now full-width like the mock's strip.
   const readoutFrame = document.createElement("div");
   readoutFrame.className = "vmx-voice__readout";
-  readoutFrame.append(bpmWrap, keyWrap);
+  // The third scene-line read: what's actually playing (timecode.track from
+  // the real now-playing wire). Hidden until a real title lands — never a
+  // fabricated value (Invariant #3).
+  const { wrap: trackWrap, value: track } = makeReadout("now");
+  trackWrap.dataset.readout = "track";
+  trackWrap.hidden = true;
+  readoutFrame.append(bpmWrap, keyWrap, trackWrap);
   claim.prepend(readoutFrame);
   const fmeter = document.createElement("div");
   fmeter.className = "vmx-fmeter";
@@ -1566,6 +1590,7 @@ export function mountSessionLayout(
     cite,
     bpm,
     key,
+    track,
     meterFill,
     meterPeak,
     statusInputs: {
@@ -1838,6 +1863,18 @@ function applyState(mounted: Mounted, next: SessionState, isMount: boolean): voi
     mounted.bpm.removeAttribute("title");
     mounted.bpm.removeAttribute("aria-label");
   }
+  // Track read — title (+ artist when known) from the real now-playing wire.
+  // The whole read hides when nothing is detected; it never invents a title.
+  const trackInfo = next.timecode.track;
+  const trackText = trackInfo
+    ? trackInfo.artist
+      ? `${trackInfo.title} — ${trackInfo.artist}`
+      : trackInfo.title
+    : "";
+  if (mounted.track.textContent !== trackText) mounted.track.textContent = trackText;
+  const trackWrapEl = mounted.track.closest<HTMLElement>(".vmx-read");
+  if (trackWrapEl && trackWrapEl.hidden !== !trackText) trackWrapEl.hidden = !trackText;
+
   const keyValue = next.timecode.key;
   const keyMissing = keyValue == null;
   const keyText = keyMissing ? "" : keyValue;
