@@ -19,28 +19,16 @@ export interface DropChipProps {
 }
 
 const CSS = `
+  /* FABLE PASS (2026-06-09): the boxed gadget chip is gone. The drop count is
+   * now the PHRASE LABEL riding the master groove (the mock's "drop in ~28
+   * bars" position) — bare tracked mono on the void, the pips as the one lit
+   * machined detail. A spec line on the faceplate, not a widget. */
   .vmx-drop-chip {
-    margin-top: 16px;
     display: inline-flex;
     align-items: center;
     gap: var(--sp-3);
-    padding: 8px 12px 8px 14px;
-    background: linear-gradient(180deg, rgba(255, 165, 223, 0.09) 0%, rgba(255, 165, 223, 0.025) 100%);
-    border: 1px solid var(--amber-40);
-    border-radius: var(--rad-sm);
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.06),
-      inset 0 -1px 0 var(--amber-40),
-      inset 0 0 14px var(--amber-22),
-      0 0 0 1px rgba(255, 165, 223, 0.14);
     position: relative;
-    /* 2026-05-19 /impeccable critique fix: dropped the panel-wide
-     * vmx-drop-pulse animation. At 130 BPM the chip pulsed every
-     * ~462ms in the same field as the timecode LIVE blink (1.4s) and
-     * the perimeter sweep (22s) — three concurrent breathing tempos
-     * competing in peripheral vision. The 4-beat pip row already
-     * carries the BPM signal as a CDJ-style sync indicator, which is
-     * the more distinctive of the two. */
+    white-space: nowrap;
   }
   /* 4-beat pip row — a small bar of dots cycling on the BPM period
    * (one full 4-beat cycle every 4 × --bpm-period-ms). Quiet but
@@ -77,44 +65,30 @@ const CSS = `
       box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.45);
     }
   }
-  .vmx-drop-chip__arrow {
-    font-family: var(--type-mono);
-    color: var(--amber);
-    font-size: 14px;
-    line-height: 1;
-    text-shadow: 0 0 4px var(--amber-22);
-  }
   .vmx-drop-chip__count {
     font-family: var(--type-mono);
     font-variant-numeric: tabular-nums;
-    font-weight: 500;
-    font-size: 22px;
+    font-weight: 700;
+    font-size: 12px;
     color: var(--amber);
-    text-shadow: 0 0 6px var(--amber-40);
-    letter-spacing: -0.02em;
+    text-shadow: 0 0 6px var(--amber-22);
+    letter-spacing: 0.08em;
     line-height: 1;
   }
   .vmx-drop-chip__lbl {
-    font-family: var(--type-display);
-    font-variation-settings: "wdth" 85, "wght" 600;
+    font-family: var(--type-mono);
+    font-weight: 500;
     font-size: 9px;
-    letter-spacing: 0.22em;
-    color: var(--silk-65);
+    letter-spacing: 0.25em;
+    color: var(--silk-40);
     text-transform: uppercase;
     line-height: 1;
     text-shadow: 0 1px 0 rgba(0, 0, 0, 0.7);
   }
   .vmx-drop-chip[data-bars="0"] {
-    border-color: var(--rec);
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.06),
-      inset 0 -1px 0 var(--rec),
-      inset 0 0 14px rgba(212, 65, 58, 0.22),
-      0 0 0 1px rgba(212, 65, 58, 0.18);
     animation: vmx-drop-rec-flash 220ms ease-out 1;
   }
-  .vmx-drop-chip[data-bars="0"] .vmx-drop-chip__count,
-  .vmx-drop-chip[data-bars="0"] .vmx-drop-chip__arrow {
+  .vmx-drop-chip[data-bars="0"] .vmx-drop-chip__count {
     color: var(--rec);
     text-shadow: 0 0 6px rgba(212, 65, 58, 0.45);
   }
@@ -141,21 +115,17 @@ export function renderDropChip(props: DropChipProps): HTMLElement | null {
     root.style.setProperty("--bpm-period-ms", `${props.bpmPeriodMs}ms`);
   }
 
-  const arrow = document.createElement("span");
-  arrow.className = "vmx-drop-chip__arrow";
-  arrow.textContent = "⟶";
-  arrow.setAttribute("aria-hidden", "true");
-  root.append(arrow);
+  // Label leads, count follows — reads as the mock's phrase line
+  // ("drop in · 08:00"), not a gadget readout.
+  const lbl = document.createElement("span");
+  lbl.className = "vmx-drop-chip__lbl";
+  lbl.textContent = "DROP IN";
+  root.append(lbl);
 
   const count = document.createElement("span");
   count.className = "vmx-drop-chip__count";
   count.textContent = formatBars(props.bars);
   root.append(count);
-
-  const lbl = document.createElement("span");
-  lbl.className = "vmx-drop-chip__lbl";
-  lbl.textContent = "DROP IN";
-  root.append(lbl);
 
   // 4-beat pip row — visualizes the sync period as a Pioneer-style
   // pulse train. Suppressed in REC-flash state (bars === 0) since the

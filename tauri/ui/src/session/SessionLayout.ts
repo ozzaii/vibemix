@@ -968,9 +968,9 @@ const LAYOUT_CSS = `
   /* --- FOOT: one steady master readout (BPM · key · live level) --- */
   .vmx-deck__foot {
     display: grid;
-    /* BPM/KEY moved up to crown the voice; the foot is now the level meter alone,
-     * spanning full width like the mock's phrase strip. */
-    grid-template-columns: 1fr;
+    /* The mock's phrase strip: groove takes the width, the drop phrase-label
+     * rides its right end on the same row. */
+    grid-template-columns: 1fr auto;
     align-items: center;
     gap: clamp(14px, 2.4vw, 40px);
     margin: 0 clamp(0px, 1.2vw, 18px);
@@ -1413,7 +1413,7 @@ export function mountSessionLayout(
   const dropSlot = document.createElement("div");
   dropSlot.className = "vmx-drop-slot";
   dropSlot.dataset.wire = "session.drop";
-  claim.append(now, receipt, dropSlot);
+  claim.append(now, receipt);
   voice.append(ghost2, ghost1, claim);
 
   // --- armed gate (SHIP-WIRE START-gate) ---
@@ -1513,7 +1513,9 @@ export function mountSessionLayout(
   const meterPeak = document.createElement("div");
   meterPeak.className = "vmx-fmeter__peak";
   fmeter.append(meterFill, meterPeak);
-  foot.append(fmeter);
+  // The drop countdown rides the groove as its phrase label (the mock's
+  // "drop in ~N bars" position) — empty slot collapses via :empty.
+  foot.append(fmeter, dropSlot);
   deck.append(foot);
 
   stage.append(deck);
