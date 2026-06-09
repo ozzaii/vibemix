@@ -350,3 +350,59 @@ def test_set_candidate_is_frozen():
     best = sequence_set(pool, curve="opener", n_slots=5)[0]
     with pytest.raises((AttributeError, Exception)):
         best.cost = 0.0  # frozen dataclass
+
+
+# ---------------------------------------------------------------------------
+# S1 — graded harmonic edges (lane: next-track intelligence / engine moat)
+# ---------------------------------------------------------------------------
+
+
+def test_graded_harmonic_edge_prefers_cleaner_key_ordering() -> None:
+    """Among gate-VALID orderings the graded harmonic edge term picks the
+    cleaner-blending one. CLAP vibe (shared vec -> cosine 1), BPM (all 124) and
+    the energy curve (all energy 50 -> track-independent node cost) are
+    neutralized, so the harmonic edge is the ONLY differentiator: a rough-key
+    track placed MID-input is pushed to an END so the two same-key tracks stay
+    adjacent (the only 0-cost harmonic edge). On HEAD the edge is CLAP-only, so
+    all orderings tie and the rough-key track stays mid -> RED."""
+    shared = _vec(7)
+    t0 = _pt("t0", camelot="8A", vec=shared)
+    tR = _pt("tR", camelot="9A", vec=shared)  # +1 hour: gate-valid, harmonic 0.88
+    t1 = _pt("t1", camelot="8A", vec=shared)
+    best = sequence_set([t0, tR, t1], curve="opener", n_slots=3)[0]
+    order = best.track_ids
+    assert order.index("tR") in (0, len(order) - 1), order
+
+
+def test_unknown_key_track_not_demoted_below_known_suboptimal() -> None:
+    """Honest-degrade: an unknown-key track contributes ZERO graded cost (mirror
+    the gate's degrade-to-pass), so it must NOT rank a worse blend than a track
+    with a KNOWN-but-suboptimal key. The known +2 track (10A, harmonic 0.78) is
+    pushed to an end; the unknown track keeps the favorable middle. A wrong
+    unknown->0.45 cost would invert this and bury the unknown track instead."""
+    shared = _vec(7)
+    t0 = _pt("t0", camelot="8A", vec=shared)
+    tS = _pt("tS", camelot="10A", vec=shared)  # +2 same-letter: gate-valid, harmonic 0.78
+    tU = _pt("tU", camelot=None, vec=shared)   # unknown key -> 0 graded cost
+    best = sequence_set([t0, tS, tU], curve="opener", n_slots=3)[0]
+    order = best.track_ids
+    # unknown->0 makes both tU edges free, so the only cost-0 orderings keep the
+    # unknown track in the favorable MIDDLE and push the known +2 track to an end.
+    # A wrong unknown->0.45 cost makes tU's edges (0.045) costlier than the +2
+    # edge (0.022), inverting this and burying tU at an end.
+    assert order.index("tU") not in (0, len(order) - 1), order
+    assert order.index("tS") in (0, len(order) - 1), order
+
+
+def test_small_harmonic_weight_does_not_flatten_energy_arc() -> None:
+    """The harmonic tiebreak must stay SMALL enough not to override the energy
+    curve: a +2 energy-lift track (10A) whose energy fits the peak slot must NOT
+    be demoted below a same-key (8A) track that misfits the slot, just to keep
+    the key static. Guards against an over-large zeta (a too-big weight flips
+    this to the same-key track and flattens the arc)."""
+    shared = _vec(7)
+    anchor = _pt("anchor", camelot="8A", energy=30.0, vec=shared)
+    lift = _pt("lift", camelot="10A", energy=52.0, vec=shared)  # +2 key, fits the peak
+    same = _pt("same", camelot="8A", energy=30.0, vec=shared)   # same key, misfits the peak
+    best = sequence_set([anchor, lift, same], curve=[30.0, 52.0], n_slots=2)[0]
+    assert best.track_ids[1] == "lift", best.track_ids

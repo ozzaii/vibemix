@@ -38,6 +38,7 @@ silently dominate the ``1-cos`` coherence term, range ~2):
                 + delta * recency                      # optional, default 0
                 + epsilon * library_bias               # optional, default 0
     edge[a, b]  = beta  * (1 - coh[a, b])              # 1 - cosine, -> [0,1]
+                + zeta  * (1 - harmonic[a, b])         # graded Camelot tiebreak (S1)
 
 Runtime: ~10k partial evals x microsecond cosine -> well under 100ms at
 M=50, N=20.
@@ -51,7 +52,7 @@ from typing import Any
 
 import numpy as np
 
-from vibemix.intel.transition_scorer import bpm_folded_delta_pct
+from vibemix.intel.transition_scorer import bpm_folded_delta_pct, harmonic_score
 from vibemix.library._cosine import l2_normalize
 from vibemix.state import harmonics
 
@@ -77,6 +78,7 @@ CURVE_PRESETS: dict[str, list[float]] = {
 _DEFAULT_WEIGHTS: dict[str, float] = {
     "alpha": 1.0,  # energy-curve adherence (the primary objective)
     "beta": 0.6,  # sonic coherence between consecutive tracks
+    "zeta": 0.10,  # graded Camelot-adjacency edge tiebreak (S1, small by design)
     "gamma": 0.0,  # surprise reward (set surprise dict to enable)
     "delta": 0.0,  # recency penalty
     "epsilon": 0.0,  # library-bias nudge
@@ -328,6 +330,32 @@ def sequence_set(
     coh = (V @ V.T).astype(float)
     np.clip(coh, -1.0, 1.0, out=coh)
 
+    # --- Precompute the M x M graded-harmonic matrix once (S1). The binary
+    # Camelot gate (`_transition_valid`) still decides ADMISSION; this graded
+    # term only re-ranks among already-valid mixes (Invariant #3 untouched).
+    # ``harmonic_score`` is memoized by Camelot pair so its parse runs once per
+    # distinct (src, dst) key pair (<=24^2), not once per (i, j) edge — sub-ms
+    # even at the 200-track pool cap. Unknown key on either side -> 1.0 (zero
+    # graded cost), mirroring the gate's degrade-to-pass: a track with no key
+    # metadata is never ranked a worse blend than a known-suboptimal key. ---
+    harm = np.ones((m, m), dtype=float)
+    _harm_cache: dict[tuple[str, str], float] = {}
+    for i in range(m):
+        ca = pool[i].camelot
+        if ca is None:
+            continue
+        for j in range(m):
+            if i == j:
+                continue
+            cb = pool[j].camelot
+            if cb is None:
+                continue
+            score = _harm_cache.get((ca, cb))
+            if score is None:
+                score = harmonic_score(ca, cb)[0]
+                _harm_cache[(ca, cb)] = score
+            harm[i, j] = score
+
     # Pre-dedupe near-identical tracks, then operate on the survivors.
     survivors = _predecupe(pool, coh)
     if len(survivors) < n_slots:
@@ -377,8 +405,10 @@ def sequence_set(
     node_cost = w["alpha"] * sq_err + taste[:, None]  # (M, n_slots)
 
     def edge_cost(a: int, b: int) -> float:
-        # 1 - cosine, already in [0, 2]; clamp the tiny negative coh slop.
-        return w["beta"] * (1.0 - coh[a, b])
+        # 1 - cosine (CLAP vibe) + the graded harmonic tiebreak (S1). The binary
+        # Camelot/BPM gates already admitted this edge; harm[a, b] only re-ranks
+        # among valid mixes (unknown key -> harm 1.0 -> zero added cost).
+        return w["beta"] * (1.0 - coh[a, b]) + w["zeta"] * (1.0 - harm[a, b])
 
     # --- Beam search over the depth-n_slots trellis. ---
     width = min(beam_width, max(8, m))
