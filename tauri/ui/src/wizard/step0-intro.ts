@@ -49,22 +49,19 @@ const CSS = `
     isolation: isolate;
     overflow: hidden;
   }
+  /* FABLE PASS (2026-06-10): the cool blue-black boxed card is GONE — it was
+   * the v5 palette in a glowy frame, the first cheap thing a new install saw.
+   * The intro now sits on the same lit warm void as the deck: a single
+   * hairline frame seating the moment, a low rose dawn beneath the wordmark.
+   * Same room from first paint to live set. */
   .wizard-intro::before {
     content: "";
     position: absolute;
     inset: 14px 8px;
     z-index: 0;
-    border: 1px solid rgba(255, 255, 255, 0.055);
+    border: 1px solid var(--border-subtle);
     border-radius: var(--rad-lg);
-    background:
-      linear-gradient(180deg, rgba(255, 255, 255, 0.035), transparent 18%),
-      repeating-linear-gradient(90deg, rgba(214, 207, 199, 0.035) 0 1px, transparent 1px 92px),
-      linear-gradient(180deg, rgba(12, 14, 22, 0.58) 0%, rgba(3, 4, 8, 0.78) 58%, rgba(1, 2, 5, 0.92) 100%);
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.055),
-      inset 0 -1px 0 rgba(0, 0, 0, 0.75),
-      inset 0 0 0 1px rgba(0, 0, 0, 0.32),
-      0 24px 70px rgba(0, 0, 0, 0.35);
+    pointer-events: none;
   }
   .wizard-intro::after {
     content: "";
@@ -74,11 +71,8 @@ const CSS = `
     pointer-events: none;
     border-radius: var(--rad-lg);
     background:
-      linear-gradient(90deg, transparent 0%, rgba(255, 165, 223, 0.12) 50%, transparent 100%),
-      repeating-linear-gradient(0deg, transparent 0 8px, rgba(214, 207, 199, 0.025) 8px 9px);
-    mix-blend-mode: screen;
-    opacity: 0.42;
-    mask-image: linear-gradient(180deg, transparent 0%, black 28%, black 72%, transparent 100%);
+      radial-gradient(120% 80% at 50% 118%, var(--brand-10), var(--brand-04) 40%, transparent 66%);
+    opacity: 0.85;
   }
   .wizard-intro__hero {
     position: relative;
@@ -132,12 +126,18 @@ const CSS = `
     font-variation-settings: "wdth" 82, "wght" 800;
     text-shadow: 0 0 12px var(--amber-40);
   }
+  /* The category line speaks in the co-host's serif voice, lowercase — the
+   * same warm human face as the deck hero, not a shouting condensed banner.
+   * (textContent stays "DJ FRIEND"; the case is a material choice.) */
   .wizard-intro__phrase {
-    font-variation-settings: "wdth" 82, "wght" 700;
-    font-size: 42px;
-    letter-spacing: 0;
-    text-transform: uppercase;
+    font-family: var(--type-serif);
+    font-weight: 400;
+    font-size: 46px;
+    line-height: 1.05;
+    letter-spacing: -0.01em;
+    text-transform: lowercase;
     color: var(--silk);
+    text-shadow: var(--text-3d);
   }
   .wizard-intro__slogan {
     font-variation-settings: "wdth" 100, "wght" 500;
@@ -160,18 +160,27 @@ const CSS = `
     z-index: 2;
     margin-top: var(--sp-2);
   }
+  /* The CTA in the deck's GO LIVE material: a rose-lit slab key with the
+   * machined specular top line — the first physical control the user presses
+   * is the same instrument they'll play. */
   .wizard-intro__cta .cmp-btn {
-    min-width: 184px;
-    padding: 15px 28px 14px;
-    letter-spacing: 0;
-    border-color: rgba(255, 165, 223, 0.2);
+    min-width: 200px;
+    padding: 16px 32px 15px;
+    letter-spacing: 0.26em;
+    color: var(--text-primary);
+    text-shadow: var(--text-emboss);
+    border-color: var(--brand-35);
+    border-radius: var(--rad-md);
+    background:
+      linear-gradient(180deg, var(--brand-22) 0%, var(--brand-10) 50%, var(--brand-06) 100%),
+      linear-gradient(180deg, var(--void-12), var(--void-8));
     box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.075),
-      inset 0 -1px 0 var(--amber-40),
-      inset 0 -8px 18px rgba(0, 0, 0, 0.32),
-      inset 0 0 18px var(--amber-22),
-      0 10px 22px rgba(0, 0, 0, 0.32),
-      0 0 0 1px rgba(255, 165, 223, 0.14);
+      inset 0 1px 0 rgba(255, 255, 255, 0.18),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.45),
+      inset 0 0 24px var(--brand-06),
+      0 1px 0 rgba(255, 255, 255, 0.04),
+      0 6px 18px rgba(176, 112, 160, 0.18),
+      0 14px 32px rgba(0, 0, 0, 0.4);
   }
   /* Phase 43 / Plan 43-03 — VIS-02 hover-glow sweep. The intro carries a
    * single CTA ("Let's go"); the broad interactive selector union below
