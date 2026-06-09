@@ -118,7 +118,13 @@ def test_build_prompt_phase_grounded_with_corpus_footer():
     assert "event=PHASE" in prompt
     # The PHASE coach task tail (built from the event, not a template).
     assert "React to what the new section" in prompt
-    assert prompt.endswith("sound-only read or silence.")
+    # The evidence-poor exit is SILENCE, not a "sound-only read" license —
+    # the first end-to-end shipped judge run (2026-06-09, OpenRouter judge on
+    # a product-floor replay) scored every sound-only PHASE read friend=0 /
+    # should_NOT_have_spoken ("pure sound narration"). Rare + earned voice:
+    # describing the sound is not worth a line.
+    assert prompt.endswith("output a single space to stay silent.")
+    assert "sound-only read" not in prompt
     # Evidence-corpus footer present because the snapshot is non-empty
     # (2 ev obs + 1 mix obs).
     assert "evidence_corpus[ev=2,aud=0,mix=1]" in prompt

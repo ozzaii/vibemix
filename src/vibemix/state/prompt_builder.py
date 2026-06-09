@@ -866,11 +866,21 @@ class AICoach:
         if t == "PHASE":
             new = ev_extra.get("new_phase", "?")
             prev = ev_extra.get("prev_phase", "?")
+            # The evidence-poor exit is SILENCE (the single-space contract the
+            # TRACK_CHANGE judge branch already uses), NOT a "sound-only read"
+            # license: the first end-to-end shipped judge run (2026-06-09,
+            # product-floor replay → OpenRouter judge) scored every sound-only
+            # PHASE read friend=0 / should_NOT_have_spoken — "pure sound
+            # narration". Rare + earned: a line must carry a point, or nothing.
             return (
                 f"Phase shifted: {prev}→{new}. React to what the new section "
-                "FEELS like, not the label. If recent_moves[8s] is NONE or "
-                "live_evidence blocks transition proof, do not give next-time "
-                "advice or timing prescriptions; sound-only read or silence."
+                "FEELS like, not the label. Speak only if you have a point a "
+                "friend at the booth would bother saying out loud — a "
+                "feel-read with an opinion, or a grounded opportunity. If "
+                "recent_moves[8s] is NONE or live_evidence blocks transition "
+                "proof, do not give next-time advice or timing prescriptions "
+                "— and when plain sound description is all you have, "
+                "output a single space to stay silent."
             )
         if t == "LAYER_ARRIVAL":
             return (

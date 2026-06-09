@@ -202,8 +202,13 @@ def test_wire13_anti_slop_disabled_path_passes_none_kwargs(main_src: str) -> Non
 
 
 def test_wire13b_citation_lint_defaults_on(main_src: str) -> None:
-    """Normal user launches should hit the strip-to-silence chokepoint."""
-    assert 'os.environ.get("VIBEMIX_CITATION_LINT", "on")' in main_src
+    """Normal user launches should hit the strip-to-silence chokepoint.
+
+    f8befafc made the default mode-aware: explicit Sven QA mode opts out,
+    every other launch defaults the lint ON. Pin both halves so neither a
+    literal "off" default nor a dropped env override can ship silently."""
+    assert 'citation_lint_default = "off" if _sven_qa_mode_enabled() else "on"' in main_src
+    assert 'os.environ.get("VIBEMIX_CITATION_LINT", citation_lint_default)' in main_src
 
 
 def test_wire14_anti_slop_banner_printed(main_src: str) -> None:
