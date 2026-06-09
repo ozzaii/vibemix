@@ -17,6 +17,7 @@
 
 import { ShellStore, type SurfaceId } from "./shell-store.js";
 import { SURFACES, type SurfaceDef } from "./surfaces.js";
+import { OrganismStage } from "./organism-stage.js";
 import { createSidebar } from "./Sidebar.js";
 import { createGroundingPanel } from "./GroundingPanel.js";
 import { createStatusFooter } from "./StatusFooter.js";
@@ -40,13 +41,39 @@ function createSurfaceRegion(def: SurfaceDef): HTMLElement {
 
   if (def.id === "deck") {
     region.innerHTML =
-      // Subliminal energy field behind the stage. Its OPACITY ramps by
-      // activation (idle still, listening faint, live present); it never
-      // breathes, so the tail cursor stays the single rhythmic sign-of-life.
-      // Kept under the "name it and it's too strong" threshold per DESIGN.md.
+      // Subliminal energy field behind the stage — the warm rose bed the organism
+      // glows over. Its OPACITY ramps by activation (idle still, listening faint,
+      // live present); it never breathes, so the tail cursor stays the single
+      // rhythmic sign-of-life. Kept under the "name it and it's too strong"
+      // threshold per DESIGN.md.
       `<div class="deck-energy" aria-hidden="true"></div>` +
+      // The living organism — vibemix's one face, mounted as the deck backdrop
+      // (OrganismStage in mountDesktopShell). Real curl drift + rose→gold bloom;
+      // presence (sleeping/awake/live) is grounded in real [data-conn]/[data-state]
+      // via CSS. When a GL context backs it, [data-organism="live"] hides the
+      // static fallback glyph below; without WebGL this canvas stays empty and the
+      // energy field + glyph carry the deck. Sits above the energy floor (later in
+      // DOM, same z-base) and below the stage text (z-stage).
+      `<canvas class="deck-organism" aria-hidden="true"></canvas>` +
       `<div class="deck-stage" data-wire="${def.wire}">` +
-      `<p class="deck-idle">listening for the mix…</p>` +
+      // The flagship surface earns the same composition tier as every other
+      // surface's empty state: an engraved glyph + the serif state line + one
+      // grounded co-host sub. Without them the home read as the barest screen in
+      // the app. The glyph is the deck's own engraved mark (def.glyph).
+      `<span class="deck-glyph" aria-hidden="true">${def.glyph}</span>` +
+      // The idle hero is CONNECTION-AWARE so it never contradicts the footer.
+      // When the audio engine is offline the co-host cannot be "listening" — it
+      // says so honestly (and the sub says what to do) instead of claiming to
+      // listen while the footer reads "co-host offline". When connected it
+      // listens. Toggled by #shell-root[data-conn] in CSS (optimistic repaint).
+      `<p class="deck-idle">` +
+      `<span class="deck-idle__on">listening for the mix…</span>` +
+      `<span class="deck-idle__off">waiting for your audio</span>` +
+      `</p>` +
+      `<p class="deck-idle-sub">` +
+      `<span class="deck-idle__on">Drop a track and play. I'm listening for the first move.</span>` +
+      `<span class="deck-idle__off">Route your master output into me, then play. I wake the moment audio flows.</span>` +
+      `</p>` +
       // The live line is where the co-host's reaction renders once wired. It
       // is an aria-live region so injected reactions are announced to AT. Until
       // wired it speaks in first person (the co-host, not a tagline); the tail
@@ -163,13 +190,37 @@ export function mountDesktopShell(host: HTMLElement, store: ShellStore = new She
   host.id = "shell-root";
   host.replaceChildren();
 
+  // The command palette is the documented "permanent cheat-sheet" for every
+  // accelerator, but it was advertised nowhere on screen — pure recall. The 28px
+  // chrome bar was ~95% dead space (just a clock). One quiet, platform-aware
+  // affordance there turns the whole power layer discoverable for the price of
+  // the space that was already empty.
+  const isMac =
+    /Mac|iPhone|iPad|iPod/.test(navigator.platform ?? "") ||
+    /Mac OS X/.test(navigator.userAgent);
+  const cmdkLabel = isMac ? "⌘K" : "Ctrl K";
+
   const chrome = document.createElement("header");
   chrome.className = "shell-chrome";
   chrome.setAttribute("data-tauri-drag-region", "");
   chrome.setAttribute("data-wire", "shell.chrome");
   chrome.innerHTML =
     '<div class="traffic-spacer" aria-hidden="true" data-tauri-drag-region></div>' +
-    '<div class="shell-clock" id="shell-clock" aria-hidden="true" data-tauri-drag-region>00:00</div>';
+    // The mock's centered chrome inscription: the app name lit as the em, the
+    // active surface as the honest session descriptor beside it. Decorative
+    // (aria-hidden) — the sidebar wordmark stays the accessible brand name.
+    '<div class="shell-chrome__title" aria-hidden="true" data-tauri-drag-region>' +
+    '<em>vibemix</em><span class="shell-chrome__title-sep"> · </span>' +
+    '<span class="shell-chrome__title-surface">deck</span>' +
+    "</div>" +
+    '<div class="shell-chrome__right" data-tauri-drag-region>' +
+    '<button type="button" class="shell-cmdk" data-wire="shell.cmdk" ' +
+    'aria-label="Open command palette" title="Command palette">' +
+    `<span class="shell-cmdk__hint">search</span>` +
+    `<kbd class="shell-cmdk__keys">${cmdkLabel}</kbd>` +
+    '</button>' +
+    '<div class="shell-clock" id="shell-clock" aria-hidden="true" data-tauri-drag-region>00:00</div>' +
+    '</div>';
 
   const body = document.createElement("div");
   body.className = "shell-body";
@@ -202,6 +253,52 @@ export function mountDesktopShell(host: HTMLElement, store: ShellStore = new She
 
   host.append(chrome, body, footer, palette.el);
 
+  // The chrome ⌘K affordance opens the same palette as the keyboard chord, so the
+  // power layer has a visible front door, not just a hidden one.
+  const cmdkButton = chrome.querySelector<HTMLButtonElement>(".shell-cmdk");
+  cmdkButton?.addEventListener("click", () => palette.toggle());
+
+  // ── The living organism deck backdrop ──────────────────────────────────
+  // Mount the real ParticleOrganism engine as the deck's face. When a GL context
+  // backs it, flag the root so CSS hides the static fallback glyph (the organism
+  // IS the face now); without WebGL the stage is a silent no-op and the glyph +
+  // energy field carry the deck. The render loop pauses whenever the deck is not
+  // the visible surface (perf) — driven from applyState + visibilitychange.
+  // The procedural mask form read as a literal emoji (Kaan: 0.1/10, nuked
+  // 2026-06-08). The agreed replacement is "abstract living matter" — a real
+  // GPGPU divergence-free curl-noise fluid with NO face — which is its own
+  // focused rebuild. Until that lands the deck organism stays PARKED: the stage
+  // infra is kept, but it is not mounted, so the deck falls back cleanly to the
+  // engraved glyph + energy field (no half-baked face ships). Flip to true once
+  // the abstract-matter engine replaces the form.
+  const ORGANISM_DECK_ENABLED = false;
+  const deckRegion = regions.get("deck");
+  const organismCanvas = ORGANISM_DECK_ENABLED
+    ? deckRegion?.querySelector<HTMLCanvasElement>(".deck-organism") ?? null
+    : null;
+  const organism = organismCanvas ? new OrganismStage(organismCanvas) : null;
+  if (organism?.isLive()) host.dataset.organism = "live";
+  // Dev-only handle for live visual verification (advance frames deterministically
+  // even when the automation tab is backgrounded and rAF is throttled). Vite
+  // strips this branch from production builds.
+  if (organism && import.meta.env?.DEV) {
+    (globalThis as { __vibemixOrganism?: OrganismStage }).__vibemixOrganism = organism;
+  }
+
+  const resizeObserver =
+    typeof ResizeObserver !== "undefined" && deckRegion
+      ? new ResizeObserver(() => organism?.resize())
+      : null;
+  if (resizeObserver && deckRegion) resizeObserver.observe(deckRegion);
+
+  const syncOrganismActivity = (): void => {
+    organism?.setActive(
+      store.getState().activeSurface === "deck" &&
+        document.visibilityState !== "hidden",
+    );
+  };
+  document.addEventListener("visibilitychange", syncOrganismActivity);
+
   // Mono clock in the drag chrome.
   const clock = chrome.querySelector<HTMLElement>("#shell-clock");
   const tickClock = (): void => {
@@ -214,8 +311,17 @@ export function mountDesktopShell(host: HTMLElement, store: ShellStore = new She
 
   // Reflect store state onto the root as data-attributes (optimistic repaint),
   // and toggle keep-alive surface visibility.
+  const chromeTitleSurface = chrome.querySelector<HTMLElement>(
+    ".shell-chrome__title-surface",
+  );
   const applyState = (): void => {
     const model = store.getState();
+    const surfaceLabel =
+      SURFACES.find((entry) => entry.id === model.activeSurface)?.label.toLowerCase() ??
+      model.activeSurface;
+    if (chromeTitleSurface && chromeTitleSurface.textContent !== surfaceLabel) {
+      chromeTitleSurface.textContent = surfaceLabel;
+    }
     host.dataset.collapsed = String(model.collapsed);
     host.dataset.panel = model.panelOpen ? "open" : "closed";
     host.dataset.settings = model.settingsOpen ? "open" : "closed";
@@ -225,6 +331,8 @@ export function mountDesktopShell(host: HTMLElement, store: ShellStore = new She
     for (const [id, region] of regions) {
       region.classList.toggle("is-active", id === model.activeSurface);
     }
+    // Pause the organism's GPU loop unless the deck is the visible surface.
+    syncOrganismActivity();
   };
   const unsubscribe = store.subscribe(applyState);
   applyState();
@@ -268,6 +376,9 @@ export function mountDesktopShell(host: HTMLElement, store: ShellStore = new She
 
   const teardown = (): void => {
     window.removeEventListener("keydown", onKeydown);
+    document.removeEventListener("visibilitychange", syncOrganismActivity);
+    resizeObserver?.disconnect();
+    organism?.dispose();
     globalThis.clearInterval(clockTimer);
     unsubscribe();
     host.replaceChildren();
