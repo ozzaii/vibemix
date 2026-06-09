@@ -188,6 +188,11 @@ live proxy (see "next lever" below).
     fires only in live-QA probe runs). The default fix above does NOT touch it — land that one only
     with a probe-run repro (see the probe-direct bullet above).
 
+**(d) Disclaimer-leak ("I can't call that a transition…")** — ✅ **ALREADY HANDLED on the default build (verify `wyetfnb3c`, verdict `already_handled`) — do NOT re-fix (it was routed to Codex in the bench memo; that work is unnecessary).**
+- The phrasing is a real held-reply string (`deck_context.py:545-547 LIVE_TRANSITION_HELD_REPLY`), but on the default path the live-claim guard's held-reply is **suppressed, never voiced**: `dj_cohost.py::llm_node` branch `@4252-4276` (`elif live_claim_guard … corrected and not emit_corrected:`) sets `citation_action="strip"`, `buffered_chunks=[]`, clears all spoken/audience text, yields NOTHING ("keep the user's audio path silent"). Landed `b38287525`/`3e80e9852`/`0a60849ab` (2026-06-01→03).
+- The disclaimer STRING reaches TTS **only** under `VIBEMIX_SVEN_PROBE_MODE`/`VIBEMIX_SVEN_QA_SET` (`emit_corrected` forced True `@4094`) — which is exactly the mode the Sven bench runs in. **That's why the bench "saw" it.**
+- **META-INSIGHT (recurring):** both this and the probe-direct blurt (c) are **probe/QA-mode-only** artifacts that are suppressed on the default build. The bench surfaces more than a default user hears, so every bench/teardown slop finding needs a "is this default-reachable?" filter (no `VIBEMIX_SVEN_PROBE_MODE`/`QA_SET`) before it becomes a product bug. The one finding that WAS a real default bug — the late-line blurt — is now fixed (`3b0cddc6`).
+
 ---
 
 ## STANDING TRUTHS (so the next session doesn't re-litigate)
