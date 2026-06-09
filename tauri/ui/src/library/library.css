@@ -1202,11 +1202,14 @@ body {
   overflow: visible;
   background: transparent;
 }
-/* The mode tabs float as a thin header strip at the top, not a button beside
-   Send (the composer reads as one job: type + send). `position: fixed` lifts
-   the switch out of the bottom-pinned composer to the top center without a DOM
-   move, so the non-chat modes that keep the switch in the console are untouched.
-   Direct tabs stay minimal here: Viber, Build, Music. */
+/* FABLE PASS (2026-06-10): the floating single-tab "VIBER" strip is DEAD
+   CHROME — a tablist with one tab names a surface the sidebar already names
+   (the teardown's "Viber = just a chat"). Hidden in product chat mode; kept
+   for the dev/test tool-mode escape hatch (data-allow-tool-modes), where it
+   stays a quiet top-center strip. */
+:is(body, .vmx-lib-app)[data-mode="chat"]:not([data-allow-tool-modes="true"]) .vmx-lib-modeswitch {
+  display: none;
+}
 :is(body, .vmx-lib-app)[data-mode="chat"] .vmx-lib-modeswitch {
   position: fixed;
   top: clamp(64px, 8vh, 84px);
@@ -1248,40 +1251,82 @@ body {
   display: block !important;
   margin: 0;
 }
+/* FABLE PASS (2026-06-10): ONE slab. The outer composer panel is the only
+   bordered material; the chatbox inside goes bare (the box-in-box-in-box read
+   was the teardown's loudest Viber complaint). Folder + textarea + Send sit on
+   one machined surface. */
 :is(body, .vmx-lib-app)[data-mode="chat"] .vmx-lib-chatbox {
   min-height: 54px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  padding: 0;
 }
 :is(body, .vmx-lib-app)[data-mode="chat"] .vmx-lib-chatbox textarea {
   min-height: 52px;
   max-height: 112px;
   font-size: var(--type-step-2);
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  caret-color: var(--brand);
 }
+/* Send: a small rose-lit keycap — the composer's one accent moment. */
 :is(body, .vmx-lib-app)[data-mode="chat"] .vmx-lib-run {
+  position: relative;
   width: auto;
   min-width: 96px;
   margin: 0;
   align-self: stretch;
+  font-family: var(--type-mono);
+  font-weight: 600;
+  font-size: 10px;
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  color: var(--text-primary);
+  text-shadow: var(--text-emboss);
+  border: 1px solid var(--brand-35);
+  border-radius: var(--rad-sm);
+  background:
+    linear-gradient(180deg, var(--brand-22) 0%, var(--brand-10) 50%, var(--brand-06) 100%),
+    linear-gradient(180deg, var(--void-12), var(--void-8));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.16),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.45),
+    inset 0 0 18px var(--brand-06),
+    0 1px 0 rgba(255, 255, 255, 0.03);
+  transition: filter 0.2s, border-color 0.2s, transform 0.12s;
 }
-/* Quiet native-folder affordance at the left of the chat composer. */
+:is(body, .vmx-lib-app)[data-mode="chat"] .vmx-lib-run:hover {
+  filter: brightness(1.12);
+  border-color: var(--brand-50);
+}
+:is(body, .vmx-lib-app)[data-mode="chat"] .vmx-lib-run:active {
+  transform: translateY(1px);
+}
+/* Quiet native-folder key at the left of the composer — borderless engraved
+   icon, lit on hover; never a second box competing with Send. */
 :is(body, .vmx-lib-app)[data-mode="chat"] #vmx-lib-chat-folder {
   display: inline-flex !important;
   align-items: center;
   justify-content: center;
   align-self: stretch;
-  width: 54px;
+  width: 44px;
   min-height: 54px;
   padding: 0;
   margin: 0;
-  color: var(--brand);
-  background: var(--glass-3);
-  border: 1px solid var(--border-default);
-  border-radius: var(--rad-sm);
+  color: var(--silk-40);
+  background: transparent;
+  border: 0;
+  border-right: 1px solid var(--border-subtle);
+  border-radius: 0;
   cursor: pointer;
-  transition: filter 0.2s, border-color 0.2s, background 0.2s;
+  transition: color 0.2s, filter 0.2s;
 }
 :is(body, .vmx-lib-app)[data-mode="chat"] #vmx-lib-chat-folder:hover {
-  border-color: var(--brand-40);
-  background: var(--brand-08);
+  color: var(--brand);
+  filter: drop-shadow(0 0 6px var(--brand-22));
 }
 :is(body, .vmx-lib-app)[data-mode="chat"] .vmx-lib-panel:nth-child(2) {
   grid-column: 1;
@@ -1323,25 +1368,19 @@ body {
   max-height: 100%;
   min-height: 0;
   padding: clamp(26px, 4vw, 64px) clamp(20px, 4vw, 48px) clamp(142px, 18vh, 190px);
-  /* A lit recessed display slab (the deck's .vmx-voice material), NOT a flat
-     dark box. A soft rose key-light pools at the bottom where Viber's newest
-     line sits, so the console reads as currently speaking. */
-  border: 1px solid var(--border-default);
-  border-radius: var(--rad-md);
+  /* FABLE PASS (2026-06-10): the bordered inset slab is GONE — the teardown's
+     "container-in-container" was exactly this box around a conversation that
+     already sits inside the shell's lit room. The talk now lives on the open
+     void like the deck's voice: one soft rose key-light pooling at the floor
+     where Viber's newest line lands, edgeless. */
+  border: 0;
+  border-radius: 0;
   background:
-    radial-gradient(94% 62% at 50% 112%, var(--brand-08), transparent 58%),
-    radial-gradient(70% 70% at 8% 102%, rgba(232, 196, 122, 0.018), transparent 56%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.020) 0%, transparent 14%, transparent 64%, rgba(0, 0, 0, 0.30) 100%),
-    var(--glass-3);
-  box-shadow:
-    inset 0 2px 16px rgba(0, 0, 0, 0.66),
-    inset 0 1px 0 var(--glass-top),
-    inset 0 0 0 1px rgba(255, 255, 255, 0.014),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.72),
-    inset 0 -28px 60px -28px var(--brand-06);
+    radial-gradient(80% 50% at 50% 108%, var(--brand-06), transparent 60%);
+  box-shadow: none;
   position: relative;
   z-index: 1;
-  /* The message list scrolls inside the lit slab; the whole panel stays put.
+  /* The message list scrolls inside the stage; the whole panel stays put.
      Bottom anchoring is handled by the margin-top:auto rule below. */
   overflow-y: auto;
   overscroll-behavior: contain;
@@ -1359,17 +1398,8 @@ body {
   width: 100%;
   max-width: 720px;
 }
-/* The lit upper seam — a quiet rose hairline catching the slab's machined lip,
-   echoing the .vmx-lib-frame::before edge so the console reads as one rack. */
-:is(body, .vmx-lib-app)[data-mode="chat"] .vmx-lib-chat-thread::before {
-  content: "";
-  position: absolute;
-  inset: 0 0 auto;
-  height: 1px;
-  background: linear-gradient(90deg, var(--brand-22), transparent 38%, transparent 74%, var(--silk-12));
-  pointer-events: none;
-  z-index: 2;
-}
+/* (Fable pass) the slab's top seam went with the slab — no floating hairline
+   over an open stage. */
 :is(body, .vmx-lib-app)[data-mode="chat"] .vmx-lib-chat-side {
   display: flex;
   flex-direction: column;
@@ -1503,49 +1533,149 @@ body {
   box-shadow: var(--glow-soft);
   animation: vmx-lib-breathe 1s ease-in-out infinite;
 }
-.vmx-lib-chat-starters {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 8px;
-  width: min(340px, 100%);
+
+.vmx-lib-chat-import-progress {
+  width: min(560px, 100%);
+  margin-top: 15px;
+  padding: 11px 12px 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--rad-sm);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.018), transparent 52%),
+    rgba(18, 14, 17, 0.52);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.018),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.5);
+}
+.vmx-lib-chat-import-progress__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 8px;
+  font-family: var(--type-mono);
+}
+.vmx-lib-chat-import-progress .label {
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--brand);
+}
+.vmx-lib-chat-import-progress .count {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--silk-55);
+  font-size: 10px;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.vmx-lib-chat-import-progress__rail {
+  position: relative;
+  height: 7px;
+  overflow: hidden;
+  border: 1px solid var(--glass-edge);
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.42);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.018),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.72);
+}
+.vmx-lib-chat-import-progress__rail i {
+  position: absolute;
+  inset: 0;
+  transform: scaleX(0);
+  transform-origin: left center;
+  background: linear-gradient(90deg, var(--brand-40), var(--brand), var(--brand-40));
+  box-shadow: 0 0 10px var(--brand-22);
+  transition: transform 0.24s var(--ease-brand);
+}
+.vmx-lib-chat-import-progress[data-indeterminate="true"] .vmx-lib-chat-import-progress__rail::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.12), transparent);
+  transform: translateX(-100%);
+  animation: vmx-lib-chat-progress-scan 1.2s var(--ease-brand) infinite;
+}
+.vmx-lib-chat-import-progress__track {
   margin-top: 8px;
+  overflow: hidden;
+  font-family: var(--type-mono);
+  font-size: 10px;
+  line-height: 1.35;
+  color: var(--silk-38);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.vmx-lib-chat-import-progress[data-state="done"] .label,
+.vmx-lib-chat-import-progress[data-state="done"] .count {
+  color: var(--ok, var(--brand));
+}
+.vmx-lib-chat-import-progress[data-state="cancelled"] .label,
+.vmx-lib-chat-import-progress[data-state="cancelled"] .count {
+  color: var(--warn, var(--silk-55));
+}
+.vmx-lib-chat-import-progress[data-state="error"] .label,
+.vmx-lib-chat-import-progress[data-state="error"] .count {
+  color: var(--danger, var(--brand));
+}
+.vmx-lib-chat-import-progress[data-state="error"] .vmx-lib-chat-import-progress__rail i {
+  background: color-mix(in srgb, var(--danger, var(--brand)) 72%, transparent);
+}
+
+@keyframes vmx-lib-chat-progress-scan {
+  to { transform: translateX(100%); }
+}
+/* FABLE PASS (2026-06-10): the four identical boxed tiles read as a SaaS
+   shortcut grid (the slop tell). Starters are now the pink mock's queue rows —
+   hairline-separated lines on the open stage, a 2px brand bar sliding in from
+   the left edge on hover. Kicker and label share one row like a setlist entry. */
+.vmx-lib-chat-starters {
+  display: flex;
+  flex-direction: column;
+  width: min(520px, 100%);
+  margin-top: 16px;
 }
 .vmx-lib-chat-starters[hidden] {
   display: none;
 }
 .vmx-lib-chat-starters button {
   position: relative;
-  min-height: 58px;
-  padding: 10px 13px;
+  display: grid;
+  grid-template-columns: 118px minmax(0, 1fr);
+  align-items: baseline;
+  gap: 16px;
+  padding: 13px 8px 13px 14px;
   text-align: left;
-  border: 1px solid var(--border-default);
-  border-radius: var(--rad-sm);
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.018), transparent 44%, rgba(0, 0, 0, 0.28)),
-    var(--void-5);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.024),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.58);
+  border: 0;
+  border-bottom: 1px solid var(--border-subtle);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
   cursor: pointer;
-  overflow: hidden;
+  transition: background 0.18s, padding-left 0.18s;
 }
-.vmx-lib-chat-starters button::after {
+.vmx-lib-chat-starters button::before {
   content: "";
   position: absolute;
-  left: 13px;
-  right: 13px;
-  bottom: 9px;
-  height: 1px;
-  background: linear-gradient(90deg, var(--brand-40), transparent 70%);
-  opacity: 0.55;
+  left: 0;
+  top: 10px;
+  bottom: 10px;
+  width: 2px;
+  border-radius: 0 1px 1px 0;
+  background: transparent;
+  transition: background 0.22s;
 }
 .vmx-lib-chat-starters button:hover,
 .vmx-lib-chat-starters button:focus-visible {
-  border-color: var(--brand-22);
-  background:
-    linear-gradient(90deg, var(--brand-06), transparent 72%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.020), transparent 50%),
-    var(--void-5);
+  background: var(--brand-04);
+  padding-left: 18px;
+}
+.vmx-lib-chat-starters button:hover::before,
+.vmx-lib-chat-starters button:focus-visible::before {
+  background: var(--brand-35);
 }
 .vmx-lib-chat-starters button:focus-visible {
   outline: 2px solid var(--brand);
@@ -1562,21 +1692,38 @@ body {
 .vmx-lib-chat-starters span {
   font-family: var(--type-mono);
   font-size: 9px;
-  letter-spacing: 0.14em;
+  font-weight: 500;
+  letter-spacing: 0.22em;
   text-transform: uppercase;
   color: var(--silk-40);
 }
 .vmx-lib-chat-starters b {
-  margin-top: 6px;
   font-family: var(--type-body);
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 500;
-  line-height: 1.15;
+  line-height: 1.2;
   letter-spacing: 0;
   color: var(--silk);
 }
 .vmx-lib-chat-thread:has(.vmx-lib-chat-starters:not([hidden])) {
   justify-content: center;
+}
+/* The empty-state greeting is Viber's VOICE — set in the hero serif like the
+   deck's spoken line, not a 18px paragraph floating over buttons. Applies only
+   while the starters are showing (= no conversation yet). */
+.vmx-lib-chat-thread:has(.vmx-lib-chat-starters:not([hidden]))
+  .vmx-lib-chat-turn[data-role="viber"] .body {
+  font-family: var(--type-serif);
+  font-size: clamp(30px, 3vw, 42px);
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  color: var(--text-primary);
+  text-wrap: balance;
+  text-shadow: var(--text-3d);
+}
+.vmx-lib-chat-thread:has(.vmx-lib-chat-starters:not([hidden]))
+  .vmx-lib-chat-turn[data-role="viber"] .who {
+  margin-bottom: 12px;
 }
 /* The trace = an instrument readout. A recessed rack of channel rows, each a
    diode + a mono label, crisp edges carrying the hierarchy. Not a chat log. */
