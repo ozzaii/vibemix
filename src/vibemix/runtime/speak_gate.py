@@ -11,6 +11,7 @@ territory, so they stay silent by default.
 from __future__ import annotations
 
 import math
+import re
 import time
 from dataclasses import dataclass
 from typing import Literal
@@ -156,6 +157,33 @@ def _has_forward_anchor(ev: Event) -> bool:
     return _payload_value_present(extra.get("moves"))
 
 
+# The energy receipt's forward clause ("points toward <nudge>") is the semantic
+# atom of the line Sven will voice. Audio-only receipts end the clause with
+# ". "; scorer-transition receipts continue "... with score/confidence", so the
+# alternation stops at either boundary.
+_NUDGE_RE = re.compile(r"points toward (.+?)(?: with |\. )")
+
+
+def _energy_nudge_atom(ev: Event) -> str | None:
+    """Return the ``nudge=<forward clause>`` fingerprint segment, or None.
+
+    Measured (iter2 judge run, 2026-06-09): five spoken PHASE lines in one
+    session all voiced the SAME "holding the groove steady" nudge — each
+    receipt carried fresh deltas/digest/bands, so the exact-match and
+    cross-type guards never fired (earned_not_constant 0.2, should_NOT 100%).
+    The nudge, not the receipt prose, is what the listener hears twice.
+    """
+    extra = ev.extra if isinstance(ev.extra, dict) else {}
+    line = extra.get("energy_read_voice_line")
+    if not isinstance(line, str):
+        return None
+    match = _NUDGE_RE.search(line)
+    if match is None:
+        return None
+    nudge = " ".join(match.group(1).strip().split()).casefold()
+    return f"nudge={nudge}" if nudge else None
+
+
 def grounded_voice_payload_keys(ev: Event) -> tuple[str, ...]:
     extra = ev.extra if isinstance(ev.extra, dict) else {}
     return tuple(key for key in _GROUNDED_VOICE_EXTRA_KEYS if bool(extra.get(key)))
@@ -217,6 +245,9 @@ def event_speak_fingerprint(ev: Event) -> str:
     if payload is not None:
         key, text = payload
         parts.append(f"payload={key}:{text}")
+    nudge_atom = _energy_nudge_atom(ev)
+    if nudge_atom is not None:
+        parts.append(nudge_atom)
     if ev.type in _DESCRIBE_BANK_EVENT_TYPES:
         parts.append(f"bands={_band_fingerprint(ev)}")
     return "|".join(parts)
@@ -286,6 +317,21 @@ def decide_speak_gate(
             for fp in recent_fingerprints:
                 segments = fp.split("|")
                 if payload_atom in segments and this_type_atom not in segments:
+                    return SpeakGateDecision(
+                        "silent", "repeat_of_recent", worthiness=worthiness
+                    )
+        # Energy-nudge novelty guard — event-type-blind and context-blind.
+        # The two guards above deliberately allow a same-type repeat when the
+        # spectral context (``bands=``) is fresh; for energy receipts that is
+        # exactly the measured slop hole (iter2 judge, 2026-06-09: the same
+        # "holding the groove steady" advice spoken 5× in one session, every
+        # time with fresh deltas/digest/bands). The same READ is worth one
+        # line within the recent-spoken window; re-speaking is earned only
+        # when the read changes ("lifting...", "leaving low-end space...").
+        nudge_atom = _energy_nudge_atom(ev)
+        if nudge_atom is not None:
+            for fp in recent_fingerprints:
+                if nudge_atom in fp.split("|"):
                     return SpeakGateDecision(
                         "silent", "repeat_of_recent", worthiness=worthiness
                     )

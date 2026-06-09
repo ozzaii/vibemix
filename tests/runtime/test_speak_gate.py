@@ -426,3 +426,156 @@ def test_interruption_worthiness_penalizes_recent_speech() -> None:
     )
 
     assert interruption_worthiness(ev, now_s=104.0) < interruption_worthiness(ev, now_s=140.0)
+
+
+# --------------------------------------------------------------------------- #
+# Energy-nudge novelty guard (2026-06-09 iter2 judge finding)                  #
+# --------------------------------------------------------------------------- #
+
+_RECEIPT_STEADY_A = (
+    "Energy-read receipt: source=master_mix. The master-mix read points toward "
+    "holding the groove steady. Live deltas: sub energy rose 0.18 to 0.42. "
+    "Use this as one forward coaching nudge scoped to master-mix energy. "
+    "Copy these citations exactly: [energy:master_read=audio_groove_37_3937c6c8]."
+)
+_RECEIPT_STEADY_B = (
+    "Energy-read receipt: source=master_mix. The master-mix read points toward "
+    "holding the groove steady. Live deltas: mid energy fell 0.31 to 0.22. "
+    "Phrase read: current section feels like groove. "
+    "Use this as one forward coaching nudge scoped to master-mix energy. "
+    "Copy these citations exactly: [energy:master_read=audio_groove_64_f00aa894]."
+)
+_RECEIPT_LIFT = (
+    "Energy-read receipt: source=master_mix. The master-mix read points toward "
+    "lifting the next phrase without rushing it. Live deltas: high energy rose "
+    "0.12 to 0.30. Use this as one forward coaching nudge scoped to master-mix "
+    "energy. Copy these citations exactly: "
+    "[energy:master_read=audio_build_91_77aa00bb]."
+)
+
+
+def _phase_with_receipt(receipt: str, *, prev: str, new: str, bands: dict | None = None):
+    return _event(
+        "PHASE",
+        {"prev_phase": prev, "new_phase": new, "energy_read_voice_line": receipt},
+        bands=bands,
+        state_values={"audible": True, "rms": 0.12},
+    )
+
+
+def test_same_energy_nudge_different_digest_suppressed_as_repeat() -> None:
+    """Iter2 measured hole (2026-06-09 OpenRouter judge on the receipt-wire
+    replay): all 5 spoken lines voiced the SAME 'holding the groove steady'
+    nudge — every receipt carried fresh deltas/digest/bands, so neither the
+    exact-match guard nor the cross-type guard fired and the listener heard
+    the same advice five times (earned_not_constant 0.2). The same READ is
+    worth one line; re-speaking is earned only when the read CHANGES."""
+    spoken = _phase_with_receipt(
+        _RECEIPT_STEADY_A,
+        prev="build",
+        new="drop",
+        bands={"sub": 0.4, "low": 0.3, "mid": 0.2, "high": 0.1},
+    )
+    same_nudge_fresh_context = _phase_with_receipt(
+        _RECEIPT_STEADY_B,
+        prev="drop",
+        new="groove",
+        bands={"sub": 0.1, "low": 0.2, "mid": 0.4, "high": 0.3},
+    )
+
+    decision = decide_speak_gate(
+        same_nudge_fresh_context,
+        recent_fingerprints=(event_speak_fingerprint(spoken),),
+    )
+
+    assert decision.verdict == "silent"
+    assert decision.reason == "repeat_of_recent"
+
+
+def test_changed_energy_nudge_still_speaks() -> None:
+    """A CHANGED read earns a line: after 'holding steady' was spoken, a
+    'lifting the next phrase' receipt passes the gate — novelty is judged on
+    the nudge, not on receipt prose."""
+    spoken = _phase_with_receipt(_RECEIPT_STEADY_A, prev="build", new="drop")
+    changed_read = _phase_with_receipt(_RECEIPT_LIFT, prev="groove", new="build")
+
+    decision = decide_speak_gate(
+        changed_read,
+        recent_fingerprints=(event_speak_fingerprint(spoken),),
+    )
+
+    assert decision.verdict == "speak"
+    assert decision.reason == "grounded_voice_payload"
+
+
+def test_same_energy_nudge_across_event_types_suppressed() -> None:
+    """The nudge guard is event-type-blind: a HEARTBEAT that spoke 'holding
+    the groove steady' silences a PHASE arriving with the same read."""
+    heartbeat_spoken = _event(
+        "HEARTBEAT",
+        {"energy_read_voice_line": _RECEIPT_STEADY_A},
+        state_values={"audible": True, "rms": 0.12},
+    )
+    phase_same_read = _phase_with_receipt(_RECEIPT_STEADY_B, prev="drop", new="groove")
+
+    decision = decide_speak_gate(
+        phase_same_read,
+        recent_fingerprints=(event_speak_fingerprint(heartbeat_spoken),),
+    )
+
+    assert decision.verdict == "silent"
+    assert decision.reason == "repeat_of_recent"
+
+
+def test_fingerprint_embeds_energy_nudge_segment() -> None:
+    """event_speak_fingerprint carries the reduced nudge as its own segment so
+    recorded spoken turns expose it to the novelty guard. Receipts without a
+    'points toward' clause fall back to the existing full-text payload atom."""
+    ev = _phase_with_receipt(_RECEIPT_STEADY_A, prev="build", new="drop")
+    segments = event_speak_fingerprint(ev).split("|")
+    assert "nudge=holding the groove steady" in segments
+
+    bare = _event(
+        "PHASE",
+        {
+            "prev_phase": "build",
+            "new_phase": "drop",
+            "energy_read_voice_line": "[energy:master_read=audio_build_4]",
+        },
+        state_values={"audible": True, "rms": 0.12},
+    )
+    assert not any(
+        seg.startswith("nudge=") for seg in event_speak_fingerprint(bare).split("|")
+    )
+
+
+def test_nudge_atom_round_trips_real_producer_output() -> None:
+    """Anti-drift lock (slop-audit residual, 2026-06-09): `_energy_nudge_atom`
+    scrapes the receipt PROSE — if build_energy_read_voice_line ever rewords
+    its "points toward" clause, the novelty guard dies silently with every
+    hardcoded-literal test still green. This feeds a REAL producer receipt
+    through the reducer so a template reword reddens here."""
+    from vibemix.runtime.energy_read_voice import build_energy_read_voice_line
+    from vibemix.state.evidence_registry import EvidenceRegistry
+
+    state = MusicState()
+    state.audible = True
+    state.phase = "groove"
+    state.energy_curve = [0.50, 0.50, 0.40, 0.40]  # settling arc → steady nudge
+
+    line = build_energy_read_voice_line(
+        None,
+        event_type="PHASE",
+        evidence_registry=EvidenceRegistry(),
+        state=state,
+    )
+    assert isinstance(line, str) and "points toward" in line
+
+    ev = _event(
+        "PHASE",
+        {"prev_phase": "drop", "new_phase": "groove", "energy_read_voice_line": line},
+        state_values={"audible": True, "rms": 0.12},
+    )
+    atom = event_speak_fingerprint(ev).split("|")
+    nudges = [seg for seg in atom if seg.startswith("nudge=")]
+    assert nudges == ["nudge=holding the groove steady"]
