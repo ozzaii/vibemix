@@ -38,13 +38,38 @@ def test_banner_with_telemetry_on_lists_telemetry_endpoint():
     assert "telemetry.altidus.world" in joined
 
 
-def test_banner_mentions_audio_midi_screen_local():
+def test_banner_tells_truth_about_audio_leaving_for_the_brain():
+    """The live brain (proxy OR direct Gemini) receives short master/mic audio
+    snapshots with every reaction request (dj_cohost.llm_node attaches
+    Part.from_bytes(audio_wav) unconditionally). The banner must say so —
+    claiming audio 'never leaves machine' is a false privacy claim."""
     lines = sec_check.banner_lines(telemetry_on=False, version="0.1.0")
     joined = "\n".join(lines)
-    assert "Audio capture: local" in joined
+    audio_line = next(line for line in lines if "Audio capture" in line)
+    assert "never leaves machine" not in audio_line
+    assert "brain" in audio_line  # discloses where the snapshots go
+    assert "Audio capture: local" in joined  # capture itself IS local
+    # Raw MIDI / raw pixels genuinely stay local; only derived text rides the prompt.
     assert "MIDI input: local" in joined
     assert "Screen capture: local" in joined
-    assert "never leaves machine" in joined
+
+
+def test_brain_endpoints_disclose_audio_snapshots():
+    """Both possible brain endpoints (Bravoh proxy = default mode, Google
+    Gemini = direct BYO-key mode) must exist in the inventory and disclose
+    that they receive audio."""
+    brains = [ep for ep in sec_check.OUTBOUND_ENDPOINTS if ep.condition == "brain"]
+    urls = {ep.url for ep in brains}
+    assert urls == {
+        "https://api.altidus.world",
+        "https://generativelanguage.googleapis.com",
+    }
+    for ep in brains:
+        assert "audio" in ep.purpose.lower(), f"{ep.url} purpose must disclose audio"
+    # The banner prints the brain group so a user can see it on launch.
+    joined = "\n".join(sec_check.banner_lines(telemetry_on=False, version="0.1.0"))
+    assert "api.altidus.world" in joined
+    assert "generativelanguage.googleapis.com" in joined
 
 
 def test_print_security_banner_goes_to_stream():
@@ -57,14 +82,19 @@ def test_print_security_banner_goes_to_stream():
 
 def test_endpoint_urls_returns_full_inventory():
     urls = sec_check.endpoint_urls()
-    assert "https://api.bravoh.altidus.world" in urls
+    # The proxy URL must match what the code actually contacts:
+    # VIBEMIX_PROXY_BASE_URL defaults to https://api.altidus.world in
+    # __main__.main() — the old api.bravoh.altidus.world entry was drift.
+    assert "https://api.altidus.world" in urls
+    assert "https://api.bravoh.altidus.world" not in urls
+    assert "https://generativelanguage.googleapis.com" in urls
     assert "https://api.altidus.world/vibemix/latest.json" in urls
     assert "https://telemetry.altidus.world/vibemix/v1/event" in urls
 
 
 def test_proxy_endpoint_purpose_does_not_claim_remote_tts():
     proxy = next(
-        ep for ep in sec_check.OUTBOUND_ENDPOINTS if ep.url == "https://api.bravoh.altidus.world"
+        ep for ep in sec_check.OUTBOUND_ENDPOINTS if ep.url == "https://api.altidus.world"
     )
     assert "reaction planning" in proxy.purpose
     assert "TTS" not in proxy.purpose
@@ -126,8 +156,8 @@ def test_telemetry_endpoint_marked_opt_in():
 
 
 def test_no_unexpected_conditions():
-    """Only the three documented conditions are allowed."""
-    allowed = {"always", "opt-in", "user-click"}
+    """Only the four documented conditions are allowed."""
+    allowed = {"always", "opt-in", "user-click", "brain"}
     for ep in sec_check.OUTBOUND_ENDPOINTS:
         assert ep.condition in allowed, (
             f"Unknown condition {ep.condition!r} on {ep.url}"

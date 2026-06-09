@@ -71,7 +71,8 @@ vibemix talks to a closed list of network endpoints. Anything else is a bug.
 
 | Endpoint | When | Direction |
 |----------|------|-----------|
-| `https://api.bravoh.altidus.world` | Every AI reaction-planning request | client → Bravoh proxy |
+| `https://api.altidus.world` | Every AI reaction-planning request in **proxy mode (the default)** — each request includes short master-output audio snapshots, plus booth-mic audio while you speak to Sven | client → Bravoh proxy |
+| `https://generativelanguage.googleapis.com` | Every AI reaction-planning request in **direct mode** (your own `GEMINI_API_KEY`) — same audio snapshots as proxy mode | client → Google Gemini |
 | `https://api.altidus.world/vibemix/latest.json` | Updater check (~once/day) | client → updater |
 | `https://github.com/bravoh-ai/vibemix` | User click in settings | shell-out only |
 | `https://existential.audio/blackhole` | User click in wizard install hint | shell-out only |

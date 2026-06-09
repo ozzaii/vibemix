@@ -36,23 +36,38 @@ from dataclasses import dataclass
 #
 # Format: tuple (endpoint, description, condition).
 #
-# An endpoint is "always reachable when the app is running"; an
-# endpoint marked with `condition="opt-in"` is only contacted when the
-# user has explicitly toggled telemetry ON.
+# Conditions:
+#   "brain"      — the live reaction-planning LLM. Exactly ONE of the two
+#                  brain endpoints is active per launch (llm_mode: proxy is
+#                  the fresh-install default; direct needs the user's own
+#                  GEMINI_API_KEY). Every reaction request to the active
+#                  brain carries short master-output audio snapshots, plus
+#                  the booth mic while the user is speaking to Sven — this
+#                  is the one place raw audio leaves the machine.
+#   "always"     — reachable whenever the app is running (no audio).
+#   "user-click" — shell-out only, on an explicit click.
+#   "opt-in"     — only after the user toggles telemetry consent ON.
 # ---------------------------------------------------------------------------
 
 @dataclass(frozen=True)
 class OutboundEndpoint:
     url: str
     purpose: str
-    condition: str  # "always" | "opt-in" | "user-click"
+    condition: str  # "brain" | "always" | "opt-in" | "user-click"
 
 
 OUTBOUND_ENDPOINTS: tuple[OutboundEndpoint, ...] = (
     OutboundEndpoint(
-        url="https://api.bravoh.altidus.world",
-        purpose="Bravoh proxy — Gemini reaction planning",
-        condition="always",
+        # Must match the code's actual default — VIBEMIX_PROXY_BASE_URL
+        # defaults to https://api.altidus.world in __main__.main().
+        url="https://api.altidus.world",
+        purpose="Bravoh proxy — Gemini reaction planning, receives audio snapshots (default mode)",
+        condition="brain",
+    ),
+    OutboundEndpoint(
+        url="https://generativelanguage.googleapis.com",
+        purpose="Google Gemini — reaction planning, receives audio snapshots (direct mode, your own GEMINI_API_KEY)",
+        condition="brain",
     ),
     OutboundEndpoint(
         url="https://api.altidus.world/vibemix/latest.json",
@@ -81,9 +96,17 @@ def banner_lines(telemetry_on: bool, version: str = "unknown") -> list[str]:
     """Return the banner as a list of lines (test-friendly)."""
     lines: list[str] = []
     lines.append(f"vibemix v{version} — privacy posture")
-    lines.append("  Audio capture: local (BlackHole / Loopback) — never leaves machine")
-    lines.append("  MIDI input: local (USB) — never leaves machine")
-    lines.append("  Screen capture: local (macOS Quartz / Win SCK) — never leaves machine")
+    lines.append(
+        "  Audio capture: local (BlackHole / Loopback); live-session reaction "
+        "snapshots (master output + mic while you speak to Sven) are sent to "
+        "the active brain endpoint below"
+    )
+    lines.append("  MIDI input: local (USB) — raw MIDI never leaves machine; detected moves reach the brain as text")
+    lines.append("  Screen capture: local (macOS Quartz / Win SCK) — pixels never leave machine; track titles reach the brain as text")
+    lines.append("  Brain endpoint (ONE active per launch, by llm mode — receives the audio snapshots):")
+    for ep in OUTBOUND_ENDPOINTS:
+        if ep.condition == "brain":
+            lines.append(f"    - {ep.url}  [{ep.purpose}]")
     lines.append("  Network out (always):")
     for ep in OUTBOUND_ENDPOINTS:
         if ep.condition == "always":
