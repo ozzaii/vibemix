@@ -193,7 +193,6 @@ export interface Mounted {
   meterPeak: HTMLElement;
   meterChunks: HTMLElement;
   statusInputs: {
-    audio: HTMLButtonElement;
     ai: HTMLButtonElement;
     voice: HTMLButtonElement;
     voiceSep: HTMLElement;
@@ -228,7 +227,7 @@ export interface MountSessionLayoutOptions {
 // state, not a fabricated reaction: why the deck is quiet and what arms proof.
 const IDLE_HERO_LINE = "Ready for the first move.";
 /** Fault-mode hero placeholder — states the hold, never invents speech. The
- *  cause line ("◂ audio input dropped" …) and the restart affordance carry
+ *  cause line ("◂ brain unreachable") and the restart affordance carry
  *  the diagnosis + recovery; this keeps the centerpiece from going blank. */
 const FAULT_HERO_LINE = "Holding here until the signal returns.";
 
@@ -1697,13 +1696,15 @@ export function mountSessionLayout(
   statusRow.setAttribute("aria-hidden", "true");
   const inputsEl = document.createElement("div");
   inputsEl.className = "vmx-statusrow__inputs";
-  const inAudio = makeInput("audio", "livekit", () => mountedHandle);
+  // No "audio" chip: the wire carries no honest audio-drop signal (livekit is
+  // hardcoded "ok"; a capture failure stops the session and lands as the
+  // ipc.error deck notice) — a chip that can never light is a lying control.
   const inAi = makeInput("ai", "gemini", () => mountedHandle);
   const inVoice = makeInput("voice", "gemini", () => mountedHandle);
   const voiceSep = sep();
   const inScreen = makeInput("screen", "screen", () => mountedHandle);
   const inMidi = makeInput("midi", "midi", () => mountedHandle);
-  inputsEl.append(inAudio, sep(), inAi, voiceSep, inVoice, sep(), inScreen, sep(), inMidi);
+  inputsEl.append(inAi, voiceSep, inVoice, sep(), inScreen, sep(), inMidi);
   const statusRight = document.createElement("div");
   statusRight.className = "vmx-statusrow__right";
   const statusMeta = document.createElement("div");
@@ -1742,7 +1743,6 @@ export function mountSessionLayout(
     meterPeak,
     meterChunks,
     statusInputs: {
-      audio: inAudio,
       ai: inAi,
       voice: inVoice,
       voiceSep,
@@ -1937,14 +1937,9 @@ function applyState(mounted: Mounted, next: SessionState, isMount: boolean): voi
   }
   syncArmedContext(mounted, next);
 
-  // Fault label states the cause; refresh whenever the cause changes.
+  // Fault label states the cause. One honest cause exists (see faultInput).
   if (downInput) {
-    const causeText =
-      downInput === "audio"
-        ? "◂ audio input dropped"
-        : downInput === "screen"
-          ? "◂ screen capture lost"
-          : "◂ brain unreachable";
+    const causeText = "◂ brain unreachable";
     if (mounted.liveFault.textContent !== causeText) mounted.liveFault.textContent = causeText;
   }
 
@@ -2134,7 +2129,6 @@ function applyState(mounted: Mounted, next: SessionState, isMount: boolean): voi
   }
 
   // --- status row inputs (silk-dim; red on a dropped input) ---
-  setInputDown(mounted.statusInputs.audio, next.status.livekit === "down");
   setInputDown(
     mounted.statusInputs.ai,
     next.status.gemini === "down" || downInput === "gemini",
@@ -2145,7 +2139,6 @@ function applyState(mounted: Mounted, next: SessionState, isMount: boolean): voi
   setInputDown(mounted.statusInputs.screen, next.status.screen === "denied");
   setInputDown(mounted.statusInputs.midi, next.status.midi === 0);
   const statusRowAlert =
-    next.status.livekit === "down" ||
     next.status.gemini === "down" ||
     downInput === "gemini" ||
     next.status.voice === "muted" ||
@@ -2200,13 +2193,13 @@ function setText(el: HTMLElement, text: string): void {
 }
 
 function armedCaptureText(state: SessionState): string {
-  if (state.status.livekit === "ok" && musicSignalActive(state.meters.music)) {
-    return "master in";
-  }
-  if (state.status.livekit === "ok") return "armed";
-  if (state.status.livekit === "connecting") return "connecting";
-  if (state.status.livekit === "down") return "dropped";
-  return "checking";
+  // Honest signals only: real music RMS, else tick-seen = armed. The old
+  // "connecting"/"dropped" arms rode livekit, which the wire hardcodes "ok"
+  // — they could never paint. "checking" survives as the before-first-tick
+  // state (livekit stays null until the first status tick lands).
+  if (musicSignalActive(state.meters.music)) return "master in";
+  if (state.status.livekit === null) return "checking";
+  return "armed";
 }
 
 function armedMidiText(state: SessionState): string {
@@ -2352,8 +2345,12 @@ function fireReceipt(mounted: Mounted): void {
 function faultInput(
   status: SessionState["status"],
   failureElapsedMs: number | null,
-): "audio" | "screen" | "gemini" | null {
-  if (status.livekit === "down") return "audio";
+): "gemini" | null {
+  // The brain is the only honest live-fault signal the wire carries: the
+  // status tick hardcodes livekit="ok" (there is no audio-drop signal — a
+  // capture failure stops the session and lands as the ipc.error deck notice
+  // instead), and screen=denied is badge-only (audio-only is a valid mode).
+  // The old "audio"/"screen" fault lanes could never fire.
   if (status.gemini === "down") return "gemini";
   if (failureElapsedMs != null && failureElapsedMs >= GROUNDING_FAILURE_MS) return "gemini";
   return null;
