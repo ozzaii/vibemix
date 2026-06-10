@@ -49,9 +49,6 @@ export interface DriverFetchStep {
   row_verifying: string;
   row_installing: string;
   row_done: string;
-  midi_probe: string;
-  tcc_probe: string;
-  bravoh_probe: string;
   stopwatch: string;
   fallback_heading: string;
   fallback_body: string;

@@ -4,8 +4,10 @@
  * Body "listen for a short voice check through your headphones."
  * Center: 96×96 LED pulse disc (Phase 13 mascot lives as overlay window,
  * not embedded here — this is the deck-LED placeholder).
- * 3-bar audio meter at static 50% (Wave 3 mock; Wave 4 wires real RMS).
  * Replay link + Open vibemix CTA (disabled until greetingPlayed).
+ * Failure renders its own honest branch (fault disc, retry copy, CTA stays
+ * armed as the escape hatch). The old static 3-bar "meter" is gone — a level
+ * meter with no signal behind it was a fake instrument.
  *
  * Copy stays short: this is the first audible handoff, not a system receipt. */
 
@@ -16,7 +18,9 @@ import { HEADPHONES_SVG } from "./icons/headphones.svg.js";
 
 export interface SmokeTestState {
   greetingPlayed: boolean;
-  meterLevel: number;
+  /** True when the voice check could not play — renders the honest fault
+   *  branch instead of the success surface. */
+  failed: boolean;
 }
 
 export interface SmokeTestCallbacks {
@@ -68,21 +72,18 @@ const CSS = `
     0%, 100% { box-shadow: var(--glow-soft), inset 0 0 14px var(--amber-22); transform: scale(1); }
     50%      { box-shadow: var(--glow-strong), inset 0 0 18px var(--amber-40); transform: scale(1.05); }
   }
-  .smoke-test__meter {
-    display: flex;
-    align-items: end;
-    gap: var(--sp-1);
-    height: 32px;
+  /* Fault branch: the disc stops celebrating — fault tint, no breath. The
+   * heading drops the rose glow; the words carry the state. */
+  .smoke-test[data-failed="true"] .smoke-test__heading {
+    color: var(--text-primary);
+    text-shadow: var(--text-emboss);
   }
-  .smoke-test__meter-bar {
-    width: 8px;
-    background: linear-gradient(180deg, var(--amber-pale), var(--amber) 65%, var(--amber-deep));
-    box-shadow: 0 0 6px var(--amber-40);
-    border-radius: 1px;
+  .smoke-test[data-failed="true"] .smoke-test__pulse {
+    border-color: rgba(212, 65, 58, 0.4);
+    color: var(--led-fault);
+    box-shadow: inset 0 0 14px rgba(212, 65, 58, 0.16);
+    animation: none;
   }
-  .smoke-test__meter-bar:nth-child(1) { height: 40%; }
-  .smoke-test__meter-bar:nth-child(2) { height: 70%; }
-  .smoke-test__meter-bar:nth-child(3) { height: 55%; }
   .smoke-test__replay {
     font-family: var(--type-body);
     font-variation-settings: "wdth" 100, "wght" 400;
@@ -108,40 +109,38 @@ registerStyle("smoke-test", CSS);
 export function renderSmokeTest(state: SmokeTestState, cb: SmokeTestCallbacks): HTMLElement {
   const body = document.createElement("div");
   body.className = "smoke-test";
+  body.dataset.failed = String(state.failed);
 
+  // The whole job of this step is to PROVE the voice plays. Failure renders
+  // its own surface — never the success celebration (it used to be
+  // pixel-identical, reporting success on failure).
   const heading = document.createElement("h1");
   heading.className = "smoke-test__heading";
-  heading.textContent = "READY TO PLAY";
+  heading.textContent = state.failed ? "VOICE CHECK DIDN'T PLAY" : "READY TO PLAY";
 
   const sub = document.createElement("p");
   sub.className = "smoke-test__body";
-  sub.textContent = "listen for a short voice check through your headphones.";
+  sub.textContent = state.failed
+    ? "I couldn't play the voice check. Check your output device, then retry."
+    : "listen for a short voice check through your headphones.";
 
   const pulse = document.createElement("div");
   pulse.className = "smoke-test__pulse";
   pulse.setAttribute("aria-hidden", "true");
   pulse.innerHTML = HEADPHONES_SVG;
 
-  const meter = document.createElement("div");
-  meter.className = "smoke-test__meter";
-  for (let i = 0; i < 3; i++) {
-    const bar = document.createElement("div");
-    bar.className = "smoke-test__meter-bar";
-    meter.append(bar);
-  }
-
   const replay = document.createElement("div");
   replay.className = "smoke-test__replay";
-  // UI-SPEC §Smoke Test "Replay link" — VERBATIM
-  replay.textContent = "didn't hear it? ";
+  // UI-SPEC §Smoke Test "Replay link" — VERBATIM (doubles as Retry on fault)
+  replay.textContent = state.failed ? "fixed it? " : "didn't hear it? ";
   const replayLink = document.createElement("button");
   replayLink.type = "button";
   replayLink.className = "smoke-test__replay-link";
-  replayLink.textContent = "[ ↻ Replay ]";
+  replayLink.textContent = state.failed ? "[ ↻ Retry ]" : "[ ↻ Replay ]";
   replayLink.addEventListener("click", () => cb.onReplay());
   replay.append(replayLink);
 
-  body.append(heading, sub, pulse, meter, replay);
+  body.append(heading, sub, pulse, replay);
 
   const panel = PrimaryPanel({ children: body });
 

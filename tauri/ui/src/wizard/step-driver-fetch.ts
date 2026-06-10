@@ -3,9 +3,11 @@
  * Orchestrates:
  *   1. Companion fetch via Tauri command `run_companion_fetch` (spawns
  *      installer/companion/fetch_drivers.{sh,ps1} per platform).
- *   2. Parallel probes: MIDI / TCC / Bravoh-proxy (reuses v3.0 surfaces).
- *   3. Onboarding stopwatch readout + INSTALL_READY event emit.
- *   4. Fallback copy when companion fetch fails (offline-installer path).
+ *   2. Onboarding stopwatch readout + INSTALL_READY event emit.
+ *   3. Fallback copy when companion fetch fails (offline-installer path).
+ *
+ * The old "parallel probe" rows (MIDI/TCC/proxy) are gone: they lit green on
+ * hardcoded setTimeouts while nothing was probed. One row, one real probe.
  *
  * Reads `audio.probe.*` events (existing event family — Phase 49 added an
  * additive `auto_install_attempted` payload field; zero new event types).
@@ -15,7 +17,7 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import { listen, emit } from "@tauri-apps/api/event";
-import { Button } from "./components/button.js";
+import { Button, setButtonState } from "./components/button.js";
 import { registerStyle } from "./components/_style-registry.js";
 import { copy, interpolate } from "./copy.js";
 import { emitInstallReadyEvent } from "./onboarding-stopwatch.js";
@@ -116,14 +118,15 @@ interface RowDef {
 }
 
 function rowsForPlatform(platform: string): RowDef[] {
+  // ONE row — the driver fetch is the only thing this step actually probes.
+  // The old midi/tcc/bravoh rows lit green on hardcoded setTimeouts while
+  // nothing was checked (and "Bravoh proxy: reachable" shipped infrastructure
+  // jargon to a DJ): instruments must never paint un-probed state.
   return [
     {
       id: "driver",
       baseLabel: copy.steps.driver_fetch.row_idle,
     },
-    { id: "midi", baseLabel: copy.steps.driver_fetch.midi_probe },
-    { id: "tcc", baseLabel: copy.steps.driver_fetch.tcc_probe },
-    { id: "bravoh", baseLabel: copy.steps.driver_fetch.bravoh_probe },
   ];
 }
 
@@ -235,8 +238,10 @@ export function createStepDriverFetch(
       (el) => el.getAttribute("data-state") === "done",
     );
     if (allDone) {
-      continueBtn.removeAttribute("disabled");
-      continueBtn.setAttribute("aria-disabled", "false");
+      // The component API keeps paint and logic in sync — raw attribute
+      // fiddling armed the button logically but left data-state="disabled"
+      // (grey fill, cursor: not-allowed): the only forward key looked dead.
+      setButtonState(continueBtn, "armed");
       if (stopwatchTimer !== undefined) {
         clearInterval(stopwatchTimer);
         stopwatchTimer = undefined;
@@ -254,8 +259,7 @@ export function createStepDriverFetch(
     // stay walkable. The fallback card names the manual installer path;
     // Continue arms so the user can keep going — the deck's armed gate
     // re-surfaces a missing capture device after launch.
-    continueBtn.removeAttribute("disabled");
-    continueBtn.setAttribute("aria-disabled", "false");
+    setButtonState(continueBtn, "armed");
     if (stopwatchTimer !== undefined) {
       clearInterval(stopwatchTimer);
       stopwatchTimer = undefined;
@@ -287,15 +291,6 @@ export function createStepDriverFetch(
       checkAllDone();
     }
   });
-
-  // Parallel probe stubs (real probes invoked from Plan 49-04 wizard_cmds.rs)
-  // — for now we mark them done after a short tick to simulate the
-  // synchronous v3.0 probe path. Real-VM discharge at §INSTALL-VM-RUN
-  // validates actual timing.
-  setTimeout(() => setRowState("midi", "done"), 200);
-  setTimeout(() => setRowState("tcc", "done"), 250);
-  setTimeout(() => setRowState("bravoh", "done"), 300);
-  setTimeout(checkAllDone, 350);
 
   return root;
 }

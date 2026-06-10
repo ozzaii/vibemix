@@ -126,7 +126,7 @@ const DEFAULT_STATE: WizardState = {
   },
   smokeTest: {
     greetingPlayed: false,
-    meterLevel: 0.5,
+    failed: false,
   },
   statusBar: {
     livekit: null,
@@ -643,7 +643,7 @@ export function renderCurrentStep(): void {
       primary = renderSmokeTest(wizardState.smokeTest, {
         onReplay: () => {
           smokeTestStarted = false;
-          setState({ smokeTest: { ...wizardState.smokeTest, greetingPlayed: false } });
+          setState({ smokeTest: { greetingPlayed: false, failed: false } });
         },
         onOpenVibemix: () => {
           void completeWizard();
@@ -1001,14 +1001,15 @@ async function runSmokeTest(): Promise<void> {
       30_000,
     );
     setState({
-      smokeTest: { ...wizardState.smokeTest, greetingPlayed: true },
+      smokeTest: { greetingPlayed: true, failed: false },
     });
   } catch (err) {
     console.warn("[smoke-test] failed:", err);
-    // Even on failure, enable the Open vibemix CTA — the user might want
-    // to proceed past a borked greeting; their dev rig still works.
+    // No dead-end: the Open vibemix CTA stays armed as the escape hatch —
+    // but the surface tells the truth (failed renders the fault branch with
+    // retry copy, never the READY TO PLAY celebration).
     setState({
-      smokeTest: { ...wizardState.smokeTest, greetingPlayed: true },
+      smokeTest: { greetingPlayed: true, failed: true },
     });
   } finally {
     if (unsubStarted) unsubStarted();

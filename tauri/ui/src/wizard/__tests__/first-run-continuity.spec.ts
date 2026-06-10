@@ -161,7 +161,7 @@ describe("first-run continuity smoke (POLISH-03)", () => {
         candidates: [],
         indexed: 0,
       },
-      smokeTest: { greetingPlayed: false, meterLevel: 0.5 },
+      smokeTest: { greetingPlayed: false, failed: false },
     });
     renderCurrentStep();
   });
