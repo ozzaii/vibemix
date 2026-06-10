@@ -76,9 +76,27 @@ require_cmd() {
 }
 
 # ─── Preflight ────────────────────────────────────────────────────────────
-require_cmd jq
+# jq is NOT stock macOS — a fresh Mac (the exact machine this script exists
+# for) failed preflight on it. plutil IS stock and reads raw JSON keypaths
+# since macOS 12 (the bundle's minimumSystemVersion). Prefer jq on dev boxes,
+# fall back to plutil, fail actionably when neither can read the manifest.
 require_cmd curl
 require_cmd shasum
+if ! command -v jq >/dev/null 2>&1 && ! command -v plutil >/dev/null 2>&1; then
+  log_event "preflight" "fail" "missing_cmd" "jq_or_plutil"
+  emit_state "fail" "reason" "missing_manifest_reader"
+  exit 1
+fi
+
+read_manifest() {
+  # read_manifest <dotted.key.path> — manifest field via jq or plutil.
+  local key="$1"
+  if command -v jq >/dev/null 2>&1; then
+    jq -r ".${key}" "$MANIFEST"
+  else
+    plutil -extract "$key" raw -o - -- "$MANIFEST"
+  fi
+}
 
 log_event "boot" "ok" "dry_run" "$DRY_RUN" "auto" "$AUTO"
 
@@ -90,9 +108,9 @@ if system_profiler SPAudioDataType 2>/dev/null | grep -qi "BlackHole 2ch"; then
 fi
 
 # ─── Read manifest ────────────────────────────────────────────────────────
-URL="$(jq -r '.drivers.blackhole_2ch.url' "$MANIFEST")"
-EXPECTED_SHA="$(jq -r '.drivers.blackhole_2ch.sha256' "$MANIFEST")"
-VERSION="$(jq -r '.drivers.blackhole_2ch.version' "$MANIFEST")"
+URL="$(read_manifest 'drivers.blackhole_2ch.url')"
+EXPECTED_SHA="$(read_manifest 'drivers.blackhole_2ch.sha256')"
+VERSION="$(read_manifest 'drivers.blackhole_2ch.version')"
 
 log_event "manifest" "ok" "version" "$VERSION"
 

@@ -128,7 +128,13 @@
     "resources": [
       "binaries/vibemix-core-aarch64-apple-darwin/**/*",
       "binaries/vibemix-core-x86_64-apple-darwin/**/*",
-      "binaries/vibemix-core-x86_64-pc-windows-msvc/**/*"
+      "binaries/vibemix-core-x86_64-pc-windows-msvc/**/*",
+      // Audit B-audio-firstrun: the wizard driver-fetch step shells the
+      // companion scripts via wizard_cmds::companion_dir() =
+      // resource_dir()/installer/companion. prepare_tauri_build.py mirrors
+      // installer/companion/ here before bundling (resource globs cannot
+      // reach ../ without path mangling).
+      "installer/companion/**/*"
     ],
     "icon": ["icons/icon.png"],
     "macOS": {

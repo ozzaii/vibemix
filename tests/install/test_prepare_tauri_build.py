@@ -180,3 +180,23 @@ def test_main_threads_require_chatterbox_ref_flag(monkeypatch: pytest.MonkeyPatc
     assert prep.main(["--skip-frontend", "--require-chatterbox-ref"]) == 0
     assert captured["skip_frontend"] is True
     assert captured["require_chatterbox_ref"] is True
+
+
+def test_sync_companion_resources_mirrors_scripts(tmp_path: Path) -> None:
+    src = tmp_path / "installer" / "companion"
+    src.mkdir(parents=True)
+    (src / "fetch_drivers.sh").write_text("#!/bin/bash\n")
+    (src / "driver_manifest.json").write_text("{}")
+    pyc = src / "__pycache__"
+    pyc.mkdir()
+    (pyc / "junk.pyc").write_text("x")
+    dst = tmp_path / "tauri" / "src-tauri" / "installer" / "companion"
+
+    prep._sync_companion_resources(src=src, dst=dst)
+    assert (dst / "fetch_drivers.sh").exists()
+    assert (dst / "driver_manifest.json").exists()
+    assert not (dst / "__pycache__").exists()
+    # Idempotent: a stale file in dst is removed on re-sync.
+    (dst / "stale.txt").write_text("old")
+    prep._sync_companion_resources(src=src, dst=dst)
+    assert not (dst / "stale.txt").exists()

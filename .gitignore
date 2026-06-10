@@ -278,3 +278,5 @@ assets/mascot/source/*.glb
 docs/launch/.partner-capabilities.html
 docs/launch/.partner-capabilities-short.html
 docs/launch/.vibemix-konusan.html
+# prepare_tauri_build.py mirror of installer/companion (bundle.resources input)
+tauri/src-tauri/installer/

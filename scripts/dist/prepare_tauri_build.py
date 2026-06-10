@@ -39,6 +39,30 @@ def _env_flag(name: str) -> bool:
     return os.environ.get(name, "").strip().lower() in {"1", "true", "yes", "on"}
 
 
+_COMPANION_SRC = REPO_ROOT / "installer" / "companion"
+_COMPANION_DST = REPO_ROOT / "tauri" / "src-tauri" / "installer" / "companion"
+
+
+def _sync_companion_resources(
+    src: Path = _COMPANION_SRC, dst: Path = _COMPANION_DST
+) -> None:
+    """Mirror installer/companion into src-tauri so bundle.resources ships it.
+
+    wizard_cmds::companion_dir() resolves resource_dir()/installer/companion
+    in the packaged app, and Tauri's resources globs are project-relative
+    (no ../ allowed without path mangling) — so the companion scripts must
+    exist under src-tauri/ at bundle time. The mirror is gitignored.
+    """
+    import shutil
+
+    if dst.exists():
+        shutil.rmtree(dst)
+    shutil.copytree(
+        src, dst, ignore=shutil.ignore_patterns("__pycache__", "*.pyc")
+    )
+    print(f"[prepare-tauri] companion resources synced -> {dst}", file=sys.stderr)
+
+
 def _spec_for_triple(triple: str) -> str:
     if "windows" in triple:
         return "vibemix-core.windows.spec"
@@ -62,6 +86,9 @@ def prepare_tauri_build(
     require_chatterbox_ref = require_chatterbox_ref or _env_flag(
         _REQUIRE_CHATTERBOX_REF_ENV
     )
+
+    if not check_only:
+        _sync_companion_resources()
 
     if not skip_frontend:
         _run(["npm", "--prefix", str(REPO_ROOT / "tauri" / "ui"), "run", "build"])
