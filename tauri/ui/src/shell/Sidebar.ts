@@ -71,7 +71,7 @@ export function createSidebar(store: ShellStore): HTMLElement {
   // only while a session is actually live (CSS gates on #shell-root
   // [data-state]); "all sessions" is a real route into the debrief surface.
   const tonightSection = document.createElement("div");
-  tonightSection.className = "sb-section";
+  tonightSection.className = "sb-section sb-section--tonight";
   tonightSection.textContent = "tonight";
   const sessions = document.createElement("div");
   sessions.className = "sb-sessions";

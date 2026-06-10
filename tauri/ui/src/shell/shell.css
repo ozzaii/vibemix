@@ -148,8 +148,8 @@ html[data-runtime="tauri"] .shell-main {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  height: 18px;
-  padding: 0 7px;
+  height: 24px;
+  padding: 0 4px 0 9px;
   border-radius: 999px;
   border: 1px solid var(--border-subtle);
   background: rgba(255, 255, 255, 0.022);
@@ -170,10 +170,22 @@ html[data-runtime="tauri"] .shell-main {
   background: rgba(255, 255, 255, 0.045);
 }
 .shell-cmdk__hint { text-transform: lowercase; }
+/* The ⌘K hint wears the sidebar's keycap material — a pressed key, not a
+ * generic search-pill suffix. Same face as .sb-kbd. */
 .shell-cmdk__keys {
   font-family: var(--type-mono);
-  font-size: 10px;
+  font-size: 9px;
+  line-height: 1;
+  padding: 3px 5px;
+  border-radius: 4px;
   color: var(--text-tertiary);
+  background: linear-gradient(180deg, var(--void-12), var(--void-8));
+  border: 1px solid var(--border-subtle);
+  box-shadow:
+    0 1px 0 rgba(0, 0, 0, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.25);
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.5);
 }
 
 /* ── Body — the fixed-furniture / swappable-interior frame ───────────────── */
@@ -363,6 +375,10 @@ html[data-runtime="tauri"] .shell-main {
   padding: 9px 12px;
   border-radius: var(--r-sm);
 }
+/* At idle the strip is empty (the live row gates below), so the engraved
+ * "tonight" header would float over a dead rail void — the label arrives WITH
+ * the session it names. "all sessions" stays: it routes to debrief any time. */
+#shell-root:not([data-state="live"]) .sb-section--tonight { display: none; }
 #shell-root[data-state="live"] .sb-session-item.sb-session-live {
   display: flex;
   background: linear-gradient(180deg, var(--brand-10) 0%, var(--brand-04) 100%);
@@ -1532,6 +1548,37 @@ html[data-runtime="tauri"] .shell-main {
   background: var(--brand);
   box-shadow: 0 0 5px var(--brand-50);
 }
+/* Machined dismiss key in the panel head — a drawer that auto-opens at live
+ * needs a visible way out (Ctrl+] stays the accelerator; this teaches it). */
+.panel-close {
+  margin-left: auto;
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  font-family: var(--type-mono);
+  font-size: 14px;
+  line-height: 1;
+  color: var(--text-muted);
+  background: transparent;
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+  box-shadow:
+    0 1px 0 rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  cursor: pointer;
+  transition:
+    color 160ms var(--ease-brand),
+    border-color 160ms var(--ease-brand),
+    background 160ms var(--ease-brand);
+}
+.panel-close:hover,
+.panel-close:focus-visible {
+  color: var(--text-primary);
+  border-color: var(--border-strong);
+  background: var(--brand-04);
+}
 .panel-body {
   flex: 1 1 auto;
   padding: var(--sp-5) var(--sp-4);
@@ -1597,7 +1644,11 @@ html[data-runtime="tauri"] .shell-main {
 .shell-footer {
   position: absolute;
   left: calc(var(--sidebar-w) + var(--sp-3));
-  right: var(--sp-3);
+  /* The footer respects the grounding panel exactly like .shell-main does —
+   * otherwise the honesty status line hides UNDER the auto-opened drawer the
+   * moment the set goes live. Same 250ms seam-sync as the panel edge. */
+  right: calc(var(--panel-cur) + var(--sp-3));
+  transition: right 250ms var(--ease-brand);
   bottom: var(--sp-2);
   z-index: var(--z-footer);
   display: flex;
@@ -1746,10 +1797,17 @@ html[data-runtime="tauri"] .shell-main {
   max-height: 78vh;
   display: flex;
   flex-direction: column;
-  background: var(--surface-base);
-  border: 1px solid var(--border-default);
+  /* Frosted glass per the contract palette (structural neutral scrim; blur
+   * comes from the token ladder so LIGHTER BLUR / low-end GPUs stay honored). */
+  background: rgba(34, 29, 32, 0.94);
+  backdrop-filter: var(--blur-glass);
+  -webkit-backdrop-filter: var(--blur-glass);
+  border: 1px solid var(--border-strong);
   border-radius: var(--r-md);
-  box-shadow: 0 24px 72px rgba(0, 0, 0, 0.55), var(--chrome-highlight);
+  box-shadow:
+    0 40px 100px rgba(0, 0, 0, 0.7),
+    0 0 0 1px var(--brand-08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
   overflow: hidden;
 }
 .palette-head {

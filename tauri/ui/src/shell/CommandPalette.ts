@@ -215,8 +215,10 @@ export function createCommandPalette(
         `<span class="pi-title"><span class="pi-label">${action.label}</span>` +
         (action.hint ? `<span class="pi-desc">${action.hint}</span>` : "") +
         `</span>` +
-        (action.status
-          ? `<span class="pi-state" data-kind="${action.statusKind ?? "quiet"}">${action.status}</span>`
+        // "quiet" chips say nothing a row doesn't already say (every surface
+        // row chip read "surface") — render a chip only when it carries state.
+        (action.status && action.statusKind !== "quiet"
+          ? `<span class="pi-state" data-kind="${action.statusKind ?? "ready"}">${action.status}</span>`
           : "") +
         `</span>` +
         (action.accel ? `<span class="pi-accel">${action.accel}</span>` : "");

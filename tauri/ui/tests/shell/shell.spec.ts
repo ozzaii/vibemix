@@ -280,12 +280,16 @@ describe("DesktopShell", () => {
     const labels = Array.from(host.querySelectorAll(".shell-panel .panel-label")).map(
       (el) => el.textContent,
     );
-    expect(host.querySelector(".shell-panel .panel-head")?.textContent).toBe("Deck notes");
+    expect(host.querySelector(".shell-panel .panel-head span")?.textContent).toBe("Deck notes");
     expect(labels).toContain("What I heard");
     expect(labels).not.toContain("Cited");
     expect(host.querySelector(".shell-panel .panel-armed")).toBeNull();
-    // Back to idle returns to the honest prose state (no leftover detail slots).
+    // Back to idle returns to the single honest placeholder slot (no leftover
+    // live detail slots).
     shell.store.setActivation("idle");
-    expect(host.querySelectorAll(".shell-panel .panel-section").length).toBe(0);
+    expect(host.querySelectorAll(".shell-panel .panel-section").length).toBe(1);
+    expect(host.querySelector(".shell-panel .panel-body")?.textContent).toContain(
+      "No deck note yet",
+    );
   });
 });

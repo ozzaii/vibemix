@@ -76,7 +76,7 @@ describe("voice readiness badge", () => {
   it("lets the live runtime muted state explain subtitles and setup readiness", () => {
     expect(voiceReadinessBadgeModel(payload(), undefined, "muted")).toMatchObject({
       state: "warn",
-      label: "",
+      label: "voice muted",
       title:
         "Local voice is muted for this session; voice setup is ready. Subtitles stay visible.",
     });
@@ -99,7 +99,7 @@ describe("voice readiness badge", () => {
       ),
     ).toMatchObject({
       state: "warn",
-      label: "",
+      label: "voice setup",
     });
   });
 
@@ -120,7 +120,7 @@ describe("voice readiness badge", () => {
       ),
     ).toMatchObject({
       state: "fault",
-      label: "",
+      label: "voice down",
     });
   });
 
@@ -143,7 +143,7 @@ describe("voice readiness badge", () => {
       ),
     ).toMatchObject({
       state: "warn",
-      label: "",
+      label: "voice muted",
       title:
         "Local voice is muted for this session; voice setup is missing, missing 1 item. Subtitles stay visible.",
     });
@@ -177,14 +177,16 @@ describe("voice readiness badge", () => {
     expect(footer.querySelector(".footer-separator")).toBeTruthy();
     expect(handle.element.tagName).toBe("BUTTON");
     expect(handle.element.dataset.state).toBe("warn");
-    expect(handle.element.textContent).toBe("");
+    // Degraded states carry words now (fable pass): warn/fault label the
+    // problem instead of hiding behind a 6px dot.
+    expect(handle.element.textContent).toBe("voice setup");
     expect(onOpenViber).toHaveBeenCalledOnce();
     handle.setVoiceStatus("muted");
     expect(handle.element.dataset.state).toBe("warn");
-    expect(handle.element.textContent).toBe("");
+    expect(handle.element.textContent).toBe("voice muted");
     handle.setVoiceStatus("ok");
     expect(handle.element.dataset.state).toBe("warn");
-    expect(handle.element.textContent).toBe("");
+    expect(handle.element.textContent).toBe("voice setup");
     handle.teardown();
     expect(footer.querySelector(".voice-readiness-badge")).toBeNull();
   });

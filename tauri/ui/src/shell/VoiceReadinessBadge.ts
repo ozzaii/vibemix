@@ -67,7 +67,7 @@ export function voiceReadinessBadgeModel(
     const voice = voiceModel(models);
     return {
       state: "warn",
-      label: QUIET_LABEL,
+      label: "voice muted",
       title: `Local voice is muted for this session; ${voiceSetupSummary(
         voice,
       )}. Subtitles stay visible.`,
@@ -109,14 +109,14 @@ export function voiceReadinessBadgeModel(
   if (mismatched) {
     return {
       state: installable ? "warn" : "fault",
-      label: QUIET_LABEL,
+      label: installable ? "voice setup" : "voice down",
       title: `Local voice needs repair${missing}${path}`,
     };
   }
 
   return {
     state: installable ? "warn" : "fault",
-    label: QUIET_LABEL,
+    label: installable ? "voice setup" : "voice down",
     title: `Local voice model missing${missing}${path}`,
   };
 }

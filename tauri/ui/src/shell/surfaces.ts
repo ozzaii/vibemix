@@ -112,8 +112,11 @@ export const SURFACES: readonly SurfaceDef[] = [
     glyph: GLYPH_SETTINGS,
     hint: "setup and tuning",
     wire: "shell.surface.settings",
+    // State-neutral: wireSettingsNav routes every settings navigation to the
+    // drawer, so this fallback rarely paints — and when it does it must never
+    // lie ("Not set up yet." was unconditional regardless of actual setup).
     empty: {
-      title: "Not set up yet.",
+      title: "Settings live in the drawer.",
       sub: "Audio routing, voice, and persona. Change what I listen to and how I sound.",
     },
   },

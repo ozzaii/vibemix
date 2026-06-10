@@ -114,7 +114,15 @@ export function libraryFreshnessBadgeModel(
   const ageText = typeof age === "number" ? `, ${age}d cache` : "";
   return {
     state,
-    label: QUIET_LABEL,
+    // Quiet while healthy; a real degradation gets words (the dot alone is a
+    // 6px color change nobody reads). Mirrors the conn label's "co-host
+    // offline" honesty.
+    label:
+      state === "warn"
+        ? "library stale"
+        : state === "fault"
+          ? "library unavailable"
+          : QUIET_LABEL,
     title: `Library freshness: ${readableStatus(reason)}${ageText}`,
   };
 }

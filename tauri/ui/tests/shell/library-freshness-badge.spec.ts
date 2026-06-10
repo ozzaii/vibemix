@@ -52,7 +52,7 @@ describe("library freshness badge", () => {
           library_age_days: 4,
         }),
       ),
-    ).toMatchObject({ state: "warn", label: "" });
+    ).toMatchObject({ state: "warn", label: "library stale" });
   });
 
   it("renders not-indexed and unreadable states without calling them fresh", async () => {

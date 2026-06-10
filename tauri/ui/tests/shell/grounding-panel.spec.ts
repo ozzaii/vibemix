@@ -30,9 +30,15 @@ describe("deck notes panel", () => {
     const panel = host.querySelector<HTMLElement>(".shell-panel");
     const body = host.querySelector<HTMLElement>(".panel-body");
     expect(panel?.getAttribute("aria-label")).toBe("Deck notes");
-    expect(host.querySelector(".panel-head")?.textContent).toBe("Deck notes");
+    expect(host.querySelector(".panel-head span")?.textContent).toBe("Deck notes");
+    expect(host.querySelector(".panel-head .panel-close")).toBeTruthy();
     expect(body?.textContent).toContain("No deck note yet");
-    expect(host.querySelector(".panel-section")).toBeNull();
+    // Idle keeps the contract furniture (one labeled placeholder slab) but no
+    // live detail slots and no armed dot — honest words, real material.
+    expect(host.querySelectorAll(".panel-section").length).toBe(1);
+    expect(host.querySelector(".panel-label")?.textContent).toBe("Deck notes");
+    expect(host.querySelector(".panel-placeholder")).toBeTruthy();
+    expect(host.querySelector(".panel-armed")).toBeNull();
   });
 
   it("keeps live slots honest until real deck reads and suggestions are wired", () => {

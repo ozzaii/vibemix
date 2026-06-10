@@ -14,7 +14,16 @@ export function createGroundingPanel(store: ShellStore): HTMLElement {
 
   const head = document.createElement("div");
   head.className = "panel-head";
-  head.textContent = "Deck notes";
+  const headTitle = document.createElement("span");
+  headTitle.textContent = "Deck notes";
+  const closeBtn = document.createElement("button");
+  closeBtn.type = "button";
+  closeBtn.className = "panel-close";
+  closeBtn.textContent = "×";
+  closeBtn.title = "Close (Ctrl+])";
+  closeBtn.setAttribute("aria-label", "Close deck notes");
+  closeBtn.addEventListener("click", () => store.setPanelOpen(false));
+  head.append(headTitle, closeBtn);
 
   const body = document.createElement("div");
   body.className = "panel-body";
@@ -52,7 +61,14 @@ export function createGroundingPanel(store: ShellStore): HTMLElement {
         });
       }
     } else {
-      body.textContent = "No deck note yet. I call it when the mix gives me something real.";
+      // Same honest words, contract furniture — a bare unstyled sentence
+      // floating in the drawer read as a stub, not a powered instrument
+      // waiting for input.
+      body.innerHTML =
+        '<div class="panel-section">' +
+        '<div class="panel-label">Deck notes</div>' +
+        '<p class="panel-placeholder">No deck note yet. I call it when the mix gives me something real.</p>' +
+        "</div>";
     }
     prevActivation = activation;
   };

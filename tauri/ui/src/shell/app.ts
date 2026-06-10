@@ -94,30 +94,33 @@ function mountLearnTease(mount: HTMLElement): void {
   led.className = "learn-tease__led";
   led.setAttribute("aria-hidden", "true");
 
+  // The tease speaks in the co-host's first person (the surfaces.ts empty-state
+  // contract), never internal sprint vocabulary — "Premium v2" and "preserved
+  // in git" were a roadmap memo shipping as product copy.
   const kicker = document.createElement("p");
   kicker.className = "learn-tease__kicker";
-  kicker.textContent = "Premium v2";
+  kicker.textContent = "Lessons";
 
   const title = document.createElement("h2");
   title.id = "learn-tease-title";
   title.className = "learn-tease__title";
-  title.textContent = "Teaching that earns its place.";
+  title.textContent = "I'll teach when I can hear you.";
 
   const body = document.createElement("p");
   body.className = "learn-tease__body";
   body.textContent =
-    "Lessons stay parked for launch until practice audio, controller proof, and feedback all meet the same bar as Sven.";
+    "Lessons open when your practice audio and your controller give me real proof: the same bar my live calls meet.";
 
   const proof = document.createElement("dl");
   proof.className = "learn-tease__proof";
-  appendLearnTeaseRow(proof, "Launch", "parked, not hidden");
-  appendLearnTeaseRow(proof, "Engine", "preserved in git");
+  appendLearnTeaseRow(proof, "Now", "I coach your live sets");
+  appendLearnTeaseRow(proof, "Next", "hands-on lessons, graded by ear");
   appendLearnTeaseRow(proof, "Rule", "no fake lessons");
 
   const note = document.createElement("p");
   note.className = "learn-tease__note";
   note.textContent =
-    "Debrief and Viber stay live for launch. Lessons return when they can teach without pretending.";
+    "Debrief and Viber are open now. Lessons join when they can teach without pretending.";
 
   plate.append(led, kicker, title, body, proof, note);
   root.append(plate);
