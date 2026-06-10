@@ -231,6 +231,24 @@ def test_generation_call_surfaces_have_ai_message_coverage() -> None:
             "OpenRouter is streamed through DJCoHost.llm_node; "
             "src/vibemix/agent/dj_cohost.py owns record_session_ai_message."
         ),
+        # 2026-06-08 "bench until perfection" Gemini-direct harness drivers
+        # (e1bde672 lineage): offline dev/eval instruments that swap the dark
+        # Respan transport for the live google-genai SDK. Their model calls
+        # produce judge SCORES over already-recorded sessions (or fresh
+        # bench-only candidate lines in the sim driver) — nothing reaches a
+        # listener, so there is no assistant ai_message to record. Results
+        # land in .planning/eval-runs/* JSON, the bench's own surface.
+        Path("scripts/eval/bench_gemini_judge.py"): (
+            "Blind judge over recorded Sven lines; emits scores to the "
+            "bench report, not assistant messages."
+        ),
+        Path("scripts/eval/bench_openrouter_judge.py"): (
+            "Same judge rubric on the OpenRouter transport; scores only."
+        ),
+        Path("scripts/eval/bench_sim_gemini.py"): (
+            "Generates fresh candidate lines under a persona for bench "
+            "scoring only — never spoken, never shown to a user."
+        ),
     }
 
     found = _generation_call_files()

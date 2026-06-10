@@ -53,9 +53,13 @@ def test_resolve_ga_paths(
 
 
 def test_resolve_openrouter_live_coach_returns_namespaced_id_and_none_tier() -> None:
-    """OpenRouter brain is not a Gemini-API call — sentinel None tier."""
+    """OpenRouter brain is not a Gemini-API call — sentinel None tier.
+
+    The ``:nitro`` provider-routing suffix (OpenRouter throughput lane,
+    added in 493de2f9) is part of the committed model id.
+    """
     model, tier = resolve("live_coach_openrouter")
-    assert model == "google/gemini-3.5-flash"
+    assert model == "google/gemini-3.5-flash:nitro"
     assert tier is None
 
 

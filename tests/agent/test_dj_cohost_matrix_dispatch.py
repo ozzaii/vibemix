@@ -83,6 +83,27 @@ def _instructions_kw_for_env(mocker, tmp_path: Path) -> str:
     return Agent.__init__.call_args.kwargs["instructions"]
 
 
+# ---------- config isolation: the operator's real config must not leak ----
+
+
+@pytest.fixture(autouse=True)
+def _isolated_config(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """Redirect config-store path resolution into ``tmp_path``.
+
+    ``_resolve_prompt_cell`` reads ``ConfigStore.extra["lens"]`` via
+    ``load_config()``, and an explicitly persisted lens legitimately WINS
+    over the env vars (Phase 79 LENS-02 / CR-01). These tests pin the
+    env-driven COLD path, so they need a fresh (empty) config — otherwise
+    the operator's real ``config.json`` (e.g. lens="tutor") drives the
+    dispatch and the expectations are wrong for the wrong reason.
+    ``_app_data_dir`` resolves through HOME (macOS), APPDATA (Windows) and
+    XDG_CONFIG_HOME (CI/Linux) — redirect all three.
+    """
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv("APPDATA", str(tmp_path))
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+
+
 # ---------- env-var fixture: clear before, restore after ------------------
 
 

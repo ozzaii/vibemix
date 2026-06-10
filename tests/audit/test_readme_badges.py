@@ -1,5 +1,12 @@
-"""DEPS-09 — assert the 4 dep-health badges are present in README.md
-with the expected shield URLs + GitHub workflow links."""
+"""DEPS-09 — assert the dep-health badges are present in README.md
+with the expected shield URLs + GitHub workflow links.
+
+The 2026-06-04 README de-slop (23bd6c0e) deliberately consolidated the
+original 4-badge block to 2: the per-job cargo-deny / npm-audit badges
+were dropped because all three dep jobs run in the SAME dep-audit.yml
+workflow — the surviving "uv lock" badge's shields.io workflow-status URL
+already goes red when cargo-deny or npm-audit fails. The jobs themselves
+are unchanged (DEPS-01/02/03 in .github/workflows/dep-audit.yml)."""
 
 import re
 from pathlib import Path
@@ -9,8 +16,6 @@ README = REPO / "README.md"
 
 REQUIRED_BADGE_LABELS = (
     "uv%20lock",
-    "cargo-deny",
-    "npm-audit",
     "CycloneDX",
 )
 

@@ -223,8 +223,13 @@ def test_min_refresh_interval_guard_delays_when_under_window() -> None:
 
 def test_main_no_create_task_for_refresh_loop() -> None:
     """Grep-style assertion against __main__.py source: no asyncio.create_task
-    spawn of cache.refresh_loop must remain. Plan 41-02 deletes the wall-
-    clock task entirely."""
+    spawn of cache.refresh_loop must remain (Plan 41-02 deleted the wall-clock
+    task). Since commit 364c55ba the LIVE GeminiContextCache wiring itself is
+    retired from main(): the class survives only behind the lazy-import seam
+    (``_ensure_context_cache_dep``), no instance is constructed, the agent is
+    built with ``cache=None``, and the registry is constructed bare (no
+    on_mutation refresh lambda). Pin that retirement so the wall-clock loop
+    can't quietly come back through a resurrected live cache."""
     main_path = (
         Path(__file__).resolve().parents[2]
         / "src"
@@ -235,11 +240,24 @@ def test_main_no_create_task_for_refresh_loop() -> None:
     assert "cache.refresh_loop(" not in src, (
         "stale cache.refresh_loop(...) spawn still present in __main__.py"
     )
-    # Positive assertion — the new wiring must be there.
-    assert "on_mutation=lambda: cache.refresh()" in src, (
-        "EvidenceRegistry(on_mutation=lambda: cache.refresh()) wiring "
-        "missing from __main__.py — Plan 41-02 mutation-driven refresh "
-        "must be wired"
+    # 364c55ba — live cache retired: no instantiation, no mutation-refresh
+    # lambda; the lazy import seam is all that remains.
+    assert "GeminiContextCache(" not in src, (
+        "live GeminiContextCache instantiation reappeared in __main__.py — "
+        "the live cache was retired in 364c55ba; re-wiring it needs a "
+        "deliberate decision (and this pin updated), not a drive-by"
+    )
+    assert "on_mutation=lambda: cache.refresh()" not in src, (
+        "mutation-driven cache.refresh() wiring reappeared in __main__.py "
+        "without the live cache decision being revisited"
+    )
+    assert "_ensure_context_cache_dep" in src, (
+        "lazy-import seam for GeminiContextCache missing from __main__.py — "
+        "if the class is gone for good, retire this test alongside it"
+    )
+    assert "cache=None" in src, (
+        "agent construction no longer passes cache=None — the live-cache "
+        "wiring changed; re-pin this test to the new reality"
     )
 
 

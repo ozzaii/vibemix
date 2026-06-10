@@ -22,6 +22,9 @@ import pathlib
 _REPO = pathlib.Path(__file__).resolve().parents[2]
 _SRC = _REPO / "src" / "vibemix"
 _PRODUCER = str(_SRC / "learn" / "practice_loop.py")
+# 9fe39054 — debrief near-miss detector imports the judge's _phase_error
+# math for OFFLINE post-session analysis only (no grading, no event emit).
+_NEAR_MISS = str(_SRC / "debrief" / "near_miss_detector.py")
 _RUNTIME = str(_SRC / "learn" / "runtime.py")
 _MAIN = str(_SRC / "__main__.py")
 _DRIVER = str(_SRC / "learn" / "beatmatch_practice_driver.py")
@@ -111,7 +114,16 @@ def test_beatmatch_judge_has_one_owned_deck_production_emitter() -> None:
 
 
 def test_beatmatch_judge_import_is_limited_to_practice_loop() -> None:
-    assert _src_files_importing_judge() == [_PRODUCER]
+    """Exactly two importers, both read-side-safe.
+
+    The Learn-owned practice loop remains the ONLY production producer
+    (the emitter/call-site pins above enforce that). 9fe39054 added a
+    second, analysis-only importer: ``debrief.near_miss_detector`` reuses
+    the judge's ``_phase_error`` math to detect last-night timing
+    recoveries offline — it never grades, never emits
+    ``BEATMATCH_GRADED``, and never touches the live credit path.
+    """
+    assert _src_files_importing_judge() == sorted([_NEAR_MISS, _PRODUCER])
 
 
 def test_beatmatch_practice_producer_has_a_runtime_caller() -> None:

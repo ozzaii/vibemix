@@ -21,9 +21,9 @@
 
 vibemix is a real DJ friend in your ear. It reacts to the audio coming out of your master, what is on your DJ software's screen right now, and the controller move you just made. Not a generic assistant voice riffing on the word "drop". If a co-host cannot tell you the kick came in two bars early, you do not want it talking over your set.
 
-Every spoken line cites a real detected event or it gets stripped before you hear it. Cuts that land late, hallucinated track names, and small-talk filler fail the grading bar before any release ships. The bar is "real friend who knows your set", not "voice assistant doing music commentary".
+Every spoken line cites a real detected event or it gets stripped before you hear it. Built by DJs: cuts that land late, hallucinated track names, and small-talk filler fail the grading bar before any release ships. The bar is "real friend who knows your set", not "voice assistant doing music commentary".
 
-Your audio stays on your machine unless you choose otherwise. The vibemix client is Apache-licensed; the hosted Bravoh service and Bravoh's product services are managed commercial infrastructure. Live co-host calls go to Bravoh's hosted service, analyzed in flight and never stored. Library search runs locally with on-device CLAP embeddings (a one-time model download on first Library open; the live co-host works without it). Recordings stay under `recordings/<session>/` with a 7-day default retention you set in Settings.
+Your audio doesn't leave your machine without you knowing. The vibemix client is Apache-licensed; the hosted Bravoh service and Bravoh's product services are managed commercial infrastructure. Live co-host calls go to Bravoh's hosted service, analyzed in flight and never stored. Library search runs locally with on-device CLAP embeddings (a one-time model download on first Library open; the live co-host works without it). Recordings stay under `recordings/<session>/` with a 7-day default retention you set in Settings.
 
 <p align="center">
   <img alt="release" src="https://img.shields.io/github/v/release/bravoh-ai/vibemix?style=flat-square&color=ff8a3d" />

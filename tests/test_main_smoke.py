@@ -256,12 +256,20 @@ def test_smoke_01c_bench_cli_is_source_only_in_frozen_sidecar(mocker, capsys):
 
 
 def test_smoke_02_missing_gemini_key_defaults_to_proxy(monkeypatch, mocker, tmp_path):
-    """SMOKE-02: a fresh no-key boot uses the Bravoh proxy instead of exit(4)."""
+    """SMOKE-02: a fresh no-key boot uses the Bravoh proxy instead of exit(4).
+
+    Since the START-gate rearchitecture, proxy AUTH is deferred until Start
+    (boot prints "mode: proxy (auth deferred until Start)") — the JWT fetch
+    and the brain/TTS build happen inside ``_activate_session``, so the
+    driver waits for the Start dispatch to finish instead of cancelling on
+    a fixed timer.
+    """
     monkeypatch.delenv("GEMINI_API_KEY", raising=False)
     monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
     monkeypatch.delenv("VIBEMIX_LLM_MODE", raising=False)
     monkeypatch.delenv("VIBEMIX_PROXY_BASE_URL", raising=False)
     monkeypatch.setattr("vibemix.__main__.load_dotenv", lambda: None)
+    _isolate_home(monkeypatch, tmp_path)
 
     import vibemix.__main__ as main_mod
     from vibemix.runtime.config_store import ConfigStore
@@ -280,12 +288,14 @@ def test_smoke_02_missing_gemini_key_defaults_to_proxy(monkeypatch, mocker, tmp_
 
     async def driver():
         main_task = asyncio.create_task(main())
-        await _REAL_SLEEP(0.05)
-        main_task.cancel()
-        try:
-            await asyncio.wait_for(main_task, timeout=3.0)
-        except (asyncio.CancelledError, Exception):
-            pass
+        died_early = await _drive_main_until(
+            main_task,
+            lambda: (
+                "session_started" in tasks_seen
+                and livekit_mocks["build_tts_chain"].call_count >= 1
+            ),
+        )
+        assert not died_early, "main() exited before the Start milestones"
 
     asyncio.run(driver())
 
@@ -335,6 +345,31 @@ def _build_audio_mocks(mocker):
         return s
 
     open_capture = MagicMock(return_value=_stream())
+
+    def _open_capture_fires_first_callback(*args, **kwargs):
+        """Simulate the capture-first Start contract.
+
+        Since the SHIP-WIRE START-gate rearchitecture, ``_activate_session``
+        marks the session started ONLY when the first real capture callback
+        arrives (``on_first_callback`` → ``_mark_capture_started`` →
+        ``started_event``) — ``session.start`` dispatch blocks until then.
+        A bare MagicMock stream never fires its callback, so the smoke
+        harness must deliver one audio block exactly like CoreAudio would
+        (we are already on the open-worker thread here, mirroring the real
+        audio-thread call site).
+        """
+        callback = kwargs.get("callback")
+        if callback is not None:
+            channels = int(kwargs.get("channels", 2) or 2)
+            frames = 512
+            block = np.zeros((frames, channels), dtype=np.float32)
+            try:
+                callback(block, frames, None, None)
+            except Exception:
+                pass  # the smoke asserts wiring, not DSP — never fail the open
+        return open_capture.return_value
+
+    open_capture.side_effect = _open_capture_fires_first_callback
     open_voice_output = MagicMock(return_value=_stream())
     open_passthrough_output = MagicMock(return_value=_stream())
     open_mic_capture = MagicMock(return_value=_stream())
@@ -655,6 +690,20 @@ def _build_livekit_mocks(mocker):
     mocker.patch.object(main_mod, "DJCoHostAgent", agent_factory)
     mocker.patch.object(main_mod, "PlaybackQueueAudioOutput", sink_factory)
 
+    # Local Chatterbox voice — patched at the SOURCE module because the live
+    # session path imports it lazily inside the start handler, so main_mod
+    # patches never reach it. Without this seam the wiring smoke constructs
+    # the REAL ChatterboxLocalTTS on a host whose ConfigStore selects it:
+    # prewarm() loads the multi-GB mlx model and the start path's
+    # wait-until-warm executor thread can outlive the test's cancel —
+    # asyncio.run's shutdown gather then blocks on it forever (observed as a
+    # whole-suite hang at test_smoke_03_full_wiring under memory pressure).
+    chatterbox_ctor = MagicMock(name="ChatterboxLocalTTS")
+    mocker.patch("vibemix.agent.chatterbox_tts.ChatterboxLocalTTS", chatterbox_ctor)
+    mocker.patch("vibemix.agent.chatterbox_tts.engine_selected", return_value=False)
+    mocker.patch("vibemix.agent.chatterbox_tts.chatterbox_available", return_value=False)
+    mocker.patch("vibemix.agent.chatterbox_tts.system_fallback_available", return_value=False)
+
     return {
         "session": session_mock,
         "AgentSession": agent_session_factory,
@@ -665,6 +714,7 @@ def _build_livekit_mocks(mocker):
         "build_tts_chain": build_tts_mock,
         "DJCoHostAgent": agent_factory,
         "PlaybackQueueAudioOutput": sink_factory,
+        "chatterbox_ctor": chatterbox_ctor,
     }
 
 
@@ -731,6 +781,45 @@ def _patch_voice_recorder(mocker, tmp_path):
     mocker.patch.object(main_mod, "VoiceRecorder", factory)
 
 
+def _isolate_home(monkeypatch, tmp_path):
+    """Re-root HOME so a live-boot smoke never touches the operator's machine.
+
+    main() reads several HOME-rooted surfaces at boot/Start: profile consent
+    (boot memory-ingest fires a REAL scan when the operator opted in),
+    config.json, ~/.cache/vibemix/library.pkl (registers the real library),
+    Pioneer rekordbox settings (deck-audio routing) and learn-progress.
+    Redirecting HOME keeps the smoke hermetic AND deterministic across hosts.
+    """
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+
+
+async def _drive_main_until(main_task, predicate, *, timeout_s: float = 30.0):
+    """Run main() until ``predicate()`` holds (or timeout), then cancel it.
+
+    The old drivers slept a fixed 0.05s and cancelled — that matched the
+    boot-time-wiring era. Since the START-gate rearchitecture the live graph
+    is built asynchronously AFTER the ipc.session.start dispatch, so the
+    driver must wait for the observable milestone it asserts on. Returns
+    True if main() exited BEFORE the predicate held (a premature death the
+    caller should fail on).
+    """
+    loop = asyncio.get_running_loop()
+    deadline = loop.time() + timeout_s
+    died_early = False
+    while not predicate() and loop.time() < deadline:
+        if main_task.done():
+            died_early = True
+            break
+        await _REAL_SLEEP(0.05)
+    main_task.cancel()
+    try:
+        await asyncio.wait_for(main_task, timeout=15.0)
+    except (asyncio.CancelledError, Exception):
+        pass
+    return died_early
+
+
 def test_smoke_03_full_wiring(monkeypatch, mocker, tmp_path):
     """SMOKE-03: full main() wiring smoke. Mocks all device + LiveKit +
     Gemini surfaces and verifies the orchestration."""
@@ -754,6 +843,7 @@ def test_smoke_03_full_wiring(monkeypatch, mocker, tmp_path):
     monkeypatch.setenv("VIBEMIX_DECK_AUDIO_CHANNELS", "off")
     monkeypatch.setenv("VIBEMIX_ENABLE_MIC", "1")
 
+    _isolate_home(monkeypatch, tmp_path)
     audio_mocks = _build_audio_mocks(mocker)
     sensor_mocks = _build_sensor_mocks(mocker)
     _build_state_refresh_noop(mocker)
@@ -767,32 +857,54 @@ def test_smoke_03_full_wiring(monkeypatch, mocker, tmp_path):
 
     async def driver():
         main_task = asyncio.create_task(main())
-        # Give main() a moment to wire everything up
-        await _REAL_SLEEP(0.05)
-        # Verify state-of-the-world AFTER setup but before teardown
-        # Then tear down by simulating SIGINT — find the stop_event
-        # actually used by main() — but since it's a local var, just wait
-        # then cancel the main_task.
-        main_task.cancel()
-        try:
-            await asyncio.wait_for(main_task, timeout=3.0)
-        except (asyncio.CancelledError, Exception):
-            pass
+        # START-gate era: the live graph is built asynchronously after the
+        # ipc.session.start dispatch — wait for the asserted milestones (the
+        # last spawns are coach + track-poll, after session.start) instead
+        # of cancelling on a fixed timer.
+        died_early = await _drive_main_until(
+            main_task,
+            lambda: (
+                "session_started" in tasks_seen
+                and "coach" in tasks_seen
+                and livekit_mocks["session"].start.await_count >= 1
+                and sensor_mocks["track_poll"].call_count >= 1
+                and audio_mocks["open_mic_capture"].call_count >= 1
+            ),
+        )
+        assert not died_early, "main() exited before the Start milestones"
 
     asyncio.run(driver())
 
-    # (a) find_device called 3 times (input, output, mic)
-    assert audio_mocks["find_device"].call_count == 3
+    # (a) find_device called 4 times: input at boot, output at boot (this
+    # harness's find_output_device mock delegates to find_device), capture
+    # re-resolve at Start (the capture-open worker), mic at Start.
+    assert audio_mocks["find_device"].call_count == 4
+    requested = [c.args[0] for c in audio_mocks["find_device"].call_args_list]
+    assert requested.count("BlackHole 2ch") == 2  # boot input + Start capture
+    assert "MacBook Pro Microphone" in requested  # mic at Start
 
-    # (b) all 4 open_* called once
+    # (b) capture/passthrough/mic streams open at Start. The dedicated voice
+    # output stream is RETIRED on the live path (voice-output rearchitecture:
+    # AI voice mixes into the 48k passthrough stream; open_voice_output
+    # survives only on the Learn tutor lazy path).
     assert audio_mocks["open_capture"].call_count == 1
-    assert audio_mocks["open_voice_output"].call_count == 1
+    assert audio_mocks["open_voice_output"].call_count == 0
     assert audio_mocks["open_passthrough_output"].call_count == 1
     assert audio_mocks["open_mic_capture"].call_count == 1
 
     # (c) build_llm called with the dummy key in direct mode (Phase 5 explicit mode kwarg)
     livekit_mocks["build_llm"].assert_called_once_with("dummy-key", mode="direct")
-    livekit_mocks["build_or_client"].assert_called_once_with("dummy-or")
+
+    # (c2) the REAL local voice engine is never constructed inside the wiring
+    # smoke — a real ChatterboxLocalTTS here means the lazy-import seam in the
+    # start handler escaped the mocks again (multi-GB model load + a warm
+    # thread that hangs the whole suite at loop shutdown).
+    assert livekit_mocks["chatterbox_ctor"].call_count == 0
+    # Direct means direct: with VIBEMIX_LLM_MODE=direct the OpenRouter
+    # reaction client is deliberately NOT built even when OPENROUTER_API_KEY
+    # is present (_openrouter_reaction_client_from_env gates on mode — the
+    # OR brain remains a proxy/default-mode surface only).
+    livekit_mocks["build_or_client"].assert_not_called()
 
     # (d) build_tts_chain gets the local Chatterbox hook when available;
     # cloud keys stay out of voice.
@@ -812,7 +924,8 @@ def test_smoke_03_full_wiring(monkeypatch, mocker, tmp_path):
         assert agent_call.kwargs.get(kw) is not None, f"missing kwarg {kw}"
     assert agent_call.kwargs.get("recall") is None
     assert agent_call.kwargs.get("recall_enabled") is False
-    assert agent_call.kwargs.get("or_client") is livekit_mocks["or_client"]
+    # or_client is None in direct mode (same gate as (c2) above).
+    assert agent_call.kwargs.get("or_client") is None
     assert livekit_mocks["genai_client"].models.embed_content.call_count == 0
 
     # (f) AgentSession constructed with llm + tts
@@ -899,12 +1012,17 @@ def test_smoke_03_recall_enabled_wires_memory_recall_and_ingest(
 
     async def driver():
         main_task = asyncio.create_task(main())
-        await _REAL_SLEEP(0.05)
-        main_task.cancel()
-        try:
-            await asyncio.wait_for(main_task, timeout=3.0)
-        except (asyncio.CancelledError, Exception):
-            pass
+        # START-gate era: recall wires inside _activate_session — wait for
+        # the agent construction + the Start dispatch, then tear down (the
+        # close-ingest fires during main()'s unwind).
+        died_early = await _drive_main_until(
+            main_task,
+            lambda: (
+                "session_started" in tasks_seen
+                and livekit_mocks["DJCoHostAgent"].call_args is not None
+            ),
+        )
+        assert not died_early, "main() exited before the Start milestones"
 
     asyncio.run(driver())
 
@@ -1147,18 +1265,21 @@ def test_smoke_04b_missing_chatterbox_boots_muted_not_cloud_fallback(
 
 
 def test_smoke_05_cleanup_closes_all_streams(monkeypatch, mocker, tmp_path):
-    """SMOKE-05: after teardown, voice/pass/input/mic streams all had stop()
-    AND close() called."""
+    """SMOKE-05: after teardown, every stream the live path OPENED had stop()
+    AND close() called. The dedicated voice output stream is retired on the
+    live path (voice mixes into the passthrough stream), so it must never
+    have been opened at all."""
     monkeypatch.setenv("GEMINI_API_KEY", "dummy-key")
     monkeypatch.setenv("OPENROUTER_API_KEY", "dummy-or")
     monkeypatch.setenv("VIBEMIX_LLM_MODE", "direct")
     monkeypatch.setenv("VIBEMIX_ENABLE_MIC", "1")
     monkeypatch.setattr("vibemix.__main__.load_dotenv", lambda: None)
+    _isolate_home(monkeypatch, tmp_path)
 
     audio_mocks = _build_audio_mocks(mocker)
     _build_sensor_mocks(mocker)
     _build_state_refresh_noop(mocker)
-    _build_livekit_mocks(mocker)
+    livekit_mocks = _build_livekit_mocks(mocker)
     _patch_voice_recorder(mocker, tmp_path)
 
     tasks_seen: list = []
@@ -1168,20 +1289,27 @@ def test_smoke_05_cleanup_closes_all_streams(monkeypatch, mocker, tmp_path):
 
     async def driver():
         main_task = asyncio.create_task(main())
-        await _REAL_SLEEP(0.05)
-        main_task.cancel()
-        try:
-            await asyncio.wait_for(main_task, timeout=3.0)
-        except (asyncio.CancelledError, Exception):
-            pass
+        # Wait for the full live graph (mic opens last) before tearing down,
+        # so the cleanup path has every stream to close.
+        died_early = await _drive_main_until(
+            main_task,
+            lambda: (
+                "session_started" in tasks_seen
+                and livekit_mocks["session"].start.await_count >= 1
+                and audio_mocks["open_mic_capture"].call_count >= 1
+            ),
+        )
+        assert not died_early, "main() exited before the Start milestones"
 
     asyncio.run(driver())
 
     # Each open_* returned a mock; access return_value.stop / close call_count
-    for key in ("open_capture", "open_voice_output", "open_passthrough_output", "open_mic_capture"):
+    for key in ("open_capture", "open_passthrough_output", "open_mic_capture"):
         stream_mock = audio_mocks[key].return_value
         assert stream_mock.stop.call_count >= 1, f"{key}: stop not called"
         assert stream_mock.close.call_count >= 1, f"{key}: close not called"
+    # Voice-output rearchitecture: no dedicated voice stream on the live path.
+    assert audio_mocks["open_voice_output"].call_count == 0
 
 
 def test_close_tts_chain_closes_nested_providers_once() -> None:
@@ -1257,10 +1385,19 @@ def _build_proxy_mocks(mocker, jwt_value="test-jwt", install_uuid_value="a" * 32
     }
 
 
-def test_main_03_proxy_register_401_boots_brainless(monkeypatch, mocker, tmp_path, capsys):
-    """MAIN-03: proxy auth failure boots the shell with Gemini down, no exit."""
+def test_main_03_proxy_register_401_boots_brainless(monkeypatch, mocker, tmp_path, caplog):
+    """MAIN-03: proxy auth failure must not kill the sidecar.
+
+    START-gate era: proxy auth runs inside ``_activate_session`` (not at
+    boot), so a 401 surfaces as a FAILED Start — ``_on_session_start``
+    catches it, logs "session.start failed" and emits an ipc.error envelope;
+    the app stays alive and armed for a retry. The old boot-time "brainless
+    boot" stderr copy ("add your Gemini key in Settings") was retired with
+    the boot-time auth path itself.
+    """
     monkeypatch.setenv("VIBEMIX_LLM_MODE", "proxy")
     monkeypatch.setattr("vibemix.__main__.load_dotenv", lambda: None)
+    _isolate_home(monkeypatch, tmp_path)
 
     import vibemix.__main__ as main_mod
 
@@ -1269,7 +1406,8 @@ def test_main_03_proxy_register_401_boots_brainless(monkeypatch, mocker, tmp_pat
     async def boom(*a, **kw):
         raise RuntimeError("proxy /register rejected install_uuid (status=401)")
 
-    mocker.patch.object(main_mod, "get_or_refresh_jwt", MagicMock(side_effect=boom))
+    jwt_mock = MagicMock(side_effect=boom)
+    mocker.patch.object(main_mod, "get_or_refresh_jwt", jwt_mock)
     _build_audio_mocks(mocker)
     _build_sensor_mocks(mocker)
     _build_state_refresh_noop(mocker)
@@ -1282,28 +1420,35 @@ def test_main_03_proxy_register_401_boots_brainless(monkeypatch, mocker, tmp_pat
 
     async def driver():
         main_task = asyncio.create_task(main())
-        await _REAL_SLEEP(0.05)
-        main_task.cancel()
-        try:
-            await asyncio.wait_for(main_task, timeout=3.0)
-        except (asyncio.CancelledError, Exception):
-            pass
+        # The failed Start must complete (dispatch returns after the handler
+        # catches the activation error) WITHOUT taking main() down.
+        died_early = await _drive_main_until(
+            main_task,
+            lambda: "session_started" in tasks_seen,
+        )
+        assert not died_early, "main() died on a failed Start — must stay armed"
 
     asyncio.run(driver())
 
+    jwt_mock.assert_called_once()
     livekit_mocks["build_llm"].assert_not_called()
     livekit_mocks["AgentSession"].assert_not_called()
     livekit_mocks["DJCoHostAgent"].assert_not_called()
     assert "session_started" in tasks_seen
-    assert "add your Gemini key in Settings" in capsys.readouterr().err
+    # The failure is surfaced, not swallowed: SessionLoop logs it (and emits
+    # an ipc.error envelope to the renderer).
+    assert "session.start failed" in caplog.text
+    assert "proxy setup failed" in caplog.text
 
 
-def test_main_04_proxy_network_error_boots_brainless(monkeypatch, mocker, tmp_path, capsys):
-    """MAIN-04: httpx.HTTPError keeps the settings-capable sidecar alive."""
+def test_main_04_proxy_network_error_boots_brainless(monkeypatch, mocker, tmp_path, caplog):
+    """MAIN-04: httpx.HTTPError on Start keeps the settings-capable sidecar
+    alive (same fail-soft Start contract as MAIN-03, network-error flavor)."""
     import httpx
 
     monkeypatch.setenv("VIBEMIX_LLM_MODE", "proxy")
     monkeypatch.setattr("vibemix.__main__.load_dotenv", lambda: None)
+    _isolate_home(monkeypatch, tmp_path)
 
     import vibemix.__main__ as main_mod
 
@@ -1312,7 +1457,8 @@ def test_main_04_proxy_network_error_boots_brainless(monkeypatch, mocker, tmp_pa
     async def neterr(*a, **kw):
         raise httpx.ConnectError("no route")
 
-    mocker.patch.object(main_mod, "get_or_refresh_jwt", MagicMock(side_effect=neterr))
+    jwt_mock = MagicMock(side_effect=neterr)
+    mocker.patch.object(main_mod, "get_or_refresh_jwt", jwt_mock)
     _build_audio_mocks(mocker)
     _build_sensor_mocks(mocker)
     _build_state_refresh_noop(mocker)
@@ -1325,52 +1471,58 @@ def test_main_04_proxy_network_error_boots_brainless(monkeypatch, mocker, tmp_pa
 
     async def driver():
         main_task = asyncio.create_task(main())
-        await _REAL_SLEEP(0.05)
-        main_task.cancel()
-        try:
-            await asyncio.wait_for(main_task, timeout=3.0)
-        except (asyncio.CancelledError, Exception):
-            pass
+        died_early = await _drive_main_until(
+            main_task,
+            lambda: "session_started" in tasks_seen,
+        )
+        assert not died_early, "main() died on a failed Start — must stay armed"
 
     asyncio.run(driver())
 
+    jwt_mock.assert_called_once()
     livekit_mocks["build_llm"].assert_not_called()
     livekit_mocks["AgentSession"].assert_not_called()
     livekit_mocks["DJCoHostAgent"].assert_not_called()
     assert "session_started" in tasks_seen
-    assert "proxy network error" in capsys.readouterr().err
+    assert "session.start failed" in caplog.text
+    assert "proxy network error" in caplog.text
 
 
 def test_main_05_proxy_mode_does_not_require_gemini_key(monkeypatch, mocker, tmp_path):
-    """MAIN-05: proxy mode does not require GEMINI_API_KEY. Test runs main() to
-    the LiveKit-mock teardown without raising SystemExit('GEMINI_API_KEY not set')."""
+    """MAIN-05: proxy mode does not require GEMINI_API_KEY. START-gate era:
+    the proxy auth (install_uuid + JWT) runs on Start, not at boot — boot
+    only resolves the mode and defers ("auth deferred until Start")."""
     monkeypatch.delenv("GEMINI_API_KEY", raising=False)
     monkeypatch.setenv("VIBEMIX_LLM_MODE", "proxy")
     monkeypatch.setenv("VIBEMIX_PROXY_BASE_URL", "https://test.altidus.world")
     monkeypatch.setattr("vibemix.__main__.load_dotenv", lambda: None)
+    _isolate_home(monkeypatch, tmp_path)
 
     _build_audio_mocks(mocker)
     _build_sensor_mocks(mocker)
     _build_state_refresh_noop(mocker)
     _build_livekit_mocks(mocker)
     _patch_voice_recorder(mocker, tmp_path)
-    _patch_runtime_for_fast_smoke(mocker, [])
+    tasks_seen: list = []
+    _patch_runtime_for_fast_smoke(mocker, tasks_seen, start_session=True)
     proxy_mocks = _build_proxy_mocks(mocker)
 
     from vibemix.__main__ import main
 
     async def driver():
         main_task = asyncio.create_task(main())
-        await _REAL_SLEEP(0.05)
-        main_task.cancel()
-        try:
-            await asyncio.wait_for(main_task, timeout=3.0)
-        except (asyncio.CancelledError, Exception):
-            pass
+        died_early = await _drive_main_until(
+            main_task,
+            lambda: (
+                "session_started" in tasks_seen
+                and proxy_mocks["get_or_refresh_jwt"].call_count >= 1
+            ),
+        )
+        assert not died_early, "main() exited before the Start milestones"
 
     asyncio.run(driver())
 
-    # install_uuid + jwt refresh both called
+    # install_uuid + jwt refresh both called (on Start)
     assert proxy_mocks["get_or_create_install_uuid"].call_count == 1
     assert proxy_mocks["get_or_refresh_jwt"].call_count == 1
     # Refresh got the right base_url
@@ -1385,6 +1537,7 @@ def test_main_05b_direct_mode_without_key_falls_to_proxy(monkeypatch, mocker, tm
     monkeypatch.setenv("VIBEMIX_LLM_MODE", "direct")
     monkeypatch.setenv("VIBEMIX_PROXY_BASE_URL", "https://test.altidus.world")
     monkeypatch.setattr("vibemix.__main__.load_dotenv", lambda: None)
+    _isolate_home(monkeypatch, tmp_path)
 
     _build_audio_mocks(mocker)
     _build_sensor_mocks(mocker)
@@ -1399,12 +1552,14 @@ def test_main_05b_direct_mode_without_key_falls_to_proxy(monkeypatch, mocker, tm
 
     async def driver():
         main_task = asyncio.create_task(main())
-        await _REAL_SLEEP(0.05)
-        main_task.cancel()
-        try:
-            await asyncio.wait_for(main_task, timeout=3.0)
-        except (asyncio.CancelledError, Exception):
-            pass
+        died_early = await _drive_main_until(
+            main_task,
+            lambda: (
+                "session_started" in tasks_seen
+                and livekit_mocks["build_llm"].call_count >= 1
+            ),
+        )
+        assert not died_early, "main() exited before the Start milestones"
 
     asyncio.run(driver())
 
@@ -1419,30 +1574,36 @@ def test_main_05b_direct_mode_without_key_falls_to_proxy(monkeypatch, mocker, tm
 
 
 def test_main_06_proxy_base_url_defaults_to_altidus(monkeypatch, mocker, tmp_path):
-    """MAIN-06: default VIBEMIX_PROXY_BASE_URL = 'https://api.altidus.world'."""
+    """MAIN-06: default VIBEMIX_PROXY_BASE_URL = 'https://api.altidus.world'.
+    START-gate era: the JWT refresh that proves the default base_url happens
+    on Start, so the test drives a Start instead of asserting at boot."""
     monkeypatch.delenv("VIBEMIX_PROXY_BASE_URL", raising=False)
     monkeypatch.delenv("GEMINI_API_KEY", raising=False)
     monkeypatch.setenv("VIBEMIX_LLM_MODE", "proxy")
     monkeypatch.setattr("vibemix.__main__.load_dotenv", lambda: None)
+    _isolate_home(monkeypatch, tmp_path)
 
     _build_audio_mocks(mocker)
     _build_sensor_mocks(mocker)
     _build_state_refresh_noop(mocker)
     _build_livekit_mocks(mocker)
     _patch_voice_recorder(mocker, tmp_path)
-    _patch_runtime_for_fast_smoke(mocker, [])
+    tasks_seen: list = []
+    _patch_runtime_for_fast_smoke(mocker, tasks_seen, start_session=True)
     proxy_mocks = _build_proxy_mocks(mocker)
 
     from vibemix.__main__ import main
 
     async def driver():
         main_task = asyncio.create_task(main())
-        await _REAL_SLEEP(0.05)
-        main_task.cancel()
-        try:
-            await asyncio.wait_for(main_task, timeout=3.0)
-        except (asyncio.CancelledError, Exception):
-            pass
+        died_early = await _drive_main_until(
+            main_task,
+            lambda: (
+                "session_started" in tasks_seen
+                and proxy_mocks["get_or_refresh_jwt"].call_count >= 1
+            ),
+        )
+        assert not died_early, "main() exited before the Start milestones"
 
     asyncio.run(driver())
 
@@ -1612,80 +1773,59 @@ def test_smoke_07_main_imports_cache_and_latency_primitives() -> None:
 
 
 def test_smoke_08_main_source_wires_cache_create_with_graceful_degradation() -> None:
-    """SMOKE-08: __main__.py source contains the cache.create + graceful-
-    degradation pattern + the agent kwargs + the coach_loop kwargs.
+    """SMOKE-08: __main__.py source pins the live-cache RETIREMENT + the
+    surviving latency-primitive wiring.
 
-    AST-level grep of the source file: avoids the smoke_03/04/05 pre-existing
-    failure (main() teardown bug carried in baseline 9-failure set) while
-    still locking the Plan 19-05 wiring contract. If a future regression
-    drops cache=cache from DJCoHostAgent kwargs or removes the try/except
-    around cache.create, this test catches it.
+    The live GeminiContextCache wiring (construction + ``await cache.create``
+    + the on_mutation refresh lambda) was REMOVED from main() in 364c55ba —
+    the class survives only behind the lazy-import seam
+    (``_ensure_context_cache_dep``), the agent is constructed with
+    ``cache=None``, and refresh has nothing live to refresh. CancelGate +
+    TTFTMeter + playback wiring remain. Source-grep level so the contract is
+    locked without booting main().
     """
     src = Path("src/vibemix/__main__.py").read_text()
 
-    # Cache construction
-    assert "GeminiContextCache(" in src, "GeminiContextCache constructor call missing"
-    # The original v1 contract baked `system_instruction_body=SYSTEM_INSTRUCTION`
-    # (= HYPE_INTERMEDIATE, Turkish hype). The 2026-05-21 fix (cache ≡ agent
-    # invariant: the cached system instruction MUST match the agent's resolved
-    # cell from VIBEMIX_SKILL_LEVEL / VIBEMIX_MODE / VIBEMIX_MOOD — otherwise
-    # a warm cache silently overrides COACH_PRO/English with HYPE_INTERMEDIATE/
-    # Turkish at runtime) replaced the hardcoded constant with a resolved local
-    # `cache_system_instruction = _resolve_prompt_cell()`. Accept either form;
-    # the load-bearing contract is "the cache is built with a system-instruction
-    # body kwarg" — not which constant feeds it. Updated 2026-05-23 (Phase 67
-    # / Plan 67P01).
-    assert (
-        "system_instruction_body=SYSTEM_INSTRUCTION" in src
-        or "system_instruction_body=cache_system_instruction" in src
-    ), (
-        "GeminiContextCache must be built with a system_instruction_body kwarg "
-        "(SYSTEM_INSTRUCTION OR cache_system_instruction)"
+    # 364c55ba — live cache retired. Only the lazy-import seam remains; a
+    # reappearing constructor call / create-await / refresh lambda means the
+    # live cache came back without the retirement decision being revisited
+    # (re-pin this test deliberately if so).
+    assert "GeminiContextCache(" not in src, (
+        "live GeminiContextCache construction reappeared in __main__.py"
     )
-    # `cache.create()` must be awaited. The 2026-05-21 fix wrapped the await
-    # in `asyncio.wait_for(cache.create(), timeout=4.0)` (fail-fast against the
-    # SDK's lack of a built-in timeout — a free-tier key on a project where
-    # context caching is paid-tier hangs `caches.create()` indefinitely and
-    # blocks boot before "listening to"). Accept the bare-await form OR the
-    # timeout-wrapped form; both must include the `await` keyword.
-    # WR-03 tightening (Phase 67 REVIEW): the wait_for-branch substring now
-    # carries the `await ` prefix, so a future refactor that drops the
-    # leading `await` (e.g. `_unused = asyncio.wait_for(cache.create(), …)`)
-    # would silently never start the coroutine and silently regress the
-    # cache-boot fail-fast guarantee — this test now catches that drift.
-    # Updated 2026-05-23 (Phase 67 / Plan 67P01 + REVIEW WR-03).
-    assert "await cache.create()" in src or "await asyncio.wait_for(cache.create()" in src, (
-        "cache.create not awaited (bare or wait_for-wrapped form must be awaited)"
+    assert "_ensure_context_cache_dep" in src, (
+        "lazy-import seam for GeminiContextCache missing — if the class is "
+        "gone for good, retire this pin alongside it"
     )
-    # Graceful degradation — cache=None on failure, no propagation of exception
-    assert "cache = None" in src, "graceful-degradation cache=None branch missing"
-    # Plan 41-02 — wall-clock refresh_loop deleted. Cache refresh is event-
-    # driven (EvidenceRegistry.write() schedules a debounced cache.refresh()
-    # via on_mutation callback). The smoke test now asserts the inverse:
-    # the old background-task spawn must NOT appear in __main__.py.
+    assert "cache.create()" not in src, (
+        "cache.create() call reappeared in __main__.py without the live-cache "
+        "decision being revisited"
+    )
     assert "cache.refresh_loop(" not in src, (
-        "stale refresh_loop background task still spawned in __main__.py "
-        "(Plan 41-02 removed wall-clock refresh)"
+        "stale refresh_loop background task reappeared in __main__.py "
+        "(Plan 41-02 removed wall-clock refresh; 364c55ba removed the cache)"
     )
-    # And the new wiring must be present — EvidenceRegistry built with the
-    # cache.refresh callback hooked via on_mutation.
-    assert "on_mutation=lambda: cache.refresh()" in src, (
-        "EvidenceRegistry(on_mutation=lambda: cache.refresh()) wiring "
-        "missing — Plan 41-02 mutation-driven refresh must be wired"
+    assert "on_mutation=lambda: cache.refresh()" not in src, (
+        "mutation-driven cache.refresh() wiring reappeared in __main__.py"
     )
-    # Agent gets cache + ttft_meter kwargs
-    assert "cache=cache" in src, "DJCoHostAgent must receive cache=cache kwarg"
-    assert "ttft_meter=ttft_meter" in src, "DJCoHostAgent must receive ttft_meter=ttft_meter kwarg"
-    # coach_loop gets cancel_gate + ttft_meter + playback (no ack_bank
-    # since the placeholder surface is retired).
-    assert "ack_bank=" not in src, "ack_bank= kwarg leaked back into __main__.py wiring"
-    assert "cancel_gate=cancel_gate" in src, "coach_loop must receive cancel_gate kwarg"
+    # Agent construction: the cache kwarg is explicitly None at HEAD.
+    assert "cache=None" in src, (
+        "DJCoHostAgent no longer receives cache=None — the live-cache wiring "
+        "changed; re-pin this test to the new reality"
+    )
+    # Latency primitives survive the cache retirement: the agent gets a
+    # TTFTMeter, coach_loop gets cancel_gate + playback. (The ttft meter is
+    # constructed inline at the call sites now — no named local.)
+    assert "ttft_meter=TTFTMeter()" in src, (
+        "TTFTMeter wiring missing from __main__.py"
+    )
+    assert "cancel_gate=CancelGate()" in src, (
+        "coach_loop must receive a CancelGate"
+    )
     assert "playback=playback" in src, "coach_loop must receive playback kwarg"
-    # Construction order — TTFTMeter + CancelGate before agent. AckBank
-    # is explicitly NOT instantiated anymore.
-    assert "TTFTMeter()" in src, "TTFTMeter not instantiated"
+    # The placeholder ack-bank surface stays retired.
+    assert "ack_bank=" not in src, "ack_bank= kwarg leaked back into __main__.py wiring"
     assert "AckBank(" not in src, "AckBank constructor leaked back into __main__.py"
-    assert "CancelGate()" in src, "CancelGate not instantiated"
 
 
 # ---------------------------------------------------------------------------

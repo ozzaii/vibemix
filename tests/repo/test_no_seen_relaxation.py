@@ -168,6 +168,7 @@ STOP_REASON_WHITELIST: frozenset[str] = frozenset(
     {
         "src/vibemix/__main__.py",
         "src/vibemix/agent/dj_cohost.py",
+        "src/vibemix/bench/respan.py",
         "src/vibemix/bench/run.py",
         "src/vibemix/debrief/drills.py",
         "src/vibemix/debrief/tldr.py",
@@ -356,6 +357,10 @@ def test_stop_reason_writes_confined_to_toolset() -> None:
       * `src/vibemix/runtime/ai_observability.py` — shared row shape
       * `src/vibemix/agent/dj_cohost.py` — live-coach assistant rows
       * `src/vibemix/bench/run.py` — bench-cell rows
+      * `src/vibemix/bench/respan.py` — read-only consumer: b9ed896b's
+        actionability summary copies the `stop_reason` field out of judged
+        bench-row targets into a bounded report dict (no writes, no Viber
+        starvation logic)
       * `src/vibemix/state/deck_vision.py` — deck-vision rows
       * `src/vibemix/learn/observability.py` — Learn tutor rows
       * `src/vibemix/debrief/drills.py` — debrief drill rows

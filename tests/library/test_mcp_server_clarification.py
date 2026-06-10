@@ -353,11 +353,17 @@ def test_request_clarification_docstring_teaches_codex(server: Any) -> None:
 
 def test_grep_gate_eighteen_mcp_tool_decorators() -> None:
     """Subprocess grep gate — independent confirmation that the source file
-    has exactly 18 ``@mcp.tool()`` decorators.
+    has exactly 19 ``@mcp.tool()`` decorators.
 
     Belt-and-braces for the registered-tool-count check; this also catches
     "tool was added but build_server didn't re-bind it" drift since the
     decorator is what binds.
+
+    19 = the 18-tool surface this file pins PLUS ``ingest_source``
+    (9849b384 — Serato/catalog ingest routed into Viber). ``ingest_source``
+    is ``hasattr``-gated on the toolset, so the registered-tool-count test
+    above still sees 18 with the bare fake toolset — the source decorator
+    count is the gate that covers it.
     """
     src = Path(__file__).resolve().parents[2] / "src" / "vibemix" / "library" / "mcp_server.py"
     assert src.exists(), f"mcp_server.py not found at {src}"
@@ -368,10 +374,11 @@ def test_grep_gate_eighteen_mcp_tool_decorators() -> None:
         check=False,
     )
     count = int(out.stdout.strip())
-    assert count == 18, (
-        f"Expected exactly 18 @mcp.tool() decorators in mcp_server.py, "
-        f"got {count}. Either request_clarification is missing, the raw "
-        f"export_cues tool came back, or a sibling grounded tool was dropped."
+    assert count == 19, (
+        f"Expected exactly 19 @mcp.tool() decorators in mcp_server.py "
+        f"(18 base + hasattr-gated ingest_source), got {count}. Either a "
+        f"grounded tool was dropped, the raw export_cues tool came back, "
+        f"or a new tool landed without re-pinning this gate."
     )
 
 
