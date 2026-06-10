@@ -31,7 +31,7 @@ export interface PermissionLostHandlerResult {
 
 const TOAST_COPY: Record<TccPermissionName, string> = {
   microphone: "Microphone access lost · paused",
-  "screen-recording": "Screen recording access lost · paused",
+  "screen-recording": "Screen Recording access lost · paused",
   accessibility: "Accessibility access lost · paused",
   automation: "Automation access lost · paused",
 };

@@ -331,8 +331,8 @@ export function HelpGroup(props: HelpGroupProps = {}): HTMLElement {
       label: "SCREEN RECORDING?",
       sub: "open system settings",
       status: props.screenRecording,
-      ariaLabel: "open macos screen recording preferences",
-      title: "open macos screen recording preferences",
+      ariaLabel: "open macOS System Settings · Screen Recording",
+      title: "open macOS System Settings · Screen Recording",
       onClick: openScreenRecordingPrefs,
     }),
   );
@@ -343,7 +343,7 @@ export function HelpGroup(props: HelpGroupProps = {}): HTMLElement {
       sub: "launch djay manually",
       status: props.djay,
       static: true,
-      title: "vibemix watches djay's window. launch djay to enable screen grounding",
+      title: "I watch your DJ app's window. launch djay so I can use screen proof",
     }),
   );
 

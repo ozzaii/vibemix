@@ -530,7 +530,7 @@ function defaultErrorMsg(key: RecoveryBadgeKey): string {
     case "livekit": return "voice link dropped. click to reconnect";
     case "gemini": return "brain unreachable. check your connection";
     case "midi": return defaultMidiErrorMsg;
-    case "screen": return "screen-capture permission denied. open system settings";
+    case "screen": return "Screen Recording denied. open System Settings to give me screen proof";
   }
 }
 
@@ -547,7 +547,7 @@ function titleForBadge(key: BadgeKey, state: string): string {
       case "livekit": return "Voice link";
       case "gemini": return "Brain";
       case "midi": return "Controller";
-      case "screen": return "Screen capture";
+      case "screen": return "Screen proof";
       case "voice": return "Local voice";
     }
   })();

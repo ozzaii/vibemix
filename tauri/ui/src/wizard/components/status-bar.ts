@@ -106,7 +106,7 @@ export function StatusBar(props: StatusBarProps): HTMLElement {
 
   // Capability words, not vendor names — a DJ doesn't care what the brain
   // runs on, and stack names date the binary. Keys/states stay unchanged.
-  const items: Array<{ label: string; state: string; key: string }> = [
+  const items: Array<{ label: string; state: string; key: string; title?: string }> = [
     { label: "voice link", state: levelToState(props.livekit), key: "livekit" },
     {
       label: "brain",
@@ -122,6 +122,9 @@ export function StatusBar(props: StatusBarProps): HTMLElement {
       label: "screen",
       state: levelToState(props.screen),
       key: "screen",
+      // Compact key on the badge; the hover names the feature noun so the
+      // wizard and session speak the same word ("screen proof").
+      title: "Screen proof",
     },
   ];
 
@@ -130,6 +133,7 @@ export function StatusBar(props: StatusBarProps): HTMLElement {
     el.className = "cmp-status-bar__item";
     el.dataset.state = item.state;
     el.dataset.key = item.key;
+    if (item.title) el.title = item.title;
     const led = document.createElement("span");
     led.className = "cmp-status-bar__led";
     led.setAttribute("aria-hidden", "true");

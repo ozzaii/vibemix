@@ -109,7 +109,7 @@ describe("Status bar tooltips (H6)", () => {
     expect(gemini?.getAttribute("title")).toContain("Brain");
     expect(gemini?.getAttribute("title")).toContain("disconnected");
     expect(midi?.getAttribute("title")).toContain("Controller");
-    expect(screen?.getAttribute("title")).toContain("Screen capture");
+    expect(screen?.getAttribute("title")).toContain("Screen proof");
     expect(screen?.getAttribute("title")).toContain("denied");
   });
 });

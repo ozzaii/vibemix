@@ -72,7 +72,7 @@ const COPY: Record<TccPermission, string> = {
   microphone:
     "vibemix listens to your master output so it can react to the music. Mic stays local. Nothing is uploaded unless you talk back.",
   "screen-recording":
-    "vibemix watches your DJ software window to ground reactions in what you actually see. Nothing is recorded to disk.",
+    "I watch your DJ app's window so what I say is backed by screen proof. Nothing is recorded to disk.",
   accessibility:
     "Used only to read the djay Pro window position so the mascot can sit beside it. No keystrokes are captured.",
   automation:

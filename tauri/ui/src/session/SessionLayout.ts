@@ -1703,6 +1703,8 @@ export function mountSessionLayout(
   const inVoice = makeInput("voice", "gemini", () => mountedHandle);
   const voiceSep = sep();
   const inScreen = makeInput("screen", "screen", () => mountedHandle);
+  // Compact "screen" key stays; the hover names the feature noun.
+  inScreen.title = "Screen proof";
   const inMidi = makeInput("midi", "midi", () => mountedHandle);
   inputsEl.append(inAi, voiceSep, inVoice, sep(), inScreen, sep(), inMidi);
   const statusRight = document.createElement("div");

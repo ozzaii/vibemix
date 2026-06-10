@@ -149,7 +149,7 @@ registerStyle("cmp-perm-card", CSS);
 const COPY: Record<PermissionKind, { label: string; sub: string }> = {
   "screen-recording": {
     label: "SCREEN RECORDING",
-    sub: "lets vibemix read your DJ app window",
+    sub: "lets me watch your DJ app's window · screen proof for what I say",
   },
   microphone: {
     label: "MICROPHONE",
