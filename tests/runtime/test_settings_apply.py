@@ -135,8 +135,8 @@ def test_voice_legacy_cloud_id_normalizes_before_live_hook(store, cascade):
     applier = SettingsApplier(config_store=store, cascade_agent=cascade)
     success, error = _apply(applier, "voice", "kore")
     assert (success, error) == (True, None)
-    cascade.set_voice.assert_called_once_with("Adam")
-    assert store.voice == "Adam"
+    cascade.set_voice.assert_called_once_with("Sven")
+    assert store.voice == "Sven"
 
 
 def test_voice_missing_hook_persists_with_warning(store, caplog):
@@ -156,8 +156,8 @@ def test_voice_legacy_cloud_id_normalizes_when_deferred(store, caplog):
     with caplog.at_level("WARNING"):
         success, error = _apply(applier, "voice", "puck")
     assert (success, error) == (True, None)
-    assert store.voice == "Adam"
-    assert any("persisted voice='Adam'" in r.message for r in caplog.records)
+    assert store.voice == "Sven"
+    assert any("persisted voice='Sven'" in r.message for r in caplog.records)
 
 
 def test_voice_invalid_value(store, cascade):

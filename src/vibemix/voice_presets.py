@@ -3,10 +3,14 @@
 
 from __future__ import annotations
 
-DEFAULT_VOICE = "Adam"
+DEFAULT_VOICE = "Sven"
 
+# Retired voice ids from pre-Chatterbox pickers. "adam" is the old
+# ElevenLabs-era default — stored configs carrying it migrate forward to
+# DEFAULT_VOICE just like the retired Gemini cloud ids.
 LEGACY_CLOUD_TTS_VOICES = frozenset(
     {
+        "adam",
         "kore",
         "puck",
         "charon",

@@ -55,7 +55,7 @@ def test_voice_recorder_writes_session_json_at_init(tmp_path: Path) -> None:
     session_json_version="1.0", crashed=False, ended_at_iso=None."""
     rec = VoiceRecorder(
         root=tmp_path,
-        voice_id="Adam",
+        voice_id="Sven",
         mode="coach",
         genre="tech-house",
         user_level="pro",
@@ -95,7 +95,7 @@ def test_voice_recorder_writes_session_json_at_init(tmp_path: Path) -> None:
         assert meta["ended_at_iso"] is None
         assert meta["ended_at_unix"] is None
         assert meta["duration_s"] is None
-        assert meta["voice"] == "Adam"
+        assert meta["voice"] == "Sven"
         assert meta["mode"] == "coach"
         assert meta["genre"] == "tech-house"
         assert meta["user_level"] == "pro"

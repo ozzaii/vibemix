@@ -336,7 +336,7 @@ def test_boot_emits_ipc_boot_and_initial_settings_state(fake_bus: FakeBus) -> No
     settings = fake_bus.emitted_by_type("ipc.settings.state")
     assert len(settings) == 1
     payload = settings[0]["payload"]
-    assert payload["voice"] == "Adam"
+    assert payload["voice"] == "Sven"
     assert payload["mode"] == "coach"
     assert payload["genre"] == "tech-house"
     assert payload["muted"] is False

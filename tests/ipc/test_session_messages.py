@@ -132,7 +132,7 @@ def test_session_set_mode_roundtrip() -> None:
 @pytest.mark.parametrize(
     "field,value",
     [
-        ("voice", "Adam"),
+        ("voice", "Sven"),
         ("mode", "hype"),
         ("genre", "techno"),
         ("output_device_id", "dev-3"),
@@ -227,7 +227,7 @@ def test_settings_state_rejects_invalid_mode() -> None:
         "type": "ipc.settings.state",
         "ts": "2026-05-12T00:00:00Z",
         "payload": {
-            "voice": "Adam",
+            "voice": "Sven",
             "mode": "neutral",  # not in enum
             "genre": "techno",
             "output_device_id": None,

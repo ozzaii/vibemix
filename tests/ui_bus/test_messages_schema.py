@@ -240,7 +240,7 @@ def _make_examples() -> list[tuple[str, object]]:
         ("SessionSetMode", SessionSetMode.make(mode="build")),
         ("SessionStart", SessionStart.make()),
         ("SessionStop", SessionStop.make()),
-        ("SettingsSet", SettingsSet.make(field="voice", value="Adam")),
+        ("SettingsSet", SettingsSet.make(field="voice", value="Sven")),
         (
             "SettingsSetBrain",
             SettingsSetBrain.make(mode="direct", gemini_api_key="AIza-test-fake"),
@@ -253,7 +253,7 @@ def _make_examples() -> list[tuple[str, object]]:
         (
             "SettingsState",
             SettingsState.make(
-                voice="Adam",
+                voice="Sven",
                 mode="coach",
                 genre="tech-house",
                 output_device_id=None,

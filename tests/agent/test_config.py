@@ -43,7 +43,7 @@ def test_config_01_constants_pinned(monkeypatch) -> None:
 
     assert config.LLM_MODEL == "gemini-3.5-flash"
     assert config.OPENROUTER_LLM_MODEL == "google/gemini-3.5-flash:nitro"
-    assert config.VOICE == "Adam"
+    assert config.VOICE == "Sven"
     assert config.INPUT_DEVICE == "BlackHole 2ch"
     assert config.OUTPUT_DEVICE == "MacBook Pro Speakers"
     assert config.MIC_DEVICE == "MacBook Pro Microphone"

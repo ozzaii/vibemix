@@ -22,7 +22,7 @@ Phase 11 keys preserved verbatim on save:
   * ``first_run_state`` (tauri-plugin-store wrapper key — preserved as-is)
 
 Phase 12 fields added:
-  * ``voice`` (default ``"Adam"``)
+  * ``voice`` (default ``"Sven"``)
   * ``mode`` (default ``"coach"``)
   * ``genre`` (default ``"tech-house"``)
   * ``output_profile`` (default ``"hp"``)

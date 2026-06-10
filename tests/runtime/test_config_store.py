@@ -41,7 +41,7 @@ from vibemix.runtime.config_store import (
 def test_defaults_phase12_fields() -> None:
     """A fresh ``ConfigStore`` carries the Phase 12 defaults verbatim."""
     cfg = ConfigStore()
-    assert cfg.voice == "Adam"
+    assert cfg.voice == "Sven"
     assert cfg.mode == "coach"
     assert cfg.genre == "tech-house"
     assert cfg.output_device_id is None
@@ -158,7 +158,7 @@ def test_round_trip_preserves_unknown_keys(tmp_path: Path) -> None:
     # Unknown key landed in extra
     assert "first_run_state" in loaded.extra
     # Defaults filled in for everything else
-    assert loaded.voice == "Adam"
+    assert loaded.voice == "Sven"
     # Now write and verify the unknown key survives
     loaded.voice = "Bella"
     save_config(loaded, target)
@@ -211,7 +211,7 @@ def test_load_missing_file_returns_defaults(tmp_path: Path) -> None:
     """No file on disk → fresh defaults without raising."""
     target = tmp_path / "nope.json"
     cfg = load_config(target)
-    assert cfg.voice == "Adam"
+    assert cfg.voice == "Sven"
     assert cfg.retention_days == 7
 
 
@@ -222,7 +222,7 @@ def test_load_corrupt_json_returns_defaults(
     target = tmp_path / "config.json"
     target.write_text("{not json")
     cfg = load_config(target)
-    assert cfg.voice == "Adam"
+    assert cfg.voice == "Sven"
     captured = capsys.readouterr()
     assert "config_store" in captured.err
 
@@ -232,7 +232,7 @@ def test_load_non_dict_returns_defaults(tmp_path: Path) -> None:
     target = tmp_path / "config.json"
     target.write_text("[1, 2, 3]")
     cfg = load_config(target)
-    assert cfg.voice == "Adam"
+    assert cfg.voice == "Sven"
 
 
 def test_load_legacy_cloud_voice_returns_moss_default(tmp_path: Path) -> None:
@@ -242,7 +242,7 @@ def test_load_legacy_cloud_voice_returns_moss_default(tmp_path: Path) -> None:
 
     cfg = load_config(target)
 
-    assert cfg.voice == "Adam"
+    assert cfg.voice == "Sven"
 
 
 def test_load_legacy_tts_engine_returns_chatterbox_default(tmp_path: Path) -> None:
