@@ -455,7 +455,7 @@ export function mountDebriefDock(
   const mast = document.createElement("section");
   mast.className = "debrief-dock__mast";
   mast.innerHTML =
-    '<div><div class="debrief-dock__kicker">review dock</div>' +
+    '<div><div class="debrief-dock__kicker">debrief dock</div>' +
     '<h2 class="debrief-dock__title">Look back at your last set.</h2>' +
     '<p class="debrief-dock__sub">I replay the real moments, show you the why behind each call, then hand you one thing to drill.</p></div>' +
     '<dl class="debrief-dock__proof">' +
@@ -472,14 +472,14 @@ export function mountDebriefDock(
     '<button class="debrief-dock__refresh" type="button">Refresh</button>' +
     "</div>" +
     '<section class="debrief-dock__readiness" aria-label="next debrief readiness" data-state="empty">' +
-    '<div><div class="debrief-dock__readiness-kicker">next review</div>' +
+    '<div><div class="debrief-dock__readiness-kicker">next debrief</div>' +
     '<h3 class="debrief-dock__readiness-title">checking recorder</h3>' +
     '<p class="debrief-dock__readiness-sub">Waiting for local session evidence.</p></div>' +
     '<div class="debrief-dock__payback" aria-label="fastest payback path">' +
     '<div class="debrief-dock__payback-cell"><span class="debrief-dock__payback-label">last set</span><strong class="debrief-dock__payback-value" data-payback="target">pending</strong></div>' +
     '<div class="debrief-dock__payback-cell"><span class="debrief-dock__payback-label">waiting on</span><strong class="debrief-dock__payback-value" data-payback="blocker">checking</strong></div>' +
     '<div class="debrief-dock__payback-cell"><span class="debrief-dock__payback-label">action</span><strong class="debrief-dock__payback-value" data-payback="action">wait</strong></div>' +
-    '<div class="debrief-dock__payback-cell"><span class="debrief-dock__payback-label">you get</span><strong class="debrief-dock__payback-value" data-payback="unlocks">review</strong></div>' +
+    '<div class="debrief-dock__payback-cell"><span class="debrief-dock__payback-label">you get</span><strong class="debrief-dock__payback-value" data-payback="unlocks">debrief</strong></div>' +
     "</div>" +
     '<dl class="debrief-dock__readiness-metrics">' +
     '<div class="debrief-dock__readiness-metric"><dt>length</dt><dd>pending</dd></div>' +
@@ -578,7 +578,7 @@ function renderSessions(
   if (visible.length === 0) {
     renderReadiness(readiness, null);
     list.replaceChildren(
-      renderEmpty("Run a real set from Deck. When the recording closes, the review opens here."),
+      renderEmpty("Run a real set from Deck. When the recording closes, the debrief opens here."),
     );
     return;
   }
@@ -618,7 +618,7 @@ function renderSessionRow(summary: RecordingSummary): HTMLElement {
 
   const state = document.createElement("div");
   state.className = "debrief-dock__row-state";
-  state.textContent = eligibility.ready ? "review ready" : "capture more";
+  state.textContent = eligibility.ready ? "debrief ready" : "capture more";
 
   const head = document.createElement("div");
   head.className = "debrief-dock__row-head";
@@ -646,14 +646,14 @@ function renderSessionRow(summary: RecordingSummary): HTMLElement {
 
   const meter = document.createElement("div");
   meter.className = "debrief-dock__meter";
-  meter.setAttribute("aria-label", `review readiness ${readiness.percent}%`);
+  meter.setAttribute("aria-label", `debrief readiness ${readiness.percent}%`);
   copy.append(head, meta, reasonEl, payoff, meter);
 
   const open = document.createElement("button");
   open.className = "debrief-dock__open";
   open.type = "button";
   open.disabled = !eligibility.ready;
-  open.textContent = eligibility.ready ? "Open review" : "Not ready";
+  open.textContent = eligibility.ready ? "Open debrief" : "Not ready";
   open.title = eligibility.ready ? "Open debrief" : eligibility.reason;
   open.addEventListener("click", () => {
     if (!eligibility.ready) return;
@@ -684,12 +684,12 @@ function renderReadiness(
       readiness.dataset.state = "empty";
       title.textContent = "nothing to review yet";
       sub.textContent =
-        "Every recent set stopped before it sealed. Run one start to finish and your review opens here.";
+        "Every recent set stopped before it sealed. Run one start to finish and your debrief opens here.";
       setPayback(payback, {
         target: "your next set",
         blocker: "none saved yet",
         action: "record start to finish",
-        unlocks: "your first review",
+        unlocks: "your first debrief",
       });
       setMetric(metrics[0], "0m");
       setMetric(metrics[1], "0 events");
@@ -716,7 +716,7 @@ function renderReadiness(
   const path = paybackPath(summary, eligibility.ready, progress);
   readiness.dataset.state = eligibility.ready ? "ready" : "warming";
   if (eligibility.ready) {
-    title.textContent = "review is armed";
+    title.textContent = "debrief is armed";
     sub.textContent = `${formatTimestamp(summary.started_at_iso)} is ready, with the why behind every call.`;
   } else if (summary.crashed) {
     title.textContent = "this set stopped early";
@@ -766,7 +766,7 @@ function paybackPath(
     return {
       target,
       blocker: "none",
-      action: "open your review",
+      action: "open your debrief",
       unlocks: "one drill or Viber move",
     };
   }
@@ -775,14 +775,14 @@ function paybackPath(
       target,
       blocker: "stopped early",
       action: "record a full set",
-      unlocks: "your review",
+      unlocks: "your debrief",
     };
   }
   return {
     target,
     blocker: `${progress.remainingLabel} short`,
     action: "keep Deck running",
-    unlocks: "your review",
+    unlocks: "your debrief",
   };
 }
 
@@ -791,7 +791,7 @@ function rowPayoffLine(
   ready: boolean,
   readiness: ReturnType<typeof reviewReadiness>,
 ): string {
-  if (ready) return "Payback: open review to leave with one drill or Viber move.";
+  if (ready) return "Payback: open the debrief to leave with one drill or Viber move.";
   if (summary.crashed) return "Record one full set start to finish and I can review it.";
   return `${readiness.remainingLabel} more and I can review this set.`;
 }

@@ -12,24 +12,28 @@ export type DebriefErrorReason =
   | "port_in_use"
   | "unknown_kind";
 
+// One noun per concept across the whole surface: the segments are
+// "moments", the voiced artifact is the "recap", the surface itself is
+// the "debrief". The same screen once said chapters/regions/TRACKS and
+// TL;DR/voiced summary/recap at the same time.
 const REASON_COPY: Record<DebriefErrorReason, string> = {
   events_missing:
-    "This session has no event data. Try a longer recording.",
+    "I didn't catch anything in that session to debrief. Try a longer set.",
   session_too_short:
-    "Session is too short for a meaningful debrief (need ≥ 5 minutes).",
+    "That set is too short for a fair debrief. Give me at least five minutes of music.",
   invalid_session_dir:
-    "That recording can't be opened. Its location doesn't match the expected layout.",
+    "That recording can't be opened. It isn't a session I saved, so I can't replay it.",
   sidecar_crashed: "Debrief crashed unexpectedly. Try reopening.",
   tldr_generation_failed:
-    "Couldn't generate the voiced summary. Try refreshing.",
+    "Couldn't put your recap together. Try reopening.",
   drills_generation_failed:
-    "Couldn't generate drills with valid citations. Try refreshing.",
+    "Couldn't build drills I can stand behind this time. Try reopening.",
   llm_unavailable:
-    "Sven's brain is unreachable, so drills and the voiced recap are skipped this time. Chapters and the replay below are still from your set.",
+    "Sven's brain is unreachable, so drills and the recap are skipped this time. Your moments and the replay below are still from your set.",
   port_in_use:
     "Another debrief window is already open. Close it and reopen this one.",
   unknown_kind:
-    "The review hit something it didn't understand. Try reopening.",
+    "The debrief hit something it didn't understand. Try reopening.",
 };
 
 export function showErrorBanner(
@@ -40,7 +44,14 @@ export function showErrorBanner(
   const key = (reason as DebriefErrorReason) in REASON_COPY
     ? (reason as DebriefErrorReason)
     : null;
-  const copy = key ? REASON_COPY[key] : message || "An unknown error occurred.";
+  // Unmapped reasons can carry raw sidecar prose; that belongs in the
+  // console for QA, not on the surface.
+  if (!key && message) {
+    console.warn(`[debrief] unmapped error reason "${reason}": ${message}`);
+  }
+  const copy = key
+    ? REASON_COPY[key]
+    : "Something went wrong putting this debrief together. Try reopening.";
 
   container.textContent = "";
   container.hidden = false;

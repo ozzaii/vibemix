@@ -147,19 +147,19 @@ describe("DebriefDock", () => {
       "ipc.recordings.list_result",
     );
     expect(host.textContent).toContain("2 sessions");
-    expect(host.textContent).toContain("next review");
-    expect(host.textContent).toContain("review is armed");
+    expect(host.textContent).toContain("next debrief");
+    expect(host.textContent).toContain("debrief is armed");
     expect(host.textContent).toContain("is ready, with the why behind every call");
     expect(host.textContent).toContain("last set");
     expect(host.textContent).toContain("waiting on");
     expect(host.textContent).toContain("you get");
-    expect(host.textContent).toContain("open your review");
+    expect(host.textContent).toContain("open your debrief");
     expect(host.textContent).toContain("one drill or Viber move");
     expect(host.textContent).toContain("2026-06-03 00:15");
     expect(host.textContent).toContain("42m");
     expect(host.textContent).toContain("19 events");
     expect(host.textContent).toContain("ready to review");
-    expect(host.textContent).toContain("Payback: open review to leave with one drill or Viber move.");
+    expect(host.textContent).toContain("Payback: open the debrief to leave with one drill or Viber move.");
 
     const openButtons = Array.from(
       host.querySelectorAll<HTMLButtonElement>(".debrief-dock__open"),
@@ -234,7 +234,7 @@ describe("DebriefDock", () => {
     expect(host.textContent).toContain("2026-06-03 00:30");
     expect(host.textContent).toContain("1m short");
     expect(host.textContent).toContain("keep Deck running");
-    expect(host.textContent).toContain("your review");
+    expect(host.textContent).toContain("your debrief");
     expect(host.querySelector('[data-payback="target"]')?.textContent).toBe("2026-06-03 00:30");
     expect(host.querySelector('[data-payback="blocker"]')?.textContent).toBe("1m short");
   });

@@ -101,7 +101,7 @@ export function mountTimelinePlaceholder(
   readout.className = "vmx-debrief-timeline-readout";
   readout.setAttribute("aria-live", "polite");
   renderReadout(readout, [
-    `${chapters.length} regions`,
+    `${chapters.length} moments`,
     `${formatTime(totalDurationS)} set`,
     "ready",
   ]);
@@ -138,7 +138,7 @@ export function mountTimelinePlaceholder(
       }
       region.dataset.active = "true";
       renderReadout(readout, [
-        c.kind ?? "region",
+        c.kind ?? "moment",
         `${formatTime(c.start)} → ${formatTime(c.end)}`,
         compactLabel(c.label),
       ]);

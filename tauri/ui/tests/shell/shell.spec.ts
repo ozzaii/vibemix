@@ -85,7 +85,7 @@ describe("DesktopShell", () => {
     shell = mountDesktopShell(host);
     const debrief = host.querySelector<HTMLElement>('.surface[data-surface="debrief"]')!;
 
-    expect(debrief.querySelector(".se-title")?.textContent).toBe("Your set review lands here.");
+    expect(debrief.querySelector(".se-title")?.textContent).toBe("Your set debrief lands here.");
     expect(debrief.textContent).toContain("timeline, skill notes, and the next move");
     expect(debrief.textContent).toContain("Timeline");
     expect(debrief.textContent).toContain("drops, recoveries, energy shape");

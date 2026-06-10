@@ -18,13 +18,13 @@ afterEach(() => {
 describe("error-banner reason→copy map", () => {
   it("events_missing → user copy", () => {
     expect(reasonToCopy("events_missing")).toBe(
-      "This session has no event data. Try a longer recording.",
+      "I didn't catch anything in that session to debrief. Try a longer set.",
     );
   });
 
   it("session_too_short → user copy", () => {
     expect(reasonToCopy("session_too_short")).toBe(
-      "Session is too short for a meaningful debrief (need ≥ 5 minutes).",
+      "That set is too short for a fair debrief. Give me at least five minutes of music.",
     );
   });
 
@@ -36,13 +36,13 @@ describe("error-banner reason→copy map", () => {
 
   it("tldr_generation_failed → user copy", () => {
     expect(reasonToCopy("tldr_generation_failed")).toBe(
-      "Couldn't generate the voiced summary. Try refreshing.",
+      "Couldn't put your recap together. Try reopening.",
     );
   });
 
   it("drills_generation_failed → user copy", () => {
     expect(reasonToCopy("drills_generation_failed")).toBe(
-      "Couldn't generate drills with valid citations. Try refreshing.",
+      "Couldn't build drills I can stand behind this time. Try reopening.",
     );
   });
 
@@ -73,11 +73,12 @@ describe("showErrorBanner mounts dom", () => {
     expect(div.hidden).toBe(true);
   });
 
-  it("unknown reason renders fallback message", () => {
+  it("unknown reason speaks product copy, never raw sidecar prose", () => {
     const div = document.createElement("div");
     document.body.append(div);
-    showErrorBanner(div, "bogus", "fallback msg");
-    expect(div.textContent).toContain("fallback msg");
+    showErrorBanner(div, "bogus", "Traceback (most recent call last): boom");
+    expect(div.textContent).not.toContain("Traceback");
+    expect(div.textContent).toContain("Try reopening");
   });
 
   it("renders the honest working line without a dismiss control", () => {

@@ -93,10 +93,10 @@ export const SURFACES: readonly SurfaceDef[] = [
     label: "Debrief",
     kbd: "4",
     glyph: GLYPH_DEBRIEF,
-    hint: "post-set review",
+    hint: "post-set debrief",
     wire: "shell.surface.debrief",
     empty: {
-      title: "Your set review lands here.",
+      title: "Your set debrief lands here.",
       sub: "After a real set, I turn key moments into a timeline, skill notes, and the next move.",
       proof: [
         { label: "Timeline", value: "drops, recoveries, energy shape" },
