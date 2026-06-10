@@ -387,8 +387,15 @@ impl TrayState {
 
 /// Minimum payload the derivation function needs. Composed from
 /// the latest `ipc.session.snapshot` (cohost_status) + the latest
-/// `ipc.status.tick` (livekit / gemini / screen) + an activity
-/// timestamp.
+/// `ipc.status.tick` (gemini) + an activity timestamp.
+///
+/// Deliberately NOT consulted (wire contract, ws_bus.py STATUS_EVERY_N):
+///   - `livekit` — the status tick hardcodes it "ok" (there is no honest
+///     audio-drop signal), so an Error lane keyed to "down" could never
+///     fire and only pretended to monitor something.
+///   - `screen` — "denied" is a badge state, not a fault: audio-only is a
+///     valid mode (cf. SessionLayout faultInput). The tray must not show
+///     ERROR for a DJ who never granted screen recording.
 ///
 /// `last_event_age_ms` is the time since the most recent snapshot;
 /// when the bus stops broadcasting, this grows and the tray falls
@@ -397,8 +404,6 @@ impl TrayState {
 pub struct SnapshotView<'a> {
     pub cohost_status: Option<&'a str>,
     pub gemini_status: Option<&'a str>,
-    pub livekit_status: Option<&'a str>,
-    pub screen_status: Option<&'a str>,
     /// Milliseconds since the last snapshot frame arrived. None = never.
     pub last_event_age_ms: Option<u64>,
 }
@@ -406,7 +411,8 @@ pub struct SnapshotView<'a> {
 /// PURE FUNCTION — derives the tray state from the latest signals.
 ///
 /// Precedence (top wins):
-///   1. Error: any of {gemini=down, livekit=down, screen=denied}.
+///   1. Error: gemini=down — the brain is the only honest fault signal
+///      the status tick carries.
 ///   2. Thinking: cohost_status == "TALKING" (AI is actively generating
 ///      / speaking — the snapshot's TALKING band covers both the
 ///      AI_GENERATING_REPLY and AI_REPLY_DONE event-pair window per
@@ -419,11 +425,8 @@ pub struct SnapshotView<'a> {
 /// itself is pure plumbing (debounce + compare-and-set). Testing the
 /// derivation in isolation gives full coverage without spinning Tauri.
 pub fn derive_tray_state(view: SnapshotView<'_>) -> TrayState {
-    // 1. Error precedence.
-    if matches!(view.gemini_status, Some("down"))
-        || matches!(view.livekit_status, Some("down"))
-        || matches!(view.screen_status, Some("denied"))
-    {
+    // 1. Error precedence — the one live fault signal.
+    if matches!(view.gemini_status, Some("down")) {
         return TrayState::Error;
     }
 
@@ -450,11 +453,10 @@ pub fn derive_tray_state(view: SnapshotView<'_>) -> TrayState {
 #[derive(Debug)]
 pub struct TrayListenerState {
     /// Snapshot-derived strings (owned because Tauri event payloads
-    /// are short-lived String references).
+    /// are short-lived String references). livekit/screen are not held:
+    /// the derivation deliberately ignores them (see SnapshotView).
     pub cohost_status: Option<String>,
     pub gemini_status: Option<String>,
-    pub livekit_status: Option<String>,
-    pub screen_status: Option<String>,
     /// Wall-clock instant of the most recent `ipc:ipc.session.snapshot`.
     pub last_snapshot: Option<std::time::Instant>,
     /// The state currently shown by the tray icon (so we can skip
@@ -469,8 +471,6 @@ impl Default for TrayListenerState {
         Self {
             cohost_status: None,
             gemini_status: None,
-            livekit_status: None,
-            screen_status: None,
             last_snapshot: None,
             current_state: TrayState::Idle,
             last_swap: None,
@@ -521,28 +521,17 @@ pub fn install_tray_state_listener(app: &AppHandle) {
         let app_clone = app.clone();
         app.listen("ipc-status-tick", move |event| {
             if let Ok(value) = serde_json::from_str::<serde_json::Value>(event.payload()) {
-                let payload = value.get("payload");
-                let gemini = payload
+                // Only `gemini` feeds the derivation — livekit is hardcoded
+                // "ok" on the wire and screen=denied is badge-only, never a
+                // fault (see SnapshotView).
+                let gemini = value
+                    .get("payload")
                     .and_then(|p| p.get("gemini"))
-                    .and_then(|v| v.as_str())
-                    .map(|s| s.to_string());
-                let livekit = payload
-                    .and_then(|p| p.get("livekit"))
-                    .and_then(|v| v.as_str())
-                    .map(|s| s.to_string());
-                let screen = payload
-                    .and_then(|p| p.get("screen"))
                     .and_then(|v| v.as_str())
                     .map(|s| s.to_string());
                 if let Ok(mut guard) = state.lock() {
                     if let Some(g) = gemini {
                         guard.gemini_status = Some(g);
-                    }
-                    if let Some(l) = livekit {
-                        guard.livekit_status = Some(l);
-                    }
-                    if let Some(s) = screen {
-                        guard.screen_status = Some(s);
                     }
                     drop(guard);
                 }
@@ -596,8 +585,6 @@ fn try_swap(app: &AppHandle, state: &Arc<std::sync::Mutex<TrayListenerState>>) {
         let view = SnapshotView {
             cohost_status: guard.cohost_status.as_deref(),
             gemini_status: guard.gemini_status.as_deref(),
-            livekit_status: guard.livekit_status.as_deref(),
-            screen_status: guard.screen_status.as_deref(),
             last_event_age_ms: age_ms,
         };
         next_state = derive_tray_state(view);
@@ -741,8 +728,6 @@ mod tests {
         let view = SnapshotView {
             cohost_status: Some("LISTENING"),
             gemini_status: Some("down"),
-            livekit_status: Some("ok"),
-            screen_status: Some("ok"),
             last_event_age_ms: Some(100),
         };
         assert_eq!(derive_tray_state(view), TrayState::Error);
@@ -753,8 +738,6 @@ mod tests {
         let view = SnapshotView {
             cohost_status: Some("TALKING"),
             gemini_status: Some("ok"),
-            livekit_status: Some("ok"),
-            screen_status: Some("ok"),
             last_event_age_ms: Some(100),
         };
         assert_eq!(derive_tray_state(view), TrayState::Thinking);
@@ -765,8 +748,6 @@ mod tests {
         let view = SnapshotView {
             cohost_status: Some("LISTENING"),
             gemini_status: Some("ok"),
-            livekit_status: Some("ok"),
-            screen_status: Some("ok"),
             last_event_age_ms: Some(2_000), // within 5s window
         };
         assert_eq!(derive_tray_state(view), TrayState::Live);
@@ -778,8 +759,6 @@ mod tests {
         let view = SnapshotView {
             cohost_status: Some("LISTENING"),
             gemini_status: Some("ok"),
-            livekit_status: Some("ok"),
-            screen_status: Some("ok"),
             last_event_age_ms: Some(10_000),
         };
         assert_eq!(derive_tray_state(view), TrayState::Idle);
@@ -788,8 +767,6 @@ mod tests {
         let cold = SnapshotView {
             cohost_status: None,
             gemini_status: None,
-            livekit_status: None,
-            screen_status: None,
             last_event_age_ms: None,
         };
         assert_eq!(derive_tray_state(cold), TrayState::Idle);
@@ -801,31 +778,23 @@ mod tests {
         let view = SnapshotView {
             cohost_status: Some("TALKING"),
             gemini_status: Some("down"),
-            livekit_status: Some("ok"),
-            screen_status: Some("ok"),
             last_event_age_ms: Some(100),
         };
         assert_eq!(derive_tray_state(view), TrayState::Error);
     }
 
     #[test]
-    fn derive_tray_state_livekit_or_screen_failures_yield_error() {
-        let livekit_down = SnapshotView {
+    fn derive_tray_state_gemini_is_the_only_status_fault() {
+        // Contract pin: livekit is hardcoded "ok" on the wire (an Error lane
+        // keyed to it could never fire) and screen=denied is badge-only —
+        // audio-only is a valid mode, never a tray fault. SnapshotView
+        // therefore carries NO livekit/screen fields at all; a healthy
+        // gemini means the listening tray stays non-error.
+        let view = SnapshotView {
             cohost_status: Some("LISTENING"),
             gemini_status: Some("ok"),
-            livekit_status: Some("down"),
-            screen_status: Some("ok"),
             last_event_age_ms: Some(100),
         };
-        assert_eq!(derive_tray_state(livekit_down), TrayState::Error);
-
-        let screen_denied = SnapshotView {
-            cohost_status: Some("LISTENING"),
-            gemini_status: Some("ok"),
-            livekit_status: Some("ok"),
-            screen_status: Some("denied"),
-            last_event_age_ms: Some(100),
-        };
-        assert_eq!(derive_tray_state(screen_denied), TrayState::Error);
+        assert_eq!(derive_tray_state(view), TrayState::Live);
     }
 }
