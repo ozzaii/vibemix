@@ -41,8 +41,8 @@ import { parseDebriefBootUrl } from "./url-state.js";
 const bootState = parseDebriefBootUrl(location.search);
 const { sessionDir, sessionId, isMockMode } = bootState;
 
-// The raw session id is dev telemetry, not a DJ's review heading; keep the
-// window title clean and leave the titlebar slot empty.
+// The raw session id is dev telemetry, not a DJ's review heading; the
+// window title stays clean.
 document.title = "Debrief";
 
 const errorBanner = document.getElementById("vmx-debrief-error-banner");
@@ -249,12 +249,19 @@ if (isMockMode) {
     });
     drillsEl.addEventListener("moment-feedback-click", (e: Event) => {
       const detail = (e as MomentFeedbackClickEvent).detail;
-      client.sendMomentFeedback({
+      const sent = client.sendMomentFeedback({
         moment_id: detail.momentId,
         citation_id: detail.citationId,
         verdict: detail.verdict,
         surface: detail.surface,
       });
+      if (!sent) {
+        drillsEl.dispatchEvent(
+          new CustomEvent("moment-feedback-rejected", {
+            detail: { momentId: detail.momentId },
+          }),
+        );
+      }
     });
   }
   if (waveformEl) {

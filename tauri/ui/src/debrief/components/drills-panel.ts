@@ -46,6 +46,24 @@ export function mountDrillsPanel(
   drills: DrillPayload[],
 ): void {
   container.textContent = "";
+  // A vote the wire never carried must not stay painted as recorded —
+  // the window bounces moment-feedback-rejected back when the socket was
+  // closed at send time, and the pressed state reverts.
+  if (!(container as { __vmxFeedbackRejectWired?: boolean }).__vmxFeedbackRejectWired) {
+    (container as { __vmxFeedbackRejectWired?: boolean }).__vmxFeedbackRejectWired = true;
+    container.addEventListener("moment-feedback-rejected", (e: Event) => {
+      const momentId = (e as CustomEvent).detail?.momentId as string | undefined;
+      if (!momentId) return;
+      const article = container.querySelector<HTMLElement>(
+        `[data-moment-id="${momentId}"]`,
+      );
+      for (const btn of Array.from(
+        article?.querySelectorAll(".vmx-drill-feedback__btn") ?? [],
+      )) {
+        btn.setAttribute("aria-pressed", "false");
+      }
+    });
+  }
   for (let i = 0; i < drills.length; i += 1) {
     const d = drills[i];
     if (!d) continue;
@@ -53,6 +71,7 @@ export function mountDrillsPanel(
     article.className = "vmx-drill";
     article.dataset.drillIndex = String(i);
     const momentId = `drill-${i}`;
+    article.dataset.momentId = momentId;
     const surface = feedbackSurfaceForCitation(d.citation);
 
     // The situation IS the title (the real line); "Drill N" was template filler.
@@ -103,6 +122,12 @@ export function mountDrillsPanel(
     const feedback = document.createElement("div");
     feedback.className = "vmx-drill-feedback";
     feedback.setAttribute("aria-label", "moment feedback");
+    // Bare RIGHT|OFF|? read as power toggles; the caption names what the
+    // row actually votes on.
+    const caption = document.createElement("span");
+    caption.className = "vmx-drill-feedback__caption";
+    caption.textContent = "Was this call right?";
+    feedback.append(caption);
     for (const [verdict, label] of [
       ["agree", "right"],
       ["disagree", "off"],
@@ -117,6 +142,13 @@ export function mountDrillsPanel(
       button.textContent = label;
       button.addEventListener("click", (e) => {
         e.stopPropagation();
+        // Re-clicking the pressed verdict un-votes locally (there is no
+        // retraction frame in the 3-verdict schema, so nothing is sent or
+        // claimed) instead of silently re-sending the same vote.
+        if (button.getAttribute("aria-pressed") === "true") {
+          button.setAttribute("aria-pressed", "false");
+          return;
+        }
         for (const peer of Array.from(
           feedback.querySelectorAll(".vmx-drill-feedback__btn"),
         )) {

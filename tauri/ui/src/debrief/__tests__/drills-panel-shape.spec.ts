@@ -139,6 +139,57 @@ describe("drills-panel", () => {
     });
   });
 
+  it("re-clicking the pressed verdict un-votes locally without re-sending", () => {
+    const div = document.createElement("div");
+    document.body.append(div);
+    const onClick = vi.fn();
+    div.addEventListener("moment-feedback-click", onClick);
+    mountDrillsPanel(div, [drill]);
+
+    const button = div.querySelector<HTMLButtonElement>(
+      '.vmx-drill-feedback__btn[data-verdict="agree"]',
+    )!;
+    button.click();
+    expect(button.getAttribute("aria-pressed")).toBe("true");
+    expect(onClick).toHaveBeenCalledTimes(1);
+
+    button.click();
+    expect(button.getAttribute("aria-pressed")).toBe("false");
+    expect(onClick).toHaveBeenCalledTimes(1);
+  });
+
+  it("moment-feedback-rejected reverts the pressed state for that moment", () => {
+    const div = document.createElement("div");
+    document.body.append(div);
+    mountDrillsPanel(div, [drill, drill]);
+
+    const first = div.querySelector<HTMLButtonElement>(
+      '[data-moment-id="drill-0"] .vmx-drill-feedback__btn[data-verdict="agree"]',
+    )!;
+    const second = div.querySelector<HTMLButtonElement>(
+      '[data-moment-id="drill-1"] .vmx-drill-feedback__btn[data-verdict="agree"]',
+    )!;
+    first.click();
+    second.click();
+
+    div.dispatchEvent(
+      new CustomEvent("moment-feedback-rejected", {
+        detail: { momentId: "drill-0" },
+      }),
+    );
+    expect(first.getAttribute("aria-pressed")).toBe("false");
+    expect(second.getAttribute("aria-pressed")).toBe("true");
+  });
+
+  it("the feedback row carries a visible caption naming the vote", () => {
+    const div = document.createElement("div");
+    document.body.append(div);
+    mountDrillsPanel(div, [drill]);
+    expect(
+      div.querySelector(".vmx-drill-feedback__caption")?.textContent,
+    ).toBe("Was this call right?");
+  });
+
   it("track citations mark feedback as cue surface", () => {
     const div = document.createElement("div");
     document.body.append(div);

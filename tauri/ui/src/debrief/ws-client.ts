@@ -105,14 +105,18 @@ export class DebriefWsClient extends EventTarget {
     this.ws.send(JSON.stringify(frame));
   }
 
-  sendMomentFeedback(payload: DebriefMomentFeedbackPayload): void {
-    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
+  /** Returns true only when the frame was actually handed to an open
+   *  socket — the caller reverts the optimistic pressed state otherwise
+   *  (a dropped vote must not stay painted as recorded). */
+  sendMomentFeedback(payload: DebriefMomentFeedbackPayload): boolean {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return false;
     const frame = {
       type: "ipc.debrief.moment-feedback",
       ts: new Date().toISOString(),
       payload,
     };
     this.ws.send(JSON.stringify(frame));
+    return true;
   }
 
   close(): void {
