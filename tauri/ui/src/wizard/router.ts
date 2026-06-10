@@ -876,27 +876,26 @@ async function persistLaunchPreferences(): Promise<void> {
 
 /** Fresh-user safety net: a user who never clicked "Index this" but had a
  *  library source auto-detected would otherwise open the deck with an empty
- *  library — the deck stays bare and the what-next pill is dark (the sidecar's
- *  SuggestionService is gated on `deck_library is not None`, which is built
- *  once at session activation from an existing library.pkl). Kick the detected
- *  source off as they open the deck so the index exists for the next
- *  activation — and for this one only if the import finishes before they go
- *  live (the live SuggestionService is not re-built mid-session). Fire-and-
- *  forget: do NOT block wizard completion on a multi-minute CLAP embed. No-op
- *  when tracks already exist / an import is in flight, or when no source was
- *  detected (the user picks a folder later from the deck). */
-function maybeAutoIngestLibrary(): void {
+ *  library — the deck stays bare and the what-next pill is dark. The wizard
+ *  sidecar QUEUES the source as a pending-import marker (it cannot survive a
+ *  real CLAP embed — ipc.wizard.done kills the process), and the live sidecar
+ *  runs the real import on its first boot with progress on the deck. The
+ *  emit is awaited by finishLaunchStep so the ipc.library.import frame is
+ *  SENT before ipc.wizard.done — both ride one ws connection (FIFO), so the
+ *  marker is persisted before the wizard sidecar exits. No-op when tracks
+ *  already exist / an import ack already landed / nothing was detected. */
+function maybeAutoIngestLibrary(): Promise<void> {
   const feed = wizardState.libraryFeed;
   if (feed.indexed > 0 || feed.status === "indexing" || feed.status === "done") {
-    return;
+    return Promise.resolve();
   }
   const candidate = feed.candidates[0];
-  if (!candidate) return;
-  void startLibraryFeedImport(candidate);
+  if (!candidate) return Promise.resolve();
+  return startLibraryFeedImport(candidate);
 }
 
 async function finishLaunchStep(): Promise<void> {
-  maybeAutoIngestLibrary();
+  await maybeAutoIngestLibrary();
   await persistLaunchPreferences();
   await completeWizard();
 }

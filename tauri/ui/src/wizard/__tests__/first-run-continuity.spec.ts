@@ -442,7 +442,9 @@ describe("first-run continuity smoke (POLISH-03)", () => {
     expect(openCta).toBeDefined();
     vi.mocked(libraryImportFromAction).mockClear();
     openCta!.click();
-    for (let i = 0; i < 6; i++) await Promise.resolve();
+    // Generous flush budget — lane A added awaits to the completion path
+    // (handoff listener arming, write-before-done, awaited auto-ingest).
+    for (let i = 0; i < 20; i++) await Promise.resolve();
 
     expect(libraryImportFromAction).not.toHaveBeenCalled();
     expect(currentStep()).toBe("done");

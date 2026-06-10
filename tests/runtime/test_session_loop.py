@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import sys
 from collections.abc import Awaitable, Callable
 from pathlib import Path
 from types import SimpleNamespace
@@ -1106,3 +1107,107 @@ def test_folder_import_partial_failure_reports_failed_without_ipc_error(
     assert final["failed"] == 1
     assert final["failure_reason"] == "second.mp3: decode error"
     assert fake_bus.emitted_by_type("ipc.error") == []
+
+
+# ---------------------------------------------------------------------------
+# Lane A (2026-06-10) — wizard→live pending library-import handoff
+# ---------------------------------------------------------------------------
+
+
+def _isolate_config_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("HOME", str(tmp_path))
+    if sys.platform == "win32":
+        monkeypatch.setenv("USERPROFILE", str(tmp_path))
+        monkeypatch.setenv("APPDATA", str(tmp_path))
+
+
+def test_kick_pending_library_import_consumes_marker(
+    fake_bus: FakeBus, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A wizard-queued source is popped from config and routed through the
+    real import path with CLAP ensured first; the marker never re-fires."""
+    _isolate_config_home(tmp_path, monkeypatch)
+    import vibemix.library.model_assets as model_assets
+    from vibemix.runtime.config_store import (
+        PENDING_LIBRARY_IMPORT_KEY,
+        ConfigStore,
+        load_config,
+    )
+
+    installed: list[str] = []
+    monkeypatch.setattr(
+        model_assets,
+        "install_models",
+        lambda target, **k: (installed.append(target), {"ok": True, "results": []})[1],
+    )
+    ran: list[Path] = []
+
+    async def fake_run(self, source_path: Path) -> None:
+        ran.append(source_path)
+
+    monkeypatch.setattr(SessionLoop, "_run_library_import", fake_run)
+
+    store = ConfigStore(extra={PENDING_LIBRARY_IMPORT_KEY: "/Users/x/Music/crates"})
+    loop = SessionLoop(fake_bus, config_store=store)
+
+    async def _run() -> None:
+        task = loop.kick_pending_library_import()
+        assert task is not None
+        await task
+
+    asyncio.run(_run())
+
+    assert installed == ["clap"]
+    assert ran == [Path("/Users/x/Music/crates")]
+    assert PENDING_LIBRARY_IMPORT_KEY not in load_config().extra
+
+
+def test_kick_pending_library_import_noop_without_marker(
+    fake_bus: FakeBus, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _isolate_config_home(tmp_path, monkeypatch)
+    from vibemix.runtime.config_store import ConfigStore
+
+    loop = SessionLoop(fake_bus, config_store=ConfigStore())
+
+    async def _run() -> None:
+        assert loop.kick_pending_library_import() is None
+
+    asyncio.run(_run())
+    assert fake_bus.emitted_by_type("ipc.error") == []
+
+
+def test_kick_pending_import_clap_failure_emits_ipc_error(
+    fake_bus: FakeBus, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """CLAP install failure surfaces as ipc.error — never a silent dead-end —
+    and the real import is NOT attempted."""
+    _isolate_config_home(tmp_path, monkeypatch)
+    import vibemix.library.model_assets as model_assets
+    from vibemix.runtime.config_store import PENDING_LIBRARY_IMPORT_KEY, ConfigStore
+
+    monkeypatch.setattr(
+        model_assets,
+        "install_models",
+        lambda target, **k: {"ok": False, "results": [{"errors": ["network down"]}]},
+    )
+    ran: list[Path] = []
+
+    async def fake_run(self, source_path: Path) -> None:
+        ran.append(source_path)
+
+    monkeypatch.setattr(SessionLoop, "_run_library_import", fake_run)
+
+    store = ConfigStore(extra={PENDING_LIBRARY_IMPORT_KEY: "/Users/x/Music/crates"})
+    loop = SessionLoop(fake_bus, config_store=store)
+
+    async def _run() -> None:
+        task = loop.kick_pending_library_import()
+        assert task is not None
+        await task
+
+    asyncio.run(_run())
+
+    assert ran == []
+    errors = fake_bus.emitted_by_type("ipc.error")
+    assert errors and "CLAP" in errors[0]["payload"]["reason"]

@@ -3088,6 +3088,15 @@ async def main() -> None:
         session_is_active=_is_live_session_active,
     )
     _session_ipc.register_handlers()
+    # Lane A (2026-06-10) — wizard→live library handoff. The wizard queues the
+    # user's chosen source in config.json; consume it now so a fresh user's
+    # first deck gets a library without re-running anything by hand. Progress
+    # reaches the Viber surface over the existing ipc.library.import_progress
+    # path; failures surface as ipc.error.
+    pending_import_task = _session_ipc.kick_pending_library_import()
+    if pending_import_task is not None:
+        _background_tasks.add(pending_import_task)
+        pending_import_task.add_done_callback(_background_tasks.discard)
     if memory_ingest_enabled:
         boot_ingest_task = asyncio.create_task(_session_ipc._fire_ingest("boot"))
         _background_tasks.add(boot_ingest_task)

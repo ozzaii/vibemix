@@ -61,6 +61,7 @@ from vibemix.runtime.config_store import (
     brain_env_path,
     brain_key_persisted,
     load_config,
+    PENDING_LIBRARY_IMPORT_KEY,
     persist_brain_settings,
     save_config,
 )
@@ -1007,6 +1008,70 @@ class SessionLoop:
         await self.bus.emit(
             json.loads(IpcError.make(reason=reason, original_type=original_type).to_json())
         )
+
+    def kick_pending_library_import(self) -> asyncio.Task | None:
+        """Consume the wizard's queued library source (lane A handoff).
+
+        The wizard sidecar cannot run a multi-minute CLAP embed (it exits on
+        ``ipc.wizard.done``), so it persists the chosen path under
+        ``ConfigStore.extra["pending_library_import"]``. main() calls this
+        once after ``register_handlers()``: pop the marker first (a failing
+        import must not retry on every boot — the Viber library card is the
+        manual recovery), then run the SAME path the ``ipc.library.import``
+        handler uses so progress frames reach the deck UI. Returns the
+        spawned task, or None when no marker is queued.
+        """
+        try:
+            raw_path = self.config_store.extra.pop(PENDING_LIBRARY_IMPORT_KEY, None)
+            if raw_path is not None:
+                save_config(self.config_store)
+        except Exception as exc:
+            log.warning("pending library import check failed: %s", exc)
+            return None
+        if not isinstance(raw_path, str) or not raw_path.strip():
+            return None
+        log.info("pending library import (wizard handoff): %s", raw_path)
+        self._library_import_cancel_requested = False
+        self._library_import_task = asyncio.create_task(
+            self._run_pending_library_import(Path(raw_path.strip()).expanduser()),
+            name="library-import-pending",
+        )
+        return self._library_import_task
+
+    async def _run_pending_library_import(self, source_path: Path) -> None:
+        """Ensure the CLAP model exists, then run the queued import.
+
+        Fresh installs ship without the CLAP ONNX snapshot (intentionally not
+        bundled) — without it every embed fails. ``install_models("clap")``
+        is idempotent: verified-skip when cached, download when missing
+        (huggingface_hub file locks serialize against a concurrent wizard
+        one-shot install). Failures surface as ``ipc.error`` frames — never
+        a silent dead-end.
+        """
+        try:
+            from vibemix.library.model_assets import install_models
+
+            loop = asyncio.get_running_loop()
+            result = await loop.run_in_executor(None, lambda: install_models("clap"))
+            if not bool(result.get("ok", False)):
+                errors = "; ".join(
+                    str(e)
+                    for r in result.get("results", [])
+                    for e in r.get("errors", [])
+                )
+                await self._emit_ipc_error(
+                    "library.import failed: CLAP model unavailable "
+                    f"({errors or 'install failed'})",
+                    "ipc.library.import",
+                )
+                return
+        except Exception as exc:
+            await self._emit_ipc_error(
+                f"library.import failed: CLAP model install error: {exc}",
+                "ipc.library.import",
+            )
+            return
+        await self._run_library_import(source_path)
 
     # ------------------------------------------------------------------
     # Phase 32 / PROFILE-07 — Settings → Profile panel handlers

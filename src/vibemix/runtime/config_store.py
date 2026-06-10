@@ -122,6 +122,12 @@ _PHASE11_FIELDS: tuple[str, ...] = (
     "blackhole_install_seen",
 )
 
+# Lane A (2026-06-10) — wizard → live-runtime library-import handoff. The
+# wizard sidecar queues the user's chosen source under this ``extra`` key;
+# the first flag-less boot (SessionLoop.kick_pending_library_import) pops it
+# and runs the real import. Lives in ``extra`` so every build round-trips it.
+PENDING_LIBRARY_IMPORT_KEY = "pending_library_import"
+
 
 # ---------------------------------------------------------------------------
 # Path resolution

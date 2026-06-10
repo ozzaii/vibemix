@@ -141,6 +141,17 @@ class WizardLoop:
         # exits; the next cold boot seeds VIBEMIX_SKILL_LEVEL from it
         # (apply_persona_config_to_env).
         self.bus.register_handler("ipc.wizard.set_skill", self._on_wizard_set_skill)
+        # Lane A (2026-06-10) — first-run library feed. The wizard sidecar
+        # cannot run a multi-minute CLAP import (ipc.wizard.done kills the
+        # process mid-embed), so "Index this" / the launch auto-ingest queue
+        # a pending-import marker the live sidecar consumes on its first
+        # boot (SessionLoop.kick_pending_library_import). The handler acks
+        # with a terminal import_progress frame so the wizard card resolves
+        # instead of waiting forever on frames that never come.
+        self.bus.register_handler("ipc.library.import", self._on_library_import_queue)
+        self.bus.register_handler(
+            "ipc.library.import_cancel", self._on_library_import_cancel_queue
+        )
 
     async def boot(self) -> None:
         """Emit ``ipc.boot {ready: true}`` so the Tauri shell can render
@@ -495,6 +506,76 @@ class WizardLoop:
         except Exception as e:
             # Non-fatal: the live Settings drawer can re-set skill post-wizard.
             log.warning("wizard.set_skill persistence failed: %s", e)
+
+    async def _on_library_import_queue(self, msg: dict) -> None:
+        """Queue the chosen library source for the live runtime to import.
+
+        The wizard process exits seconds after ``ipc.wizard.done`` — a CLAP
+        embed of a real library takes minutes and would be killed mid-flight.
+        Persist the path under ``extra["pending_library_import"]`` instead;
+        the first flag-less boot runs the real import with live progress on
+        the deck. The terminal ``import_progress`` ack (total=0) resolves the
+        wizard card to its "music feed started" state immediately.
+        """
+        from vibemix.runtime.config_store import (
+            PENDING_LIBRARY_IMPORT_KEY,
+            load_config,
+            save_config,
+        )
+        from vibemix.ui_bus.messages import IpcError, LibraryImportProgress
+
+        payload = msg.get("payload", {})
+        raw_path = payload.get("path")
+        if not isinstance(raw_path, str) or not raw_path.strip():
+            await self.bus.emit(
+                json.loads(
+                    IpcError.make(
+                        reason="library.import rejected: path missing",
+                        original_type="ipc.library.import",
+                    ).to_json()
+                )
+            )
+            return
+        try:
+            store = load_config()
+            store.extra[PENDING_LIBRARY_IMPORT_KEY] = raw_path.strip()
+            save_config(store)
+            log.info("library import queued for live boot: %s", raw_path.strip())
+        except Exception as e:
+            log.warning("library.import queue persistence failed: %s", e)
+            await self.bus.emit(
+                json.loads(
+                    IpcError.make(
+                        reason=f"library.import queue failed: {e}",
+                        original_type="ipc.library.import",
+                    ).to_json()
+                )
+            )
+            return
+        ack = LibraryImportProgress.make(
+            total=0, done=0, current_track_name="", cache_hits=0, cancelled=False
+        )
+        await self.bus.emit(json.loads(ack.to_json()))
+
+    async def _on_library_import_cancel_queue(self, _msg: dict) -> None:
+        """Clear the queued pending-import marker (best-effort)."""
+        from vibemix.runtime.config_store import (
+            PENDING_LIBRARY_IMPORT_KEY,
+            load_config,
+            save_config,
+        )
+        from vibemix.ui_bus.messages import LibraryImportProgress
+
+        try:
+            store = load_config()
+            if store.extra.pop(PENDING_LIBRARY_IMPORT_KEY, None) is not None:
+                save_config(store)
+        except Exception as e:
+            log.warning("library.import_cancel queue clear failed: %s", e)
+        ack = LibraryImportProgress.make(
+            total=0, done=0, current_track_name="", cache_hits=0, cancelled=True
+        )
+        await self.bus.emit(json.loads(ack.to_json()))
 
     async def _prefetch_chatterbox_model(self) -> None:
         """Download Chatterbox weights before the first live session starts.

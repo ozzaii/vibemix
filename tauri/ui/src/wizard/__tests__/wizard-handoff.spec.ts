@@ -117,4 +117,28 @@ describe("wizard → live handoff (lane A)", () => {
     }
     expect(reload).toHaveBeenCalledTimes(1);
   });
+
+  it("auto-ingest queue emit is sent before ipc.wizard.done (FIFO marker handoff)", async () => {
+    const action = {
+      type: "ipc.library.import",
+      payload: { path: "/Users/x/Music/Engine Library/Database2/m.db" },
+    };
+    getDevSurface().setState({
+      currentStep: "library-feed",
+      libraryFeed: {
+        status: "ready",
+        indexed: 0,
+        candidates: [
+          { kind: "engine_database", path: action.payload.path, import_action: action },
+        ],
+      },
+    });
+    renderCurrentStep();
+    clickOpenVibemix();
+    await flush(12);
+    const importIdx = callOrder.indexOf("import:library");
+    const doneIdx = callOrder.indexOf("emit:ipc.wizard.done");
+    expect(importIdx).toBeGreaterThanOrEqual(0);
+    expect(doneIdx).toBeGreaterThan(importIdx);
+  });
 });
