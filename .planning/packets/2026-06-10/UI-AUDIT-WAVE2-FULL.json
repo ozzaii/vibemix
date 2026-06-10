@@ -1,0 +1,823 @@
+{
+ "audits": [
+  {
+   "surface": "Floating pill (tauri/ui/pill.html + src/pill/*) — collapsed face, speaking waveform, expand-on-reaction panel, citation/deck chips, next-suggestion peek",
+   "grade": 6.5,
+   "findings": [
+    {
+     "severity": "P1",
+     "title": "Half the actionable pill face is a dead click zone with a pointer cursor",
+     "file": "tauri/ui/src/pill/index.ts:1987",
+     "evidence": "Live hit-test: with a grounded suggestion + peek open, click at x=60 (label area) dismisses the card and sends next_suggestion.feedback accept over ws:8765; clicks at x=140 and x=200 hit .vmx-pill-wave__bar inside the waveform mount which boot() tags data-no-drag (index.ts:1987), and pillPeekHandlePrimaryActionClick (index.ts:989-1005) rejects any [data-no-drag] target. Meanwhile pill.css:693-695 sets cursor:pointer on the WHOLE .pill__row when data-actionable, so ~140px of the 280px face promises a click that silently does nothing.",
+     "fix_sketch": "Exempt the waveform from the click guard (it is aria-hidden decoration, not a control): either drop data-no-drag from waveEl (it already sits below the drag strip) or add \".vmx-pill-wave\" to an allowlist in pillPeekHandlePrimaryActionClick so the no-drag check only blocks real controls (buttons/chips/card).",
+     "drift_class": "dead-control"
+    },
+    {
+     "severity": "P1",
+     "title": "The 'next ready' notch is 100% clipped — an instrument that can never paint",
+     "file": "tauri/ui/src/pill/pill.css:999-1055",
+     "evidence": "Measured in the live page: notch boundingRect.top=44 == pill height 44, height 3, clippedPx=3, .pill overflow:hidden — and the native window is also 44px collapsed (pill_window.rs:94), so the notch + its 4 ready/glint keyframes (pill-next-notch-ready-a/b, glint-a/b) never render a single pixel in browser OR overlay. The comment calls it 'the tiny more-below signal'; it is dead weight shipping as if it signals.",
+     "fix_sketch": "Move the notch INSIDE the 44px face (e.g. top: 39px so its 3px fits above the bottom edge), or grow set_pill_height by ~4px when data-has-next, or delete the notch + keyframes and let the dot ring (data-intel=knows) be the single 'next ready' signal.",
+     "drift_class": "dead-control"
+    },
+    {
+     "severity": "P1",
+     "title": "Camelot numerics render rose, not gold — --amber is aliased to --brand",
+     "file": "tauri/ui/src/pill/deck-chips.ts:97",
+     "evidence": "Screenshot 05-expand-negative shows deck chip 'a · 8a · 124' with '8a' in rose. .vmx-deck-chip__key--resolved { color: var(--amber) } and tokens.css:288 defines --amber: var(--brand) (#FFA5DF rose). The pink mock contract renders .camelot-chip in var(--gold) with gold-glow (mock lines 707-731) — gold is reserved for exactly heat/Camelot numerics. The pill spends rose on the one glyph the contract says is gold, and the only gold on the surface is misapplied to the peek cue-rail gradient (next-suggestion.ts:246, a timing meter, not a numeric).",
+     "fix_sketch": "Change .vmx-deck-chip__key--resolved to color: var(--gold) (+ optional text-shadow var(--gold-glow)); swap the cue-rail gradient to brand-only so gold stays Camelot/heat-exclusive. Audit the 'gold only for the XP heat number' comment in next-suggestion.ts (no XP number is ever rendered).",
+     "drift_class": "conceptual-misalignment"
+    },
+    {
+     "severity": "P1",
+     "title": "Rose budget blown: 5+ simultaneous rose accents per reaction vs One-Rose/one-breath",
+     "file": "tauri/ui/src/pill/pill.css:736-760,1366-1380,1743-1751",
+     "evidence": "Screenshot 04-expand-bomb shows in one frame: rose waveform bars (up to 14), rose BOMB lead with triple text-shadow glow, rose receipt rule, rose stage rail (expand::after), rose radial bloom (expand::before + reaction::after), rose-bordered citation chips, rose camelot glyph, plus the rose dot. Collapsed speaking already runs two breathing rose elements (blinking dot pill.css:738-748 + lit bars waveform.ts:71-77). The mock's law is one rose accent breathing at a time; the pill's own comments still claim a 'four reserved amber accents' budget, which itself predates the rose contract.",
+     "fix_sketch": "Pick the reaction lead as THE rose element during expand: demote receipt rule and stage rail to silk (they already have silk variants for clean/mid), keep chips glass-edge, and make the dot yield (silk) while the waveform is lit during speaking.",
+     "drift_class": "conceptual-misalignment"
+    },
+    {
+     "severity": "P1",
+     "title": "Glyphs below the ink-20 text floor: silk-40 (and silk-40 × 0.72) body-info text at 9-10px",
+     "file": "tauri/ui/src/pill/deck-chips.ts:93-107",
+     "evidence": "silk-40 composited over --glass-3 ≈ #706D6F ≈ 3.4:1 contrast — below the --ink-20 (#8A858A ≈ 4.9:1) floor — used for load-bearing info glyphs: the honest 'unknown' key/bpm in deck chips (10px mono), the 'decks · unknown' fallback chip further dimmed to opacity 0.72 (pill.css:1804-1814, visible in shot 14 as barely-there), the 'next' micro-label and why-text at 9px (next-suggestion.ts:132,212). The honest-null read is the anti-slop centerpiece; it ships below the floor the contract sets.",
+     "fix_sketch": "Raise the floor: silk-65 for unknown key/bpm and the fallback chip (drop the extra 0.72 opacity), silk-65 for .vmx-next-card__why; keep silk-40 only for true decoration (aria-hidden hairlines).",
+     "drift_class": "missing-token"
+    },
+    {
+     "severity": "P1",
+     "title": "Peek primary action promises 'load suggestion' but nothing is loaded",
+     "file": "tauri/ui/src/pill/next-suggestion.ts:403-409",
+     "evidence": "nextSuggestionPrimaryActionAriaLabel appends 'activate to load suggestion' and the card is role=button; activating it sends next_suggestion.feedback accept (verified on the wire) and the card vanishes with zero confirmation. vibemix cannot load a track into the DJ software — record_feedback (ws_bus.py:1154-1166) pins the pick and feeds the taste loop. The accessible name promises an action the system cannot perform, and the visible result (card silently disappears) reads as dismissal, not acceptance.",
+     "fix_sketch": "Rename the action to what it does: 'activate to accept pick' / 'pin this next'. Add a one-breath acknowledgment (e.g. echo label 'PINNED' for 1.8s reusing the reactionEcho path) so accept is distinguishable from dismiss.",
+     "drift_class": "honesty-bug"
+    },
+    {
+     "severity": "P2",
+     "title": "~100 literal cubic-bezier(0.16,1,0.3,1) duplicating the existing --ease-brand token (+ one stray second bezier)",
+     "file": "tauri/ui/src/pill/pill.css:110",
+     "evidence": "tokens.css:250 defines --ease-brand: cubic-bezier(0.16, 1, 0.3, 1); pill.css inlines that exact literal ~100 times (lines 110-2997) and introduces a one-off cubic-bezier(0.22,1,0.36,1) at pill.css:1750 for the receipt draw. Several animation durations also exceed the 150-250ms band for decorative moves (pill-actionable-face-rail 1180ms:697, echo-afterglow 720ms:121, lens-sweep 680ms).",
+     "fix_sketch": "sed the literal to var(--ease-brand) (or it can't be used inside animation shorthand? it can — custom properties work in transition/animation timing position via var()); fold 0.22,1,0.36,1 into --ease-brand or add a named --ease-draw token; pull decorative-only animations toward the 150-250ms band.",
+     "drift_class": "one-off-implementation"
+    },
+    {
+     "severity": "P2",
+     "title": "Raw RGB color triplets defined outside tokens.css (--pill-fx-* palettes + TS fallbacks + one rgba)",
+     "file": "tauri/ui/src/pill/pill.css:1227-1257",
+     "evidence": "Six tone palettes are literal RGB triplets in pill.css (e.g. --pill-fx-primary: 255 129 218; --pill-fx-secondary: 248 198 120; negative 235 78 70) — colors living outside the token ladder, duplicated AGAIN as hardcoded fallbacks in index.ts:1396-1410 (255,170,224 / 235,197,128 / 255,232,196). Plus rgba(18,14,17,0.9) text-shadow at pill.css:2401 (dev-only demo pads).",
+     "fix_sketch": "Promote the fx palette to tokens.css as channel-triplet tokens next to --brand (e.g. --brand-rgb, --gold-rgb, --led-fault-rgb) and reference them; keep TS fallbacks reading the same tokens via getComputedStyle only.",
+     "drift_class": "missing-token"
+    },
+    {
+     "severity": "P2",
+     "title": "Six dead [data-feedback] selectors — state hook never set by any pill TS",
+     "file": "tauri/ui/src/pill/pill.css:815",
+     "evidence": "pill.css guards label/notch animations with :not([data-feedback]) at lines 815, 821, 1032, 1038, 1044, 1050, but grep over src/pill/*.ts shows no code ever sets data-feedback on the pill root — leftover from a removed feedback-chip UI. The :not() guards are permanently true.",
+     "fix_sketch": "Delete the [data-feedback] terms from the six selectors (or wire the attribute if a feedback-ack state is planned per the 'PINNED' echo above).",
+     "drift_class": "dead-control"
+    },
+    {
+     "severity": "P2",
+     "title": "Keyboard re-activation trap: focused pill ignores Enter for a fresh suggestion until blur/refocus",
+     "file": "tauri/ui/src/pill/index.ts:2108-2114",
+     "evidence": "Reproduced live: accept a pick (closePeekToRoot(true) sets peek=false, root keeps focus) → a NEW suggestion arrives on the wire → press Enter → nothing (card stays hidden, no send; verified sent array unchanged). peek only re-opens on focusin/pointerenter, and an already-focused root never re-fires focusin, so a keyboard-only operator must Tab away and back to act on the next pick.",
+     "fix_sketch": "In the bus listener, when a suggestion with a NEW render key arrives while document.activeElement === root, re-arm peek (state = setPeek(state, true)) — mirrors what pointer users get from still-hovering.",
+     "drift_class": "dead-control"
+    },
+    {
+     "severity": "P2",
+     "title": "Copy register wobble: 'DJ KNOWS' / 'COHOST' / 'LIT AFF' on the collapsed face",
+     "file": "tauri/ui/src/pill/index.ts:1116",
+     "evidence": "Hover with a grounded pick flips the state label to 'DJ KNOWS' (screenshot 10); expand relabels the face 'COHOST' (the rest of the product says Sven); echo labels surface backend slugs as 'LIT AFF' / 'NEG' (move-grade-vocabulary.json). No jargon (livekit/gemini/ws) and no em dashes found — good — but three different naming registers rotate through one 9px label.",
+     "fix_sketch": "Pick one register for the face label: keep the state words (IDLE/LISTENING/SPEAKING) + 'NEXT READY' instead of 'DJ KNOWS', 'SVEN' instead of 'COHOST', and map lit_aff/negative to spoken-register labels ('LIT', 'HOLD') in PILL_MOVE_GRADE_VOCABULARY labels.",
+     "drift_class": "copy"
+    }
+   ],
+   "states_unreachable": [
+    "Native Tauri overlay behaviors (set_pill_height window growth, drag-to-move, vibrancy underlay, DMG transparency fallback) — audited from pill_window.rs + pill.css comments only; browser preview cannot resize the window",
+    "Demo booth controls + pill-demo-stage (requires dev server started with VITE_VIBEMIX_DEMO_NEXT=1; not set on the running server) — judged from code (index.ts:526-630, pill.css:2081-2877)",
+    "Bus disconnected/reconnecting visuals — by design the pill renders NO error UI (62-UI-SPEC honest silence, ws-client.ts); nothing to screenshot, verified silent in code",
+    "Decision-carrying suggestion (decision.emitted/accepted wire shape driving nextDecisionText) — exercised only the transition shape; decision branch judged from next-suggestion.ts:465-476",
+    "sexy/mid tone expand materials and sexy/bomb echo labels — only BOMB/NEG/untoned/CLEAN-long captured; remaining tones judged from pill.css tone blocks",
+    "Low-confidence (--unsure) resolved Camelot dimming below the 0.6 cite-floor — judged from deck-chips.ts:126,157 (not injected)"
+   ]
+  },
+  {
+   "surface": "Click-through overlay (overlay.html + src/overlay/overlay-runtime.ts + src/overlay/overlay-highlight.ts + src-tauri/overlay.rs + src-tauri/djay_ax.rs)",
+   "grade": 7,
+   "findings": [
+    {
+     "severity": "P1",
+     "title": "Ring placement rides a hand-guessed 12-element percentage map, not real element positions — precision the voice implies but the instrument does not have",
+     "file": "tauri/src-tauri/src/djay_ax.rs:54-69",
+     "evidence": "READ: COORD_MAP is hand-mapped to 'djay Pro 5.x default layout @ 1920x1080' with a comment asserting 'proportions hold' on other sizes; query_element_bounds() multiplies those fixed percentages into whatever window rect Quartz returns (djay_ax.rs:86-105). djay's layout is adaptive (library pane, 2/4-deck view, collapsed EQ), so the same percentages land on different controls. When Sven says 'your low EQ on deck A' and the ring draws around the gain knob, the product's own grounding promise is broken by its pointing finger. The AX-precise path is explicitly deferred ('Plan 24-03 will replace this IF the spike verdict comes back PASS' — verdict still pending). Honest mitigations exist: djay-absent/unknown-id/degenerate-rect all no-op rather than draw a wrong ring (overlay.rs:46-49).",
+     "fix_sketch": "Until the AX spike passes, shrink the claim to match the instrument: highlight at deck granularity (one rect per deck half, which the percentage map CAN guarantee) instead of per-knob, or gate per-knob rings behind a verified-layout check (compare djay window aspect/size against the calibration assumption and fall back to the deck rect when it deviates).",
+     "drift_class": "conceptual-misalignment"
+    },
+    {
+     "severity": "P1",
+     "title": "One-off motion curve + warm-white sheen literals inlined in overlay.html while tokens.css already ships the vocabulary",
+     "file": "tauri/ui/overlay.html:71,92-93,107-108,148,158,178",
+     "evidence": "READ: cubic-bezier(0.22, 1, 0.36, 1) is hardcoded 3x (.ring, .scan--x, .scan--y) while tokens.css:251 defines --ease-brand: cubic-bezier(0.16, 1, 0.3, 1) — a forked easing vocabulary that will rot silently when the brand curve shifts. Same pattern for material sheen: rgba(255, 251, 244, 0.26/0.34/0.42) and rgba(0, 0, 0, 0.46) are inlined although tokens.css:325-328 ships the exact warm-white specular family as --lg-spec-hi/--lg-rim-light. Contract rule 2: any hardcoded hex/cubic-bezier outside tokens.css is drift. Notably the COLOR layer got this right (VIS-02 fixed the #f59e0b literal; ring resolves --amber→--brand rose, screenshot-verified) — the motion/sheen layer was missed in the same sweep.",
+     "fix_sketch": "Replace the 3 bezier literals with var(--ease-brand) (or add a dedicated --ease-aperture token to tokens.css if the 0.22/1/0.36/1 feel is deliberate); point the sheen rgba()s at the --lg-spec-*/--lg-rim-light ladder, adding alpha steps to tokens.css if the existing ones are too faint.",
+     "drift_class": "missing-token"
+    },
+    {
+     "severity": "P2",
+     "title": "prefers-reduced-motion rule for .ring is a literal no-op — reduced-motion users still get the full scale-breathing ring",
+     "file": "tauri/ui/overlay.html:209-219",
+     "evidence": "READ: the @media (prefers-reduced-motion: reduce) block sets `.ring { animation-name: focus-aperture; }` — that IS the animation already assigned at line 71, so the rule changes nothing; the scale 0.985→1→1.012 breath still plays. Only the scan sweeps are genuinely stilled (animation: none, static opacity 0.16). The dangling no-op reads like an unfinished intent to swap in a reduced keyframe set (fade-only, no transform). Note a pure `animation: none` would be wrong too — base state is opacity:0, the ring would never appear.",
+     "fix_sketch": "Add a second keyframe set (focus-aperture-reduced: opacity-only, no transform) and point the reduced-motion rule at it; delete the no-op as-is if the breath is deemed acceptable.",
+     "drift_class": "dead-control"
+    },
+    {
+     "severity": "P2",
+     "title": "Scan crosshair + tick rails + beads are decorative HUD theater on a state cue",
+     "file": "tauri/ui/overlay.html:130-208",
+     "evidence": "SAW (ring-amber-default.png, ring-waveform-size.png): beyond the corner ring (which IS the state — 'look here'), the window animates a sweeping horizontal+vertical scanline crosshair, repeating tick rails top/bottom, and two glowing beads. The sweep travels for the full 1300ms default. Contract rule 3: motion conveys state, not decoration — the crosshair sweep conveys nothing the ring doesn't. In its defense it is the surface's only breath (one-breath rule arguably satisfied), it self-extinguishes, and reduced-motion stills it; but stacked with drop-shadow glow on every layer it reads tactical-HUD, a register apart from the pink mock's forged-obsidian quiet.",
+     "fix_sketch": "Keep ring + corners (the state), drop or radically fade the scan sweep and beads (opacity ≤0.12, or remove); keep rails only at waveform-scale windows where they read as measurement, not garnish.",
+     "drift_class": "one-off-implementation"
+    },
+    {
+     "severity": "P2",
+     "title": "Surface still speaks 'amber / CDJ Whisper v5' internally while shipping rose — stale vocabulary across 3 layers",
+     "file": "tauri/ui/overlay.html:21,28-34 (also src/vibemix/agent/dj_cohost.py:710-714 OVERLAY_COLOR='amber', tauri/ui/src/ipc/messages.schema.json:2289 'amber ring')",
+     "evidence": "SAW: ring renders rose #FFA5DF-family (tokens.css:288 re-points --amber→--brand), matching the pink contract — visual is CORRECT. READ: every layer of the chain still names it amber: overlay.html comments cite 'CDJ Whisper v5 amber' and 'mocks use #ff8a3d' (a retired mock), Python's wire constant is OVERLAY_COLOR='amber', the schema $comment promises 'an amber ring'. Zero user-visible copy on this surface (aria-hidden, no text), so this is internal-naming drift only — but the next engineer reading 'amber' in three places will reintroduce #ff8a3d in good faith.",
+     "fix_sketch": "Sweep the comments to 'brand rose (via --amber alias)'; consider renaming the wire value amber→brand with a compat alias in TOKEN_FOR_KEY (overlay-runtime.ts:24-32 already makes this a one-line addition).",
+     "drift_class": "copy"
+    },
+    {
+     "severity": "P2",
+     "title": "Overlay is silently absent on Windows — v1 platform ships the feature dark with no fallback or note",
+     "file": "tauri/src-tauri/src/djay_ax.rs:198-203",
+     "evidence": "READ: the non-macOS shim of find_djay_window_rect() returns None unconditionally, so show_overlay_highlight no-ops on every call on Windows — the [screen:*] citation speaks but never points. CLAUDE.md pins v1 platforms as macOS + Windows. It degrades honestly (nothing renders, nothing lies), so not an honesty bug — but it is a quietly missing limb on half the v1 platform matrix, undocumented outside a Rust module comment.",
+     "fix_sketch": "Either a Win32 EnumWindows port of find_djay_window_rect (same owner-contains-'djay' heuristic), or document the gap where platform feature parity is tracked so it's a decision, not an accident.",
+     "drift_class": "conceptual-misalignment"
+    }
+   ],
+   "states_unreachable": [
+    "Real positioned overlay over a running djay Pro window (needs macOS Quartz + djay running + packaged Tauri shell — dev-server screenshots show the ring content only, not placement accuracy)",
+    "Live fire from an actual [screen:<element_id>] citation during a set (needs Gemini key + live audio; chain verified from code: dj_cohost.py:4549 publish → __main__.py:2880 ipc_bus wired → session/router.ts:104 listener → main.rs:131 command registered)",
+    "Two overlapping rings on different elements simultaneously (per-element window labels, overlay.rs:53-57 — judged from code: second call on SAME element collapses to no-op, different elements would stack windows)",
+    "Windows behavior (judged from code: djay_ax.rs non-macOS shim returns None, overlay never fires)"
+   ]
+  },
+  {
+   "findings": [
+    {
+     "severity": "P0",
+     "title": "Verdict headline calls chapters \"TRACKS\" — lying instrument",
+     "file": "/Users/ozai/projects/dj-set-ai/tauri/ui/src/debrief/debrief-window.ts:108-113",
+     "evidence": "SAW (05-mock-populated.png): gold headline \"5 TRACKS · 47M IN THE MIX\". READ: renderVerdictLine(tldrPanelEl, buildVerdictText(chapters.length, totalDurationS)) — buildVerdictText (tldr-player.ts:117-121) labels its first arg \"N TRACKS\", but the caller passes the CHAPTER count. Backend chapters.py:_is_break_event breaks on TRACK_CHANGE *and* PHASE/LAYER_ARRIVAL/MIX_MOVE/KAAN_SPOKE (≥30s gap), so chapter count > track count on any real set. A 3-track set with phase movement will proudly read \"9 TRACKS\". The component's own docstring promises \"no invented numbers\" — this invents one.",
+     "fix_sketch": "Plumb the real track count: session-loaded frame (or chapter kind==\"track\"/TRACK_CHANGE-origin chapters only) → count those; or change the copy to the truthful noun (\"5 CHAPTERS\" / \"5 MOMENTS\"). Cheapest honest fix: chapters.filter(c => c.kind === \"track\"|| originates from TRACK_CHANGE).length, falling back to the duration-only verdict when unknown.",
+     "drift_class": "honesty-bug"
+    },
+    {
+     "severity": "P0",
+     "title": "Chapter sidebar is a dead control — clicks dispatch an event nobody consumes",
+     "file": "/Users/ozai/projects/dj-set-ai/tauri/ui/src/debrief/components/chapter-list.ts:36-47",
+     "evidence": "READ: chapter buttons dispatch CustomEvent(\"chapter-selected\") with {id, start, citation_event_id}. grep across src/ shows the ONLY listener is the unit test (chapter-list.spec.ts:50); debrief-window.ts wires citation-click, moment-feedback-click and region-clicked but never chapter-selected. SAW (07-mock-chapter-click.png): clicking \"00:00 warm pressure\" changes nothing — no seek, no timeline highlight, no readout change. The buttons have full hover/focus styling (rose border, translateX(2px)) so they promise interaction; the entire left rail (~320px of the layout) does nothing when clicked, in both real and mock mode.",
+     "fix_sketch": "In debrief-window.ts add chaptersEl.addEventListener(\"chapter-selected\", e => { highlight matching .vmx-debrief-region (reuse the deep-link path: dispatch vmx-debrief-deeplink with {eventId: detail.citation_event_id, timestampS: detail.start}) and/or client.sendCitationTooltipRequest(detail.citation_event_id); }). The deep-link machinery in timeline.ts already does scroll+pulse — one dispatch wires it.",
+     "drift_class": "dead-control"
+    },
+    {
+     "severity": "P0",
+     "title": "False \"Debrief crashed unexpectedly\" verdict during normal sidecar boot (warming ≠ fault)",
+     "file": "/Users/ozai/projects/dj-set-ai/tauri/ui/src/debrief/ws-client.ts:87-89",
+     "evidence": "SAW (03-fake-session.png): with 8766 not yet bound, the red banner \"Debrief crashed unexpectedly. Try reopening.\" appears within ~2.5s of load. READ: ws.onerror dispatches CustomEvent(\"error\", {detail: rawWsEvent}); debrief-window.ts:163-175 maps ANY \"error\" event through detail?.reason ?? \"sidecar_crashed\" — a raw WebSocket Event has no .reason, so every transient connect failure renders the crash verdict. This bypasses the carefully built 120s RECONNECT_BUDGET_MS (ws-client.ts:52) and the 10s \"Sven is still putting your debrief together\" grace (debrief-window.ts:180-187) — the code's own comments say the sidecar binds 8766 late on every first run. Same disease as Invariant #5: an expected in-between state declared a fault.",
+     "fix_sketch": "Don't funnel transport onerror into the banner channel: rename the raw dispatch to \"ws-error\" (or drop it — onclose already drives _scheduleReconnect), so showErrorBanner only fires on (a) schema ipc.debrief.error frames and (b) the synthetic {reason:\"sidecar_crashed\"} emitted after the 120s budget genuinely exhausts (ws-client.ts:128-134).",
+     "drift_class": "honesty-bug"
+    },
+    {
+     "severity": "P1",
+     "title": "Cold/empty state: skeletons claim perpetual work that contradicts the terminal error, and teach nothing",
+     "file": "/Users/ozai/projects/dj-set-ai/tauri/ui/debrief.html:39-58",
+     "evidence": "SAW (01-cold-no-session.png, 02-cold-after-7s.png): with no session, banner says \"That recording can't be opened…\" while all three panels keep claiming activity forever: \"Listening back...\", \"Generating voiced summary…\", \"Generating drills…\" (note even the ellipsis glyph is inconsistent: ASCII '...' vs '…'). READ: debrief-window.ts:57-60 shows the invalid_session_dir branch only raises the banner — skeleton copy is never swapped to a terminal state. Timeline empty copy is \"No regions to render.\" (timeline.ts:48) — internal nouns (\"regions\", \"render\"), no path forward. Empty states neither teach (\"finish a set and your review lands here\") nor stop lying about progress.",
+     "fix_sketch": "On any terminal error (invalid_session_dir, budget-exhausted crash), replace the three skeletons with quiet resolved copy (\"Nothing to listen back to yet.\"). Rewrite timeline empty state to teach: \"Play a set with the co-host live and the timeline builds itself here.\" Normalize ellipses to one glyph.",
+     "drift_class": "honesty-bug"
+    },
+    {
+     "severity": "P1",
+     "title": "Gold spent on non-heat numerics — verdict line breaks the gold quarantine",
+     "file": "/Users/ozai/projects/dj-set-ai/tauri/ui/src/debrief/styles/debrief.css:652-665",
+     "evidence": "SAW: \"5 TRACKS · 47M IN THE MIX\" rendered in gold (#e8c47a) with gold-glow text-shadow — the largest warm element on the surface. READ: tokens.css:136 declares gold \"reserved for Camelot / heat / energy-delta numerics\"; the pink mock spends gold only on the Camelot chip, heat chip, and nr-delta hot/warm readouts. Track count and runtime are neither heat nor Camelot. The CSS comment even rationalizes it (\"a heat/energy readout\") — it is a count and a duration.",
+     "fix_sketch": "Re-tone .vmx-debrief-verdict to the rose ladder (color: var(--brand-glow); text-shadow brand-40) or ink-primary mono — keep gold for a real heat/Camelot stat if the verdict ever carries one (e.g. peak energy delta).",
+     "drift_class": "conceptual-misalignment"
+    },
+    {
+     "severity": "P1",
+     "title": "27 raw color literals in debrief.css, including three RETIRED-palette values",
+     "file": "/Users/ozai/projects/dj-set-ai/tauri/ui/src/debrief/styles/debrief.css:48",
+     "evidence": "READ: 27 hardcoded rgba color literals. Worst offenders: rgba(214,207,199,…) at :48, :65, :243, :698 — that's the RETIRED v5 silk #d6cfc7 (tokens.css:16 says silk was promoted to ink #F2EFF1; --silk-025 exists and is used elsewhere in the same file, so the texture grids mix two whites). rgba(255,197,107,0.1) at :1299 (drill-learn hover) — a retired v5 amber-orange that matches NO current token (gold is 232,196,122). rgba(212,65,58,…) at :1370/:1374 — error red bypassing --danger/--led-fault. Plus ~20 rgba(255,165,223,…) literals duplicating the --brand alpha ladder (e.g. :63-65, :73-74, :452-453, :849, :963-977, :988-990, :1014, :1616-1617).",
+     "fix_sketch": "Mechanical sweep: rgba(255,165,223,X) → nearest --brand-XX (ladder covers 03..78); rgba(214,207,199,X) → --silk-025/--silk-06 (ink-based); rgba(255,197,107,0.1) → --gold-glow or --brand-10 depending on intent; rgba(212,65,58,…) → --danger with an alpha companion token if needed.",
+     "drift_class": "missing-token"
+    },
+    {
+     "severity": "P1",
+     "title": "TL;DR meta line clipped mid-glyph at 1440x900 — player well too short for its content",
+     "file": "/Users/ozai/projects/dj-set-ai/tauri/ui/src/debrief/styles/debrief.css:672-689",
+     "evidence": "SAW (10-zoom-tldr.png): \"74s recap queued · local render\" is sliced horizontally — only the top half of the line shows under the verdict, reading as broken text on the surface's HERO panel. READ: .vmx-debrief-tldr grid rows auto/auto/minmax(64px,1fr) (:459-463) hand the player a row shorter than its content (meta + 48px HUD + 42px rail in mock; meta + ~54px native audio in real mode), and .vmx-debrief-tldr-player has align-content:center + overflow:hidden (:681) so overflow crops BOTH edges — the top line dies first.",
+     "fix_sketch": "Let the player row size to content: grid-template-rows auto auto auto with min-height on the panel instead of a 1fr clamp, or align-content:start + overflow:visible and drop the fixed min-height math; verify at 900px-tall viewport in both mock and real (audio element) variants.",
+     "drift_class": "one-off-implementation"
+    },
+    {
+     "severity": "P1",
+     "title": "Evidence tooltip is never anchored — opens at the document tail, not at the clicked chip",
+     "file": "/Users/ozai/projects/dj-set-ai/tauri/ui/src/debrief/debrief-window.ts:158-161",
+     "evidence": "READ: showCitationTooltip(container, payload, anchor?) only sets left/top when anchor is passed (citation-tooltip.ts:41-44). The sole production caller — the citation-tooltip ws listener — calls showCitationTooltip(tooltip, detail) with NO anchor, for both drill-chip clicks and timeline region clicks. #vmx-debrief-tooltip is position:absolute (debrief.css:1417) as the last child of the root, so the \"evidence receipt\" materializes at the bottom of the document flow, potentially below the fold, nowhere near what the user clicked. The grounding receipt — the product's trust centerpiece — plays hide and seek.",
+     "fix_sketch": "Capture the click position in the citation-click / region-clicked dispatches (detail: {citation, x: rect.right, y: rect.top}), stash as pendingAnchor, and pass it when the citation-tooltip frame returns; clamp to viewport.",
+     "drift_class": "one-off-implementation"
+    },
+    {
+     "severity": "P1",
+     "title": "Noun chaos: chapters/regions/TRACKS for one object; TL;DR/voiced summary/recap for another; Debrief vs review across surfaces",
+     "file": "/Users/ozai/projects/dj-set-ai/tauri/ui/src/debrief/components/timeline.ts:103-105",
+     "evidence": "SAW on one screen: sidebar header \"CHAPTERS\", timeline HUD chip \"5 regions\", gold verdict \"5 TRACKS\" — three nouns for the same five objects, simultaneously visible. The recap artifact: panel title \"TL;DR\" (debrief.html:43), skeleton \"Generating voiced summary…\" (:45), meta \"74s recap\" (tldr-player.ts:46), error copy says both \"voiced summary\" (error-banner.ts:24) and \"voiced recap\" (:28). Cross-surface: the in-shell DebriefDock calls the whole thing \"review\" (\"review dock\", \"next review\", \"Open review\", \"review ready\" — DebriefDock.ts:453, 470, 651, 616) while this window titles itself \"Debrief\".",
+     "fix_sketch": "Pick one noun per concept and sweep: chapters (kill \"regions\" in readout + empty copy; verdict per P0 fix), \"recap\" for the voiced artifact (rename TL;DR panel title — it's also internet jargon), and align dock+window on either \"review\" or \"debrief\" everywhere.",
+     "drift_class": "conceptual-misalignment"
+    },
+    {
+     "severity": "P1",
+     "title": "Copy-law violations: em dash in working banner; port numbers and protocol jargon in user-facing errors",
+     "file": "/Users/ozai/projects/dj-set-ai/tauri/ui/src/debrief/components/error-banner.ts:80",
+     "evidence": "READ: showWorkingBanner renders \"Sven is still putting your debrief together — the first pass can take a minute.\" (em dash, banned in UI copy). REASON_COPY ships internals: \"Port 8766 is already taken by another process. Close the other debrief window and reopen.\" (:29-30), \"Received an unknown message kind from the backend.\" (:31-32), \"Its location doesn't match the expected layout.\" (:20-21 — developer-speak; SAW it verbatim in 01-cold-no-session.png). Also debrief.html:6 ships <title>Debrief —</title> (dangling em dash, visible until JS overwrites it).",
+     "fix_sketch": "Em dash → period or comma (\"…together. The first pass can take a minute.\"). port_in_use → \"Another review window is already open. Close it and reopen this one.\" unknown_kind → \"Something arrived I don't understand. Try reopening.\" invalid_session_dir → \"I can't find that set's recording. Open the review from the deck after a session.\" Fix the static title.",
+     "drift_class": "copy"
+    },
+    {
+     "severity": "P2",
+     "title": "Raw internal lesson_id rendered in the drill learn-referral row",
+     "file": "/Users/ozai/projects/dj-set-ai/tauri/ui/src/debrief/components/drills-panel.ts:148",
+     "evidence": "READ: meta.textContent = `${referral.skill_label} · ${referral.lesson_id}` — a machine id (e.g. \"beatmatch-04-b\") printed next to the human label in uppercase mono. The adjacent disabled button copy (\"Lessons land after launch\") is honest, but the id is internal telemetry leaking into product copy.",
+     "fix_sketch": "Show referral.title or course_label instead of lesson_id; keep the id in a data- attribute for QA.",
+     "drift_class": "copy"
+    },
+    {
+     "severity": "P2",
+     "title": "Moment-feedback buttons: \"OFF\" reads as a power toggle, choice can't be unpressed, no sent/failed state",
+     "file": "/Users/ozai/projects/dj-set-ai/tauri/ui/src/debrief/components/drills-panel.ts:96-129",
+     "evidence": "SAW (12-zoom-drills.png): each drill carries uppercase micro-buttons \"RIGHT | OFF | ?\" with no caption — \"OFF\" next to a chip reads like disabling something, not \"this call was off\". READ: clicking sets aria-pressed and fires ws send; re-clicking the same button re-sends and stays pressed (no un-vote), and sendMomentFeedback silently no-ops when the socket is closed (ws-client.ts:103) — the button shows pressed even when nothing was recorded. No loading/error/ack state.",
+     "fix_sketch": "Caption the group (\"Was this call right?\"), allow toggle-off, and only flip aria-pressed after the send path confirms the socket was open (or queue and flush on reconnect).",
+     "drift_class": "one-off-implementation"
+    },
+    {
+     "severity": "P2",
+     "title": "Dead chrome: \"ear\" grid area assigned to nothing, titlebar status chips styled but never rendered, session slot permanently empty",
+     "file": "/Users/ozai/projects/dj-set-ai/tauri/ui/src/debrief/styles/debrief.css:226-229",
+     "evidence": "READ: grid-template-areas declare \"ear ear\" (:229, :1467) but no element sets grid-area: ear — a phantom row. .vmx-debrief-titlebar__status (:131-169, ~40 lines incl. a lit rose first-chip treatment) matches no element in debrief.html or any mount code. debrief-window.ts:40-42 deliberately leaves #vmx-debrief-session empty, so the titlebar's right half is reserved dead space with styling for content that never comes.",
+     "fix_sketch": "Delete the ear row and __status rules, or actually mount a status chip (connection state would be a natural honest tenant — \"connecting / live / done\") and put the session date (not the raw id) in the session slot.",
+     "drift_class": "one-off-implementation"
+    }
+   ],
+   "grade": 4.5,
+   "states_unreachable": [
+    "Real populated state fed by live ws frames on 8766 (session-loaded → chapter-list → near-miss → tldr-audio → drills) — sidecar not running; judged from the ?mock=1 dev render plus code. Mock mode itself never wires citation/region/feedback listeners (mountMockDebrief adds none), so all interaction findings there are code-judged.",
+    "Citation evidence tooltip rendered (needs a citation-tooltip ws round-trip) — anchor bug reported from code only.",
+    "\"Sven is still putting your debrief together\" working banner (connecting >10s grace) — preempted in the dev run by the false crash banner (finding 3).",
+    "Morning-mirror quiet state (no near-miss) and the \"Play line\" friend-audio button (needs friend_line_audio_relative_path payload).",
+    "Drill learn-referral row (needs a drills payload carrying learn_referral).",
+    "Deep-link region highlight pulse (needs Tauri event or deepLinkEventId URL params + live chapter frames).",
+    "Error banner variants: events_missing, session_too_short, tldr/drills_generation_failed, llm_unavailable, port_in_use — copy judged from error-banner.ts only.",
+    "Narrow-viewport (<=1040px / <=680px) responsive layouts — desktop window surface, judged from CSS."
+   ],
+   "surface": "Debrief window (post-session review, second Tauri window :8766) — tauri/ui/debrief.html + tauri/ui/src/debrief/ (window code, components, debrief.css), screenshotted at http://localhost:1420/debrief.html in cold, fake-session, and ?mock=1 populated states (/tmp/uxshots/wave2/debrief/)"
+  },
+  {
+   "findings": [
+    {
+     "severity": "P0",
+     "title": "Invisible, unnamed, keyboard-focusable RESTART button sits on the live deck at all times",
+     "file": "tauri/ui/src/session/SessionLayout.ts:1421",
+     "evidence": "VERIFIED LIVE (shot 16 probe): in running/live mode (data-mode=\"\") `button.vmx-live__s--fault` accepted focus with computed opacity:0, textContent \"\", tabIndex 0. The CSS only gates pointer-events (lines 425-426, 438), which does not block keyboard. Tab from STOP lands on a zero-width empty button; the global *:focus-visible (tokens.css:610) draws around nothing. Enter dispatches click -> cohost.onRetry -> restart_sidecar (render-loop.ts:46-51): an invisible control that restarts the co-host mid-set, with no accessible name when no fault is active.",
+     "fix_sketch": "In applyState, when mode !== \"fault\" set liveFault.disabled = true (or tabIndex = -1) and aria-hidden=\"true\"; re-enable + set aria-label=\"restart co-host\" only in fault mode — mirror the setInputDown() pattern already used for status-row inputs (SessionLayout.ts:2246).",
+     "drift_class": "honesty-bug"
+    },
+    {
+     "severity": "P1",
+     "title": "\"audio input dropped\" fault state is dead-wired — no backend producer can ever fire it",
+     "file": "tauri/ui/src/session/SessionLayout.ts:2240",
+     "evidence": "faultInput() flips the deck to fault only on status.livekit === \"down\", but grep across src/vibemix shows NO emitter ever sends livekit=\"down\": ws_bus.py:1510 hardcodes livekit=\"ok\" in the 1Hz tick (comment: \"never-fault\"), session_loop.py:1695 recheck replies only ok/connecting, wizard.py:620 sends connecting. A real capture loss arrives only as ipc.error audio.capture -> deck notice + armed (ws-bridge.ts:653-662). The deck's primary audio-fault hero (shot 01) is reachable only by injection; if capture silently degrades without the backend self-parking, the deck never shows it.",
+     "fix_sketch": "Either wire a real capture-health probe into the status tick (livekit=\"down\" when the input stream callback stops delivering), or delete the audio branch from faultInput and route ALL capture loss through the audio.capture notice path so UI vocabulary matches what the wire can actually say.",
+     "drift_class": "dead-control"
+    },
+    {
+     "severity": "P1",
+     "title": "Fault with empty transcript renders a blank hero — failure state with no cause or recovery in the body",
+     "file": "tauri/ui/src/session/SessionLayout.ts:1871",
+     "evidence": "SCREENSHOT 04: fresh session + fault = vast empty void; nowText falls through to \"\" (`mode === \"silent\" ? IDLE_HERO_LINE : \"\"` — fault gets empty string). The only cause indicator is the 10px mono \"◂ audio input dropped\" top-right; nothing says it is clickable (title tooltip only), no \"what do I do now\" copy anywhere in the body. This is the documented recurring \"blank hero / always broken\" failure shape, surviving for the no-transcript case.",
+     "fix_sketch": "In fault mode with no nowLine, render a grounded fault hero in the dimmed silent treatment: cause + action (\"Audio input dropped. Check your capture routing, or tap restart.\") — an operating state, not a fabricated reaction, mirroring how IDLE_HERO_LINE handles silent.",
+     "drift_class": "one-off-implementation"
+    },
+    {
+     "severity": "P1",
+     "title": "Idle setup instruction wears the \"earlier\" ghost-mark — current guidance labeled as prior speech",
+     "file": "tauri/ui/src/session/SessionLayout.ts:826",
+     "evidence": "SCREENSHOT 05: at silent idle the readiness ACTION line (\"BLACKHOLE 2CH: SEND DJ APP TO A MULTI-OUTPUT/AGGREGATE...\") renders into ghost g1 (lines 1875-1879), and `.vmx-ghost--g1:not(:empty)::before` unconditionally prefixes \"earlier\" — so the screen literally reads \"EARLIER BLACKHOLE 2CH: SEND DJ APP...\". The mark means prior co-host speech; this instruction was never spoken. A lying label on the exact line that teaches the empty state.",
+     "fix_sketch": "Add `.vmx-session[data-mode=\"silent\"] .vmx-ghost--g1::before { content: none; }` (the idle path is the only one that writes non-transcript text into g1), or give idle lines their own mark (\"set up\").",
+     "drift_class": "honesty-bug"
+    },
+    {
+     "severity": "P1",
+     "title": "Voice-engine-down is labeled \"muted\" — the UI blames the user for an engine failure",
+     "file": "tauri/ui/src/session/SessionLayout.ts:2116",
+     "evidence": "Backend: live_voice_muted = not _local_voice_ready_for_status() (__main__.py:2089) — wire voice=\"muted\" (ws_bus.py:1514) means Chatterbox NOT READY, not user-muted. Deck renders it as idle note \"Voice muted.\" (line 2116), red status-row word \"voice\" with aria \"voice status muted\" (line 2263). A user whose voice engine failed reads that they muted it; the mute button shows unpressed \"mute\" simultaneously, and toggling it cannot recover an engine-down.",
+     "fix_sketch": "Split the wire enum (voice: ok | muted | down) — backend already knows the difference (config muted vs _local_voice_ready_for_status). Until then, copy \"Voice not ready.\" when status.muted is false but voice===\"muted\" (the contradiction is detectable UI-side).",
+     "drift_class": "conceptual-misalignment"
+    },
+    {
+     "severity": "P1",
+     "title": "Crash banner speaks internal jargon at the worst moment: \"VIBEMIX-CORE STOPPED\"",
+     "file": "tauri/ui/index.html:39",
+     "evidence": "SCREENSHOT 13b: heading \"VIBEMIX-CORE STOPPED\" plus body \"vibemix-core stopped responding. The Restart button below will relaunch it.\" (crash-banner.ts:57). 'vibemix-core' is the sidecar binary name — internal jargon banned by the product-register law (product words only). The banner itself is correctly styled (tokens, rose Restart button) and the prod boot path correctly hoists it to body before shedding #wizard-app (main.ts:218-222), so this is purely a copy fix.",
+     "fix_sketch": "Heading: \"SVEN'S ENGINE STOPPED\" (or \"co-host stopped\"); body: \"The co-host engine stopped responding. Restart below — it usually recovers in a few seconds.\" Same fix in reasonMessage(\"ws-unreachable\").",
+     "drift_class": "copy"
+    },
+    {
+     "severity": "P1",
+     "title": "Closed settings drawer leaves invisible focusable controls in the session window tab order (adjacent surface)",
+     "file": "tauri/ui/src/settings/SettingsDrawer.ts:1",
+     "evidence": "VERIFIED LIVE (tab probe on ?dev=session-mock): tabs 4-12 from the deck land on .vmx-settings-drawer__close, three .vmx-rocker__seg (Hype/Coach/Teach), .vmx-picker__row and four .vmx-picker__opt — all while the drawer is CLOSED; the picker options even report pointer-events:none yet take focus. Keyboard focus vanishes off the visible deck for 8+ stops. Flagging here because it breaks keyboard recovery DURING deck failures; the settings auditor owns the fix.",
+     "fix_sketch": "Set `inert` (or aria-hidden + tabindex=-1 subtree) on the drawer root while closed; remove it on open.",
+     "drift_class": "honesty-bug"
+    },
+    {
+     "severity": "P2",
+     "title": "BPM=0 would print \"0.0\" as a measured value (latent lying instrument)",
+     "file": "tauri/ui/src/session/SessionLayout.ts:1922",
+     "evidence": "SCREENSHOT 11: injected bpm=0 renders \"BPM 0.0\" beside a playing track. Only null is treated as missing (`bpmMissing = bpmValue == null`); the wire schema allows 0. Backend currently clamps 0->null at both producers (ws_bus.py:345, session_loop.py:1775) so it is latent today — but the 2026-06 BPM-floor bug shipped exactly this value class, and the UI has no boundary defense.",
+     "fix_sketch": "`const bpmMissing = bpmValue == null || bpmValue <= 0;` — one-line guard matching the bpmPeriodMs guard already in ws-bridge.applySnapshot (line 392).",
+     "drift_class": "honesty-bug"
+    },
+    {
+     "severity": "P2",
+     "title": "Empty BPM/KEY readouts teach only via hover tooltip — bare labels read as broken instruments",
+     "file": "tauri/ui/src/session/SessionLayout.ts:1929",
+     "evidence": "SCREENSHOTS 04/05/12: with bpm/key null the scene line shows the lead hairline + bare \"BPM · KEY\" labels with empty values floating over the hero. The honest cause copy (\"BPM waits for audio from BlackHole 2ch; speaker output alone is not capture proof\") exists but only as title/aria-label (lines 1930-1934, 1959-1962) — invisible on a glance surface mid-set. Contract law: empty states teach. This is the first thing a fresh user stares at during the known cold-start silence.",
+     "fix_sketch": "Render a dim visible sentinel in the value slot (e.g. \"--\" in --text-disabled) plus surface the existing waiting-title as a short visible microcopy once (e.g. swap the track read slot for \"waiting for signal\" while bpm==null and music inactive); keep the tooltip.",
+     "drift_class": "one-off-implementation"
+    },
+    {
+     "severity": "P2",
+     "title": "Deck notice `tone` is a dead style switch — info and error render identically",
+     "file": "tauri/ui/src/session/SessionLayout.ts:2027",
+     "evidence": "data-tone is written on the notice element (line 2027) but no CSS selector anywhere consumes [data-tone]; tone \"info\" has no producer (ws-bridge.applyIpcError always writes tone:\"error\", line 649). SCREENSHOT 08 vs 07: an info notice paints the same amber fault pill as a go-live failure.",
+     "fix_sketch": "Either style `.vmx-deck__notice[data-tone=\"info\"]` (silk border/text, no amber) and use it for the audio.capture \"back on standby\" recovery notice, or delete the tone field from DeckNotice and the dataset write.",
+     "drift_class": "dead-control"
+    },
+    {
+     "severity": "P2",
+     "title": "Muted state ships no resume path — the hotkey hint is projected but never rendered",
+     "file": "tauri/ui/src/session/SessionLayout.ts:2012",
+     "evidence": "SCREENSHOT 09: muted mid-set shows only the lit \"MUTED\" button and a red \"voice\" word in the status row. status.hotkey (\"⌘⇧M\") is projected by render-loop (line 388) but no deck element renders it; the muted-banner component that carried \"PRESS ⌘⇧M TO RESUME\" is intentionally unmounted (muted-banner.ts:11-18). A DJ who hit the push-to-mute hotkey by accident gets no visible route back beyond guessing the button.",
+     "fix_sketch": "Set title/aria on the muted button: `unmute co-host · ${hotkey}`, and print the hotkey in the status-row right slot while muted (the row is already visible in the muted alert state).",
+     "drift_class": "one-off-implementation"
+    },
+    {
+     "severity": "P2",
+     "title": "Below 780px the fault cause label and its restart affordance disappear entirely",
+     "file": "tauri/ui/src/session/SessionLayout.ts:1260",
+     "evidence": "SCREENSHOT 14 (760px, livekit down): `.vmx-live { display: none; }` in the narrow media query removes all three liveness labels including the clickable fault-cause/restart button. The only remaining failure signal is the small red \"AUDIO\" word in the status row; the deck body shows a dimmed hero with no explanation.",
+     "fix_sketch": "In the narrow query keep `.vmx-session[data-mode=\"fault\"] .vmx-live` visible (hide only the live/silent labels), or move the cause text into the deck notice line at narrow widths.",
+     "drift_class": "one-off-implementation"
+    },
+    {
+     "severity": "P2",
+     "title": "Missing-token drift in LAYOUT_CSS: hardcoded easings and brand/fault rgba literals",
+     "file": "tauri/ui/src/session/SessionLayout.ts:306",
+     "evidence": "cubic-bezier(0.16, 1, 0.3, 1) appears verbatim 4x (lines 306, 321, 913, 997) duplicating tokens.css --ease-brand (line 251); cubic-bezier(0.22, 1, 0.36, 1) (line 959) has no token at all. Raw brand-rose alphas rgba(255,165,223,0.11/.075/.16/.115...) at lines 396-412 and 780 bypass the existing --brand-04..78 ladder; raw fault-red glow rgba(212, 65, 58, 0.5) (line 1164) has no --led-fault alpha token. 62 rgba() literals total in the file (most are legitimate machined-shadow blacks).",
+     "fix_sketch": "Swap the four 0.16-curves to var(--ease-brand); add --ease-draw to tokens.css for the receipt rule; replace rose rgba with the nearest --brand-XX rung; add --led-fault-glow: rgba(212,65,58,0.5) to tokens.css and use it here + in muted-banner.ts.",
+     "drift_class": "missing-token"
+    },
+    {
+     "severity": "P2",
+     "title": "Dead fault copy \"◂ screen capture lost\" is unreachable, plus unused escapeHtml",
+     "file": "tauri/ui/src/session/SessionLayout.ts:1854",
+     "evidence": "causeText handles downInput === \"screen\" (lines 1853-1855) but faultInput() can never return \"screen\" — screen=denied was deliberately demoted to badge-only on 2026-05-26 (lines 2230-2235, test-pinned in grounding-failure.spec.ts:92). escapeHtml (line 2286) has no callers since the node-wise rebuild. Dead branches in the fault state machine invite a future regression where someone \"re-wires\" them.",
+     "fix_sketch": "Delete the screen branch from causeText and narrow faultInput's return type to \"audio\" | \"gemini\" | null; delete escapeHtml.",
+     "drift_class": "dead-control"
+    },
+    {
+     "severity": "P2",
+     "title": "Em dashes in shipped UI copy: deck failure notices and the track readout",
+     "file": "tauri/ui/src/session/ws-bridge.ts:626",
+     "evidence": "deckNoticeText builds \"couldn't go live — {reason}\" / \"couldn't stop cleanly — {reason}\" / \"{reason} — the deck is back on standby...\" (ws-bridge.ts:626, 629, 634; visible in SCREENSHOT 07), and the track read renders `${title} — ${artist}` (SessionLayout.ts:1944, visible in shots 09-12). The copy law bans em dashes in UI copy.",
+     "fix_sketch": "Notices: use a colon or period (\"Couldn't go live: audio capture device not found.\"); track read: use the status-row's existing middot vocabulary (`${title} · ${artist}`).",
+     "drift_class": "copy"
+    }
+   ],
+   "grade": 6,
+   "states_unreachable": [
+    "Wire-driven fault states from a real sidecar (livekit=down has NO producer at all — see P1 finding; gemini=down and the >5s grounding fault were exercised via local state injection in the dev mock, screenshots 01-03, not a live backend)",
+    "Crash banner inside the real session window post-hoist — judged from main.ts:218-222 (hoist-before-shed is correct) + styled screenshot on the wizard route (13b); the ?dev=session-mock route deletes the banner DOM (mock.ts root.replaceChildren) so it cannot be shot in situ",
+    "Deck notice via a real ipc.error round-trip (audio.capture / session.start failure) — rendered by injecting SessionState.notice; the wire path applyIpcError->deckNotice->runState=armed judged from ws-bridge.ts:639-663",
+    "Inactive renderMutedBanner component (muted-banner.ts) — intentionally unmounted since 2026-05-14; judged from code only",
+    "Voice-down (wire voice=\"muted\") on a live sidecar with Chatterbox actually unavailable — simulated via state injection (screenshot 09); derivation verified in __main__.py:2089",
+    "TALKING-state fault transitions with real audio + the fault label's onRetry actually invoking restart_sidecar (no Tauri runtime in pure Vite dev)"
+   ],
+   "surface": "DECK FAILURE & EDGE STATES — session surface failure modes (SessionLayout fault/silent/armed states, grounding-failure timer, deck notice, muted, crash banner, sentinels/overflow). Verified positives: Invariant #5 holds end-to-end (idle never faults — code SessionLayout.ts:1821, spec grounding-failure.spec.ts, and screenshot 05 all agree; the >5s flip fires only on an ACTIVE co-host, confirmed live in shot 03); MUTE/STOP stay powered and reachable in every fault state (shots 01-03); long titles/lines clamp cleanly (shot 10); the armed gate + go-live-failed notice is the strongest failure surface (shots 06/07/17, no overlap, recovery named). Screenshots: /tmp/uxshots/wave2/deck-failure/."
+  },
+  {
+   "surface": "Wizard failure paths (tauri/ui/src/wizard/ — permissions denied, driver-fetch/BlackHole install failure, library feed errors/empty, voice model failure, smoke-test failure, completion-write failure). Screenshots: /tmp/uxshots/wave2/wizard-failures/01..11 at http://localhost:1420/?step=*, failure states injected via window.__vibemixDev.",
+   "grade": 4,
+   "findings": [
+    {
+     "severity": "P0",
+     "title": "Driver-fetch Continue arms logically but stays painted disabled (cursor: not-allowed) — the only forward key on a fresh Mac looks dead",
+     "file": "/Users/ozai/projects/dj-set-ai/tauri/ui/src/wizard/step-driver-fetch.ts:238 and :257",
+     "evidence": "checkAllDone() and showFallback() call continueBtn.removeAttribute(\"disabled\") + setAttribute(\"aria-disabled\",\"false\") but never update data-state, and button.ts styles disabled via .cmp-btn[data-state=\"disabled\"] (grey fill, cursor: not-allowed, button.ts:90-97). PROVEN live in screenshot 07-driver-fetch-fallback.png + playwright probe: after the fallback fired, the Continue button reported {dataState:\"disabled\", disabledAttr:false, cursor:\"not-allowed\"} yet clicking it advanced the wizard to library-feed. A fresh Mac without BlackHole (the exact audience of this chain) sees a dead-looking Continue after both success AND failure of the install.",
+     "fix_sketch": "Replace the raw attribute fiddling with the component's own API: import setButtonState from components/button.js and call setButtonState(continueBtn, \"armed\") in both checkAllDone() and showFallback().",
+     "drift_class": "honesty-bug"
+    },
+    {
+     "severity": "P0",
+     "title": "Three fake probe rows light green 'done' on hardcoded setTimeouts — 'Bravoh proxy: reachable' is both a lie and internal jargon",
+     "file": "/Users/ozai/projects/dj-set-ai/tauri/ui/src/wizard/step-driver-fetch.ts:295-298",
+     "evidence": "setTimeout(() => setRowState(\"midi\",\"done\"),200) / (\"tcc\",250) / (\"bravoh\",300) with the comment 'Parallel probe stubs … mark them done after a short tick to simulate'. Screenshot 07 shows all three rows green ('MIDI controller: optional', 'Mic + screen permissions: ready', 'Bravoh proxy: reachable') WHILE the real driver fetch sat in its failed state — nothing was probed. copy.json:28 'Bravoh proxy: reachable' also ships infrastructure jargon to a DJ.",
+     "fix_sketch": "Either delete the three rows (the driver row is the only real instrument) or wire them to real probes via wizard_cmds.rs / ipc.calibration; rename 'Bravoh proxy' to a product word ('voice link' / 'brain', matching status-bar.ts:109-126 vocabulary).",
+     "drift_class": "honesty-bug"
+    },
+    {
+     "severity": "P0",
+     "title": "Smoke-test failure renders the exact success surface — 'READY TO PLAY' + armed CTA when the voice check never played",
+     "file": "/Users/ozai/projects/dj-set-ai/tauri/ui/src/wizard/router.ts:991-1000",
+     "evidence": "runSmokeTest()'s catch sets greetingPlayed:true ('Even on failure, enable the Open vibemix CTA'); SmokeTestState (smoke-test.ts:17-20) has no error field, so the failed render is pixel-identical to success: rose 'READY TO PLAY' heading, pulsing disc, armed [OPEN VIBEMIX]. Confirmed live: in dev the IPC failed instantly and screenshot 09-smoke-test-waiting.png already shows the full success surface (identical to 10). The one step whose whole job is to prove the voice works reports success on failure.",
+     "fix_sketch": "Add a failed: boolean to SmokeTestState set in the catch; render a fault branch — copy like 'couldn't play the voice check. check your output device.' with the LED disc in --led-fault, a real [Retry] button (reuse the existing onReplay path), and keep Open vibemix armed as the escape hatch.",
+     "drift_class": "honesty-bug"
+    },
+    {
+     "severity": "P0",
+     "title": "Smoke-test 3-bar audio meter is a static decoration shipped as an instrument",
+     "file": "/Users/ozai/projects/dj-set-ai/tauri/ui/src/wizard/smoke-test.ts:83-85",
+     "evidence": "Bars hardcoded at heights 40%/70%/55% (.smoke-test__meter-bar:nth-child rules); module header admits '3-bar audio meter at static 50% (Wave 3 mock; Wave 4 wires real RMS)' — Wave 4 never wired it. Visible in screenshots 09/10: the meter glows rose at fixed levels whether audio is playing, silent, or the IPC failed entirely. A meter that shows level with no signal behind it is exactly the contract's 'instrument shows fake data' P0.",
+     "fix_sketch": "Remove the meter (the pulsing disc already carries 'listening') or drive it from real playback RMS over the ws bus during smoke_test playback; never paint fixed bars.",
+     "drift_class": "honesty-bug"
+    },
+    {
+     "severity": "P1",
+     "title": "Failed driver row shows a red LED next to the label 'Checking…' forever",
+     "file": "/Users/ozai/projects/dj-set-ai/tauri/ui/src/wizard/step-driver-fetch.ts:252",
+     "evidence": "showFallback() calls setRowState(\"driver\",\"fail\") with no label argument, so the row keeps its idle copy. Screenshot 07: --led-fault red dot beside 'Checking…' — the instrument says both 'in progress' and 'failed' at once.",
+     "fix_sketch": "setRowState(\"driver\",\"fail\", copy.steps.driver_fetch.fallback_heading) (add a short row_fail string, e.g. 'couldn't auto-install'), keeping the existing fallback card as the detail.",
+     "drift_class": "honesty-bug"
+    },
+    {
+     "severity": "P1",
+     "title": "Library-feed errors pipe raw internal exception text into the rose success chip",
+     "file": "/Users/ozai/projects/dj-set-ai/tauri/ui/src/wizard/router.ts:804-811 (also 866-874, 954-961)",
+     "evidence": "err.message is stored verbatim in libraryFeed.error and rendered by step-library-feed.ts:418 + :664-670 into .wizard-feed-hero__ready — the SAME uppercase brand-rose chip used for 'SOURCE FOUND'. Screenshot 05 shows 'FILE PICKER UNAVAILABLE: WINDOW.__TAURI_INTERNALS__ IS UNDEFINED' in the hero chip; on a real rig ipc/client.ts:121 produces 'ipc timeout: no ipc.library.stats_result within 10000ms'. Failure copy is internal jargon AND wears the success chip's positive styling (no [data-status=error] tone exists for the chip).",
+     "fix_sketch": "Map errors to product copy at the setState site ('couldn't read your library. recheck below.'), log the raw message to console only, and add a fault tone for the chip + card meta when status===\"error\" (ink + --led-fault dot, not brand rose).",
+     "drift_class": "honesty-bug"
+    },
+    {
+     "severity": "P1",
+     "title": "Wizard completion failure falls back to a native window.confirm OS dialog",
+     "file": "/Users/ozai/projects/dj-set-ai/tauri/ui/src/wizard/router.ts:1120-1127",
+     "evidence": "completeWizard()'s catch shows window.confirm(`Setup couldn't be saved (${detail}).\\n\\nRetry now? Cancel to continue without saving…`) — an unstyled OS-chrome dialog carrying raw err detail, entirely outside the forged-obsidian register, with recursive retry. The only catastrophic failure a finishing user can hit is the one surface with zero product styling.",
+     "fix_sketch": "Render an inline fault card on the done surface (reuse wizard-done styles + Button component): serif line 'setup couldn't be saved', detail in mono, real [Retry] / [Continue anyway] keys with full states.",
+     "drift_class": "one-off-implementation"
+    },
+    {
+     "severity": "P1",
+     "title": "Install chain speaks a different LED language: green --led-ok dots and a time-based fault-red stopwatch in a room whose vocabulary is rose + true-fault red",
+     "file": "/Users/ozai/projects/dj-set-ai/tauri/ui/src/wizard/step-driver-fetch.ts:59 (also :77-79, :215-218)",
+     "evidence": "Done rows use background: var(--led-ok) green (visible in screenshot 07), while the same wizard's permissions card deliberately re-toned 'granted' to lit ink + rose dot (permissions-card.ts:75-77,131) and status-bar.ts:58 states 'green is not in the room's vocabulary'. The stopwatch also flips to --led-fault red purely on elapsed>60s while the install is still legitimately running — red without true failure, against the two-hue LED rule. Fallback heading additionally introduces --led-warn yellow (:78, :88-93).",
+     "fix_sketch": "Done dots → var(--brand) + brand-40 glow (match permissions-card granted LED); stopwatch stays neutral mono and only the genuine fail state earns --led-fault; fallback heading in ink with a red dot, not warn-yellow text.",
+     "drift_class": "conceptual-misalignment"
+    },
+    {
+     "severity": "P1",
+     "title": "Em dashes throughout failure/readout UI copy (banned by the copy law)",
+     "file": "/Users/ozai/projects/dj-set-ai/tauri/ui/src/wizard/router.ts:842-843",
+     "evidence": "Shipped strings: 'indexing failed — no tracks were indexed' (router.ts:842-843), 'downloading voice — N MB of N MB' and 'voice download failed — vibemix opens with voice muted' (step-library-feed.ts:50,55), 'Embedding locally on your device — your library never leaves this machine.' (step-library-feed.ts:620), 'tight already — vibemix stays out of the way unless you ask.' (components/skill-level.ts:46). All visible in screenshots 04/05.",
+     "fix_sketch": "Rewrite with periods or the wizard's existing middot: 'indexing failed · no tracks were indexed', 'voice download failed. vibemix opens with voice muted.'",
+     "drift_class": "copy"
+    },
+    {
+     "severity": "P2",
+     "title": "Forewarning + driver-fetch steps drop the wizard's component vocabulary (no PrimaryPanel, no 0N· lead glyph)",
+     "file": "/Users/ozai/projects/dj-set-ai/tauri/ui/src/wizard/step-forewarning.ts:31-37",
+     "evidence": "Both Phase-49 steps render naked on the void with sentence-case wdth-82 headings (step-driver-fetch.ts:32-38 same), while permissions/library-feed/smoke-test wrap in PrimaryPanel with the amber-rose '01·'/'03·' heading index (step1-permissions.ts:169-180). Screenshots 07/11 vs 01: mid-chain the surface visibly changes container language — the failure-prone install steps look like a different, less finished app.",
+     "fix_sketch": "Wrap both steps' bodies in PrimaryPanel + panel-rise, apply wizard-step__heading + withStepLeadGlyph(heading, 2) ('02·' for the audio stop).",
+     "drift_class": "one-off-implementation"
+    },
+    {
+     "severity": "P2",
+     "title": "Hardcoded rose rgba outside tokens.css + placeholder interpolations ('Downloading from vendor…', 'Installed · 0.6.0' regardless of reality)",
+     "file": "/Users/ozai/projects/dj-set-ai/tauri/ui/src/wizard/step-driver-fetch.ts:269,280,286",
+     "evidence": "row_fetching interpolates the literal vendor_host:\"vendor\" → user-visible 'Downloading from vendor…'; row_done hardcodes version:\"0.6.0\" → 'Installed · 0.6.0' even on already_installed of another version. Token drift: smoke-test.ts:58 rgba(255,165,223,…) gradient, permissions-card.ts:46,58 rgba(255,165,223,…)/rgba(255,222,242,…), step-library-feed.ts:360 rgba(26,22,24,…) scrim — all #FFA5DF-family values bypassing the --brand-XX ladder.",
+     "fix_sketch": "Pass real host/version from the companion.fetch.progress payload or drop them from copy ('Downloading installer…', 'Installed'); swap raw rgba to var(--brand-08)/var(--brand-04)/void tokens.",
+     "drift_class": "missing-token"
+    },
+    {
+     "severity": "P2",
+     "title": "Voice-model error sets data-status=\"error\" that no CSS consumes — failure reads in the same silk as normal copy",
+     "file": "/Users/ozai/projects/dj-set-ai/tauri/ui/src/wizard/step-library-feed.ts:571-573",
+     "evidence": "#voice-model-readout gets dataset.status (also repainted by router.ts:921-929 paintVoiceModel) but no [data-status] rule exists in the step's CSS — screenshot 04 shows 'voice download failed — vibemix opens with voice muted' in plain --silk-65, indistinguishable from 'preparing voice'. Related hue nit: the recoverable 'GRANTED? RESTART TO APPLY ↻' affordance rides full --led-fault red (permissions-card.ts:124,221-225) while telling the user they likely already fixed it.",
+     "fix_sketch": "Add .wizard-feed-card__body[data-status=\"error\"] { color: var(--text-primary); } with a small --led-fault dot prefix; consider the restart-pending readout in ink + rose (it is an action hint, not a fault).",
+     "drift_class": "dead-control"
+    }
+   ],
+   "states_unreachable": [
+    "format-check / 48k-probe failure card (copy.json format_check.fail + step-48k-probe.ts): 'format-check' is excluded from KNOWN_STEPS (router.ts:181-189) and step-48k-probe.ts is not imported by the router — deliberately unwired per router.ts:173-175; judged from code only",
+    "Real companion.fetch.progress row states (fetching/verifying/installing) and a genuine BlackHole install failure — require the Tauri runtime + installer script; only the browser-side invoke-rejection fallback was screenshot (07)",
+    "Real-rig library import wipeout with sidecar failure_reason (router.ts:836-844) — injected an analog via __vibemixDev; the live ws import path was not exercised",
+    "window.confirm completion-failure dialog (router.ts:1120) — native OS chrome, not capturable in headless playwright; judged from code",
+    "Legacy components not reachable from the router: uninstall-dialog.ts, components/blackhole-step.ts, components/windows-smartscreen-step.ts, components/controller-probe.ts, components/tcc-permissions.ts (only their specs reference them)",
+    "smoke-test 30s-timeout variant on a rig where the ws bus connects but the greeting hangs — dev failed instantly; same catch path as screenshot 09"
+   ]
+  },
+  {
+   "findings": [
+    {
+     "severity": "P1",
+     "title": "Warming window is indistinguishable from live-listening: deck claims \"listening\" before capture/voice exist",
+     "file": "tauri/ui/src/session/SessionLayout.ts:1417 (+ state.ts:48-64, src/vibemix/runtime/ws_bus.py:796-801)",
+     "evidence": "SAW (06/07/08-warming-*.png, state-injected committed code): immediately after GO LIVE with zero backend status, the deck shows the full running surface with the rail label \"LISTENING\", hero \"Ready for the first move.\", ghost \"Audio checking. Co-host checking.\" READ: StatusFlags.voice is only \"ok\"|\"muted\" (state.ts:53), cohost_status is only LISTENING/TALKING/IDLE (ws_bus.py:796-801), and grep finds ZERO warming/arming strings in session+shell UI — so the up-to-90s Chatterbox warm (backend __main__.py:2550 \"warming Chatterbox while capture arms\"; cold-start silence 2-4min is a known launch bug) renders pixel-identical to \"live and hearing silence\". The user cannot tell deliberate-hold from broken, which is the documented go-live-flail loop.",
+     "fix_sketch": "Add a wire term for the in-between: status tick voice:\"warming\" (or a session phase field arming|warming|live) emitted while wait_until_warm/capture-arm runs; add a fourth .vmx-live label (\"warming the voice\") in the live label stack gated on it, and let armedCaptureText-style copy cover the running-silent deck. Keep Invariant #5 vocabulary calm (holding, never fault).",
+     "drift_class": "conceptual-misalignment"
+    },
+    {
+     "severity": "P1",
+     "title": "GO LIVE emit failure leaves a forever-fake live deck (catch logs to console only)",
+     "file": "tauri/ui/src/session/render-loop.ts:78-81",
+     "evidence": "READ: sessionStartHandler flips runState to \"running\" optimistically then fires ipc.session.start; the .catch only console.warns. If the emit itself fails (ws/sidecar link down — reproduced live in browser dev: console printed \"[render-loop] session.start emitIpc failed: Error: Tauri runtime unavailable\" while the deck stayed on the running surface, shot 04), no snapshot ever reconciles and no ipc.error can arrive, so the deck claims a live \"listening\" session indefinitely. The deckNotice surface that exists for exactly this class (ws-bridge.ts:616-662 reveals the gate + names the cause when the BACKEND rejects start) never fires because the failure happened before the backend. Grounding-fault timer can't save it either (cohostStatus stays IDLE, SessionLayout.ts:1821).",
+     "fix_sketch": "In sessionStartHandler's catch: setSessionState({ runState: \"armed\", deckNotice: { text: \"couldn't go live, the link to the co-host is down. Go live to retry.\", tone: \"error\", ts: Date.now() } }) — mirror of the applyIpcError(ipc.session.start) path. Same for sessionStopHandler.",
+     "drift_class": "honesty-bug"
+    },
+    {
+     "severity": "P1",
+     "title": "Armed gate PERSONA context prints the retired voice name \"hype / Adam\"",
+     "file": "tauri/ui/src/session/SessionLayout.ts:2081",
+     "evidence": "SAW (01-armed-gate-boot.png): the four-item telemetry seam reads PERSONA \"hype / Adam\". READ: syncArmedContext renders `${mood} / ${state.persona.voice}`; the wire default voice is \"Adam\" (src/vibemix/runtime/config_store.py:25), a retired MOSS-era name — the product voice is single-reference local Chatterbox (Sven). The settings drawer already fixed this exact lie: it killed the 14-voice picker as \"a dead control wearing premium material\" and renders \"SVEN · LOCAL VOICE / on-device, no cloud\" (SettingsDrawer.ts:960-975). The gate still promises a voice that will never speak.",
+     "fix_sketch": "Render the drawer's honest identity at the gate: `${mood} / sven local` (or mood only); stop surfacing settings.voice anywhere user-visible until it maps to a real selectable voice.",
+     "drift_class": "honesty-bug"
+    },
+    {
+     "severity": "P1",
+     "title": "Idle/warming setup instructions wear the \"earlier\" spoken-line mark — provenance lie",
+     "file": "tauri/ui/src/session/SessionLayout.ts:826-827 (+1876-1878)",
+     "evidence": "SAW (07/08-warming-*.png): \"EARLIER CONNECT THE CONTROLLER, THEN RECHECK MIDI.\" and \"EARLIER BLACKHOLE 2CH: SEND DJ APP TO A MULTI-OUTPUT/AGGREGATE...\". READ: `.vmx-ghost--g1:not(:empty)::before { content: \"earlier\" }` is the transcript ghost-mark, but at idle applyState reuses the g1 ghost slot for idleReadinessLines().action — a setup instruction the co-host never spoke gets labeled as a prior co-host line. Violates the spirit of citation grounding (never present un-spoken text as spoken).",
+     "fix_sketch": "Suppress the mark when the slot holds guidance: `.vmx-session[data-mode=\"silent\"] .vmx-ghost--g1::before { content: none; }` (the silent branch is exactly when setGhostText carries idle.action), or give guidance its own mono eyebrow (\"setup\").",
+     "drift_class": "honesty-bug"
+    },
+    {
+     "severity": "P2",
+     "title": "Em dashes in shipped UI copy (deck notices + track join)",
+     "file": "tauri/ui/src/session/ws-bridge.ts:626,629,634 (+ SessionLayout.ts:1944)",
+     "evidence": "SAW (09/10-*.png): \"couldn't go live — audio engine could not open BlackHole 2ch\" and \"audio capture failed to open — the deck is back on standby. Go live to retry.\" rendered on the deck. READ: deckNoticeText composes all three notice variants with em dashes; the hero track read joins `${title} — ${artist}`. Product law: no em dashes in UI copy.",
+     "fix_sketch": "Recast with periods/commas: \"couldn't go live. Audio engine could not open BlackHole 2ch.\"; track join with \" · \" (matches the deck's existing separator vocabulary).",
+     "drift_class": "copy"
+    },
+    {
+     "severity": "P2",
+     "title": "One action, two verbs: \"Start\" vs \"Go live\" split across the gate's own copy",
+     "file": "tauri/ui/src/session/SessionLayout.ts:1526 vs 1550,1561",
+     "evidence": "SAW (01-armed-gate-boot.png): lead copy says \"Start when the mix is moving...\", the control says \"GO LIVE\", the note says \"Stands by until you go live.\" The error notices also say \"Go live to retry\" (ws-bridge.ts:634). Same-noun law: one control, one name.",
+     "fix_sketch": "Unify user copy on \"go live\": lead becomes \"Go live when the mix is moving.\" (keep data-action=\"start\" + spec ids as internal vocabulary).",
+     "drift_class": "copy"
+    },
+    {
+     "severity": "P2",
+     "title": "Hardcoded rose rgba tints in the armed-gate CSS bypass the token ladder",
+     "file": "tauri/ui/src/session/SessionLayout.ts:514,550,558,583,646",
+     "evidence": "READ: rgba(176,112,160,0.20/0.35/0.18) (= --brand-press hue, which has no alpha ladder in tokens.css) in the title/em text-shadows and the Start button shadow stack; rgba(255,222,242,0.03/0.07) (#FFDEF2, in no ladder at all) in the ambient field and context seam. The start-gate spec pins \"zero raw hex\" but raw rgba() slips past a hex-only gate.",
+     "fix_sketch": "Mint --brand-press-18/20/35 and a --rose-pale-03/07 pair in tokens.css (or reuse the existing --brand-XX ladder) and swap the five literals; consider widening the legacy-token gate regex to rgba literals in src/session.",
+     "drift_class": "missing-token"
+    },
+    {
+     "severity": "P2",
+     "title": "Start key has no disabled/loading vocabulary and its standby note is near-invisible",
+     "file": "tauri/ui/src/session/SessionLayout.ts:616-684",
+     "evidence": "SAW (01/02/03-*.png): default/hover/focus-visible/active states all present and good (amber-rose focus ring confirmed by keyboard, shot 02); but there is no disabled or loading treatment in the .vmx-armed__start block — the click instantly swaps surfaces, so any slow path shows nothing pressed-and-working. The note \"Stands by until you go live.\" at --silk-22 / 11px mono is barely perceptible on the void (shot 01).",
+     "fix_sketch": "Add [disabled]/[data-busy] styling (dim fill, no hover lift) for future gating, and lift the note one ladder rung (--silk-40) or drop it (the kicker already carries \"ready to listen\").",
+     "drift_class": "one-off-implementation"
+    }
+   ],
+   "grade": 7,
+   "states_unreachable": [
+    "Real sidecar warming sequence (Chatterbox warm + capture arm timing) — pure-Vite dev has no backend; the warming window was rendered by injecting the exact post-click state (runState running, cohostStatus IDLE, status null/connecting/ok) into the committed code path and screenshotting it",
+    "Wire run-state reconciliation (RUN_STATE_HOLD_MS=2500 hold vs stale snapshot, backend pending-activation-counts-as-running __main__.py:2217-2228) — judged from code only",
+    "Stop-during-warm drain (optimistic armed flip while the backend graph drains) — code only",
+    "Shell footer/activation badge during warming (?dev=shell with a live ws; activation-bridge.ts maps IDLE→idle honestly, also lacks any warming term) — code only"
+   ],
+   "surface": "GO-LIVE in-between (armed gate → warming → running) — tauri/ui/src/session/ start-gate + render-loop + SessionLayout armed runstate + ws-bridge run-state reconciliation, plus shell activation-bridge"
+  },
+  {
+   "surface": "FONT-LOADING / FOUC / BOOT FLASH across all 8 HTML entries (wizard, session, shell, pill, debrief, library, learn, mascot, overlay) + Rust window builders",
+   "grade": 7.5,
+   "findings": [
+    {
+     "severity": "P1",
+     "title": "Debrief / Learn / Library windows open platform-white before the dark void paints (white flash on a dark app)",
+     "file": "tauri/src-tauri/src/debrief_window.rs:201",
+     "evidence": "READ (code): all three secondary-window builders set only title/size/decorations — no .background_color(), no .transparent(), created visible immediately: debrief_window.rs:201-207, learn_window.rs:90-100, library_cmds.rs:1381-1392. On macOS the WKWebView canvas defaults to WHITE until first CSS paint, so every 'open Debrief/Learn/Library' pops a white frame on an all-dark (#1A1618) app. The fix already exists elsewhere and was not copied: main window uses transparent:true (tauri.conf.json5:54) + NSVisualEffectView vibrancy applied in setup (main.rs:57/178); pill/mascot/overlay use .transparent(true) (pill_window.rs:217, mascot_window.rs:103, overlay.rs:73). Learn compounds it: learn.html mounts ALL content via JS, so even after CSS the first ~150ms is a featureless black void (SAW: learn-50ms.png pure black vs learn-150ms.png full UI) — white → black void → UI, a three-step boot flash.",
+     "fix_sketch": "Tauri 2.11 supports WebviewWindowBuilder::background_color — add .background_color(Color(0x1A, 0x16, 0x18, 0xFF)) (= --void-0) to the debrief, learn, and library builders; or build .visible(false) and show on the first page_load event. One shared helper so the next window can't drift again.",
+     "drift_class": "one-off-implementation"
+    },
+    {
+     "severity": "P2",
+     "title": "No font preloads in any entry, and learn.html's head comment claims a 'font preload' precedent that exists nowhere",
+     "file": "tauri/ui/learn.html:13",
+     "evidence": "READ: learn.html:13 says it 'mirrors the structural precedent of debrief.html: font preload + tokens.css import' — but grep across all 8 source entries and all dist/*.html finds zero <link rel=preload as=font>; dist only has modulepreload JS hints. All four faces are font-display:swap (tokens.css:58,70,84,92), and the waterfall shows late discovery: tokens.css fetched at 3-5ms, Geist at 7-13ms, InstrumentSerif-Latin lazily at 95ms (only when serif text is first styled). Every window open therefore renders 1-2 frames in system-ui/Georgia before swapping. MEASURED mitigation: under a forced 2.5s font delay, pre/post-swap bounding boxes were pixel-identical on wizard/shell/debrief/session (zero layout shift) and the Georgia→Instrument Serif hero swap is visually subtle (slowfont-session-mock-fallback/swapped.png), so this is polish, not breakage.",
+     "fix_sketch": "Add <link rel=\"preload\" href=\"/fonts/Geist-Variable.woff2\" as=\"font\" type=\"font/woff2\" crossorigin> (+ GeistMono-Variable, InstrumentSerif-Latin) to each entry head before the tokens.css link; correct or delete the learn.html comment so it stops asserting a precedent that was never built.",
+     "drift_class": "copy"
+    },
+    {
+     "severity": "P2",
+     "title": "Wizard titlebar boots showing a fake '00:00' clock until JS takes over (frozen forever if boot JS fails)",
+     "file": "tauri/ui/index.html:26",
+     "evidence": "SAW (wizard-50ms.png): the static placeholder <div class=\"clock\" id=\"wizard-clock\">00:00</div> is painted at first CSS paint, top-right of the titlebar, ~100-150ms before main.ts writes the real time. An instrument showing midnight at every cold boot; and because the value is hardcoded in markup, a failed JS boot leaves a permanently lying clock next to the crash banner.",
+     "fix_sketch": "Ship the div empty with a CSS min-width/ch reserve (no reflow when JS fills it), or visibility:hidden until the first tick handler writes a real value.",
+     "drift_class": "honesty-bug"
+    },
+    {
+     "severity": "P2",
+     "title": "Window titles use em dashes and a dangling 'Debrief —', breaking the register law and the existing '·' title vocabulary",
+     "file": "tauri/ui/debrief.html:6",
+     "evidence": "READ: static <title>Debrief —</title> (trailing em dash, nothing after it — visible in cmd-tab/Mission Control/Windows taskbar until/if Rust retitles); debrief_window.rs:202 .title(format!(\"Debrief — {session_label}\")) and learn_window.rs:95 .title(\"Learn — vibemix\") bake em dashes into shipped UI copy. The register law bans em dashes in UI copy, and the library window already established the product vocabulary without one: 'vibemix · vibe engine' (library_cmds.rs:1387, library.html:6) — so the two em-dash titles are also internally inconsistent.",
+     "fix_sketch": "Rename to the existing '·' vocabulary: 'Debrief · {session}', 'Learn · vibemix'; fix the static debrief.html <title> to plain 'Debrief' so nothing dangles pre-retitle.",
+     "drift_class": "copy"
+    }
+   ],
+   "states_unreachable": [
+    "Real WKWebView white-flash on Debrief/Learn/Library window open — needs a packaged Tauri launch; judged from builder code (no background_color/transparent) + macOS WKWebView default-white behavior; the dev-server Chromium ladder cannot reproduce the native window layer",
+    "Main-window launch frame (transparent window + vibrancy material before first webview paint) — Tauri runtime only; judged from tauri.conf.json5 transparent:true + main.rs apply_main_native_material in setup",
+    "True cold-disk font/css timing in the packaged app — simulated via playwright route delays (fonts +2500ms, tokens.css +1500ms) instead; packaged assets are local so real timings are faster than the simulation",
+    "mascot.html first paint with the Three.js canvas — WebGL overlay window not mountable meaningfully in headless dev; judged from code (transparent root chain + inline override verified present in dist)"
+   ]
+  },
+  {
+   "findings": [
+    {
+     "severity": "P1",
+     "title": "Crash banner shouts the internal binary name 'VIBEMIX-CORE' at the user",
+     "file": "tauri/ui/index.html:39",
+     "evidence": "Static heading reads \"VIBEMIX-CORE STOPPED\"; the body copy at src/crash-banner.ts:57 says \"vibemix-core stopped responding. The Restart button below will relaunch it.\" 'vibemix-core' is the sidecar binary's build name, not a product noun. Same file also ships dev fallbacks: line 59 \"(no error line captured)\" and line 119 dumps the raw Tauri error: `restart failed: ${err}`.",
+     "fix_sketch": "Heading: \"VIBEMIX STOPPED LISTENING\" (or \"Sven lost the room\"); body: \"vibemix stopped responding. Restart below brings it back.\" Replace \"(no error line captured)\" with \"Something stopped and we couldn't read why. Restart usually fixes it.\" Map `err` through reasonMessage instead of interpolating it raw.",
+     "drift_class": "copy"
+    },
+    {
+     "severity": "P1",
+     "title": "One brain, five names: 'brain' / 'AI' / 'AI service' / 'Co-host' / 'coaching brain' for the same subsystem",
+     "file": "tauri/ui/src/session/components/status-bar.ts:305,531",
+     "evidence": "Wizard status bar labels the Gemini LED \"brain\" (src/wizard/components/status-bar.ts:113). The session deck labels the SAME LED \"● AI · DOWN\" (status-bar.ts:305+404) with tooltip \"AI service unreachable. recheck network + key\" (status-bar.ts:531 — 'key' is API-key jargon the packaged user never manages). SessionLayout calls the same down-state \"◂ ai service unreachable\" (SessionLayout.ts:1856) and \"Co-host offline.\" (SessionLayout.ts:2117). Debrief calls it \"the coaching brain\" (debrief/components/error-banner.ts:28). Contract: same nouns everywhere; product word is 'brain'.",
+     "fix_sketch": "Pick 'brain' everywhere the wizard already uses it: badge \"● BRAIN · DOWN\", tooltip \"brain unreachable. check your connection\", fault line \"◂ brain unreachable\", idle note \"Brain checking.\" Drop 'key' from customer copy (proxy build has no user key).",
+     "drift_class": "conceptual-misalignment"
+    },
+    {
+     "severity": "P1",
+     "title": "Voice-link noun drift: 'voice link' / 'LINK' / 'Realtime link' / 'realtime channel' / 'Audio'",
+     "file": "tauri/ui/src/session/components/status-bar.ts:299,530,549",
+     "evidence": "Wizard calls the LiveKit LED \"voice link\" (wizard/components/status-bar.ts:110). Session deck badge says \"● LINK\" (status-bar.ts:299), hover tooltip says \"Realtime link\" (status-bar.ts:549), and the error copy says \"vibemix link to the realtime channel dropped. click to reconnect\" (status-bar.ts:530) — 'realtime channel' is LiveKit-speak. SessionLayout's idle notes call the same status \"Audio connecting.\" (SessionLayout.ts:2110 area, idleReadinessLines).",
+     "fix_sketch": "Standardize on 'voice link': badge \"● VOICE LINK\", tooltip \"voice link\", error \"voice link dropped. click to reconnect\", idle note \"Voice link connecting.\"",
+     "drift_class": "conceptual-misalignment"
+    },
+    {
+     "severity": "P1",
+     "title": "Viber failure cards instruct the user in Codex jargon",
+     "file": "tauri/ui/src/library/index.ts:197-207",
+     "evidence": "User-facing AGENT_FAILURE_COPY next-steps read: \"Install Codex, run codex login, then run this brief again.\" (197), \"The agent exists, but it cannot use the signed-in Codex session.\" (201), \"Run codex login, then retry the same brief.\" (202), \"Enable the Codex shell bridge, then reopen vibemix and retry.\" (207). Contract bans codex as internal jargon; 'shell bridge' is a VIBEMIX_CODEX_ALLOW_SHELL env flag surfacing as a user action with no button to do it. Also noun drift inside the same map: 'Viber' vs 'the agent' vs 'the set-prep agent'.",
+     "fix_sketch": "Lead with the product story: \"Viber's brain isn't signed in on this machine.\" Keep the literal command only as a secondary mono line if it is genuinely the BYO path (e.g. \"In Terminal: codex login\"), or better, link a help row that owns the setup. Use 'Viber' as the only subject in all nine cards.",
+     "drift_class": "copy"
+    },
+    {
+     "severity": "P1",
+     "title": "Em dashes ship in UI copy across at least 11 strings (explicit contract ban)",
+     "file": "tauri/ui/src/session/ws-bridge.ts:626-634",
+     "evidence": "Deck notices: \"couldn't go live — ...\" (626), \"couldn't stop cleanly — ...\" (629), \"... — the deck is back on standby.\" (634). Also: debrief/components/error-banner.ts:80 \"Sven is still putting your debrief together — the first pass can take a minute.\"; learn/lesson/skip-button.ts:48 \"at least 45 seconds per lesson — that's the floor.\"; learn/SkillWall.ts:182 \"Your skills light up as you learn — and earn their stars in a live set.\"; wizard/router.ts:842 \"indexing failed — ...\"; wizard/step-library-feed.ts:50,55,620; wizard/components/skill-level.ts:46; library/index.ts:1740; shell/Sidebar.ts:87 aria-label \"All sessions — open debrief\". (Bare \"—\" as a numeric blank in timecode/BPM readouts is a placeholder glyph, not prose; not counted.)",
+     "fix_sketch": "Replace with periods, commas, or the house ' · ' separator: \"couldn't go live. ...\", \"Sven is still putting your debrief together. The first pass can take a minute.\", \"at least 45 seconds per lesson. that's the floor.\", aria \"All sessions, open debrief\". One mechanical pass; add a vitest copy-lint that greps shipped string literals for U+2014.",
+     "drift_class": "copy"
+    },
+    {
+     "severity": "P1",
+     "title": "Raw backend error strings pass through verbatim to user surfaces",
+     "file": "tauri/ui/src/session/ws-bridge.ts:626-635",
+     "evidence": "deckNoticeText only strips the \"session.start failed:\" prefix then shows the remaining Python reason raw on the deck; default branch `return reason` shows it completely unfiltered. Same pattern: library/index.ts:2994 puts `engine error: ${msg}` straight into a Viber chat turn; wizard/router.ts:842 shows `${progress.failure_reason}` raw; crash-banner.ts:119 shows `${err}` raw. Backend reasons carry tracebacks, module paths, and jargon the contract bans.",
+     "fix_sketch": "Add a reason→copy map (mirror debrief's REASON_COPY pattern, error-banner.ts:15) with a safe generic fallback (\"something failed on the way up. try again, and check Settings > Troubleshoot if it repeats\"); log the raw reason to ui.log only.",
+     "drift_class": "one-off-implementation"
+    },
+    {
+     "severity": "P1",
+     "title": "Dev-memo tooltip leaks an internal cache path in Settings",
+     "file": "tauri/ui/src/settings/components/learn-group.ts:183",
+     "evidence": "resetRow.title = \"wipes ~/.cache/vibemix/learn-progress.json; confirm dialog gates the action\" — an engineering note shipping as the hover tooltip on the reset-learn-progress row. The visible secondary copy right below it (line 192, \"clears all completed lessons. cannot be undone.\") already says it correctly.",
+     "fix_sketch": "Drop the title attribute entirely, or set it to the same user sentence: \"clears all completed lessons. cannot be undone.\"",
+     "drift_class": "copy"
+    },
+    {
+     "severity": "P1",
+     "title": "Sprint language and raw lesson IDs in the debrief drills referral",
+     "file": "tauri/ui/src/debrief/components/drills-panel.ts:144,148,152",
+     "evidence": "Disabled button tooltip: \"Learning engine is parked for launch.\" (144) — 'parked for launch' is roadmap vocabulary. Meta line shows `${referral.skill_label} · ${referral.lesson_id}` (148) so users see internal ids like \"course_2_transitions\". Line 152: \"Practice routing is parked for launch. ${referral.reason}\" appends a raw backend reason. Ironically shell/app.ts:98 has a comment banning exactly this (\"never internal sprint vocabulary\").",
+     "fix_sketch": "Tooltip: \"Lessons aren't in this release yet.\" Meta: skill_label only. Reason line: \"Practice for this lands in a later release.\" without the raw reason.",
+     "drift_class": "copy"
+    },
+    {
+     "severity": "P1",
+     "title": "Three surfaces tell three different stories about whether lessons exist",
+     "file": "tauri/ui/src/shell/surfaces.ts:86-89",
+     "evidence": "Shell Learn empty state: \"No lesson running. Pick a course. I'm watching your hands on the controller, beat for beat.\" (invites use now). Shell tease in app.ts:107-112: \"I'll teach when I can hear you. Lessons open when your practice audio and your controller give me real proof\" (conditional). Debrief drills button: \"Lessons land after launch\" (not available at all). With Learn parked, the surfaces.ts copy promises an action that cannot be taken.",
+     "fix_sketch": "Make the parked truth the single story: reuse the app.ts tease copy as the Learn surface empty state while LEARN is parked, and align the drills button to the same noun (\"Lessons\") and the same promise.",
+     "drift_class": "conceptual-misalignment"
+    },
+    {
+     "severity": "P1",
+     "title": "Debrief error copy speaks in ports, processes, and message kinds",
+     "file": "tauri/ui/src/debrief/components/error-banner.ts:29-32",
+     "evidence": "\"Port 8766 is already taken by another process. Close the other debrief window and reopen.\" and \"Received an unknown message kind from the backend. Try reopening.\" — port numbers, 'process', 'message kind', 'backend' are dev vocabulary; the recovery action (close the other window) is the only part the user needs.",
+     "fix_sketch": "port_in_use: \"Another debrief window is already open. Close it and reopen this one.\" unknown_kind: \"The review hit something it didn't understand. Try reopening.\"",
+     "drift_class": "copy"
+    },
+    {
+     "severity": "P1",
+     "title": "Library window status copy uses engine-room nouns: 'runtime fault', 'engine error', 'library worker'",
+     "file": "tauri/ui/src/library/index.ts:235,1179,1696,2611",
+     "evidence": "\"Viber hit a runtime fault\" (235), error panel title \"engine error\" (1179, 2611), \"Waiting for the library worker\" (1696). Also library.html:27 idle LED label \"embedding / loading\" — 'embedding' is the CLAP pipeline term; the same window already owns the good phrasing \"How vibemix listens to each track\".",
+     "fix_sketch": "\"Viber hit a wall mid-run\" / \"something broke\" for the error title; \"Waiting for the library\" or \"Library warming up\"; LED label \"listening / loading\" or \"reading your tracks\".",
+     "drift_class": "copy"
+    },
+    {
+     "severity": "P2",
+     "title": "Same-rank labels flip between ALL CAPS, Title Case, and sentence case",
+     "file": "tauri/ui/src/settings/SettingsDrawer.ts:808-812",
+     "evidence": "Inside one drawer: lens picker labels \"Hype / Coach / Teach\" (Title Case, 809-811) but mascot mood picker labels \"COACH / TEACH\" (caps, settings/components/mascot-group.ts:65-66). Learn window: \"COURSE 3 · PLAY-MODE\" vs \"Course 3 · Play Mode\" — same course, hyphenated in one rank and spaced in the other. Wizard CTAs mix \"LAUNCH\" / \"Continue\" / \"Let's go\" / \"Index this\". library.html buttons mix \"Install Required Models\" (Title Case + 'Models' jargon) against \"Build set\" / \"Curate a set\" (sentence case).",
+     "fix_sketch": "One rule: caps for hardware-register labels (pickers, badges), sentence case for buttons and prose. Rename \"Install Required Models\" → \"Install listening models\" or \"Set up local AI\" in sentence case; unify \"Play Mode\" spelling.",
+     "drift_class": "conceptual-misalignment"
+    },
+    {
+     "severity": "P2",
+     "title": "Screen subsystem has four names: 'screen' / 'SCREEN RECORDING' / 'Screen capture' / 'Screen proof' / 'screen grounding'",
+     "file": "tauri/ui/src/settings/components/help-group.ts:337",
+     "evidence": "Settings help row tooltip: \"vibemix watches djay's window. launch djay to enable screen grounding\" — 'grounding' is the internal anti-slop term. SessionLayout.ts idle note says \"Screen proof denied.\", session tooltip says \"Screen capture\" (status-bar.ts:551), wizard says \"SCREEN RECORDING\". Also brand casing drift: \"DJAY PRO RUNNING?\" (caps) vs lowercase \"djay\", and \"blackhole\" lowercase in wizard banner body (wizard/components/blackhole-banner.ts:110) vs \"BlackHole\" everywhere else.",
+     "fix_sketch": "Pick 'screen' + one verb family (\"screen watching\" or \"screen proof\") and use it in all four places; keep third-party brands in their own casing (djay Pro, BlackHole) at every rank.",
+     "drift_class": "conceptual-misalignment"
+    },
+    {
+     "severity": "P2",
+     "title": "Dev-memo tooltip on voice badge: 'model row missing'",
+     "file": "tauri/ui/src/shell/VoiceReadinessBadge.ts:92",
+     "evidence": "title = \"Local voice status unavailable: model row missing\" — 'model row' is the LibraryModelsResult table row, an implementation detail, shown on hover of the shell voice badge.",
+     "fix_sketch": "\"Can't read voice setup right now. Open Viber to check the local voice.\"",
+     "drift_class": "copy"
+    },
+    {
+     "severity": "P2",
+     "title": "'COHOST' vs 'co-host' spelling drift and 'Bravoh proxy' in wizard probe copy",
+     "file": "tauri/ui/src/session/components/picker.ts",
+     "evidence": "Session picker option renders \"COHOST\" (one word) while every prose string spells it \"co-host\" (\"mute co-host\", \"stop co-host\", \"Co-host Sven\", \"Co-host offline.\"). Wizard driver-fetch copy.json ships \"Bravoh proxy: reachable\" — 'proxy' is infrastructure vocabulary (the API-key-protection layer), shown during onboarding. Window titles also drift: debrief.html:6 is a dangling \"Debrief —\" while learn.html is \"Learn — vibemix\".",
+     "fix_sketch": "Picker label \"CO-HOST\"; copy.json bravoh_probe → \"Bravoh link: reachable\"; debrief title \"Debrief · vibemix\", learn \"Learn · vibemix\" (the · separator is already the house style).",
+     "drift_class": "copy"
+    }
+   ],
+   "grade": 6.5,
+   "states_unreachable": [
+    "Live crash banner with a real sidecar crash reason (judged reasonMessage map + index.html DOM from code)",
+    "Deck error notices (ipc.session.start/stop, audio.capture failures) — need a live backend failure to render; judged from ws-bridge.ts deckNoticeText",
+    "Viber agent failure cards (codex_not_installed / auth / timeout / starvation) — need a failing Codex run; judged from library/index.ts AGENT_FAILURE_COPY",
+    "Debrief error banners (port_in_use, llm_unavailable, unknown_kind) — need the 8766 sidecar in a failure state; judged from error-banner.ts REASON_COPY",
+    "Learn window lesson flow + skip-button lock tooltip — Learn is parked; judged from learn/ source",
+    "VoiceReadinessBadge degraded tooltips — need a models-query failure; judged from code",
+    "Pill demo deck/reaction strings — confirmed dev-gated (DEV + VITE_VIBEMIX_DEMO_NEXT=1, pill/index.ts:441), honest in production"
+   ],
+   "surface": "sven-voice-copy-consistency (text-only sweep of tauri/ui/src/**/*.ts user-visible strings + 8 static HTML entries)"
+  }
+ ],
+ "critic": {
+  "gaps": [
+   "QUIT-GUARD + TWO-STEP TRAY QUIT — zero coverage, and it hides a likely P0: tauri/ui/src/session/quit-guard.ts:37-40 keys isLiveSessionActive() off `status.livekit === \"ok\"`, but src/vibemix/runtime/ws_bus.py:1503-1510 hardcodes livekit=\"ok\" on the ~1Hz status tick (comment at :126-128: it can never go down). So the styled 'STILL LIVE' confirm (quit-guard.ts:61) fires on tray-quit even at a fully idle deck — a lying instrument at the exact moment of exit. Also unaudited: the Rust 1.5s no-ack force-exit fallback racing the dialog mount (main.rs:281-301 + quit-guard.ts:104-120).",
+   "SYSTEM TRAY surface (tauri/src-tauri/src/tray.rs) — icon state machine (idle/live/thinking/error, derive_tray_state :421, 2Hz throttle), menu copy, and left-click wake were never audited. Notably there is NO warming state in the tray vocabulary, so during the ~90s warmup the tray either claims live or claims idle — same misreport the go-live auditor found on the deck, never checked here.",
+   "SETTINGS DRAWER interior — only adjacent findings landed (tab-order leak, two dev-memo tooltips). Unaudited: hotkey-capture.ts conflict/failure states, recording-browser/recording-row empty+error states, whether the voice control displays the retired default 'Adam' (it arrives on the wire: ws-bridge.ts:146 WireSettingsStatePayload.voice), and the optimistic-repaint contract CLAUDE.md mandates for every settings control.",
+   "MASCOT overlay — src/mascot/ (~30 modules: mood, morph-controller, focus-layer, particle-organism, perf-observer, chrome.css) + mascot.html + mascot_window.rs: zero visual/state audit (the FOUC auditor explicitly skipped it as WebGL-unmountable). Perf-degradation visuals, crossfade policy, and mood consistency with the tray (tray.rs listens to ipc.mascot.mood_change :485) are all unverified.",
+   "LEARN window failure states — learn.html ships and learn_window.rs builds the window even though Learn is parked behind LEARN_ENABLED; only copy-level findings exist. Lesson-flow failure, skill-wall empty states, and the practice-audio gate surface (Invariant #3's user-visible half) uncovered.",
+   "LIBRARY window beyond strings — wave2 swept only copy. Ingest progress states (ipc.library.import_progress → bar at library/index.ts:1633), import wipeout/failure_reason rendering, Viber tool-call animation, and the chat-scroll bug from the 2026-06-06 meeting teardown were never re-verified at HEAD.",
+   "UPDATER prompt (tauri/src-tauri/src/updater.rs, plugin dialog:true) — native OS update dialog never audited; it institutionalizes the exact native-dialog pattern the wizard auditor flagged as P1 (router.ts:1120 window.confirm), so the product currently has no single rule for native chrome.",
+   "VOICE NAME end-to-end — 'Adam' is not a stale UI string: src/vibemix/voice_presets.py:6 sets DEFAULT_VOICE=\"Adam\" and config_store.py:253 persists it, so the ElevenLabs-era name is the product-wide persona voice label in a Chatterbox-only product. No auditor traced it past the armed gate (SessionLayout.ts:826/2341, state.ts:253).",
+   "WINDOWS parity of the wizard install chain — step-driver-fetch is BlackHole/macOS-specific; nobody checked what the wizard renders on the v1 Windows platform (WASAPI path; windows-smartscreen-step.ts is unrouted legacy). Only the overlay's Windows darkness was flagged.",
+   "IN-DECK 'NEXT UP' rail / grounding feed — explicitly listed as remaining work in the fable-pass ledger; the pill auditor covered only the floating pill window, so the session-deck suggestion surface fell between the two waves."
+  ],
+  "contradictions": [
+   "GOLD LANE BUILT THREE WAYS: tokens.css:137-139 already ships the canonical --gold #e8c47a ladder ('CANONICAL: gold heat — Camelot / heat / energy-delta numerics', matching mock :67). Yet pill deck-chips.ts paints resolved Camelot with --amber, which tokens.css:289 aliases to rose; and debrief.css hand-rolls raw gold literals instead of the token. One contract concept, three implementations; the two per-surface auditors each saw half and neither saw that the correct token already exists.",
+   "ONE ACTION, TWO VERBS ACROSS SURFACES: the armed gate's key says 'Start' (SessionLayout.ts:1526) while the audio.capture deck notice in ws-bridge.ts:634 instructs 'Go live to retry' — recovery copy names a control that does not exist under that name on the same deck. Two auditors flagged the halves separately, never the join.",
+   "NATIVE OS DIALOG POLICY IS INCOHERENT: wizard completion-failure window.confirm flagged P1 (router.ts:1120-1127), but quit-guard.ts deliberately uses native beforeunload confirm and updater.rs uses the plugin's native dialog. Three surfaces share the pattern; only one was condemned.",
+   "livekit=\"ok\" MEANS THREE THINGS: ws_bus.py emits it hardcoded-ok forever (:126-128, :1510). The deck reads it as 'capture armed' (armedCaptureText), quit-guard reads it as 'live session active' (quit-guard.ts:37), and SessionLayout.ts:2240 treats livekit=\"down\" as a reachable audio fault. One never-changing wire bit is simultaneously a dead fault input on one surface and a false STILL-LIVE trigger on another.",
+   "WARMING IS UNNAMED EVERYWHERE, CONSISTENTLY: deck claims 'listening' during the ~90s warmup (go-live auditor), shell activation-bridge has no warming term (their unreachable note), and tray.rs has no warming icon state (idle/live/thinking/error only, :644). Three surfaces independently misreport the same window; per-surface fixes will produce three different warming vocabularies unless coordinated.",
+   "EM-DASH LAW IS CROSS-LANGUAGE: copy auditors swept only TS/HTML, but Rust bakes em dashes into window titles (debrief_window.rs:213 `format!(\"Debrief — {session_label}\")`). A tauri/ui-only sweep ships the violation anyway.",
+   "PROVENANCE GHOST-MARK FOUND TWICE AS TWO FINDINGS: deck-failure auditor ('idle setup instruction wears the earlier ghost-mark', SessionLayout.ts:826) and go-live auditor ('provenance lie', :826-827/1876-1878) filed the same bug from the same lines under two severities — should converge to one fix, not two tickets."
+  ],
+  "suspect_findings": [
+   "Deck P0 'Invisible, UNNAMED, keyboard-focusable RESTART button' — 'unnamed' is FALSE: SessionLayout.ts:1422 sets title=\"restart co-host\" (an accessible name). The dangerous half is real and verified: the fault label is a <button> hidden only by opacity:0 + pointer-events:none (LAYOUT_CSS :420-438), never disabled, so keyboard Enter fires onRetry (restart) on a live deck. Keep the P0, correct the description.",
+   "Go-live P1 'GO LIVE emit failure leaves a FOREVER-fake live deck' (render-loop.ts:78-81) — overstated: ws_bus.py:93-105 emits schema-valid ipc.session.snapshot at ~15Hz carrying authoritative run_state, and ws-bridge reconciles after the 2.5s click-hold. A forever-fake deck requires the bus itself down, which the link-status surface already shows, and reconnect self-corrects. Real residue is only 'failure is console-only' — P2.",
+   "Pill P1 'Camelot rose not gold, --amber aliased to --brand @ deck-chips.ts:97' — substance correct, root-cause class wrong: this is not a token-ladder gap; tokens.css:137-139 already defines canonical --gold. The drift class is 'legacy alias trap' (author reached for --amber, which :289 silently rosed). One-line token swap, and the finding's fix sketch should say so.",
+   "Pill P1 'next-ready notch is 100% clipped — can never paint' — directionally right, absolutely wrong: the notch sits at top:43px height 3px inside a 44px native window (pill_window.rs:94 PILL_COLLAPSED_H), so a ~1px bottom-center sliver can paint (corner radius doesn't cut the center). 'Illegible instrument' yes; 'can never paint' no.",
+   "Deck P1 ''audio input dropped' fault is dead-wired' — true but mis-weighted: ws_bus.py:126-128 documents that livekit never flips down BY DESIGN ('no honest audio-drop signal'). The UI branch is unreachable dead code that can never lie to a user — that is P2 cleanup, not a P1 visible-in-normal-use contract violation.",
+   "Wizard P0 'smoke-test failure renders the exact success surface' — confirmed real, but it is a commented deliberate dead-end-avoidance choice (router.ts ~991: 'Even on failure, enable the Open vibemix CTA'). The fix is honest failure copy that keeps the CTA armed, not blocking the path; an auditor fix that re-gates the wizard would regress the product bar ('no dead ends').",
+   "Debrief P0 'verdict calls chapters TRACKS' — UNDERstated, if anything: chapters.py:168 emits kind=\"phase\" chapters, so buildVerdictText (tldr-player.ts:117, fed chapters.length at debrief-window.ts:108-113) counts PHASE chapters as 'N TRACKS'. The lie is structural, not just a label.",
+   "Pill P1 'half the face is a dead click zone @ index.ts:1987' — line anchor does not match HEAD (1987 sits in the next-suggestion mount scaffolding, not a click-zone). Substance unverified either way; re-pin the anchor before anyone fixes against it. Several wave2 anchors may share this drift since the tree is mid-flight."
+  ],
+  "top_fixes": [
+   "ONE HONEST RUN/CAPTURE STATE ON THE WIRE, WITH 'WARMING' NAMED. Replace the hardcoded livekit=\"ok\" tick (ws_bus.py:1503-1510) with a real armed/warming/capturing/live signal and key four consumers off it: deck mode + armed gate (kills the warming-looks-live P1), tray icon state (tray.rs derive_tray_state), shell activation badge, and quit-guard's isLiveSessionActive (kills the false STILL-LIVE confirm at idle). This single backend truth retires the go-live flail class, the dead audio-fault branch, and the unnamed-warming contradiction across three surfaces at once — highest honesty-per-line in the audit.",
+   "GOLD-LANE TOKEN SWAP + ALIAS QUARANTINE. Point pill deck-chips.ts resolved-Camelot at the existing --gold/--gold-glow (tokens.css:137-139) instead of --amber, replace debrief.css's raw gold literals with the same tokens, and decide --amber's fate explicitly (it now silently means rose — tokens.css:289); add the existing CSS-contract test pattern (deck-chips _CSS_FOR_TEST) as a grep gate on new --amber uses. Closes contract-#1 violations on two surfaces and prevents the third way of writing gold.",
+   "ONE ENFORCED COPY CONTRACT INSTEAD OF ~20 POINT EDITS. A single vitest sweep over user-visible strings in tauri/ui (plus Rust window titles) banning: em dashes, 'VIBEMIX-CORE', 'Adam' (fix DEFAULT_VOICE at voice_presets.py:6, not just the gate), port numbers/protocol nouns, codex/livekit/proxy jargon, and pinning the noun set (one brain name, one voice-link name, Start-vs-Go-live unified). This one gate absorbs the crash banner, deck notices, debrief error banners, wizard probe copy, drills referral, and persona line — and keeps them fixed."
+  ]
+ }
+}
