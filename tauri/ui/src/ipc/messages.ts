@@ -292,6 +292,7 @@ export interface SessionSnapshot {
       reason: string | null;
     };
     grounded: boolean;
+    run_state?: "armed" | "running" | null;
   };
 }
 export interface LevelPair {

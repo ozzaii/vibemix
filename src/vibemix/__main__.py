@@ -2214,6 +2214,19 @@ async def main() -> None:
             and not active_task.done()
         )
 
+    def _is_session_graph_engaged() -> bool:
+        """Deck run-state truth for the snapshot's ``run_state`` field.
+
+        A PENDING activation counts as running (confirms the optimistic
+        GO LIVE repaint while capture/TTS warm up), and a stop-requested
+        teardown counts as armed (confirms the optimistic Stop repaint while
+        the graph drains). Distinct from ``_is_live_session_active``, which
+        stays capture-started-only for the cold-state read gates.
+        """
+        if active_task is None or active_task.done():
+            return False
+        return not (active_stop_event is not None and active_stop_event.is_set())
+
     def _is_brain_configured() -> bool:
         # Runtime outage first: while a live agent is parked in the holder its
         # proxy/connection one-shots are the freshest brain truth (they clear
@@ -3108,6 +3121,7 @@ async def main() -> None:
             audio_capture_context=audio_capture_context,
             voice_muted=_DynamicBool(lambda: live_voice_muted),  # type: ignore[arg-type]
             brain_available=_DynamicBool(_is_brain_configured),  # type: ignore[arg-type]
+            session_running=_DynamicBool(_is_session_graph_engaged),  # type: ignore[arg-type]
         )
 
     ws_task = asyncio.create_task(_run_ws_broadcast_supervised(_ws_broadcast_once, stop_event, tracer))

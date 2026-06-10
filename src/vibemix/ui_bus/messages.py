@@ -327,6 +327,11 @@ class SessionSnapshotPayload:
     latency_ms: float | None
     grounded: bool
     claim_policy: LiveClaimPolicyPayload | None = None
+    # SHIP-WIRE START-gate — authoritative run-state reflection (the
+    # SessionStart schema $comment promise). None = the emitter does not
+    # track the live lifecycle (standalone SessionLoop path); the shell only
+    # reconciles its optimistic data-runstate on a non-null value.
+    run_state: Literal["armed", "running"] | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -936,6 +941,7 @@ class SessionSnapshot:
         latency_ms: float | None = None,
         grounded: bool = False,
         claim_policy: LiveClaimPolicyPayload | None = None,
+        run_state: Literal["armed", "running"] | None = None,
     ) -> SessionSnapshot:
         return cls(
             type="ipc.session.snapshot",
@@ -953,6 +959,7 @@ class SessionSnapshot:
                 latency_ms=latency_ms,
                 grounded=grounded,
                 claim_policy=claim_policy,
+                run_state=run_state,
             ),
         )
 

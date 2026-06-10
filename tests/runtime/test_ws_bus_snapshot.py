@@ -320,3 +320,26 @@ def test_midi_controller_failure_is_swallowed():
     )
     validate_message(msg)  # must not raise — snapshot still valid
     assert msg["payload"]["midi_events"] == []
+
+
+def test_snapshot_run_state_reflects_session_lifecycle():
+    # running: an activation/live task is alive and not stop-requested.
+    msg = _build_session_snapshot(
+        _FakeLevels(0.3, 0.0, 0.0), _fake_state(), session_running=True
+    )
+    validate_message(msg)
+    assert msg["payload"]["run_state"] == "running"
+
+    # armed: parked / never started / stop-requested teardown draining.
+    msg = _build_session_snapshot(
+        _FakeLevels(0.3, 0.0, 0.0), _fake_state(), session_running=False
+    )
+    validate_message(msg)
+    assert msg["payload"]["run_state"] == "armed"
+
+
+def test_snapshot_run_state_null_when_lifecycle_unknown():
+    # Default (no probe wired) stays null — the shell must NOT reconcile.
+    msg = _build_session_snapshot(_FakeLevels(0.3, 0.0, 0.0), _fake_state())
+    validate_message(msg)
+    assert msg["payload"]["run_state"] is None

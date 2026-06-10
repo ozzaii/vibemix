@@ -1289,6 +1289,10 @@
             },
             "grounded": {
               "type": "boolean"
+            },
+            "run_state": {
+              "$comment": "SHIP-WIRE START-gate - the sidecar's authoritative run-state, the reconciliation source for the shell's optimistic data-runstate (fulfils the SessionStart $comment promise). 'running' = an activation/live task is alive and not stop-requested; 'armed' = idle/parked; null = this emitter does not track the live lifecycle (standalone SessionLoop snapshot path).",
+              "enum": ["armed", "running", null]
             }
           }
         }

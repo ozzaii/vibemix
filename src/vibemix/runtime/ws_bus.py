@@ -753,6 +753,7 @@ def _build_session_snapshot(
     controller_state: Any | None = None,
     last_move_ts: list[float] | None = None,
     audio_capture_context: dict[str, object] | None = None,
+    session_running: bool | None = None,
 ) -> dict:
     """Build a schema-valid ``ipc.session.snapshot`` dict from live refs.
 
@@ -890,6 +891,11 @@ def _build_session_snapshot(
         latency_ms=None,
         grounded=grounded,
         claim_policy=claim_policy,
+        run_state=(
+            None
+            if session_running is None
+            else ("running" if session_running else "armed")
+        ),
     )
     return json.loads(msg.to_json())
 
@@ -1050,6 +1056,10 @@ async def ws_broadcast(
     audio_capture_context: dict[str, object] | None = None,
     voice_muted: bool = False,
     brain_available: bool = True,
+    # Live run-state probe for the snapshot's run_state field. Passed as a
+    # _DynamicBool by __main__ so each tick reads fresh truth; None (default)
+    # keeps run_state null for callers that don't track the lifecycle.
+    session_running: bool | None = None,
 ) -> None:
     """30Hz outbound mascot broadcast + inbound manual-trigger handler.
 
@@ -1469,6 +1479,9 @@ async def ws_broadcast(
                         controller_state=controller_state,
                         last_move_ts=last_move_ts,
                         audio_capture_context=audio_capture_context,
+                        session_running=(
+                            None if session_running is None else bool(session_running)
+                        ),
                     )
                     _validate_snapshot(snap_msg)
                     snap_payload = json.dumps(snap_msg, separators=(",", ":"))
