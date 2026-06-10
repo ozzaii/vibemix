@@ -108,6 +108,7 @@ interface WireSnapshotPayload {
     level: ClaimPolicyLevel;
     reason: string | null;
   } | null;
+  run_state?: "armed" | "running" | null;
 }
 
 interface WireStatusTickPayload {
@@ -221,6 +222,19 @@ export const SETTINGS_FIELDS = [
   "learn.headphone_device_index",
 ] as const;
 export type SettingsField = (typeof SETTINGS_FIELDS)[number];
+
+// SHIP-WIRE START-gate — run-state reconciliation hold. Start/Stop clicks
+// repaint optimistically; snapshots already in flight may still carry the
+// pre-click run_state, so the click arms a short hold during which the
+// optimistic value wins. Outside the hold the wire is authoritative — a
+// restarted sidecar (fresh boot = armed) can never strand a "running" deck.
+export const RUN_STATE_HOLD_MS = 2500;
+let runStateHoldUntilMs = 0;
+
+/** Called by the render-loop's Start/Stop handlers at click time. */
+export function holdRunStateReconciliation(ms: number = RUN_STATE_HOLD_MS): void {
+  runStateHoldUntilMs = Date.now() + ms;
+}
 
 let initialized = false;
 
@@ -406,6 +420,18 @@ export function applySnapshot(p: WireSnapshotPayload): void {
       ageMs: 0,
     }));
     appendMidiEvents(events);
+  }
+
+  // Authoritative run-state reconciliation (the SessionStart $comment
+  // promise, now implemented). null = the emitter doesn't track the live
+  // lifecycle — leave the optimistic value alone.
+  const wireRunState = p.run_state ?? null;
+  if (
+    wireRunState !== null &&
+    Date.now() >= runStateHoldUntilMs &&
+    getSessionState().runState !== wireRunState
+  ) {
+    setSessionState({ runState: wireRunState });
   }
 }
 
@@ -654,4 +680,5 @@ export function applyCohostReaction(
 /** Test-only: reset the singleton so a vitest case can rerun init. */
 export function _resetBridgeForTests(): void {
   initialized = false;
+  runStateHoldUntilMs = 0;
 }

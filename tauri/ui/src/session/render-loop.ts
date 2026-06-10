@@ -27,7 +27,7 @@ import type {
   CohostReaction,
   SessionState as BridgeSessionState,
 } from "./state.js";
-import { sendMute } from "./ws-bridge.js";
+import { holdRunStateReconciliation, sendMute } from "./ws-bridge.js";
 import type { ReactionsByTs } from "./cohost-model.js";
 import type { CitationChip } from "./components/citation-strip.js";
 
@@ -68,10 +68,12 @@ function cohostMuteHandler(): void {
  *  then fire ipc.session.start. No ack: the BACKEND-BOOT lane's
  *  register_handler("ipc.session.start", _on_session_start) owns the model
  *  load + silent pre-warm + capture lifecycle in __main__.py, and reflects the
- *  authoritative run-state on its next ipc.session.snapshot. Fire-and-forget;
- *  an emit failure logs only (the optimistic deck stays running). */
+ *  authoritative run-state on its next ipc.session.snapshot (run_state field,
+ *  reconciled in ws-bridge.applySnapshot behind a short click-hold). Fire-and-
+ *  forget; an emit failure logs only until the wire corrects it. */
 function sessionStartHandler(): void {
   if (getSessionState().runState === "running") return;
+  holdRunStateReconciliation();
   setSessionState({ runState: "running" });
   void emitIpc("ipc.session.start", {}).catch((err: unknown) => {
     // eslint-disable-next-line no-console
@@ -85,6 +87,7 @@ function sessionStartHandler(): void {
  *  parks/unloads the model. Fire-and-forget; failure logs only. */
 function sessionStopHandler(): void {
   if (getSessionState().runState !== "running") return;
+  holdRunStateReconciliation();
   setSessionState({ runState: "armed" });
   void emitIpc("ipc.session.stop", {}).catch((err: unknown) => {
     // eslint-disable-next-line no-console
