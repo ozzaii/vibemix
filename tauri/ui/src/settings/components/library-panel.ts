@@ -166,7 +166,7 @@ const CSS = `
   }
   .vmx-library-droptarget__hint {
     margin-top: var(--sp-1);
-    color: var(--silk-50);
+    color: var(--text-muted);
     font-size: 11px;
     line-height: 1.35;
   }

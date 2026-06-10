@@ -1591,7 +1591,7 @@
 }
 
 .learn-status-voice[data-voice-status="ok"] {
-  color: var(--mint-pale);
+  color: var(--ok);
 }
 
 .learn-status-voice[data-voice-status="muted"],

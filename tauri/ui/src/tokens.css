@@ -304,6 +304,11 @@
   --led-ok:    #6dd44a;
   --led-warn:  #f4c542;
   --led-fault: #d4413a;
+  /* Semantic status aliases — components reach for meaning, not lamp part
+   * numbers, and error never falls back to a foreign red. */
+  --ok:     var(--led-ok);
+  --warn:   var(--led-warn);
+  --danger: var(--led-fault);
 
   /* Glass blurs */
   --blur-glass:         blur(32px) saturate(140%);

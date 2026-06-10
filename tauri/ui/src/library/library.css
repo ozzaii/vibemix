@@ -1095,7 +1095,7 @@ body {
   text-transform: uppercase;
 }
 .vmx-lib-clarification-question {
-  color: var(--silk-90);
+  color: var(--text-primary);
   font-weight: 650;
 }
 .vmx-lib-clarification-choices {
@@ -1109,7 +1109,7 @@ body {
   font-weight: 800;
 }
 .vmx-lib-clarification-hint {
-  color: var(--silk-58);
+  color: var(--text-tertiary);
 }
 .vmx-lib-agent-failure {
   display: grid;
@@ -1125,7 +1125,7 @@ body {
 }
 .vmx-lib-agent-failure-detail {
   max-width: 62ch;
-  color: var(--silk-72);
+  color: var(--text-secondary);
 }
 .vmx-lib-agent-failure-receipt {
   display: flex;
@@ -1137,7 +1137,7 @@ body {
   border: 1px solid var(--glass-edge);
   border-radius: var(--rad-sm);
   padding: 5px 8px;
-  color: var(--silk-58);
+  color: var(--text-tertiary);
   font-family: var(--type-mono);
   font-size: 10px;
   line-height: 1;
@@ -1605,7 +1605,7 @@ body {
   font-family: var(--type-mono);
   font-size: 10px;
   line-height: 1.35;
-  color: var(--silk-38);
+  color: var(--text-muted);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -2506,12 +2506,12 @@ body {
 .vmx-lib-proghead .cost { font-family: var(--type-mono); font-size: 13px; color: var(--amber); }
 
 .vmx-lib-ingest-error {
-  border: 1px solid color-mix(in srgb, var(--danger, #ff6b6b) 42%, transparent);
-  border-radius: var(--radius-sm, 8px);
+  border: 1px solid color-mix(in srgb, var(--danger) 42%, transparent);
+  border-radius: var(--rad-md);
   padding: 12px 13px;
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.025), transparent),
-    color-mix(in srgb, var(--danger, #ff6b6b) 8%, transparent);
+    color-mix(in srgb, var(--danger) 8%, transparent);
   color: var(--silk);
   font-size: 12px;
   line-height: 1.45;
@@ -2523,7 +2523,7 @@ body {
   font-size: 10px;
   letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: var(--danger, #ff6b6b);
+  color: var(--danger);
 }
 .vmx-lib-ingest-error .msg { color: var(--silk); }
 .vmx-lib-ingest-error .hint { margin-top: 7px; color: var(--silk-55); }
