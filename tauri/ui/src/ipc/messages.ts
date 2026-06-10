@@ -24,6 +24,7 @@ export type VibemixIPCMessages =
   | WizardStart
   | WizardDone
   | WizardSetSkill
+  | TelemetrySetConsent
   | SessionSnapshot
   | SessionMute
   | SessionCitation
@@ -250,6 +251,13 @@ export interface WizardSetSkill {
   ts: string;
   payload: {
     skill: "beginner" | "intermediate" | "pro";
+  };
+}
+export interface TelemetrySetConsent {
+  type: "ipc.telemetry.set_consent";
+  ts: string;
+  payload: {
+    consent: boolean;
   };
 }
 export interface SessionSnapshot {

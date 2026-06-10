@@ -169,12 +169,13 @@ def test_count_parity_holds_after_addition():
     schema = json.loads(schema_path.read_text())
     oneof_count = len(schema["oneOf"])
 
-    assert wrapper_count == oneof_count == 83, (
+    assert wrapper_count == oneof_count == 84, (
         f"count parity violated: wrappers={wrapper_count} vs oneOf={oneof_count}; "
-        "expected both 83 after adding the debrief near-miss envelopes "
-        "(DebriefNearMiss/DebriefMomentFeedback — 9fe39054 last-night timing "
-        "recoveries) on top of the SHIP-WIRE START-gate SessionStart/SessionStop "
-        "and DEMOCRATIZATION-1 SettingsSetBrain/SettingsBrainAck envelopes"
+        "expected both 84 after the QW telemetry-consent recovery (59a50fa9) "
+        "added TelemetrySetConsent on top of the debrief near-miss envelopes "
+        "(DebriefNearMiss/DebriefMomentFeedback), the SHIP-WIRE START-gate "
+        "SessionStart/SessionStop, and DEMOCRATIZATION-1 "
+        "SettingsSetBrain/SettingsBrainAck envelopes"
     )
 
 

@@ -120,6 +120,7 @@ from vibemix.ui_bus import (
     SettingsState,
     StatusRecheck,
     StatusTick,
+    TelemetrySetConsent,
     WindowInfo,
     WizardDone,
     WizardSetSkill,
@@ -223,6 +224,7 @@ def _make_examples() -> list[tuple[str, object]]:
             ),
         ),
         ("WizardSetSkill", WizardSetSkill.make(skill="intermediate")),
+        ("TelemetrySetConsent", TelemetrySetConsent.make(consent=False)),
         # Phase 12 wrappers
         (
             "SessionSnapshot",
@@ -711,7 +713,8 @@ def test_example_count_matches_schema_oneof() -> None:
     # SHIP-WIRE START-gate adds SessionStart + SessionStop (live-session
     # arm/run control: idle until Start, Stop returns to idle) → 81.
     # Learn Revolution debrief adds DebriefNearMiss + DebriefMomentFeedback → 83.
-    assert len(_EXAMPLES) == len(_SCHEMA["oneOf"]) == 83
+    # QW telemetry-consent recovery (59a50fa9) adds TelemetrySetConsent → 84 oneOf, 87 definitions.
+    assert len(_EXAMPLES) == len(_SCHEMA["oneOf"]) == 84
 
 
 @pytest.mark.parametrize(
@@ -782,7 +785,7 @@ def test_schema_self_validates_against_draft7() -> None:
     jsonschema.Draft7Validator.check_schema(_SCHEMA)
 
 
-def test_schema_oneof_count_is_72() -> None:
+def test_schema_oneof_count_is_84() -> None:
     """Plan-locked invariant — Phase 11 Wave 0 froze 19; Phase 12 added 7
     (19 → 26); Phase 13-05 added 1 (MascotMoodChange) → 27; Phase 15-01 adds
     7 recordings.* families → 34; Phase 20-04 adds 1 (SessionCitation) → 35;
@@ -820,8 +823,9 @@ def test_schema_oneof_count_is_72() -> None:
     # 84 definitions (both top-level ipc.* messages; skew vs oneOf stays 3).
     # Learn Revolution debrief adds DebriefNearMiss + DebriefMomentFeedback
     # → 83 oneOf, 86 definitions.
-    assert len(_SCHEMA["oneOf"]) == 83
-    assert len(_SCHEMA["definitions"]) == 86
+    # QW telemetry-consent recovery (59a50fa9) adds TelemetrySetConsent → 84 oneOf, 87 definitions.
+    assert len(_SCHEMA["oneOf"]) == 84
+    assert len(_SCHEMA["definitions"]) == 87
 
 
 def test_no_pydantic_imports_in_ui_bus() -> None:

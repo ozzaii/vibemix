@@ -324,11 +324,11 @@ def test_count_parity_at_83() -> None:
                 seen.add(obj)
                 wrapper_count += 1
 
-    assert len(_SCHEMA["oneOf"]) == 83, (
-        "schema oneOf count should be 83 after the current live-session, "
-        "democratization, and Learn progress envelopes"
+    assert len(_SCHEMA["oneOf"]) == 84, (
+        "schema oneOf count should be 84 after the current live-session, "
+        "democratization, Learn progress, and telemetry-consent envelopes"
     )
-    assert wrapper_count == 83, f"wrapper count {wrapper_count} != 83"
+    assert wrapper_count == 84, f"wrapper count {wrapper_count} != 84"
 
 
 def test_check_ipc_schema_script_exits_zero() -> None:

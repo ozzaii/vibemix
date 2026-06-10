@@ -267,6 +267,11 @@ class WizardSetSkillPayload:
     skill: Literal["beginner", "intermediate", "pro"]
 
 
+@dataclass(frozen=True, slots=True)
+class TelemetrySetConsentPayload:
+    consent: bool
+
+
 # ---------------------------------------------------------------------------
 # Phase 12 — session + settings payload structs
 # ---------------------------------------------------------------------------
@@ -908,6 +913,27 @@ class WizardSetSkill:
             type="ipc.wizard.set_skill",
             ts=_now_iso(),
             payload=WizardSetSkillPayload(skill=skill),  # type: ignore[arg-type]
+        )
+
+    def to_json(self) -> str:
+        return _serialize(self)
+
+
+@dataclass(frozen=True, slots=True)
+class TelemetrySetConsent:
+    """Shell → sidecar. Wizard telemetry step persists explicit user consent
+    to config.json. Default stays OFF if no message lands."""
+
+    type: Literal["ipc.telemetry.set_consent"]
+    ts: str
+    payload: TelemetrySetConsentPayload
+
+    @classmethod
+    def make(cls, *, consent: bool) -> TelemetrySetConsent:
+        return cls(
+            type="ipc.telemetry.set_consent",
+            ts=_now_iso(),
+            payload=TelemetrySetConsentPayload(consent=consent),
         )
 
     def to_json(self) -> str:

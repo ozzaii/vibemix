@@ -476,6 +476,7 @@ export const MOCK_TRANSFER_RUNTIME_CONTRACT: readonly MockTransferRuntimeSurface
       "ipc.profile.regenerate",
       "ipc.profile.delete",
       "ipc.profile.set_consent",
+      "ipc.telemetry.set_consent",
       "ipc.wizard.start",
       "ipc.learn.progress_state",
       "rebind_hotkey",

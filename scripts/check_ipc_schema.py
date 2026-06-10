@@ -118,6 +118,7 @@ from vibemix.ui_bus import (
     SettingsState,
     StatusRecheck,
     StatusTick,
+    TelemetrySetConsent,
     WindowInfo,
     WizardDone,
     WizardSetSkill,
@@ -215,6 +216,7 @@ def _minimal_examples() -> list[tuple[str, object]]:
             ),
         ),
         ("WizardSetSkill", WizardSetSkill.make(skill="intermediate")),
+        ("TelemetrySetConsent", TelemetrySetConsent.make(consent=False)),
         # Phase 12 wrappers
         (
             "SessionSnapshot",

@@ -65,6 +65,9 @@
       "$ref": "#/definitions/WizardSetSkill"
     },
     {
+      "$ref": "#/definitions/TelemetrySetConsent"
+    },
+    {
       "$ref": "#/definitions/SessionSnapshot"
     },
     {
@@ -1035,6 +1038,37 @@
                 "intermediate",
                 "pro"
               ]
+            }
+          }
+        }
+      }
+    },
+    "TelemetrySetConsent": {
+      "$comment": "Shell -> sidecar. Wizard telemetry-consent toggle. Fire-and-forget; sidecar persists ConfigStore.telemetry_consent to config.json. Default-OFF if absent.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "ts",
+        "payload"
+      ],
+      "properties": {
+        "type": {
+          "const": "ipc.telemetry.set_consent"
+        },
+        "ts": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "consent"
+          ],
+          "properties": {
+            "consent": {
+              "type": "boolean"
             }
           }
         }

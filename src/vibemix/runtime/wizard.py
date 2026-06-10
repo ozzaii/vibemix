@@ -152,6 +152,13 @@ class WizardLoop:
         self.bus.register_handler(
             "ipc.library.import_cancel", self._on_library_import_cancel_queue
         )
+        # QW telemetry-consent (recovered from lost commit 59a50fa9) — the
+        # wizard's "share diagnostics" toggle persists to config.json here;
+        # without this handler the opt-in is silently dropped and the
+        # control lies.
+        self.bus.register_handler(
+            "ipc.telemetry.set_consent", self._on_telemetry_set_consent
+        )
 
     async def boot(self) -> None:
         """Emit ``ipc.boot {ready: true}`` so the Tauri shell can render
@@ -581,6 +588,24 @@ class WizardLoop:
             total=0, done=0, current_track_name="", cache_hits=0, cancelled=True
         )
         await self.bus.emit(json.loads(ack.to_json()))
+
+    async def _on_telemetry_set_consent(self, msg: dict) -> None:
+        """Persist the wizard telemetry-consent choice to config.json.
+
+        Fire-and-forget: the renderer already owns the visible wizard state,
+        and ConfigStore keeps the durable default OFF if no message lands.
+        """
+        try:
+            from vibemix.runtime.config_store import load_config, save_config
+
+            payload = msg.get("payload", {})
+            consent = bool(payload.get("consent", False))
+            store = load_config()
+            store.telemetry_consent = consent
+            save_config(store)
+            log.info("telemetry consent persisted: %s", consent)
+        except Exception as e:
+            log.warning("telemetry.set_consent persistence failed: %s", e)
 
     # ------------------------------------------------------------------
     # Background loops
