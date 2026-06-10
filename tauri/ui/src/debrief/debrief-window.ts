@@ -102,13 +102,13 @@ if (isMockMode) {
       }
     }
     // P1-a uplift 3 — the verdict headline. Built from REAL session
-    // structure (track count + duration), not invented. Lands as soon
-    // as the chapter-list frame arrives so the peak-end focal point is
-    // present before the voiced TL;DR finishes generating.
+    // structure, not invented: chapters break on phase/layer/mix movement
+    // too, so only kind=="track" chapters may be counted as TRACKS.
     if (tldrPanelEl) {
+      const trackCount = chapters.filter((c) => c.kind === "track").length;
       renderVerdictLine(
         tldrPanelEl,
-        buildVerdictText(chapters.length, totalDurationS),
+        buildVerdictText(trackCount, totalDurationS, chapters.length),
       );
     }
   });
@@ -165,12 +165,13 @@ if (isMockMode) {
       reason?: string;
       message?: string;
     };
+    // Only verdict-carrying errors reach the banner: schema
+    // ipc.debrief.error frames and the reconnect-budget's synthetic
+    // {reason:"sidecar_crashed"}. A detail without a reason is transport
+    // noise — never a crash verdict (Invariant #5: in-between ≠ fault).
+    if (!detail?.reason) return;
     if (errorBanner) {
-      showErrorBanner(
-        errorBanner,
-        detail?.reason ?? "sidecar_crashed",
-        detail?.message ?? "",
-      );
+      showErrorBanner(errorBanner, detail.reason, detail?.message ?? "");
     }
   });
 
@@ -196,6 +197,26 @@ if (isMockMode) {
       errorBanner.textContent = "";
     }
   });
+
+  // Wire the chapter rail → timeline deep-link. The rail's buttons were a
+  // dead control: they dispatched chapter-selected and nobody listened —
+  // ~320px of fully-styled affordance that did nothing. Route through the
+  // existing vmx-debrief-deeplink path (same scroll+pulse the live
+  // chip-click uses); covers both the live and mock mounts.
+  if (chaptersEl) {
+    chaptersEl.addEventListener("chapter-selected", (e: Event) => {
+      const detail = (e as CustomEvent).detail as {
+        id: string;
+        start: number;
+        citation_event_id: string;
+      };
+      window.dispatchEvent(
+        new CustomEvent("vmx-debrief-deeplink", {
+          detail: { eventId: detail.citation_event_id, timestampS: detail.start },
+        }),
+      );
+    });
+  }
 
   // Wire citation chip clicks → request tooltip via WS.
   if (drillsEl) {
@@ -356,7 +377,13 @@ function mountMockDebrief(): void {
     );
   }
   if (tldrPanelEl) {
-    renderVerdictLine(tldrPanelEl, buildVerdictText(chapters.length, totalDurationS));
+    // Mock chapters carry no kind=="track" — they speak as MOMENTS, same
+    // honest rule as the live path.
+    const mockTrackCount = chapters.filter((c) => c.kind === "track").length;
+    renderVerdictLine(
+      tldrPanelEl,
+      buildVerdictText(mockTrackCount, totalDurationS, chapters.length),
+    );
   }
   mountMockTldrPlayer(totalDurationS, chapters.length);
   if (drillsEl) {

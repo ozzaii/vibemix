@@ -85,7 +85,13 @@ export class DebriefWsClient extends EventTarget {
       this._scheduleReconnect();
     };
     this.ws.onerror = (e) => {
-      this.dispatchEvent(new CustomEvent("error", { detail: e }));
+      // Transport-level errors are NOT verdicts: the sidecar binds 8766 late
+      // on every first run, so a raw connect failure funneled into the
+      // "error" channel painted "Debrief crashed unexpectedly" ~2.5s into a
+      // normal boot. onclose already drives the reconnect budget; the real
+      // crash verdict is the synthetic {reason:"sidecar_crashed"} emitted
+      // only when the 120s budget genuinely exhausts.
+      this.dispatchEvent(new CustomEvent("ws-error", { detail: e }));
     };
   }
 

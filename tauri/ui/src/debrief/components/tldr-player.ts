@@ -113,11 +113,23 @@ export function renderVerdictLine(panelEl: HTMLElement, text: string): void {
  * structure. Kept pure + exported so it's unit-testable and so the
  * "no invented numbers" contract is verifiable. Picks the most
  * impressive REAL stat available; falls back gracefully when data is thin.
+ *
+ * trackCount must be the count of kind=="track" chapters ONLY — chapters
+ * also break on phase/layer/mix/crowd movement, so the raw chapter count
+ * overstates tracks on any real set (a 3-track set with phase movement
+ * proudly read "9 TRACKS"). When no track chapters exist, the raw chapter
+ * count speaks under its truthful noun: MOMENTS.
  */
-export function buildVerdictText(trackCount: number, sessionDurationS: number): string {
+export function buildVerdictText(
+  trackCount: number,
+  sessionDurationS: number,
+  chapterCount = 0,
+): string {
   const parts: string[] = [];
   if (trackCount > 0) {
     parts.push(`${trackCount} ${trackCount === 1 ? "TRACK" : "TRACKS"}`);
+  } else if (chapterCount > 0) {
+    parts.push(`${chapterCount} ${chapterCount === 1 ? "MOMENT" : "MOMENTS"}`);
   }
   if (sessionDurationS > 0) {
     parts.push(`${formatDuration(sessionDurationS)} IN THE MIX`);

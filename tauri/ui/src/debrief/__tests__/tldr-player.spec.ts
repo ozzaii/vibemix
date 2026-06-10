@@ -99,3 +99,15 @@ function clearTauriRuntime(): void {
   Reflect.deleteProperty(window, "__TAURI_INTERNALS__");
   Reflect.deleteProperty(window, "__TAURI__");
 }
+
+describe("buildVerdictText honesty", () => {
+  it("counts only track chapters as TRACKS; other chapters speak as MOMENTS", async () => {
+    const { buildVerdictText } = await import("../components/tldr-player.js");
+    // A 3-track set whose chapters also broke on phase/layer movement must
+    // never read "9 TRACKS" — that invents six tracks.
+    expect(buildVerdictText(3, 47 * 60, 9)).toBe("3 TRACKS · 47M IN THE MIX");
+    // No track chapters at all (mock kinds, pure-phase sets): truthful noun.
+    expect(buildVerdictText(0, 47 * 60, 4)).toBe("4 MOMENTS · 47M IN THE MIX");
+    expect(buildVerdictText(0, 0, 0)).toBe("SET LOGGED");
+  });
+});
