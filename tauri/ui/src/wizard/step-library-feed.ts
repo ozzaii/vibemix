@@ -367,7 +367,13 @@ function progressCopy(state: LibraryFeedState): string {
   if (state.status === "ready") return "source found";
   if (state.status === "done") {
     if (progress?.cancelled) return "import cancelled";
-    if (progress && progress.total > 0) return `indexed ${progress.done} of ${progress.total}`;
+    if (progress && progress.total > 0) {
+      const failed = progress.failed ?? 0;
+      if (failed > 0) {
+        return `indexed ${Math.max(0, progress.total - failed)} of ${progress.total} · ${failed} failed`;
+      }
+      return `indexed ${progress.done} of ${progress.total}`;
+    }
     return "music feed started";
   }
   if (state.status === "error") return state.error ?? "library feed failed";

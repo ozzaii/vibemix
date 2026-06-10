@@ -21,6 +21,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { emitIpc, sendIpcRequest, subscribeIpc } from "../ipc/client.js";
 import {
   libraryImportFromAction,
+  libraryImportOutcome,
   libraryStats,
   onLibraryImportProgress,
   type LibrarySetupCandidate,
@@ -741,13 +742,18 @@ async function startLibraryFeedImport(
     unlisten = await onLibraryImportProgress((progress) => {
       const terminal =
         progress.cancelled || progress.total <= 0 || progress.done >= progress.total;
+      const wipeout = terminal && libraryImportOutcome(progress) === "failed";
       setState({
         libraryFeed: {
           ...wizardState.libraryFeed,
-          status: terminal ? "done" : "indexing",
+          status: terminal ? (wipeout ? "error" : "done") : "indexing",
           selectedPath: candidate.path,
           progress,
-          error: undefined,
+          error: wipeout
+            ? progress.failure_reason
+              ? `indexing failed — ${progress.failure_reason}`
+              : "indexing failed — no tracks were indexed"
+            : undefined,
         },
       });
       if (terminal) unlisten();

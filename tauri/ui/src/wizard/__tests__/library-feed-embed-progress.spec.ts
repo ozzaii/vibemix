@@ -77,4 +77,36 @@ describe("library-feed embed progress (F10 frontend-half)", () => {
     pick!.click();
     expect(onPickFolder).toHaveBeenCalledTimes(1);
   });
+
+  it("shows failed counts on a done import instead of pure success copy", () => {
+    const state: LibraryFeedState = {
+      status: "done",
+      candidates: [],
+      indexed: 0,
+      selectedPath: "/Users/ozai/Music",
+      progress: {
+        total: 10,
+        done: 10,
+        current_track_name: "",
+        cache_hits: 0,
+        cancelled: false,
+        failed: 3,
+        failure_reason: "broken.mp3: unprobeable",
+      },
+    };
+    const text = renderStepLibraryFeed(state, callbacks()).textContent ?? "";
+    expect(text).toContain("7 of 10");
+    expect(text).toContain("3 failed");
+  });
+
+  it("renders the wipeout error copy the router sets on a total failure", () => {
+    const state: LibraryFeedState = {
+      status: "error",
+      candidates: [],
+      indexed: 0,
+      error: "indexing failed — first.mp3: unprobeable",
+    };
+    const text = renderStepLibraryFeed(state, callbacks()).textContent ?? "";
+    expect(text).toContain("indexing failed — first.mp3: unprobeable");
+  });
 });
