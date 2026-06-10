@@ -108,7 +108,7 @@ export function mountTimelinePlaceholder(
 
   container.append(signalBed, phaseRail, regionLayer, readout);
 
-  for (const [i, c] of chapters.entries()) {
+  for (const c of chapters) {
     const region = document.createElement("button");
     region.type = "button";
     region.className = "vmx-debrief-region";
@@ -119,11 +119,6 @@ export function mountTimelinePlaceholder(
     const left = (c.start / totalDurationS) * 100;
     region.style.left = `${left}%`;
     region.style.width = `${width}%`;
-    region.style.setProperty("--vmx-region-y", `${30 + (i % 3) * 9}%`);
-    region.style.setProperty(
-      "--vmx-region-h",
-      `${Math.max(18, Math.min(34, 18 + width * 0.45))}%`,
-    );
     region.title = c.label;
     region.textContent = compactLabel(c.label);
     region.setAttribute(
