@@ -367,6 +367,32 @@ def _log_brain_unavailable(reason: str) -> None:
     )
 
 
+async def _reap_session_task(
+    task: asyncio.Task | None,
+    stop_signal: asyncio.Event | None,
+) -> None:
+    """Cancel + drain a half-activated live-session task.
+
+    Used by the Start activation-timeout path: a wedged activation (e.g. a
+    CoreAudio open that never returns) must not survive as a zombie — a live
+    ``active_task`` makes the next Start a silent no-op and Stop unreachable
+    (``live_session_active`` never flipped), so only an app relaunch would
+    recover. Setting the stop signal first lets a healthy-but-slow activation
+    park gracefully through its ``finally`` cleanup; ``cancel()`` unblocks a
+    truly wedged await. Teardown errors are swallowed — the caller is about
+    to raise the real timeout error to the UI.
+    """
+    if stop_signal is not None:
+        stop_signal.set()
+    if task is None or task.done():
+        return
+    task.cancel()
+    try:
+        await task
+    except (asyncio.CancelledError, Exception):
+        pass
+
+
 def _resample_pcm16_mono_bytes(pcm: bytes, *, source_sr: int, target_sr: int) -> bytes:
     """Convert mono int16 PCM bytes between sample rates."""
     if not pcm:
@@ -2929,9 +2955,38 @@ async def main() -> None:
         try:
             await asyncio.wait_for(started_event.wait(), timeout=activation_timeout_s)
         except TimeoutError:
-            raise RuntimeError("session.start timed out waiting for activation") from None
+            # Zombie reaper — the activation never signalled started (e.g. a
+            # wedged CoreAudio open). Tear the half-built graph down and reset
+            # the lifecycle slots so the NEXT Start is a clean retry instead of
+            # a silent no-op against a task that is still "running". This also
+            # keeps the graph from going live AFTER the UI was told start failed.
+            await _reap_session_task(active_task, active_stop_event)
+            active_task = None
+            active_stop_event = None
+            raise RuntimeError(
+                f"session.start timed out after {activation_timeout_s:.0f}s waiting for activation"
+            ) from None
         if active_task.done():
-            active_task.result()
+            # Fail-fast activation (e.g. proxy setup failed before any stream
+            # opened): clear the slots so retry works immediately, then surface
+            # the real error to the Start caller.
+            task = active_task
+            active_task = None
+            active_stop_event = None
+            task.result()
+        elif not live_session_active:
+            # started_event was set by _activate_session's failure path (its
+            # ``except`` arms the event before re-raising) but the teardown in
+            # its ``finally`` is still draining. Await it so the REAL activation
+            # error reaches the Start caller — returning here would report a
+            # phantom success while the backend unwinds back to armed.
+            task = active_task
+            try:
+                await task
+            finally:
+                if active_task is task:
+                    active_task = None
+                    active_stop_event = None
 
     async def _stop_live_session() -> None:
         nonlocal active_task, active_stop_event
