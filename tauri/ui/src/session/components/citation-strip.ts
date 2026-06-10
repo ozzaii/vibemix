@@ -105,7 +105,6 @@ const CSS = `
     color: var(--amber);
     box-shadow: var(--glow-soft);
   }
-  .vmx-citation-chip:focus-visible { outline: none; }
   .vmx-citation-chip:active {
     /* Inset press feedback — subtle, matches the existing CDJ panel
      * inset language. Black inset works against the amber wash. */

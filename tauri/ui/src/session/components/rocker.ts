@@ -89,7 +89,6 @@ const CSS = `
   /* The body-level *:focus-visible already paints a 2px amber outline +
    * --glow-soft so we explicitly suppress the duplicate ring on the
    * segment (its glow comes from the rule above). */
-  .vmx-rocker__seg:focus-visible { outline: none; }
   /* --- rocker variant: pressed amber tile when active (used for BEG/INT/PRO etc.) --- */
   .vmx-rocker[data-variant="rocker"] .vmx-rocker__seg[data-active="true"] {
     color: var(--amber);

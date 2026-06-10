@@ -92,7 +92,6 @@ const CSS = `
     color: var(--silk);
     box-shadow: var(--glow-faint);
   }
-  .vmx-mode-picker__seg:focus-visible { outline: none; }
   .vmx-mode-picker__seg[data-active="true"] {
     color: var(--amber);
     background: linear-gradient(180deg, rgba(255, 165, 223, 0.095) 0%, rgba(255, 165, 223, 0.026) 100%);

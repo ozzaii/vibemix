@@ -100,7 +100,6 @@ const CSS = `
     color: var(--silk-65);
     box-shadow: var(--glow-faint);
   }
-  .vmx-statusbar__badge[data-clickable="true"]:focus-visible { outline: none; }
   .vmx-statusbar__led {
     display: inline-block;
     width: 6px;
@@ -275,7 +274,6 @@ const CSS = `
       inset 0 0 18px var(--amber-40),
       var(--glow-faint);
   }
-  .vmx-statusbar__tooltip-btn:focus-visible { outline: none; }
 `;
 
 registerStyle("vmx-statusbar", CSS);

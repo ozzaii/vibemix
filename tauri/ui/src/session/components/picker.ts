@@ -85,7 +85,6 @@ const CSS = `
   }
   /* Picker row owns the outer halo above — kill the body-level
    * 2px amber outline so we don't stack two focus rings. */
-  .vmx-picker__row:focus-visible { outline: none; }
   .vmx-picker[data-open="true"] .vmx-picker__row {
     color: var(--amber);
     background: linear-gradient(180deg, rgba(255, 165, 223, 0.072) 0%, rgba(255, 165, 223, 0.022) 100%);
@@ -269,7 +268,6 @@ const CSS = `
     text-shadow: 0 0 4px var(--amber-22);
     box-shadow: var(--glow-faint);
   }
-  .vmx-picker__opt:focus-visible { outline: none; }
   .vmx-picker__opt[data-selected="true"] {
     color: var(--amber);
     background: rgba(255, 165, 223, 0.05);

@@ -167,7 +167,6 @@ const CSS = `
   }
   /* Suppress the body-level *:focus-visible outline+glow-soft on the
    * gear; the rule above is the authoritative focus signal. */
-  .vmx-titlebar__settings:focus-visible { outline: none; }
   .vmx-titlebar__settings[data-active="true"] {
     color: var(--amber);
     border-color: var(--amber-40);
