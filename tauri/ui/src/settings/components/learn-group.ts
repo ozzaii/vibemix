@@ -80,13 +80,18 @@ const CSS = `
     transform: translateX(-50%);
     z-index: 9000;
     padding: var(--sp-3) var(--sp-5);
+    /* Warm void glass; the v5 cool blue-black toast was the drawer's last
+     * cold surface (structural neutral scrim + brand hairline). */
     background:
-      linear-gradient(180deg, rgba(18, 20, 28, 0.88), rgba(4, 5, 9, 0.82)),
-      rgba(0, 0, 0, 0.55);
+      linear-gradient(180deg, rgba(40, 35, 38, 0.92), rgba(26, 22, 24, 0.86)),
+      rgba(0, 0, 0, 0.45);
     backdrop-filter: var(--blur-glass-light);
     -webkit-backdrop-filter: var(--blur-glass-light);
-    border: 1px solid var(--glass-edge);
+    border: 1px solid var(--brand-22);
     border-radius: var(--rad-md);
+    box-shadow:
+      0 12px 36px rgba(0, 0, 0, 0.5),
+      0 0 18px var(--brand-08);
     font-family: var(--type-mono);
     font-size: 11px;
     letter-spacing: 0.16em;

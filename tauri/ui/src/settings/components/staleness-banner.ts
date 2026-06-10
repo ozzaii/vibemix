@@ -19,6 +19,87 @@
 
 import { emitIpc, subscribeIpc } from "../../ipc/client.js";
 import type { LibraryStalenessNudge } from "../../ipc/messages.js";
+import { registerStyle } from "../../session/components/_style-registry.js";
+
+/* The banner shipped with NO registered styles: permanently visible raw text
+ * reading "Library is … old." over three default buttons. The material below
+ * is the drawer's brand-wash banner recipe, and `.hidden` finally works. */
+registerStyle(
+  "vmx-staleness-banner",
+  `
+  .vmx-staleness-banner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--sp-3);
+    padding: 10px var(--sp-3);
+    border: 1px solid var(--border-default);
+    border-radius: var(--rad-sm);
+    background:
+      linear-gradient(180deg, var(--brand-08), transparent 60%),
+      rgba(0, 0, 0, 0.18);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 222, 242, 0.05),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.4);
+  }
+  .vmx-staleness-banner.hidden { display: none; }
+  .vmx-staleness-text {
+    font-family: var(--type-body);
+    font-size: 12px;
+    line-height: 1.4;
+    color: var(--text-secondary);
+    min-width: 0;
+  }
+  .vmx-staleness-age {
+    font-family: var(--type-mono);
+    font-style: normal;
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    color: var(--brand);
+  }
+  .vmx-staleness-copy { color: var(--text-muted); }
+  .vmx-staleness-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    flex: 0 0 auto;
+  }
+  .vmx-staleness-actions button {
+    font-family: var(--type-mono);
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    padding: 6px 10px;
+    color: var(--text-secondary);
+    background: linear-gradient(180deg, var(--void-12), var(--void-8));
+    border: 1px solid var(--border-default);
+    border-radius: var(--rad-sm);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.05),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.4);
+    cursor: pointer;
+    transition: color 0.15s, border-color 0.15s, filter 0.15s;
+  }
+  .vmx-staleness-actions button:hover {
+    color: var(--text-primary);
+    border-color: var(--brand-35);
+    filter: brightness(1.1);
+  }
+  .vmx-staleness-actions button.hidden { display: none; }
+  .vmx-staleness-actions .vmx-staleness-refresh {
+    color: var(--text-primary);
+    border-color: var(--brand-35);
+    background:
+      linear-gradient(180deg, var(--brand-10), var(--brand-04)),
+      linear-gradient(180deg, var(--void-12), var(--void-8));
+  }
+  .vmx-staleness-actions button:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+`,
+);
 
 export interface StalenessBannerHandle {
   element: HTMLElement;

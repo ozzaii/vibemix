@@ -156,7 +156,7 @@ describe("recording-browser — Test 2: setUsage formatting", () => {
     const usage = handle.root.querySelector<HTMLElement>(
       ".vmx-rec-browser__usage",
     );
-    expect(usage?.textContent).toBe("loading...");
+    expect(usage?.textContent).toBe("loading…");
   });
 
   it("renders UNAVAILABLE sentinel for bytes_total === -2", () => {
@@ -172,7 +172,7 @@ describe("recording-browser — Test 2: setUsage formatting", () => {
     const usage = handle.root.querySelector<HTMLElement>(
       ".vmx-rec-browser__usage",
     );
-    expect(usage?.textContent).toBe("unavailable");
+    expect(usage?.textContent).toBe("—");
   });
 });
 

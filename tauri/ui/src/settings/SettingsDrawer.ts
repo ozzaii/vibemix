@@ -476,6 +476,39 @@ const CSS = `
     flex-shrink: 0;
     background: var(--brand-22);
   }
+  /* Voice identity readout — a recessed display window (glass-3 floor, inset
+   * bezel), not a control: it shows what the instrument IS, no chevron. */
+  .vmx-settings-drawer__voice-readout {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--sp-3);
+    padding: 10px 12px;
+    border: 1px solid var(--border-default);
+    border-radius: var(--rad-sm);
+    background: var(--glass-3);
+    box-shadow:
+      inset 0 2px 6px rgba(0, 0, 0, 0.55),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.5),
+      inset 0 1px 0 rgba(0, 0, 0, 0.3);
+  }
+  .vmx-settings-drawer__voice-name {
+    font-family: var(--type-mono);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    color: var(--brand);
+    text-shadow: 0 0 6px var(--brand-22);
+    white-space: nowrap;
+  }
+  .vmx-settings-drawer__voice-sub {
+    font-family: var(--type-mono);
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    white-space: nowrap;
+  }
 `;
 
 registerStyle("vmx-settings-drawer", CSS);
@@ -490,29 +523,11 @@ interface DrawerHandle {
 
 let mountedHandle: DrawerHandle | null = null;
 
-// Mirrored from src/vibemix/voice_presets.py. These are real MOSS-TTS-Nano
-// manifest voices; retired Gemini voice ids must not re-enter this picker.
-// Grouped by gender/language: all 11 female voices + the two EN male voices.
-const VOICE_OPTIONS = [
-  // English male
-  "Adam",
-  "Nathan",
-  // English female
-  "Ava",
-  "Bella",
-  // Chinese female
-  "Xiaoyu",
-  "Yuewen",
-  "Lingyu",
-  // Japanese female
-  "Soyo",
-  "Mei",
-  "Arisa",
-  "Saki",
-  "Mortis",
-  "Umiri",
-  "Anon",
-] as const;
+// The 14-voice MOSS-TTS-Nano picker died with MOSS (the product voice is
+// single-reference local Chatterbox). The drawer renders an honest voice
+// identity READOUT instead of a control; `settings.voice` stays on the wire
+// untouched. If multi-reference presets ever ship, repopulate from a real
+// manifest, never a hardcoded list.
 
 const GENRE_OPTIONS = [
   "house",
@@ -524,6 +539,19 @@ const GENRE_OPTIONS = [
   "hip-hop",
   "edm-generic",
 ] as const;
+
+// User-facing names for the wire enums above — the ids ride the wire
+// verbatim, the labels speak product (a DJ picks "Drum & Bass", not "dnb").
+const GENRE_LABELS: Record<(typeof GENRE_OPTIONS)[number], string> = {
+  house: "House",
+  "tech-house": "Tech House",
+  techno: "Techno",
+  dnb: "Drum & Bass",
+  trance: "Trance",
+  psytrance: "Psytrance",
+  "hip-hop": "Hip-Hop",
+  "edm-generic": "EDM",
+};
 
 /** Mount the drawer + backdrop into the provided root. Idempotent — a
  *  second call returns the same handle without re-mounting. */
@@ -928,19 +956,25 @@ function renderDrawerBody(body: HTMLElement, modalSlot: HTMLElement): void {
   const personaBody = document.createElement("div");
   personaBody.style.cssText = "display:flex; flex-direction:column; gap: var(--sp-4);";
 
-  // Voice picker
-  const voicePicker = rememberPicker(
-    renderPicker({
-      label: "VOICE",
-      value: settings.voice,
-      avatar: true,
-      options: VOICE_OPTIONS.map((v) => ({ id: v, label: v })),
-      onChange: (id) => {
-        void sendSettingsField("voice", id);
-      },
-    }),
-  );
-  personaBody.append(withWire(voicePicker, "settings.persona.voice"));
+  // Voice identity readout — single-reference local Chatterbox is the product
+  // voice; a 14-option picker of retired MOSS names was a dead control wearing
+  // premium material. The row keeps the settings.persona.voice wire anchor.
+  const voiceWrap = document.createElement("div");
+  voiceWrap.style.cssText = "display:flex; flex-direction:column; gap: var(--sp-2);";
+  const voiceLabel = document.createElement("div");
+  voiceLabel.className = "vmx-settings-drawer__label";
+  voiceLabel.textContent = "VOICE";
+  const voiceReadout = document.createElement("div");
+  voiceReadout.className = "vmx-settings-drawer__voice-readout";
+  const voiceName = document.createElement("span");
+  voiceName.className = "vmx-settings-drawer__voice-name";
+  voiceName.textContent = "SVEN · LOCAL VOICE";
+  const voiceSub = document.createElement("span");
+  voiceSub.className = "vmx-settings-drawer__voice-sub";
+  voiceSub.textContent = "on-device, no cloud";
+  voiceReadout.append(voiceName, voiceSub);
+  voiceWrap.append(voiceLabel, voiceReadout);
+  personaBody.append(withWire(voiceWrap, "settings.persona.voice"));
 
   const lensWrap = document.createElement("div");
   lensWrap.style.cssText = "display:flex; flex-direction:column; gap: var(--sp-2);";
@@ -974,9 +1008,13 @@ function renderDrawerBody(body: HTMLElement, modalSlot: HTMLElement): void {
     rememberPicker(
       renderPicker({
         label: "GENRE",
-        value: settings.genre,
+        // The picker's closed chip + selected marks match by LABEL; map the
+        // wire enum to its product name here (ids still ride onChange).
+        value:
+          GENRE_LABELS[settings.genre as (typeof GENRE_OPTIONS)[number]] ??
+          settings.genre,
         autoPill: false,
-        options: GENRE_OPTIONS.map((g) => ({ id: g, label: g })),
+        options: GENRE_OPTIONS.map((g) => ({ id: g, label: GENRE_LABELS[g] })),
         onChange: (id) => {
           void sendSettingsField("genre", id);
         },
@@ -1255,13 +1293,12 @@ function renderDrawerBody(body: HTMLElement, modalSlot: HTMLElement): void {
     // --- LEARN (Phase 92 / LESSON-03) --------------------------------------
     // Reset Learn progress is destructive recovery, not a normal Settings row.
     body.append(LearnGroup());
-  }
 
-  // --- MASCOT (Phase 13-03) -------------------------------------------------
-  // Appended per Plan 13-03 §Task 2; per Plan 14-04 the new PERFORMANCE
-  // group sits AFTER MASCOT. Internal dev tools mount just before MASCOT when
-  // import.meta.env.DEV is true.
-  body.append(MascotGroup());
+    // --- MASCOT (Phase 13-03) ----------------------------------------------
+    // Dev-gated (fable pass 2026-06-10): the mascot is a parked feature and
+    // the group duplicated the PERSONA MODE switch verbatim in shipped builds.
+    body.append(MascotGroup());
+  }
 
   // --- PERFORMANCE (Phase 14-04) -------------------------------------------
   // Single-row group: "LIGHTER BLUR" toggle wiring the data-blur-perf
@@ -1346,7 +1383,7 @@ async function sendSettingsField(
     await sendSettings(field, value);
   } catch (err) {
     // eslint-disable-next-line no-console
-    console.warn(`[settings] sendSettings(${field}) failed:`, err);
+    console.warn("[settings] sendSettings failed:", field, err);
   }
 }
 

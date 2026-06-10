@@ -310,7 +310,7 @@ export function HelpGroup(props: HelpGroupProps = {}): HTMLElement {
     buildRow({
       label: "BLACKHOLE ROUTED?",
       sub: "open install page",
-      status: props.blackhole ?? "unknown",
+      status: props.blackhole,
       ariaLabel: "open blackhole install page",
       title: "open the blackhole install page in your browser",
       onClick: openBlackHoleInstall,
@@ -321,7 +321,7 @@ export function HelpGroup(props: HelpGroupProps = {}): HTMLElement {
     buildRow({
       label: "SCREEN RECORDING?",
       sub: "open system settings",
-      status: props.screenRecording ?? "unknown",
+      status: props.screenRecording,
       ariaLabel: "open macos screen recording preferences",
       title: "open macos screen recording preferences",
       onClick: openScreenRecordingPrefs,
@@ -332,7 +332,7 @@ export function HelpGroup(props: HelpGroupProps = {}): HTMLElement {
     buildRow({
       label: "DJAY PRO RUNNING?",
       sub: "launch djay manually",
-      status: props.djay ?? "unknown",
+      status: props.djay,
       static: true,
       title: "vibemix watches djay's window. launch djay to enable screen grounding",
     }),

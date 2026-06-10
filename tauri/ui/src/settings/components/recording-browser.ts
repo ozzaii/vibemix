@@ -84,10 +84,12 @@ function formatBytes(bytes: number): string {
   return `${gb.toFixed(1)} GB`;
 }
 
-/** Build the disk-usage line string per the sentinel + normal formats. */
+/** Build the disk-usage line string per the sentinel + normal formats.
+ *  Sentinels read as instrument states, not bare debug words: a proper
+ *  ellipsis while counting, a quiet dash when the sidecar can't say. */
 function formatUsageLine(usage: RecordingsUsage): string {
-  if (usage.bytes_total === -1) return "loading...";
-  if (usage.bytes_total === -2) return "unavailable";
+  if (usage.bytes_total === -1) return "loading…";
+  if (usage.bytes_total === -2) return "—";
   const noun = usage.sessions === 1 ? "session" : "sessions";
   return `${usage.sessions} ${noun} · ${formatBytes(usage.bytes_total)}`;
 }

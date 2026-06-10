@@ -188,7 +188,10 @@ describe("Phase 12 — session + drawer integration", () => {
     expect(getSessionState().settings.learn_headphone_device_index).toBe(4);
   });
 
-  it("voice picker lists local voice presets and emits the selected voice", async () => {
+  it("voice row is an honest readout — single local voice, no dead picker", async () => {
+    // Fable pass 2026-06-10: the 14-option MOSS-TTS picker died with MOSS.
+    // The product voice is single-reference local Chatterbox, so the row is
+    // a readout (no control, no options, no ipc.settings.set emission).
     mountSettingsDrawer(document.body);
     applySettingsState({
       voice: "Adam",
@@ -205,56 +208,22 @@ describe("Phase 12 — session + drawer integration", () => {
     openSettings();
     invokeMock.mockClear();
 
-    const picker = document.querySelector<HTMLElement>(
-      '.vmx-settings-drawer .vmx-picker[aria-label="VOICE"]',
+    const voiceWire = document.querySelector<HTMLElement>(
+      '.vmx-settings-drawer [data-wire="settings.persona.voice"]',
     );
-    expect(picker).toBeTruthy();
-    const optionIds = Array.from(
-      picker!.querySelectorAll<HTMLElement>(".vmx-picker__opt"),
-    ).map((el) => el.dataset.id);
-    expect(optionIds).toEqual([
-      "Adam",
-      "Nathan",
-      "Ava",
-      "Bella",
-      "Xiaoyu",
-      "Yuewen",
-      "Lingyu",
-      "Soyo",
-      "Mei",
-      "Arisa",
-      "Saki",
-      "Mortis",
-      "Umiri",
-      "Anon",
-    ]);
-    expect(optionIds).not.toContain("kore");
-    expect(optionIds).not.toContain("puck");
-    expect(picker!.textContent).not.toContain("MOSS");
-
-    const bella = Array.from(
-      picker!.querySelectorAll<HTMLElement>(".vmx-picker__opt"),
-    ).find((el) => el.dataset.id === "Bella");
-    expect(bella).toBeTruthy();
-    bella?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-
-    await Promise.resolve();
-    await Promise.resolve();
-
-    const settingsSetCall = invokeMock.mock.calls.find((c) => {
-      const args = c[1] as { message?: { type?: string; payload?: unknown } };
-      return (
-        args?.message?.type === "ipc.settings.set" &&
-        (args.message.payload as { field?: string }).field === "voice"
-      );
-    });
-    expect(settingsSetCall).toBeDefined();
-    const payload = (
-      settingsSetCall![1] as {
-        message: { payload: { field: string; value: unknown } };
-      }
-    ).message.payload;
-    expect(payload).toEqual({ field: "voice", value: "Bella" });
+    expect(voiceWire).toBeTruthy();
+    expect(voiceWire!.textContent).toContain("SVEN · LOCAL VOICE");
+    expect(voiceWire!.textContent).toContain("on-device, no cloud");
+    // No picker control mounts inside the wire anchor, and no retired voice
+    // names leak into the drawer.
+    expect(voiceWire!.querySelector(".vmx-picker")).toBeNull();
+    expect(voiceWire!.querySelectorAll(".vmx-picker__opt").length).toBe(0);
+    expect(voiceWire!.textContent).not.toContain("MOSS");
+    const drawerText =
+      document.querySelector(".vmx-settings-drawer")?.textContent ?? "";
+    for (const retired of ["Bella", "Xiaoyu", "kore", "puck"]) {
+      expect(drawerText).not.toContain(retired);
+    }
   });
 
   it("drawer lens rocker emits ipc.settings.set with lens", async () => {
