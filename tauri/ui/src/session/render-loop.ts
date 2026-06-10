@@ -69,8 +69,9 @@ function cohostMuteHandler(): void {
  *  register_handler("ipc.session.start", _on_session_start) owns the model
  *  load + silent pre-warm + capture lifecycle in __main__.py, and reflects the
  *  authoritative run-state on its next ipc.session.snapshot (run_state field,
- *  reconciled in ws-bridge.applySnapshot behind a short click-hold). Fire-and-
- *  forget; an emit failure logs only until the wire corrects it. */
+ *  reconciled in ws-bridge.applySnapshot behind a short click-hold). An emit
+ *  FAILURE parks the deck back to armed with a notice: no backend heard the
+ *  start, so no wire would ever correct the optimistic flip. */
 function sessionStartHandler(): void {
   if (getSessionState().runState === "running") return;
   holdRunStateReconciliation();
@@ -78,13 +79,25 @@ function sessionStartHandler(): void {
   void emitIpc("ipc.session.start", {}).catch((err: unknown) => {
     // eslint-disable-next-line no-console
     console.warn("[render-loop] session.start emitIpc failed:", err);
+    // The emit never reached the backend, so no wire will ever correct the
+    // optimistic flip — without this the deck plays LIVE forever while
+    // nothing runs. Park back to armed and say why.
+    setSessionState({
+      runState: "armed",
+      deckNotice: {
+        text: "couldn't go live. the app bridge didn't answer. try again.",
+        tone: "error",
+        ts: Date.now(),
+      },
+    });
   });
 }
 
 /** SHIP-WIRE START-gate — Stop the live session, returning to the armed (idle)
  *  deck. Same optimistic-then-emit shape as start; the backend
  *  register_handler("ipc.session.stop", _on_session_stop) ends capture and
- *  parks/unloads the model. Fire-and-forget; failure logs only. */
+ *  parks/unloads the model. An emit FAILURE returns to running with a notice:
+ *  the backend never heard the stop, so the session is genuinely still live. */
 function sessionStopHandler(): void {
   if (getSessionState().runState !== "running") return;
   holdRunStateReconciliation();
@@ -92,6 +105,17 @@ function sessionStopHandler(): void {
   void emitIpc("ipc.session.stop", {}).catch((err: unknown) => {
     // eslint-disable-next-line no-console
     console.warn("[render-loop] session.stop emitIpc failed:", err);
+    // Mirror of the start path: the backend never heard the stop, so the
+    // session is still live — showing the armed deck would be a lie (and
+    // would disarm the quit guard mid-set). Return to the truth and say why.
+    setSessionState({
+      runState: "running",
+      deckNotice: {
+        text: "couldn't stop cleanly. the app bridge didn't answer. try again.",
+        tone: "error",
+        ts: Date.now(),
+      },
+    });
   });
 }
 

@@ -227,6 +227,10 @@ export interface MountSessionLayoutOptions {
 // Calm idle hero shown before the co-host's first reaction. It is an operating
 // state, not a fabricated reaction: why the deck is quiet and what arms proof.
 const IDLE_HERO_LINE = "Ready for the first move.";
+/** Fault-mode hero placeholder — states the hold, never invents speech. The
+ *  cause line ("◂ audio input dropped" …) and the restart affordance carry
+ *  the diagnosis + recovery; this keeps the centerpiece from going blank. */
+const FAULT_HERO_LINE = "Holding here until the signal returns.";
 
 const METER_ATTACK = 0.16;
 const METER_PEAK_DECAY = 0.04;
@@ -816,7 +820,7 @@ const LAYOUT_CSS = `
   /* The nearest ghost wears the mock's ghost-mark — a mono "earlier" anchor
    * so prior speech reads as a labeled receipt, not an unexplained echo.
    * g2 stays bare so the stack still recedes. */
-  .vmx-ghost--g1:not(:empty)::before {
+  .vmx-ghost--g1:not(:empty):not([data-kind="readiness"])::before {
     content: "earlier";
     font-family: var(--type-mono);
     font-size: 9px;
@@ -1955,14 +1959,24 @@ function applyState(mounted: Mounted, next: SessionState, isMount: boolean): voi
   // (the silent CSS already greys .vmx-now to silk-40, so it reads as a
   // placeholder, NOT a fabricated reaction). Real lines replace it the instant
   // the co-host speaks. Live mode keeps "" (a live deck always has a line).
-  const nowText = nowLine ? nowLine.text : mode === "silent" ? IDLE_HERO_LINE : "";
+  // Fault with an empty transcript used to render a BLANK hero — a failure
+  // state with no body. The cause line + restart live below; the hero holds
+  // the room with a dimmed placeholder (fault CSS drops .vmx-now to the
+  // disabled ink, so it reads as state, not a fabricated reaction).
+  const nowText = nowLine
+    ? nowLine.text
+    : mode === "silent"
+      ? IDLE_HERO_LINE
+      : mode === "fault"
+        ? FAULT_HERO_LINE
+        : "";
   // textContent of the built line concatenates to nowText, so this guard still
   // holds (skip the DOM rebuild when the line is unchanged).
   if (mounted.now.textContent !== nowText) setVoiceLine(mounted.now, nowText);
   if (!nowLine && mode === "silent") {
     const idle = idleReadinessLines(next);
-    setGhostText(mounted.ghosts[0], idle.action);
-    setGhostText(mounted.ghosts[1], idle.inputs);
+    setGhostText(mounted.ghosts[0], idle.action, "readiness");
+    setGhostText(mounted.ghosts[1], idle.inputs, "readiness");
   } else {
     setGhost(mounted.ghosts[0], g1Line);
     setGhost(mounted.ghosts[1], g2Line);
@@ -2157,9 +2171,18 @@ function setGhost(el: HTMLElement, line: TranscriptLine | null): void {
   setGhostText(el, text);
 }
 
-function setGhostText(el: HTMLElement, text: string): void {
+function setGhostText(
+  el: HTMLElement,
+  text: string,
+  kind: "readiness" | "speech" = "speech",
+): void {
   if (el.textContent !== text) el.textContent = text;
   el.style.display = text ? "" : "none";
+  // Readiness guidance is CURRENT instruction, not prior speech — flag it so
+  // the g1 "earlier" provenance label stays off (it was labeling live setup
+  // tips as something the co-host already said).
+  if (kind === "readiness") el.dataset.kind = "readiness";
+  else delete el.dataset.kind;
 }
 
 function syncArmedContext(mounted: Mounted, state: SessionState): void {
@@ -2203,7 +2226,10 @@ function idleReadinessLines(state: SessionState): { inputs: string; action: stri
   const notes: string[] = [];
   if (state.status.livekit === "connecting") notes.push("Audio connecting.");
   else if (state.status.livekit !== "ok") notes.push("Audio checking.");
-  if (state.status.voice === "muted") notes.push("Voice muted.");
+  // "Voice off." not "muted": the ok|muted wire value can't distinguish a
+  // user mute from an engine that failed to load — naming it "muted" blamed
+  // the user for an engine fault. State the fact, not the cause.
+  if (state.status.voice === "muted") notes.push("Voice off.");
   else if (state.status.gemini === "down") notes.push("Co-host offline.");
   else if (state.status.gemini !== "ok") notes.push("Co-host checking.");
   if (state.status.screen === "denied") notes.push("Screen proof denied.");

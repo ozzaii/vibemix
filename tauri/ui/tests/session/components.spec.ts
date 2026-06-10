@@ -844,7 +844,7 @@ describe("SessionLayout", () => {
     expect(voice?.dataset.down).toBe("true");
     expect(voice?.dataset.actionable).toBe("false");
     expect(voice?.getAttribute("aria-label")).toBe("voice status muted");
-    expect(root.textContent).toContain("Voice muted.");
+    expect(root.textContent).toContain("Voice off.");
     expect(root.textContent).toContain("Route DJ output into capture.");
     expect(root.textContent).not.toContain("audio waiting · voice muted · controller seen");
 
