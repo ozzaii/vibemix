@@ -270,6 +270,16 @@ export function renderProfilePanel(
   }
 
   function render(): void {
+    // Preserve the outcome line across rebuilds: regenerate()/deleteProfile()
+    // setStatus the verdict and then await refresh() — which lands here and
+    // used to replaceChildren a FRESH empty status node, wiping the copy
+    // milliseconds after it appeared (every in-protocol failure read as
+    // nothing-happened).
+    const prevStatus = root.querySelector(
+      ".vmx-profile-panel__status",
+    ) as HTMLElement | null;
+    const keepText = prevStatus?.textContent ?? "";
+    const keepError = prevStatus?.dataset.error === "true";
     root.replaceChildren();
 
     const consentRow = document.createElement("div");
@@ -312,6 +322,7 @@ export function renderProfilePanel(
         "profile disabled. enable to let vibemix learn your style.";
       root.append(empty);
       appendStatusAndFooter();
+      if (keepText) setStatus(keepText, keepError);
       return;
     }
 
