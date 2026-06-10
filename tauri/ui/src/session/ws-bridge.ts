@@ -628,6 +628,11 @@ function deckNoticeText(originalType: string, reason: string): string {
   if (originalType === "ipc.session.stop") {
     return `couldn't stop cleanly — ${reason.replace(/^session\.stop failed:\s*/i, "")}`;
   }
+  if (originalType === "audio.capture") {
+    // The deck flips back to the armed gate alongside this notice — name
+    // the recovery action, not just the failure.
+    return `${reason} — the deck is back on standby. Go live to retry.`;
+  }
   return reason;
 }
 
@@ -645,10 +650,13 @@ export function applyIpcError(p: WireIpcErrorPayload): void {
       ts: Date.now(),
     },
   };
-  if (original === "ipc.session.start") {
+  if (original === "ipc.session.start" || original === "audio.capture") {
     // The optimistic GO LIVE repaint was wrong — the backend never went
     // live. Reveal the Start gate so the deck stops claiming a session
-    // that does not exist.
+    // that does not exist. audio.capture is included because a capture-open
+    // failure makes ipc.session.start SUCCEED (__main__._set_input_stream_error
+    // sets started_event BEFORE run_stop_event) and the backend self-parks;
+    // this broadcast is the only wire signal that the running deck is dead.
     patch.runState = "armed";
   }
   setSessionState(patch);
