@@ -32,7 +32,7 @@ test.describe("pill demo reaction triggers", () => {
       await expect(pill).toHaveAttribute("data-open", "true");
       await expect(pill).toHaveAttribute("data-reaction-tone", reaction.tone);
       await expect(pill).toHaveAttribute("data-fx", reaction.tone);
-      await expect(page.locator("#pill-label")).toHaveText("COHOST");
+      await expect(page.locator("#pill-label")).toHaveText("SVEN");
       await expect(page.locator("#pill-reaction .pill__reaction-lead")).toHaveText(
         reaction.lead,
       );
@@ -168,7 +168,7 @@ test.describe("pill demo reaction triggers", () => {
     const bomb = page.locator('#pill-demo-controls button[data-demo-tone="bomb"]');
     await bomb.click();
     await expect(pill).toHaveAttribute("data-state", "expand");
-    await expect(label).toHaveText("COHOST");
+    await expect(label).toHaveText("SVEN");
     await expect(bomb).toHaveAttribute("aria-pressed", "true");
 
     await expect(pill).toHaveAttribute("data-state", "idle", { timeout: 7_000 });
@@ -187,7 +187,7 @@ test.describe("pill demo reaction triggers", () => {
     await page.hover("#pill");
     await expect(pill).toHaveAttribute("data-peek", "true");
     await expect(pill).toHaveAttribute("data-open", "true");
-    await expect(label).toHaveText("DJ KNOWS");
+    await expect(label).toHaveText("NEXT READY");
     await expect(pill).not.toHaveAttribute("data-reaction-echo", /.+/);
 
     await page.mouse.move(740, 300);

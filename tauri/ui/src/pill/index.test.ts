@@ -45,6 +45,7 @@ import {
   pillNextCompletionKey,
   pillSuggestionIsHandled,
   pillShouldClearHandledNextOnNull,
+  pillShouldRearmPeekForFreshSuggestion,
   pillPeekCloseKey,
   pillPeekHandleCloseKey,
   pillPeekHandlePrimaryActionClick,
@@ -284,8 +285,8 @@ describe("readNextSuggestion — tri-state (omitted / null / object)", () => {
 });
 
 describe("pillFaceLabel — booth-facing face copy", () => {
-  it("uses COHOST while a reaction owns the opened body", () => {
-    expect(pillFaceLabel("expand", "TALKING")).toBe("COHOST");
+  it("uses SVEN while a reaction owns the opened body", () => {
+    expect(pillFaceLabel("expand", "TALKING")).toBe("SVEN");
     expect(pillFaceLabel("speaking", "TALKING")).toBe("SPEAKING");
     expect(pillFaceLabel("listening", "LISTENING")).toBe("LISTENING");
     expect(pillFaceLabel("idle", "IDLE")).toBe("IDLE");
@@ -472,7 +473,7 @@ describe("pillDemoReactionKeyForShortcut — demo pad keyboard contract", () => 
   });
 });
 
-describe("pillPeekPrimaryActionKey — focused DJ KNOWS completion", () => {
+describe("pillPeekPrimaryActionKey — focused NEXT READY completion", () => {
   it("accepts Enter and Space only", () => {
     expect(pillPeekPrimaryActionKey("Enter")).toBe(true);
     expect(pillPeekPrimaryActionKey(" ")).toBe(true);
@@ -482,7 +483,7 @@ describe("pillPeekPrimaryActionKey — focused DJ KNOWS completion", () => {
   });
 });
 
-describe("pillPeekHandlePrimaryActionKey — real DJ KNOWS completion contract", () => {
+describe("pillPeekHandlePrimaryActionKey — real NEXT READY completion contract", () => {
   function dispatchRootPrimaryKey(
     root: HTMLElement,
     peek: boolean,
@@ -547,7 +548,7 @@ describe("pillPeekHandlePrimaryActionKey — real DJ KNOWS completion contract",
   });
 });
 
-describe("pillPeekHandlePrimaryActionClick — face click DJ KNOWS completion contract", () => {
+describe("pillPeekHandlePrimaryActionClick — face click NEXT READY completion contract", () => {
   function dispatchRootPrimaryClick(
     root: HTMLElement,
     target: HTMLElement,
@@ -1372,8 +1373,8 @@ describe("syncFocusableDescendants — hidden panel tab discipline", () => {
 });
 
 describe("pillRenderLabel — honest hover copy", () => {
-  it("says DJ KNOWS only when a grounded peek card is visible", () => {
-    expect(pillRenderLabel("IDLE", true, true)).toBe("DJ KNOWS");
+  it("says NEXT READY only when a grounded peek card is visible", () => {
+    expect(pillRenderLabel("IDLE", true, true)).toBe("NEXT READY");
     expect(pillRenderLabel("IDLE", true, false)).toBe("IDLE");
     expect(pillRenderLabel("LISTENING", false, false)).toBe("LISTENING");
   });
@@ -1428,6 +1429,63 @@ describe("pillShouldClearHandledNextOnNull — demo fallback completion memory",
   it("keeps handled fallback cards consumed in demo mode while production null clears", () => {
     expect(pillShouldClearHandledNextOnNull(false)).toBe(true);
     expect(pillShouldClearHandledNextOnNull(true)).toBe(false);
+  });
+});
+
+describe("pillShouldRearmPeekForFreshSuggestion — keyboard re-activation", () => {
+  const fresh: NextSuggestionWire = {
+    track_id: "t2",
+    title: "Night Bloom",
+    artist: "Mira Vale",
+    similarity: 0.84,
+    why: "same late-night pulse",
+    camelot: "9A",
+    bpm: 126,
+  };
+
+  it("re-arms the peek when a fresh pick lands while the root holds focus", () => {
+    const root = document.createElement("div");
+    expect(
+      pillShouldRearmPeekForFreshSuggestion({
+        suggestion: fresh,
+        activeElement: root,
+        root,
+        handledNextKey: "",
+        handledRenderKey: "",
+      }),
+    ).toBe(true);
+  });
+
+  it("stays quiet when focus is elsewhere, the pick is null, or it was already handled", () => {
+    const root = document.createElement("div");
+    const other = document.createElement("button");
+    expect(
+      pillShouldRearmPeekForFreshSuggestion({
+        suggestion: fresh,
+        activeElement: other,
+        root,
+        handledNextKey: "",
+        handledRenderKey: "",
+      }),
+    ).toBe(false);
+    expect(
+      pillShouldRearmPeekForFreshSuggestion({
+        suggestion: null,
+        activeElement: root,
+        root,
+        handledNextKey: "",
+        handledRenderKey: "",
+      }),
+    ).toBe(false);
+    expect(
+      pillShouldRearmPeekForFreshSuggestion({
+        suggestion: fresh,
+        activeElement: root,
+        root,
+        handledNextKey: "",
+        handledRenderKey: nextSuggestionRenderKey(fresh) ?? "",
+      }),
+    ).toBe(false);
   });
 });
 

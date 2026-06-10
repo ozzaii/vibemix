@@ -292,12 +292,13 @@ const STATE_LABEL: Record<PillState["mode"], string> = {
   idle: "IDLE",
   listening: "LISTENING",
   speaking: "SPEAKING",
-  // expand is reaction-open mode; pillFaceLabel maps it to COHOST.
+  // expand is reaction-open mode; pillFaceLabel names the speaker — the rest
+  // of the product says Sven, so the face does too (one register, no COHOST).
   expand: "",
 };
 
 export function pillFaceLabel(mode: PillState["mode"], cohostStatus: CohostStatus): string {
-  if (mode === "expand") return "COHOST";
+  if (mode === "expand") return "SVEN";
   return STATE_LABEL[mode] || labelForStatus(cohostStatus);
 }
 
@@ -1114,12 +1115,35 @@ export function pillShouldClearHandledNextOnNull(demoFallbackEnabled: boolean): 
   return !demoFallbackEnabled;
 }
 
+/** Keyboard parity with a still-hovering pointer: `focusin` never re-fires on
+ *  an already-focused root, so a FRESH grounded pick arriving while the root
+ *  holds focus must re-arm the peek itself — otherwise a keyboard operator is
+ *  trapped (Enter ignored) until they Tab away and back. Pure so the contract
+ *  is testable without the bus or DOM focus. */
+export function pillShouldRearmPeekForFreshSuggestion(input: {
+  suggestion: NextSuggestionWire | null;
+  activeElement: Element | null;
+  root: HTMLElement;
+  handledNextKey: string;
+  handledRenderKey: string;
+}): boolean {
+  if (!hasRenderableSuggestion(input.suggestion)) return false;
+  if (input.activeElement !== input.root) return false;
+  return !pillSuggestionIsHandled(
+    input.suggestion,
+    input.handledNextKey,
+    input.handledRenderKey,
+  );
+}
+
 export function pillRenderLabel(
   baseLabel: string,
   hoverActive: boolean,
   peekVisible: boolean,
 ): string {
-  return hoverActive && peekVisible ? "DJ KNOWS" : baseLabel;
+  // State-word register, same as IDLE/LISTENING/SPEAKING — "NEXT READY" says
+  // what the open glance holds ("DJ KNOWS" was a third naming register).
+  return hoverActive && peekVisible ? "NEXT READY" : baseLabel;
 }
 
 export function pillRootAriaLabel(input: {
@@ -1397,22 +1421,26 @@ function pillFxRandom(seed: number): () => number {
 }
 
 function pillReactionFxPalette(view: PillView): PillFxPalette {
+  // The real palette is the token triplets on [data-reaction-tone] (pill.css →
+  // tokens.css --brand-rgb / --silk-rgb / --warn-rgb / --fault-rgb). The
+  // inline numbers below are last-resort fallbacks for a detached test DOM and
+  // mirror --brand / --silk exactly — never a third palette.
   const styles = getComputedStyle(view.root);
   return {
     primary: pillFxRgb(styles.getPropertyValue("--pill-fx-primary"), {
       r: 255,
-      g: 170,
-      b: 224,
+      g: 165,
+      b: 223,
     }),
     secondary: pillFxRgb(styles.getPropertyValue("--pill-fx-secondary"), {
-      r: 235,
-      g: 197,
-      b: 128,
+      r: 242,
+      g: 239,
+      b: 241,
     }),
     accent: pillFxRgb(styles.getPropertyValue("--pill-fx-accent"), {
-      r: 255,
-      g: 232,
-      b: 196,
+      r: 242,
+      g: 239,
+      b: 241,
     }),
   };
 }
@@ -2222,6 +2250,17 @@ function boot(): void {
         if (ns === null && pillShouldClearHandledNextOnNull(DEMO_NEXT_ENABLED)) {
           view.handledNextKey = "";
           view.handledNextRenderKey = "";
+        }
+        if (
+          pillShouldRearmPeekForFreshSuggestion({
+            suggestion: ns,
+            activeElement: document.activeElement,
+            root,
+            handledNextKey: view.handledNextKey,
+            handledRenderKey: view.handledNextRenderKey,
+          })
+        ) {
+          state = setPeek(state, true);
         }
       }
     });

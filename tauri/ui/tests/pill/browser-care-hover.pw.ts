@@ -129,7 +129,7 @@ const LONG_CARE_FRAME = {
   },
 };
 
-test.describe("pill DJ KNOWS hover and completion", () => {
+test.describe("pill NEXT READY hover and completion", () => {
   test("risky suggestion owns hover/click even when demo controls overlap", async ({ page }) => {
     await installFakePillBus(page);
     await page.setViewportSize({ width: 600, height: 260 });
@@ -293,7 +293,7 @@ test.describe("pill DJ KNOWS hover and completion", () => {
     );
   });
 
-  test("narrow DJ KNOWS card keeps long care copy readable without spill", async ({
+  test("narrow NEXT READY card keeps long care copy readable without spill", async ({
     page,
   }) => {
     await installFakePillBus(page);
@@ -309,7 +309,7 @@ test.describe("pill DJ KNOWS hover and completion", () => {
 
     await page.hover("#pill");
     await expect(pill).toHaveAttribute("data-peek", "true");
-    await expect(page.locator("#pill-label")).toHaveText("DJ KNOWS");
+    await expect(page.locator("#pill-label")).toHaveText("NEXT READY");
     await expect(page.locator(".pill__peek .vmx-next-card__peek-action")).toHaveText("CARE");
     await page.waitForFunction(() => {
       const peek = document.querySelector<HTMLElement>("#pill-peek");
@@ -394,7 +394,7 @@ test.describe("pill DJ KNOWS hover and completion", () => {
     expect(layout.pillScrollWidth).toBeLessThanOrEqual(layout.pillClientWidth + 1);
   });
 
-  test("focused DJ KNOWS completes KEEP with Enter and clears shortcuts", async ({
+  test("focused NEXT READY completes KEEP with Enter and clears shortcuts", async ({
     page,
   }) => {
     await installFakePillBus(page);
@@ -415,7 +415,7 @@ test.describe("pill DJ KNOWS hover and completion", () => {
     await expect(pill).toHaveAttribute("aria-keyshortcuts", "Enter Space");
     await expect(pill).toHaveAttribute("aria-controls", "pill-peek");
     await expect(pill).toHaveAttribute("aria-expanded", "true");
-    await expect(page.locator("#pill-label")).toHaveText("DJ KNOWS");
+    await expect(page.locator("#pill-label")).toHaveText("NEXT READY");
     await expect(page.locator(".pill__peek .vmx-next-card__peek-action")).toHaveText("KEEP");
 
     const focusedAction = await pill.getAttribute("aria-label");
@@ -569,14 +569,14 @@ test.describe("pill DJ KNOWS hover and completion", () => {
 
     await expect(pill).toHaveAttribute("data-state", "expand");
     await expect(pill).toHaveAttribute("data-open", "true");
-    await expect(page.locator("#pill-label")).toHaveText("COHOST");
+    await expect(page.locator("#pill-label")).toHaveText("SVEN");
     await expect(page.locator("#pill-peek")).toBeEmpty();
     await expect
       .poll(() => page.evaluate(() => document.activeElement?.id))
       .toBe("pill");
   });
 
-  test("focused risky DJ KNOWS completes CARE with Space", async ({ page }) => {
+  test("focused risky NEXT READY completes CARE with Space", async ({ page }) => {
     await installFakePillBus(page);
     await page.setViewportSize({ width: 600, height: 260 });
     await page.goto("/pill.html?controls=1", { waitUntil: "domcontentloaded" });
@@ -595,7 +595,7 @@ test.describe("pill DJ KNOWS hover and completion", () => {
     await expect(pill).toHaveAttribute("aria-keyshortcuts", "Enter Space");
     await expect(pill).toHaveAttribute("aria-controls", "pill-peek");
     await expect(pill).toHaveAttribute("aria-expanded", "true");
-    await expect(page.locator("#pill-label")).toHaveText("DJ KNOWS");
+    await expect(page.locator("#pill-label")).toHaveText("NEXT READY");
     await expect(page.locator(".pill__peek .vmx-next-card__peek-action")).toHaveText("CARE");
 
     const focusedAction = await pill.getAttribute("aria-label");
@@ -617,7 +617,7 @@ test.describe("pill DJ KNOWS hover and completion", () => {
     await expect(page.locator("#pill-peek")).toBeEmpty();
   });
 
-  test("Escape dismisses focused DJ KNOWS without consuming the suggestion", async ({
+  test("Escape dismisses focused NEXT READY without consuming the suggestion", async ({
     page,
   }) => {
     await installFakePillBus(page);
@@ -636,7 +636,7 @@ test.describe("pill DJ KNOWS hover and completion", () => {
     await expect(pill).toHaveAttribute("data-actionable", "true");
     await expect(pill).toHaveAttribute("aria-controls", "pill-peek");
     await expect(pill).toHaveAttribute("aria-expanded", "true");
-    await expect(page.locator("#pill-label")).toHaveText("DJ KNOWS");
+    await expect(page.locator("#pill-label")).toHaveText("NEXT READY");
 
     await page.keyboard.press("Escape");
 
@@ -666,7 +666,7 @@ test.describe("pill DJ KNOWS hover and completion", () => {
     await expect(pill).toHaveAttribute("aria-controls", "pill-peek");
     await expect(pill).toHaveAttribute("aria-expanded", "true");
     await expect(page.locator("#pill-peek")).not.toHaveAttribute("inert", /.+/);
-    await expect(page.locator("#pill-label")).toHaveText("DJ KNOWS");
+    await expect(page.locator("#pill-label")).toHaveText("NEXT READY");
     await expect(page.locator("#pill-peek .vmx-next-card")).toHaveAttribute("tabindex", "0");
     await expect(page.locator(".pill__peek .vmx-next-card__peek-action")).toHaveText("KEEP");
   });
@@ -708,7 +708,7 @@ test.describe("pill DJ KNOWS hover and completion", () => {
     await expect(peekCard).toHaveAttribute("tabindex", "-1");
   });
 
-  test("face click completes visible DJ KNOWS without aiming at the peek card", async ({
+  test("face click completes visible NEXT READY without aiming at the peek card", async ({
     page,
   }) => {
     await installFakePillBus(page);
@@ -728,7 +728,7 @@ test.describe("pill DJ KNOWS hover and completion", () => {
     await expect(pill).toHaveAttribute("data-actionable", "true");
     await expect(pill).toHaveAttribute("aria-controls", "pill-peek");
     await expect(pill).toHaveAttribute("aria-expanded", "true");
-    await expect(label).toHaveText("DJ KNOWS");
+    await expect(label).toHaveText("NEXT READY");
     await expect(page.locator(".pill__peek .vmx-next-card__peek-action")).toHaveText("KEEP");
 
     const clickedZone = await page.evaluate(() => {
