@@ -346,8 +346,18 @@ const CSS = `
   .wizard-step--library-feed .vmx-skill-level__radio-row {
     padding: 8px var(--sp-3);
   }
+  /* "Open vibemix" must never fall below the fold: at 900px the assembled
+   * panel overflows the scrolling grid, hiding the deck-opening key behind a
+   * 6px scrollbar. Sticky pins the CTA to the scroll viewport's floor; the
+   * scrim is a structural neutral fade so content slides under, not through.
+   */
   .wizard-step.wizard-step--library-feed > .wizard-step__cta-row {
     margin-top: var(--sp-2);
+    position: sticky;
+    bottom: 0;
+    z-index: 3;
+    padding: var(--sp-3) 0 var(--sp-2);
+    background: linear-gradient(180deg, rgba(26, 22, 24, 0), rgba(26, 22, 24, 0.94) 46%);
   }
   @media (max-width: 900px) {
     .wizard-grid:has(.wizard-step--library-feed) {

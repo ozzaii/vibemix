@@ -30,6 +30,7 @@ import {
 } from "../library/api.js";
 import { registerShortcuts } from "../session/shortcuts.js";
 import { listenTauri } from "../tauri-runtime.js";
+import { registerStyle } from "./components/_style-registry.js";
 import { StatusBar } from "./components/status-bar.js";
 import type { StatusBarProps } from "./components/status-bar.js";
 import { StepIndicator } from "./components/step-indicator.js";
@@ -337,8 +338,83 @@ function ensureWizardShortcuts(): void {
   });
 }
 
+// ---------------------------------------------------------------------------
+// Wizard chrome clock — the titlebar's mono readout shipped as a dead "00:00"
+// through the whole first run (the first fake LED a new user saw). Mirror the
+// shell chrome's 1s HH:MM ticker so the instrument tells the truth from boot.
+// ---------------------------------------------------------------------------
+
+let wizardClockTimer: number | null = null;
+
+function ensureWizardClock(): void {
+  if (wizardClockTimer !== null) return;
+  const clock = document.getElementById("wizard-clock");
+  if (!clock) return;
+  const tick = (): void => {
+    const now = new Date();
+    clock.textContent = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+  };
+  tick();
+  wizardClockTimer = globalThis.setInterval(tick, 1000) as unknown as number;
+}
+
+// The wizard→shell handoff moment. A bare "loading vibemix…" text node read
+// like a crash if the sidecar respawn took seconds; the handoff now speaks the
+// room's vocabulary — serif line on the void, one breathing rose dot (the only
+// element on screen, so the one-breath law holds).
+registerStyle(
+  "wizard-done",
+  `
+  .wizard-done {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--sp-4);
+    min-height: 360px;
+  }
+  .wizard-done__line {
+    font-family: var(--type-serif);
+    font-size: clamp(26px, 3vw, 34px);
+    font-weight: 400;
+    line-height: 1.2;
+    color: var(--text-primary);
+    text-shadow: var(--text-3d);
+  }
+  .wizard-done__dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--brand);
+    box-shadow: 0 0 8px var(--brand-40);
+    animation: wizard-done-breathe var(--motion-led-pulse) var(--ease-brand) infinite;
+  }
+  @keyframes wizard-done-breathe {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.45; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .wizard-done__dot { animation: none; }
+  }
+`,
+);
+
+function renderDoneHandoff(): HTMLElement {
+  const root = document.createElement("div");
+  root.className = "wizard-done";
+  const line = document.createElement("div");
+  line.className = "wizard-done__line";
+  line.textContent = "opening the deck";
+  const dot = document.createElement("span");
+  dot.className = "wizard-done__dot";
+  dot.setAttribute("aria-hidden", "true");
+  root.append(line, dot);
+  return root;
+}
+
 export function renderCurrentStep(): void {
   ensureWizardShortcuts();
+  ensureWizardClock();
   // Leaving driver-fetch drops the cached mount so a re-entry re-runs the
   // probe (the companion script's already_installed check keeps it idempotent).
   if (wizardState.currentStep !== "driver-fetch" && driverFetchEl !== null) {
@@ -560,8 +636,7 @@ export function renderCurrentStep(): void {
       });
       break;
     case "done":
-      primary = document.createElement("div");
-      primary.textContent = "loading vibemix…";
+      primary = renderDoneHandoff();
       break;
   }
 
