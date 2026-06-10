@@ -458,7 +458,10 @@
 
 .vmx-debrief-tldr {
   display: grid;
-  grid-template-rows: auto auto minmax(64px, 1fr);
+  /* min-content floor: the panel's fixed-height column can compress the
+   * player row below its content; the well must never shrink under what
+   * it holds (the meta line sheared mid-glyph at 1440x900). */
+  grid-template-rows: auto auto minmax(min-content, 1fr);
   min-height: 174px;
 }
 
@@ -670,7 +673,11 @@
   position: relative;
   min-height: 48px;
   display: grid;
-  align-content: center;
+  /* start, not center: when the well runs short, centering splits the
+   * overflow across BOTH clipped edges — the meta line loses its top half
+   * and the rail its feet. Top-aligned, only the decorative rail bottom
+   * can ever crop. */
+  align-content: start;
   gap: var(--sp-2);
   padding: var(--sp-3);
   border: 1px solid var(--border-subtle);
@@ -776,6 +783,20 @@
   margin: 0;
   color: var(--text-muted);
   font-size: 12px;
+}
+
+/* Short viewports (1440x900-class displays): the main column is genuinely
+ * overcommitted, so the mock player goes on a diet — rail and gauge wells
+ * shrink until the content fits its well instead of cropping. Real mode
+ * (<audio>, no rail/hud) is untouched. */
+@media (max-height: 940px) {
+  .vmx-debrief-tldr-mock-rail {
+    height: 26px;
+  }
+
+  .vmx-debrief-tldr-hud-cell {
+    min-height: 40px;
+  }
 }
 
 .vmx-debrief-timeline-placeholder {
