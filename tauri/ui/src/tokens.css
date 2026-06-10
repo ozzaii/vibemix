@@ -321,6 +321,15 @@
   --danger-10: rgba(212, 65, 58, 0.10);
   --danger-58: rgba(212, 65, 58, 0.58);
 
+  /* Channel triplets — `R G B` numbers for surfaces that paint through a 2D
+   * canvas (the pill reaction fx) and need raw channels at runtime alpha.
+   * Mirrors of --brand / --silk / --led-warn / --led-fault; tokens.css is the
+   * only file allowed to carry the literals. */
+  --brand-rgb: 255 165 223;
+  --silk-rgb:  242 239 241;
+  --warn-rgb:  244 197 66;
+  --fault-rgb: 212 65 58;
+
   /* Glass blurs */
   --blur-glass:         blur(32px) saturate(140%);
   --blur-glass-light:   blur(16px) saturate(120%);

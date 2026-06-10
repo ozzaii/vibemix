@@ -90,23 +90,25 @@ describe("pill waveform — PILL-03 contract", () => {
     expect(_CSS_FOR_TEST).not.toMatch(/#[0-9a-fA-F]{3,6}\b/);
   });
 
-  test("frontend-enforcement: lit bar reuses the amber warm-zone gradient tokens", () => {
+  test("frontend-enforcement: lit bar wears the brand rose gradient, spelled directly (no --amber alias)", () => {
     const litRule = _CSS_FOR_TEST.match(
       /\.vmx-pill-wave__bar\[data-lit="true"\]\s*\{[^}]*\}/,
     );
     expect(litRule).not.toBeNull();
-    // The lit-bar fill is the SAME amber warm gradient as the session meter.
-    expect(litRule![0]).toMatch(/var\(--amber\)/);
-    expect(litRule![0]).toMatch(/var\(--amber-78\)/);
-    expect(litRule![0]).toMatch(/var\(--amber-40\)/);
+    // The lit-bar fill is the SAME rose warm gradient as the session meter,
+    // spelled --brand directly (the --amber alias is quarantined).
+    expect(litRule![0]).toMatch(/var\(--brand\)/);
+    expect(litRule![0]).toMatch(/var\(--brand-78\)/);
+    expect(litRule![0]).toMatch(/var\(--brand-40\)/);
+    expect(_CSS_FOR_TEST).not.toMatch(/var\(--amber/);
   });
 
-  test("frontend-enforcement: 20/80 — amber appears ONLY on the lit bar, not the resting bar", () => {
+  test("frontend-enforcement: 20/80 — rose appears ONLY on the lit bar, not the resting bar", () => {
     const restRule = _CSS_FOR_TEST.match(
       /\.vmx-pill-wave__bar\s*\{[^}]*\}/,
     );
     expect(restRule).not.toBeNull();
-    // Resting bars are silk, never amber (amber is reserved for the lit fill).
-    expect(restRule![0]).not.toMatch(/var\(--amber/);
+    // Resting bars are silk, never rose (the rose is reserved for the lit fill).
+    expect(restRule![0]).not.toMatch(/var\(--brand/);
   });
 });

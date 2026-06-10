@@ -142,14 +142,16 @@
     linear-gradient(180deg, var(--glass-top), transparent 54%),
     var(--glass-3);
 }
+/* One-Rose: during a reaction THE rose is the lead word. The lozenge itself
+ * keeps the silk hover-grade edge (one whisper of brand ambience, no rose
+ * ring) so the border never competes with the lead. */
 .pill[data-state="expand"][data-reaction-tone="bomb"],
 .pill[data-state="expand"][data-reaction-tone="lit_aff"] {
-  border-color: var(--brand-40);
+  border-color: var(--glass-edge-up);
   box-shadow:
     var(--lg-surface-shadow),
-    inset 0 0 0 1px var(--brand-40),
-    0 0 24px var(--brand-22),
-    0 14px 42px var(--brand-12);
+    inset 0 0 0 1px var(--glass-edge-up),
+    0 0 18px var(--brand-08);
 }
 .pill[data-state="expand"][data-reaction-tone="bomb"][data-reaction-pulse="a"],
 .pill[data-state="expand"][data-reaction-tone="lit_aff"][data-reaction-pulse="a"] {
@@ -733,18 +735,17 @@
     border-color 180ms var(--ease-brand),
     box-shadow 180ms var(--ease-brand);
 }
-/* State dot — one of the four reserved amber accents (20/80). Amber + pulse
- * ONLY in listening/speaking; dim silk at idle. */
+/* State dot — rose only while the co-host is live (20/80); dim silk at idle.
+ * One breath per face (One-Rose): at listening the dot IS the breath and
+ * blinks; at speaking the live waveform carries the breath, so the dot
+ * steadies to static lit rose. */
 .pill[data-state="listening"] .pill__dot,
 .pill[data-state="speaking"] .pill__dot {
-  background: var(--amber);
+  background: var(--brand);
   box-shadow: var(--glow-soft);
 }
 .pill[data-state="listening"] .pill__dot {
   animation: pill-blink 1.4s ease-in-out infinite;
-}
-.pill[data-state="speaking"] .pill__dot {
-  animation: pill-blink 0.9s ease-in-out infinite;
 }
 .pill[data-intel="knows"] .pill__dot::after {
   animation: pill-dot-ring-arm 360ms var(--ease-brand) both;
@@ -812,13 +813,13 @@
   color: var(--brand-glow);
   text-shadow: 0 0 10px var(--brand-22);
 }
-.pill[data-state="listening"]:not([data-feedback]):not([data-peek="true"]):not(
+.pill[data-state="listening"]:not([data-peek="true"]):not(
     [data-reaction-echo]
   )
   .pill__label {
   animation: pill-live-label-listen 280ms var(--ease-brand) both;
 }
-.pill[data-state="speaking"]:not([data-feedback]):not([data-peek="true"]):not(
+.pill[data-state="speaking"]:not([data-peek="true"]):not(
     [data-reaction-echo]
   )
   .pill__label {
@@ -903,6 +904,9 @@
 .pill[data-reaction-echo] .pill__dot {
   background: var(--brand);
   box-shadow: var(--glow-soft);
+  /* The echoed word is the accent; a listening blink under it would be a
+   * second breath. The dot holds static lit for the echo window. */
+  animation: none;
 }
 .pill[data-reaction-echo="mid"] .pill__dot {
   background: var(--led-warn);
@@ -1032,25 +1036,25 @@
 .pill[data-open="true"] .pill__notch {
   opacity: 0;
 }
-.pill[data-next-pulse="a"]:not([data-open="true"]):not([data-feedback]):not(
+.pill[data-next-pulse="a"]:not([data-open="true"]):not(
     [data-reaction-echo]
   )
   .pill__notch {
   animation: pill-next-notch-ready-a 560ms var(--ease-brand) both;
 }
-.pill[data-next-pulse="b"]:not([data-open="true"]):not([data-feedback]):not(
+.pill[data-next-pulse="b"]:not([data-open="true"]):not(
     [data-reaction-echo]
   )
   .pill__notch {
   animation: pill-next-notch-ready-b 560ms var(--ease-brand) both;
 }
-.pill[data-next-pulse="a"]:not([data-open="true"]):not([data-feedback]):not(
+.pill[data-next-pulse="a"]:not([data-open="true"]):not(
     [data-reaction-echo]
   )
   .pill__notch::before {
   animation: pill-next-notch-glint-a 520ms var(--ease-brand) both;
 }
-.pill[data-next-pulse="b"]:not([data-open="true"]):not([data-feedback]):not(
+.pill[data-next-pulse="b"]:not([data-open="true"]):not(
     [data-reaction-echo]
   )
   .pill__notch::before {
@@ -1173,7 +1177,9 @@
   z-index: -1;
   height: 2px;
   border-radius: 999px;
-  background: linear-gradient(90deg, transparent, var(--brand), var(--brand), transparent);
+  /* Structural silk — the stage line under the face is a sill the panel
+   * opens from, not a second rose accent (the lead owns the rose). */
+  background: linear-gradient(90deg, transparent, var(--glass-edge-up), var(--border-strong), transparent);
   opacity: 0;
   transform: scaleX(0);
   transform-origin: left center;
@@ -1190,14 +1196,16 @@
   transform: translateY(0);
 }
 .pill[data-state="expand"][data-reaction-tone] .pill__expand::before {
-  opacity: 0.72;
+  /* Low-alpha ambience only — the wash supports the rose lead, it never
+   * competes with it. */
+  opacity: 0.36;
   transform: translateY(0) scaleY(1);
   transition:
     opacity 260ms var(--ease-brand),
     transform 320ms var(--ease-brand);
 }
 .pill[data-state="expand"][data-reaction-tone] .pill__expand::after {
-  opacity: 0.88;
+  opacity: 0.62;
   animation: pill-stage-rail 620ms var(--ease-brand) both;
 }
 .pill[data-state="expand"][data-reaction-tone][data-reaction-pulse="a"] .pill__expand::after {
@@ -1205,9 +1213,6 @@
 }
 .pill[data-state="expand"][data-reaction-tone][data-reaction-pulse="b"] .pill__expand::after {
   animation-name: pill-stage-rail-b;
-}
-.pill[data-state="expand"][data-reaction-tone="clean"] .pill__expand::before {
-  opacity: 0.36;
 }
 .pill[data-state="expand"][data-reaction-tone="mid"] .pill__expand::before {
   background:
@@ -1227,36 +1232,23 @@
 .pill[data-state="expand"][data-reaction-tone="mid"] .pill__expand::after {
   background: linear-gradient(90deg, transparent, var(--led-warn), transparent);
 }
+/* Reaction-fx channel palette — token triplets only (tokens.css owns the
+ * literals). Hot tones burst BRAND rose with silk-light sparks; the old
+ * palette carried five off-brand roses plus a gold secondary, which broke
+ * both One-Rose and the gold quarantine. Status tones stay LED-true. */
 .pill[data-reaction-tone] {
-  --pill-fx-primary: 255 170 224;
-  --pill-fx-secondary: 236 196 132;
-  --pill-fx-accent: 255 230 194;
+  --pill-fx-primary: var(--brand-rgb);
+  --pill-fx-secondary: var(--silk-rgb);
+  --pill-fx-accent: var(--silk-rgb);
 }
 .pill[data-reaction-tone="clean"] {
-  --pill-fx-primary: 230 236 232;
-  --pill-fx-secondary: 204 214 210;
-  --pill-fx-accent: 245 236 218;
-}
-.pill[data-reaction-tone="sexy"] {
-  --pill-fx-primary: 255 153 223;
-  --pill-fx-secondary: 188 144 255;
-  --pill-fx-accent: 255 220 192;
+  --pill-fx-primary: var(--silk-rgb);
 }
 .pill[data-reaction-tone="mid"] {
-  --pill-fx-primary: 225 186 96;
-  --pill-fx-secondary: 165 176 166;
-  --pill-fx-accent: 236 210 142;
-}
-.pill[data-reaction-tone="bomb"],
-.pill[data-reaction-tone="lit_aff"] {
-  --pill-fx-primary: 255 129 218;
-  --pill-fx-secondary: 248 198 120;
-  --pill-fx-accent: 255 232 194;
+  --pill-fx-primary: var(--warn-rgb);
 }
 .pill[data-reaction-tone="negative"] {
-  --pill-fx-primary: 235 78 70;
-  --pill-fx-secondary: 255 142 92;
-  --pill-fx-accent: 255 204 172;
+  --pill-fx-primary: var(--fault-rgb);
 }
 .pill__fx {
   position: absolute;
@@ -1303,26 +1295,14 @@
   padding-bottom: 3px;
   overflow: hidden;
 }
-.pill[data-state="expand"][data-reaction-tone] .pill__reaction::before,
+/* The reaction block carries ONE pseudo: the soft halo behind the lead (the
+ * lead's own light, part of THE rose accent). The old ::before underline was
+ * a second rail duplicating .pill__receipt-rule one breath below it. */
 .pill[data-state="expand"][data-reaction-tone] .pill__reaction::after {
   content: "";
   position: absolute;
   pointer-events: none;
   z-index: 0;
-}
-.pill[data-state="expand"][data-reaction-tone] .pill__reaction::before {
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 1px;
-  border-radius: 999px;
-  background: linear-gradient(90deg, transparent, var(--brand-40), var(--brand-40), transparent);
-  opacity: 0.64;
-  transform: scaleX(0);
-  transform-origin: left center;
-  animation: pill-reaction-rail-settle 620ms var(--ease-brand) 80ms both;
-}
-.pill[data-state="expand"][data-reaction-tone] .pill__reaction::after {
   left: -18px;
   top: -8px;
   width: 104px;
@@ -1336,25 +1316,13 @@
   transform: translate3d(-8px, 6px, 0) scale(0.72);
   animation: pill-reaction-ink-bloom 720ms var(--ease-brand) both;
 }
-.pill[data-state="expand"][data-reaction-tone="clean"] .pill__reaction::before {
-  background: linear-gradient(90deg, transparent, var(--glass-edge-up), var(--border-strong), transparent);
-  opacity: 0.5;
-}
 .pill[data-state="expand"][data-reaction-tone="clean"] .pill__reaction::after {
   background: radial-gradient(closest-side, var(--silk-12), transparent 76%);
   opacity: 0.16;
 }
-.pill[data-state="expand"][data-reaction-tone="mid"] .pill__reaction::before {
-  background: linear-gradient(90deg, transparent, var(--led-warn), var(--glass-edge-up), transparent);
-  opacity: 0.42;
-}
 .pill[data-state="expand"][data-reaction-tone="mid"] .pill__reaction::after {
   background: radial-gradient(closest-side, var(--led-warn), transparent 76%);
   opacity: 0.12;
-}
-.pill[data-state="expand"][data-reaction-tone="negative"] .pill__reaction::before {
-  background: linear-gradient(90deg, transparent, var(--led-fault), var(--glass-edge-up), transparent);
-  opacity: 0.54;
 }
 .pill[data-state="expand"][data-reaction-tone="negative"] .pill__reaction::after {
   background: radial-gradient(closest-side, var(--led-fault), transparent 74%);
@@ -1600,20 +1568,6 @@
     transform: translate3d(0, 0, 0);
   }
 }
-@keyframes pill-reaction-rail-settle {
-  from {
-    opacity: 0;
-    transform: scaleX(0);
-  }
-  48% {
-    opacity: 0.82;
-    transform: scaleX(1);
-  }
-  to {
-    opacity: 0.52;
-    transform: scaleX(0.92);
-  }
-}
 @keyframes pill-reaction-ink-bloom {
   from {
     opacity: 0;
@@ -1638,7 +1592,7 @@
     opacity: 1;
   }
   to {
-    opacity: 0.88;
+    opacity: 0.62;
     transform: scaleX(1);
   }
 }
@@ -1651,7 +1605,7 @@
     opacity: 1;
   }
   to {
-    opacity: 0.88;
+    opacity: 0.62;
     transform: scaleX(1);
   }
 }
@@ -1664,7 +1618,7 @@
     opacity: 1;
   }
   to {
-    opacity: 0.88;
+    opacity: 0.62;
     transform: scaleX(1);
   }
 }
@@ -1684,9 +1638,10 @@
   height: 24px;
   max-inline-size: 148px;
   padding: 0 8px;
-  border-color: var(--brand-22);
+  /* Receipts wear glass, not rose — hover/focus lights them (transient
+   * affordance); the resting strip leaves the lead as the only rose. */
+  border-color: var(--glass-edge-up);
   background:
-    radial-gradient(70px 24px at 12% 0%, var(--brand-08), transparent 72%),
     linear-gradient(180deg, var(--lg-spec-mid), transparent 46%),
     var(--glass-2);
   color: var(--silk);
@@ -1737,27 +1692,23 @@
 }
 
 /* ── Receipt rule (2026-05-26 "The Deck Speaks" echo) ────────────────────── *
- * A 1px tone-aware hairline that draws left-to-right above the citation strip when
- * the pill expands on a reaction — the session deck's signature gesture ("the
- * sentence draws its receipt") carried to the pill in miniature. One draw on
- * void glass; the color follows the reaction lead so negatives do not inherit
- * the same success rail as BOMB/LIT. Inserted fresh per reaction (index.ts) so the draw
- * replays each time; frozen complete under reduced-motion. */
+ * A 1px hairline that draws left-to-right above the citation strip when the
+ * pill expands on a reaction — the session deck's signature gesture ("the
+ * sentence draws its receipt") carried to the pill in miniature. Structural
+ * silk: the rose lives in the lead word alone (One-Rose), so the receipt is
+ * a quiet draw, not a second accent; only a negative carries the fault tint.
+ * Inserted fresh per reaction (index.ts) so the draw replays each time;
+ * frozen complete under reduced-motion. */
 .pill__receipt-rule {
   align-self: stretch;
   height: 1px;
-  background: linear-gradient(90deg, var(--brand-40), var(--brand));
-  opacity: 0.9;
+  background: linear-gradient(90deg, var(--silk-40), var(--silk-65));
+  opacity: 0.64;
   transform: scaleX(0);
   transform-origin: left;
   animation: pill-receipt-draw 520ms var(--ease-draw) 80ms forwards;
 }
-.pill[data-reaction-tone="clean"] .pill__receipt-rule {
-  background: linear-gradient(90deg, var(--silk-40), var(--silk-65));
-  opacity: 0.64;
-}
 .pill[data-reaction-tone="mid"] .pill__receipt-rule {
-  background: linear-gradient(90deg, var(--silk-40), var(--silk-65));
   opacity: 0.48;
 }
 .pill[data-reaction-tone="negative"] .pill__receipt-rule {
@@ -2948,11 +2899,6 @@
   }
   .pill__fx {
     display: none;
-  }
-  .pill[data-state="expand"][data-reaction-tone] .pill__reaction::before {
-    animation: none !important;
-    opacity: 0.52;
-    transform: scaleX(0.92);
   }
   .pill[data-actionable="true"] .pill__row::after {
     opacity: 0.54;

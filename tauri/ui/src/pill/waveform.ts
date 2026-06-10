@@ -66,14 +66,17 @@ const CSS = `
                 opacity var(--motion-snap) ease-out;
     opacity: 0.85;
   }
-  /* Lit bar — the SAME amber warm-zone gradient + glow as the session meter's
-   * warm segments (meter.ts lines 113-118). 20/80: amber lives here only. */
+  /* Lit bar — the SAME rose warm-zone gradient + glow as the session meter's
+   * warm segments (meter.ts). 20/80: the rose lives here only — while
+   * speaking, the voice-driven bars are the face's single breath and the
+   * state dot holds static (One-Rose). Spelled --brand directly; the --amber
+   * alias is quarantined (tokens.css). */
   .vmx-pill-wave__bar[data-lit="true"] {
     opacity: 1;
-    background: linear-gradient(180deg, var(--amber), var(--amber-78));
+    background: linear-gradient(180deg, var(--brand), var(--brand-78));
     box-shadow:
       inset 0 0 0 0.5px var(--seg-hi-12),
-      0 0 4px var(--amber-40);
+      0 0 4px var(--brand-40);
   }
 `;
 
