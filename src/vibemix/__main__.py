@@ -2743,9 +2743,16 @@ async def main() -> None:
                 print("-> mic disabled: set VIBEMIX_ENABLE_MIC=1 to enable mic capture")
 
             midi_stop = threading.Event()
-            midi_macos.start_listener_thread(midi_stop)
+            midi_listener_thread = midi_macos.start_listener_thread(midi_stop)
             midi_watcher_stop = asyncio.Event()
 
+            # Mirror hook rides on_applied: the single-state listener manager
+            # (stop old listener / rebind profile / mark_connected / spawn for
+            # the watcher-resolved profile) runs first, and the UI envelope
+            # fires only when the binding actually changed. The boot FLX4
+            # listener seeds the holder so the first connected sweep hands it
+            # off cleanly (replay keeps its tape via start_listener_thread —
+            # its watcher is an idle no-op).
             _on_midi_port_change = _make_midi_mirror_hotplug_hook(
                 midi_mirror, midi_macos.controller_state
             )
@@ -2755,7 +2762,9 @@ async def main() -> None:
                 try:
                     midi_watcher_task = midi_macos.start_port_watcher(
                         midi_watcher_stop,
-                        on_change=_on_midi_port_change,
+                        on_applied=_on_midi_port_change,
+                        listener_thread=midi_listener_thread,
+                        listener_stop=midi_stop,
                     )
                 except Exception as exc:
                     print(f"-> MIDI hotplug watcher disabled: {exc!r}", file=sys.stderr)
@@ -2843,6 +2852,13 @@ async def main() -> None:
                 midi_stop.set()
             if midi_watcher_stop is not None:
                 midi_watcher_stop.set()
+            # 2026-06-10 audit: the hot-plug manager spawns listeners with
+            # their OWN stop events (holder.listener_stop) — stop the live
+            # one too, or a session restart leaves two daemon listeners
+            # feeding the same ControllerState.
+            watcher_holder = getattr(midi_macos, "_watcher_holder", None)
+            if watcher_holder is not None and watcher_holder.listener_stop is not None:
+                watcher_holder.listener_stop.set()
             for task in list(cleanup_tasks):
                 if not task.done():
                     task.cancel()

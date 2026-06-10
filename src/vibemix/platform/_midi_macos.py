@@ -155,18 +155,18 @@ class MidiMacOS:
         on_change=None,
         *,
         poll_seconds: float = 2.0,
+        on_applied=None,
+        listener_thread=None,
+        listener_stop=None,
     ):
         """Spawn the asyncio port_watcher_task as a background task on the
         running event loop.
 
         Phase 9 Wave 2 Task 3 — exposes hot-plug detection on macOS. Polls
         ``mido.get_input_names()`` every ``poll_seconds`` seconds; emits
-        connected / disconnected events to ``on_change`` (default:
-        ``functools.partial(handle_port_change, holder)`` wired by Phase 4
-        ``__main__.py`` — the production callback restarts the listener
-        thread on hot-plug). For unit tests + lower-level callers, pass any
-        callable accepting a ``(kind, port, profile)`` / ``(kind, port)``
-        tuple.
+        connected / disconnected events to ``on_change``. For unit tests +
+        lower-level callers, pass any callable accepting a
+        ``(kind, port, profile)`` / ``(kind, port)`` tuple.
 
         Phase 53 BRINGUP-03: the default callback is the SINGLE-STATE one
         (``handle_port_change_single_state``, option B from 53-RESEARCH §Q2). It
@@ -176,19 +176,33 @@ class MidiMacOS:
         no capture-once-then-rebuild divergence, no consumer signature change.
         Tests can still inject their own callback via ``on_change``.
 
+        2026-06-10 audit (E-midi): the default path composes via
+        ``make_single_state_on_change`` — ``on_applied`` is a post-hook fired
+        ONLY when the manager actually changed the binding (``__main__``
+        passes the MidiMirror envelope hook), and ``listener_thread`` /
+        ``listener_stop`` seed the holder with the boot-time FLX4 listener so
+        the first ``connected`` sweep stops it before spawning the
+        profile-resolved one (never two listeners feeding one
+        ControllerState).
+
         Args:
             stop_event: ``asyncio.Event`` cooperative shutdown signal.
             on_change: callback for the watcher. If None, builds the default
                 single-state production callback bound to a ListenerHolder
                 seeded from the current ``self.controller_state``.
             poll_seconds: sweep cadence (default 2.0 per CONTEXT).
+            on_applied: optional post-hook for the default callback; ignored
+                when ``on_change`` is supplied.
+            listener_thread: optional already-running boot listener to seed
+                the holder with; ignored when ``on_change`` is supplied.
+            listener_stop: the boot listener's ``threading.Event``; ignored
+                when ``on_change`` is supplied.
 
         Returns:
             The ``asyncio.Task`` running the watcher coroutine.
         """
         # Lazy imports — see top-of-file note about avoiding cycles.
         import asyncio
-        import functools
 
         from vibemix.midi.watcher import port_watcher_task
         from vibemix.platform import _midi_common
@@ -196,15 +210,15 @@ class MidiMacOS:
         if on_change is None:
             holder = _midi_common.ListenerHolder(
                 controller_state=self.controller_state,
-                listener_thread=None,
-                listener_stop=None,
+                listener_thread=listener_thread,
+                listener_stop=listener_stop,
                 mido_module=mido,
                 bound_port=None,
             )
             # Single-state default (option B): mutate self.controller_state in
             # place so the live loops keep their reference live across hot-plug.
-            on_change = functools.partial(
-                _midi_common.handle_port_change_single_state, holder
+            on_change = _midi_common.make_single_state_on_change(
+                holder, on_applied=on_applied
             )
             self._watcher_holder = holder  # retain so callers can introspect
 

@@ -242,7 +242,13 @@ class ReplayMidiBackend:
         on_change=None,
         *,
         poll_seconds: float = 2.0,
+        on_applied=None,
+        listener_thread=None,
+        listener_stop=None,
     ) -> asyncio.Task:
+        # on_applied / listener_thread / listener_stop are accepted for
+        # signature parity with MidiMacOS and ignored — replay never
+        # hot-plugs; the tape rides start_listener_thread.
         async def _idle_replay_watcher() -> None:
             while not stop_event.is_set():
                 await asyncio.sleep(0.1)

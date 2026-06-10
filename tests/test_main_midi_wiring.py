@@ -97,3 +97,36 @@ def test_queue_controller_detected_called_with_keywords():
         "queue_controller_detected must be called with keyword arguments "
         "(connected=/profile=/port_name=) — it is keyword-only"
     )
+
+
+def test_main_routes_hotplug_through_single_state_listener_manager():
+    """__main__ passes the mirror hook as on_applied (NOT on_change) so the
+    single-state manager (stop old listener / rebind / mark_connected /
+    spawn for the watcher-resolved profile) runs for every hot-plug event —
+    the 2026-06-10 audit found on_change= bypassed it, leaving 9 of 10
+    bundled profiles detect-only and replug unrecoverable."""
+    src = _source()
+    assert "on_applied=_on_midi_port_change" in src
+    assert "on_change=_on_midi_port_change" not in src
+
+
+def test_main_seeds_watcher_with_boot_listener():
+    """The boot FLX4 listener is handed to the watcher holder so the first
+    'connected' sweep stops it before spawning the profile-resolved listener
+    (no double dispatch into the shared ControllerState). The static spawn
+    itself must STAY — replay's MIDI tape rides start_listener_thread."""
+    src = _source()
+    assert re.search(
+        r"midi_listener_thread\s*=\s*midi_macos\.start_listener_thread\(midi_stop\)", src
+    )
+    assert "listener_thread=midi_listener_thread" in src
+    assert "listener_stop=midi_stop" in src
+
+
+def test_main_stops_watcher_spawned_listener_in_finally():
+    """Watcher-spawned listeners carry their own stop events — session
+    teardown must set the live one, or a restart leaves two daemon
+    listeners feeding one ControllerState."""
+    src = _source()
+    assert "_watcher_holder" in src
+    assert re.search(r"watcher_holder\.listener_stop\.set\(\)", src)
