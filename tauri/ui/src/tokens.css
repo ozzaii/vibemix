@@ -243,6 +243,7 @@
   --sidebar-expanded: 260px;
   --sidebar-w: var(--sidebar-expanded);
   --panel-w: 280px;
+  --r-xs: 4px;   /* tiny chips/pips — the mock's raw 3-5px micro range */
   --r-sm: 6px;
   --r-md: 10px;
 
@@ -345,10 +346,11 @@
   --type-step-3: 18px;
   --type-step-4: 22px;
 
-  /* --- Radius (v5) --- */
-  --rad-sm: 2px;
-  --rad-md: 6px;
-  --rad-lg: 10px;
+  /* --- Radius (v5 names re-pointed at the canonical --r-* ladder; the
+     2px micro corner is retired — sharper than the contract's language) --- */
+  --rad-sm: var(--r-xs);
+  --rad-md: var(--r-sm);
+  --rad-lg: var(--r-md);
 
   /* --- Spacing scale (4 -> 96 in 8 steps) --- */
   --sp-1: 4px;
