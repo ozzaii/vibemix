@@ -1944,7 +1944,7 @@ function applyState(mounted: Mounted, next: SessionState, isMount: boolean): voi
         ? "◂ audio input dropped"
         : downInput === "screen"
           ? "◂ screen capture lost"
-          : "◂ ai service unreachable";
+          : "◂ brain unreachable";
     if (mounted.liveFault.textContent !== causeText) mounted.liveFault.textContent = causeText;
   }
 
@@ -2224,14 +2224,14 @@ function idleReadinessLines(state: SessionState): { inputs: string; action: stri
   const audioWaiting = state.status.livekit === "ok" && !audioActive;
   const controllerWaiting = state.status.midi === 0;
   const notes: string[] = [];
-  if (state.status.livekit === "connecting") notes.push("Audio connecting.");
-  else if (state.status.livekit !== "ok") notes.push("Audio checking.");
+  if (state.status.livekit === "connecting") notes.push("Voice link connecting.");
+  else if (state.status.livekit !== "ok") notes.push("Voice link checking.");
   // "Voice off." not "muted": the ok|muted wire value can't distinguish a
   // user mute from an engine that failed to load — naming it "muted" blamed
   // the user for an engine fault. State the fact, not the cause.
   if (state.status.voice === "muted") notes.push("Voice off.");
-  else if (state.status.gemini === "down") notes.push("Co-host offline.");
-  else if (state.status.gemini !== "ok") notes.push("Co-host checking.");
+  else if (state.status.gemini === "down") notes.push("Brain offline.");
+  else if (state.status.gemini !== "ok") notes.push("Brain checking.");
   if (state.status.screen === "denied") notes.push("Screen proof denied.");
   const action = audioWaiting
     ? captureRouteAction(state.status.captureDevice)

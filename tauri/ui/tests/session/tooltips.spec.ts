@@ -104,9 +104,9 @@ describe("Status bar tooltips (H6)", () => {
     );
     // 2026-05-19 /impeccable critique round 3: engineering vocabulary
     // (LiveKit / Gemini / MIDI) replaced with DJ-register labels.
-    expect(live?.getAttribute("title")).toContain("Realtime link");
+    expect(live?.getAttribute("title")).toContain("Voice link");
     expect(live?.getAttribute("title")).toContain("connected");
-    expect(gemini?.getAttribute("title")).toContain("AI");
+    expect(gemini?.getAttribute("title")).toContain("Brain");
     expect(gemini?.getAttribute("title")).toContain("disconnected");
     expect(midi?.getAttribute("title")).toContain("Controller");
     expect(screen?.getAttribute("title")).toContain("Screen capture");

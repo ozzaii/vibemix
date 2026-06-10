@@ -296,13 +296,13 @@ function buildBadgeSpecs(props: StatusBarProps): BadgeSpec[] {
     {
       key: "livekit",
       state: props.livekit ?? "off",
-      label: badgeLabel("LINK", props.livekit),
+      label: badgeLabel("VOICE LINK", props.livekit),
       clickable: props.livekit === "down",
     },
     {
       key: "gemini",
       state: props.gemini ?? "off",
-      label: badgeLabel("AI", props.gemini),
+      label: badgeLabel("BRAIN", props.gemini),
       clickable: props.gemini === "down",
     },
     midiBadgeSpec(props),
@@ -527,8 +527,8 @@ function buildTooltip(
 
 function defaultErrorMsg(key: RecoveryBadgeKey): string {
   switch (key) {
-    case "livekit": return "vibemix link to the realtime channel dropped. click to reconnect";
-    case "gemini": return "AI service unreachable. recheck network + key";
+    case "livekit": return "voice link dropped. click to reconnect";
+    case "gemini": return "brain unreachable. check your connection";
     case "midi": return defaultMidiErrorMsg;
     case "screen": return "screen-capture permission denied. open system settings";
   }
@@ -544,8 +544,8 @@ function titleForBadge(key: BadgeKey, state: string): string {
   // their technical names.
   const label = (() => {
     switch (key) {
-      case "livekit": return "Realtime link";
-      case "gemini": return "AI";
+      case "livekit": return "Voice link";
+      case "gemini": return "Brain";
       case "midi": return "Controller";
       case "screen": return "Screen capture";
       case "voice": return "Local voice";

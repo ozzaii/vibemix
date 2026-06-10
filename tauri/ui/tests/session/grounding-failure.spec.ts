@@ -66,7 +66,7 @@ describe("SessionLayout grounding-failure → fault state (H9)", () => {
     expect(session?.dataset.mode).toBe("fault");
     // The fault liveness label names the grounding cause.
     const fault = root.querySelector<HTMLElement>(".vmx-live__s--fault");
-    expect(fault?.textContent).toContain("ai service");
+    expect(fault?.textContent).toContain("brain unreachable");
   });
 
   it("the restart button is unfocusable and hidden from AT outside fault mode", () => {

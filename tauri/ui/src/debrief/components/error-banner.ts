@@ -25,7 +25,7 @@ const REASON_COPY: Record<DebriefErrorReason, string> = {
   drills_generation_failed:
     "Couldn't generate drills with valid citations. Try refreshing.",
   llm_unavailable:
-    "The coaching brain is unreachable, so drills and the voiced recap are skipped this time. Chapters and the replay below are still from your set.",
+    "Sven's brain is unreachable, so drills and the voiced recap are skipped this time. Chapters and the replay below are still from your set.",
   port_in_use:
     "Another debrief window is already open. Close it and reopen this one.",
   unknown_kind:
