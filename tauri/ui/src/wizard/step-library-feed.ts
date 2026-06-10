@@ -106,9 +106,13 @@ const CSS = `
     font-size: 42px;
     font-weight: 400;
     line-height: 0.96;
-    letter-spacing: 0;
+    letter-spacing: -0.01em;
+    /* The serif is the co-host's voice — sentence case always. The legacy
+     * wizard-step__heading class underneath uppercases; undo it here so the
+     * hero never paints "FEED YOUR LIBRARY" like a bank plaque. */
+    text-transform: none;
     color: var(--silk);
-    text-shadow: 0 0 16px var(--brand-12);
+    text-shadow: var(--text-3d);
   }
   .wizard-feed-hero__ready {
     display: inline-flex;
@@ -316,19 +320,22 @@ const CSS = `
     font-family: var(--type-body);
     font-size: 13px;
     color: var(--silk);
-    text-transform: uppercase;
   }
   .wizard-feed-controller {
     display: flex;
     align-items: center;
     gap: var(--sp-3);
   }
+  /* Unlit by default — a lamp that never changes state is a fake affordance.
+   * The copy ("plug it in whenever") carries the meaning; the dome reads as a
+   * waiting socket, not a glowing LED pretending a controller is connected. */
   .wizard-feed-controller__dot {
     width: 10px;
     height: 10px;
     border-radius: 999px;
-    background: var(--amber);
-    box-shadow: 0 0 8px var(--amber-40);
+    background: var(--void-20);
+    border: 1px solid var(--border-subtle);
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.5);
   }
   .wizard-step--library-feed .vmx-skill-level {
     padding: 0;

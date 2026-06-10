@@ -109,7 +109,12 @@ describe("wizard surface tokens (wave 1)", () => {
       screen: "ok",
     });
 
-    expect(rendered.textContent).toContain("livekit");
+    // Labels are capability words, never vendor/stack names (fable pass
+    // 2026-06-10): "voice link" not "livekit", "brain" not "gemini".
+    expect(rendered.textContent).toContain("voice link");
+    expect(rendered.textContent).toContain("brain");
+    expect(rendered.textContent).not.toContain("livekit");
+    expect(rendered.textContent).not.toContain("gemini");
     expect(rendered.textContent).toContain("controller 1");
     expect(rendered.textContent).not.toContain("made by bravoh");
     expect(rendered.querySelector(".cmp-status-bar__signature")).toBeNull();

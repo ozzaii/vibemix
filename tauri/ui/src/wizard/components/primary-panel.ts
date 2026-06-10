@@ -27,32 +27,30 @@ const CSS = `
    * a hairline under it, then the step's controls. No card fill, no drop
    * shadow. The wizard is form-bearing (device probe, window pick, MIDI listen)
    * so the controls stay; only the enclosing card is removed. */
+  /* FABLE PASS (2026-06-10): the v5 cool blue-black slab (raw rgba(8,10,16)
+   * literals + old-silk rivets) is GONE — inside the retextured warm room it
+   * read as a leftover cold tile. The panel now sits in the mock's card
+   * material: warm void gradient, machined bevel, one brand hairline catching
+   * the top lip (the evidence-card seam). */
   .cmp-primary-panel {
     position: relative;
     padding: var(--sp-5);
-    border: 1px solid rgba(255, 255, 255, 0.055);
+    border: 1px solid var(--border-subtle);
     border-radius: var(--rad-md);
-    background:
-      linear-gradient(180deg, rgba(255, 255, 255, 0.026), transparent 18%),
-      repeating-linear-gradient(90deg, rgba(214, 207, 199, 0.018) 0 1px, transparent 1px 72px),
-      linear-gradient(180deg, rgba(8, 10, 16, 0.38), rgba(2, 3, 6, 0.52));
+    background: linear-gradient(180deg, var(--void-10) 0%, var(--void-5) 100%);
     box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.045),
-      inset 0 -1px 0 rgba(0, 0, 0, 0.74),
+      var(--bevel-raised),
       0 18px 46px rgba(0, 0, 0, 0.22);
     overflow: hidden;
   }
   .cmp-primary-panel::before {
     content: "";
     position: absolute;
-    inset: 0;
+    inset: 0 12px auto;
+    height: 1px;
     pointer-events: none;
-    background:
-      radial-gradient(circle at 10px 10px, rgba(214, 207, 199, 0.2) 0 2px, transparent 2.5px),
-      radial-gradient(circle at calc(100% - 10px) 10px, rgba(214, 207, 199, 0.12) 0 2px, transparent 2.5px),
-      linear-gradient(90deg, transparent, rgba(255, 165, 223, 0.055), transparent);
-    opacity: 0.78;
-    mask-image: linear-gradient(180deg, black 0%, black 78%, transparent 100%);
+    background: linear-gradient(90deg, transparent, var(--brand-35), transparent);
+    opacity: 0.5;
   }
   .cmp-primary-panel__header {
     position: relative;
@@ -61,13 +59,15 @@ const CSS = `
     justify-content: space-between;
     gap: var(--sp-3);
     padding: 0 0 var(--sp-3);
-    border-bottom: 1px solid var(--glass-edge);
-    font-family: var(--type-display);
-    font-variation-settings: "wdth" 85, "wght" 600;
+    border-bottom: 1px solid var(--border-subtle);
+    /* Engraved silkscreen label — the contract speaks mono for machine labels,
+     * not the condensed display face. */
+    font-family: var(--type-mono);
+    font-weight: 600;
     font-size: 9px;
     letter-spacing: 0.28em;
     text-transform: uppercase;
-    color: var(--silk-40);
+    color: var(--text-muted);
     line-height: 1;
     z-index: 2;
   }

@@ -79,9 +79,15 @@ const CSS = `
   .vmx-skill-level__radio-row:hover {
     border-color: var(--silk-65);
   }
+  /* Selected = a RECESS, not a rose slab — brand is spent as a low-alpha ring
+   * + glow inside a pressed socket (tokens.css: wash-never-fill). */
   .vmx-skill-level__radio-row[data-selected="true"] {
-    border-color: var(--amber);
-    background: var(--amber-22);
+    border-color: var(--brand-35);
+    background: radial-gradient(ellipse at top, var(--void-8), var(--void-12));
+    box-shadow:
+      inset 0 2px 5px rgba(0, 0, 0, 0.55),
+      inset 0 0 0 1px var(--brand-22),
+      inset 0 0 14px var(--brand-04);
   }
   .vmx-skill-level__radio {
     appearance: none;

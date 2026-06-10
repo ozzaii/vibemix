@@ -55,9 +55,11 @@ const CSS = `
     background: var(--silk-22);
     box-shadow: inset 0 0 1px rgba(0, 0, 0, 0.5);
   }
+  /* ok = lit ink + rose dot (the contract's alive-state); green is not in the
+   * room's vocabulary. Fault red survives below as the one functional hue. */
   .cmp-status-bar__item[data-state="ok"] .cmp-status-bar__led {
-    background: var(--led-ok);
-    box-shadow: 0 0 6px var(--led-ok);
+    background: var(--brand);
+    box-shadow: 0 0 6px var(--brand-40);
   }
   .cmp-status-bar__item[data-state="ok"] {
     color: var(--silk);
@@ -102,10 +104,12 @@ export function StatusBar(props: StatusBarProps): HTMLElement {
   const group = document.createElement("div");
   group.className = "cmp-status-bar__group";
 
+  // Capability words, not vendor names — a DJ doesn't care what the brain
+  // runs on, and stack names date the binary. Keys/states stay unchanged.
   const items: Array<{ label: string; state: string; key: string }> = [
-    { label: "livekit", state: levelToState(props.livekit), key: "livekit" },
+    { label: "voice link", state: levelToState(props.livekit), key: "livekit" },
     {
-      label: "gemini",
+      label: "brain",
       state: levelToState(props.gemini),
       key: "gemini",
     },

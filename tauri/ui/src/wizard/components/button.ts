@@ -76,7 +76,9 @@ const CSS = `
                 border-color var(--motion-snap) ease-out,
                 color var(--motion-snap) ease-out,
                 text-shadow var(--motion-snap) ease-out,
-                box-shadow var(--motion-snap) ease-out;
+                box-shadow var(--motion-snap) ease-out,
+                transform 120ms ease-out,
+                filter var(--motion-snap) ease-out;
   }
   .cmp-btn .glyph-trail,
   .cmp-btn .glyph-lead {
@@ -105,49 +107,48 @@ const CSS = `
       inset 0 -1px 0 rgba(0, 0, 0, 0.45),
       0 0 10px var(--amber-22);
   }
-  /* Armed — internal amber bleed (mock §02 .btn.on) */
+  /* Armed — FABLE PASS (2026-06-10): the money keys (Continue / Index this /
+   * Open vibemix) now press the same rose-lit slab key the intro CTA and the
+   * deck's GO LIVE press — physical fill with mass and a specular top line,
+   * not a 9%-alpha ghost with pink text. */
   .cmp-btn[data-variant="primary"][data-state="armed"] {
-    background: linear-gradient(180deg, rgba(255, 165, 223, 0.09) 0%, rgba(255, 165, 223, 0.025) 100%);
-    border-color: rgba(255, 165, 223, 0.14);
-    color: var(--amber);
-    text-shadow: 0 0 4px var(--amber-65);
+    background:
+      linear-gradient(180deg, var(--brand-22) 0%, var(--brand-10) 50%, var(--brand-06) 100%),
+      linear-gradient(180deg, var(--void-12), var(--void-8));
+    border-color: var(--brand-35);
+    color: var(--text-primary);
+    text-shadow: var(--text-emboss);
     box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.06),
-      inset 0 -1px 0 var(--amber-40),
-      inset 0 0 14px var(--amber-22),
-      0 0 0 1px rgba(255, 165, 223, 0.14);
+      inset 0 1px 0 rgba(255, 255, 255, 0.18),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.45),
+      inset 0 0 24px var(--brand-06),
+      0 1px 0 rgba(255, 255, 255, 0.04),
+      0 6px 18px rgba(176, 112, 160, 0.18);
   }
   .cmp-btn[data-variant="primary"][data-state="armed"]:hover,
   .cmp-btn[data-variant="primary"][data-state="hover-armed"] {
-    background: linear-gradient(180deg, rgba(255, 165, 223, 0.14) 0%, rgba(255, 165, 223, 0.04) 100%);
-    border-color: var(--amber);
-    color: var(--amber);
-    text-shadow: 0 0 6px var(--amber-65), 0 0 14px var(--amber-22);
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.08),
-      inset 0 -1px 0 var(--amber-65),
-      inset 0 0 18px var(--amber-40),
-      0 0 0 1px rgba(255, 165, 223, 0.22);
+    filter: brightness(1.12);
+    border-color: var(--brand-50);
   }
   .cmp-btn[data-variant="primary"][data-state="armed"]:active,
   .cmp-btn[data-variant="primary"][data-state="pressed-armed"] {
-    background: var(--void-2);
-    border-color: var(--amber-40);
-    color: var(--amber);
-    text-shadow: 0 0 3px var(--amber-22);
+    transform: translateY(1px);
+    border-color: var(--brand-35);
+    color: var(--text-primary);
     box-shadow:
-      inset 0 2px 6px rgba(0, 0, 0, 0.85),
-      inset 0 0 0 1px rgba(0, 0, 0, 0.45),
-      inset 0 0 14px var(--amber-22);
+      var(--shadow-pressed),
+      inset 0 0 14px var(--brand-06);
   }
   .cmp-btn[data-variant="primary"][data-state="loading"] {
-    background: linear-gradient(180deg, rgba(255, 165, 223, 0.06) 0%, rgba(255, 165, 223, 0.018) 100%);
-    border-color: var(--amber-22);
-    color: var(--amber);
-    text-shadow: 0 0 4px var(--amber-22);
+    background:
+      linear-gradient(180deg, var(--brand-10) 0%, var(--brand-04) 100%),
+      linear-gradient(180deg, var(--void-12), var(--void-8));
+    border-color: var(--brand-22);
+    color: var(--text-primary);
+    text-shadow: var(--text-emboss);
     box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.04),
-      inset 0 0 12px var(--amber-22);
+      inset 0 1px 0 rgba(255, 255, 255, 0.08),
+      inset 0 0 12px var(--brand-06);
     cursor: progress;
   }
   /* --- Secondary states (text-only emphasis; never amber-bleed body) --- */

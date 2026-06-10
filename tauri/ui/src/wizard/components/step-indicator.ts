@@ -73,21 +73,23 @@ const CSS = `
       inset 0 -0.5px 0 rgba(0, 0, 0, 0.4);
     animation: cmp-step-pulse var(--motion-led-pulse) ease-in-out infinite;
   }
+  /* Complete — FABLE PASS (2026-06-10): the green traffic-light dome read
+   * generic-installer. A settled step is a RECESS in the contract's grammar:
+   * dark inset ring with a rose tick — done is quiet, only the active node
+   * stays lit. Fault red remains the lone functional exception elsewhere. */
   .cmp-step-indicator__node[data-state="complete"] {
-    background: var(--led-ok);
-    border-color: rgba(109, 212, 74, 0.7);
+    background: var(--void-12);
+    border-color: var(--brand-35);
     box-shadow:
-      0 0 3px var(--led-ok),
-      0 0 6px rgba(109, 212, 74, 0.28),
-      inset 0 1px 0 rgba(255, 255, 255, 0.35),
-      inset 0 -0.5px 0 rgba(0, 0, 0, 0.4);
+      inset 0 1px 2px rgba(0, 0, 0, 0.5),
+      0 0 0 1px var(--brand-08);
   }
   .cmp-step-indicator__node[data-state="complete"]::after {
     content: "";
     width: 5px;
     height: 2.5px;
-    border-left: 1.5px solid var(--void);
-    border-bottom: 1.5px solid var(--void);
+    border-left: 1.5px solid var(--brand);
+    border-bottom: 1.5px solid var(--brand);
     transform: rotate(-45deg) translate(0, -1px);
   }
   .cmp-step-indicator__label {

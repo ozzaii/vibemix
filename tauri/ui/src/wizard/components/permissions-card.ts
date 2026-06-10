@@ -55,8 +55,8 @@ const CSS = `
     inset: 0;
     pointer-events: none;
     background:
-      repeating-linear-gradient(90deg, transparent 0 43px, rgba(214, 207, 199, 0.018) 43px 44px),
-      linear-gradient(90deg, transparent, rgba(255, 165, 223, 0.06), transparent);
+      repeating-linear-gradient(90deg, transparent 0 43px, rgba(255, 222, 242, 0.016) 43px 44px),
+      linear-gradient(90deg, transparent, var(--brand-06), transparent);
     opacity: 0.7;
     mask-image: linear-gradient(90deg, black 0%, black 88%, transparent 100%);
   }
@@ -72,7 +72,9 @@ const CSS = `
     width: 24px;
     height: 24px;
   }
-  .cmp-perm-card[data-state="granted"] .cmp-perm-card__icon { color: var(--led-ok); }
+  /* Granted speaks the contract's two-hue language: lit ink + a rose dot.
+   * Red stays ONLY for genuine denial — the lone functional exception. */
+  .cmp-perm-card[data-state="granted"] .cmp-perm-card__icon { color: var(--text-primary); }
   .cmp-perm-card[data-state="denied"]  .cmp-perm-card__icon { color: var(--led-fault); }
   .cmp-perm-card__text {
     display: flex;
@@ -118,7 +120,7 @@ const CSS = `
     text-shadow: 0 1px 0 rgba(0, 0, 0, 0.7);
     cursor: default;
   }
-  .cmp-perm-card__state-readout[data-tone="ok"]  { color: var(--led-ok); }
+  .cmp-perm-card__state-readout[data-tone="ok"]  { color: var(--text-primary); }
   .cmp-perm-card__state-readout[data-tone="rec"] { color: var(--led-fault); cursor: pointer; }
   .cmp-perm-card__led {
     width: 6px;
@@ -126,7 +128,7 @@ const CSS = `
     border-radius: 50%;
     display: inline-block;
   }
-  .cmp-perm-card__state-readout[data-tone="ok"]  .cmp-perm-card__led { background: var(--led-ok);    box-shadow: 0 0 6px var(--led-ok); }
+  .cmp-perm-card__state-readout[data-tone="ok"]  .cmp-perm-card__led { background: var(--brand);     box-shadow: 0 0 6px var(--brand-40); }
   .cmp-perm-card__state-readout[data-tone="rec"] .cmp-perm-card__led { background: var(--led-fault); box-shadow: 0 0 6px var(--led-fault); }
   @media (max-width: 720px) {
     .cmp-perm-card {
