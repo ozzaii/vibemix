@@ -106,7 +106,7 @@ const CSS = `
     z-index: 39;
     opacity: 0;
     pointer-events: none;
-    transition: opacity 180ms cubic-bezier(0.22, 1, 0.36, 1);
+    transition: opacity 180ms var(--ease-draw);
   }
   .vmx-settings-backdrop[data-open="true"] {
     opacity: 1;

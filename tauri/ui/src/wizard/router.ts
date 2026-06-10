@@ -1,4 +1,4 @@
-/* router.ts — wizard state machine + slide transitions (UI-SPEC §Motion §step).
+/* router.ts — wizard state machine + step transitions (UI-SPEC §Motion §step).
  *
  * Phase 11 Wave 4: replaces Wave 3's setTimeout mocks with real ipc.*
  * requests. Every webview→sidecar interaction goes through
@@ -13,7 +13,10 @@
  *   - Legacy smoke-test mount -> ipc.calibration.smoke_test (timeout 30s).
  *   - Wizard done → emitIpc ipc.wizard.done + invoke write_first_run_state.
  *
- * State transitions still use 250ms ease-in-out (UI-SPEC §Motion Budget cap).
+ * State transitions ride the room's rise language: 250ms (--motion-step)
+ * on var(--ease-brand), translateY — same vocabulary as vmx-intro-rise —
+ * and skip entirely under prefers-reduced-motion (inline styles bypass
+ * media queries, so the router gates itself).
  */
 
 import { invoke } from "@tauri-apps/api/core";
@@ -228,15 +231,26 @@ function stepStripFor(current: WizardStep): HTMLElement {
   });
 }
 
+/** Inline styles bypass CSS media queries, so the router gates its own
+ *  step transition on the user's motion preference. */
+function prefersReducedMotion(): boolean {
+  return (
+    typeof window.matchMedia === "function" &&
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches
+  );
+}
+
 export function advanceTo(next: WizardStep): void {
   if (next === wizardState.currentStep) return;
   const primaryMount = document.getElementById("wizard-primary");
-  if (primaryMount && primaryMount.firstElementChild) {
+  if (primaryMount?.firstElementChild && !prefersReducedMotion()) {
+    // Exit on the room's rise language (the reverse of vmx-intro-rise) —
+    // the old lateral slide was a foreign move in a vertical room.
     const child = primaryMount.firstElementChild as HTMLElement;
     child.style.transition =
-      "opacity var(--motion-step) ease-in-out, transform var(--motion-step) ease-in-out";
+      "opacity var(--motion-step) var(--ease-brand), transform var(--motion-step) var(--ease-brand)";
     child.style.opacity = "0";
-    child.style.transform = "translateX(-16px)";
+    child.style.transform = "translateY(-8px)";
     setTimeout(() => {
       setState({ currentStep: next });
     }, 250);
@@ -300,13 +314,14 @@ export function getState(): Readonly<WizardState> {
 
 function renderInto(parent: HTMLElement, child: HTMLElement): void {
   parent.replaceChildren(child);
+  if (prefersReducedMotion()) return;
   child.style.opacity = "0";
-  child.style.transform = "translateX(16px)";
+  child.style.transform = "translateY(8px)";
   child.style.transition =
-    "opacity var(--motion-step) ease-in-out, transform var(--motion-step) ease-in-out";
+    "opacity var(--motion-step) var(--ease-brand), transform var(--motion-step) var(--ease-brand)";
   requestAnimationFrame(() => {
     child.style.opacity = "1";
-    child.style.transform = "translateX(0)";
+    child.style.transform = "translateY(0)";
   });
 }
 

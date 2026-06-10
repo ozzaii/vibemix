@@ -107,9 +107,9 @@
   color: var(--silk);
   cursor: default;
   transition:
-    border-radius 260ms cubic-bezier(0.16, 1, 0.3, 1),
-    box-shadow 260ms cubic-bezier(0.16, 1, 0.3, 1),
-    background 260ms cubic-bezier(0.16, 1, 0.3, 1);
+    border-radius 260ms var(--ease-brand),
+    box-shadow 260ms var(--ease-brand),
+    background 260ms var(--ease-brand);
 }
 .pill[data-open="true"] {
   height: auto;
@@ -118,7 +118,7 @@
     inset 0 0 0 1px var(--glass-edge-up);
 }
 .pill[data-reaction-echo] {
-  animation: pill-echo-afterglow 720ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: pill-echo-afterglow 720ms var(--ease-brand) both;
 }
 .pill[data-reaction-echo="clean"] {
   animation-name: pill-echo-clean;
@@ -153,47 +153,47 @@
 }
 .pill[data-state="expand"][data-reaction-tone="bomb"][data-reaction-pulse="a"],
 .pill[data-state="expand"][data-reaction-tone="lit_aff"][data-reaction-pulse="a"] {
-  animation: pill-booth-hit-a 520ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: pill-booth-hit-a 520ms var(--ease-brand) both;
 }
 .pill[data-state="expand"][data-reaction-tone="bomb"][data-reaction-pulse="b"],
 .pill[data-state="expand"][data-reaction-tone="lit_aff"][data-reaction-pulse="b"] {
-  animation: pill-booth-hit-b 520ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: pill-booth-hit-b 520ms var(--ease-brand) both;
 }
 .pill[data-state="expand"][data-reaction-tone="clean"][data-reaction-pulse="a"] {
-  animation: pill-booth-clean-a 420ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: pill-booth-clean-a 420ms var(--ease-brand) both;
 }
 .pill[data-state="expand"][data-reaction-tone="clean"][data-reaction-pulse="b"] {
-  animation: pill-booth-clean-b 420ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: pill-booth-clean-b 420ms var(--ease-brand) both;
 }
 .pill[data-state="expand"][data-reaction-tone="sexy"][data-reaction-pulse="a"] {
-  animation: pill-booth-glide-a 620ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: pill-booth-glide-a 620ms var(--ease-brand) both;
 }
 .pill[data-state="expand"][data-reaction-tone="sexy"][data-reaction-pulse="b"] {
-  animation: pill-booth-glide-b 620ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: pill-booth-glide-b 620ms var(--ease-brand) both;
 }
 .pill[data-state="expand"][data-reaction-tone="mid"][data-reaction-pulse="a"] {
-  animation: pill-booth-mid-a 380ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: pill-booth-mid-a 380ms var(--ease-brand) both;
 }
 .pill[data-state="expand"][data-reaction-tone="mid"][data-reaction-pulse="b"] {
-  animation: pill-booth-mid-b 380ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: pill-booth-mid-b 380ms var(--ease-brand) both;
 }
 .pill[data-state="expand"][data-reaction-tone="negative"][data-reaction-pulse="a"] {
-  animation: pill-booth-caution-a 460ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: pill-booth-caution-a 460ms var(--ease-brand) both;
 }
 .pill[data-state="expand"][data-reaction-tone="negative"][data-reaction-pulse="b"] {
-  animation: pill-booth-caution-b 460ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: pill-booth-caution-b 460ms var(--ease-brand) both;
 }
 .pill[data-state="expand"][data-reaction-tone][data-reaction-pulse="a"]::before {
-  animation: pill-lens-sweep-a 680ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: pill-lens-sweep-a 680ms var(--ease-brand) both;
 }
 .pill[data-state="expand"][data-reaction-tone][data-reaction-pulse="b"]::before {
-  animation: pill-lens-sweep-b 680ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: pill-lens-sweep-b 680ms var(--ease-brand) both;
 }
 .pill[data-state="expand"][data-reaction-tone][data-reaction-pulse="a"]::after {
-  animation: pill-rim-flash-a 620ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: pill-rim-flash-a 620ms var(--ease-brand) both;
 }
 .pill[data-state="expand"][data-reaction-tone][data-reaction-pulse="b"]::after {
-  animation: pill-rim-flash-b 620ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: pill-rim-flash-b 620ms var(--ease-brand) both;
 }
 .pill[data-state="expand"][data-reaction-tone="negative"] {
   border-color: var(--led-fault);
@@ -585,9 +585,9 @@
   overflow: hidden;
   pointer-events: none;
   transition:
-    width var(--motion-transition) cubic-bezier(0.16, 1, 0.3, 1),
-    opacity var(--motion-transition) cubic-bezier(0.16, 1, 0.3, 1),
-    background var(--motion-transition) cubic-bezier(0.16, 1, 0.3, 1);
+    width var(--motion-transition) var(--ease-brand),
+    opacity var(--motion-transition) var(--ease-brand),
+    background var(--motion-transition) var(--ease-brand);
 }
 .pill__grab::before {
   content: "";
@@ -610,7 +610,7 @@
 .pill:focus-visible .pill__grab::before,
 .pill:hover .pill__grab::before,
 .pill[data-open="true"] .pill__grab::before {
-  animation: pill-grab-glint 460ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: pill-grab-glint 460ms var(--ease-brand) both;
 }
 .pill[data-state="expand"][data-reaction-pulse="a"] .pill__grab::before {
   animation-name: pill-grab-glint-a;
@@ -694,7 +694,7 @@
   cursor: pointer;
 }
 .pill[data-actionable="true"] .pill__row::after {
-  animation: pill-actionable-face-rail 1180ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: pill-actionable-face-rail 1180ms var(--ease-brand) both;
 }
 .pill__dot {
   position: relative;
@@ -707,8 +707,8 @@
     inset 0 1px 0 var(--lg-spec-mid),
     inset 0 -1px 0 var(--lg-rim-void);
   transition:
-    background 180ms cubic-bezier(0.16, 1, 0.3, 1),
-    box-shadow 180ms cubic-bezier(0.16, 1, 0.3, 1);
+    background 180ms var(--ease-brand),
+    box-shadow 180ms var(--ease-brand);
 }
 .pill__dot::before,
 .pill__dot::after {
@@ -728,10 +728,10 @@
   opacity: 0;
   transform: scale(0.72);
   transition:
-    opacity 180ms cubic-bezier(0.16, 1, 0.3, 1),
-    transform 220ms cubic-bezier(0.16, 1, 0.3, 1),
-    border-color 180ms cubic-bezier(0.16, 1, 0.3, 1),
-    box-shadow 180ms cubic-bezier(0.16, 1, 0.3, 1);
+    opacity 180ms var(--ease-brand),
+    transform 220ms var(--ease-brand),
+    border-color 180ms var(--ease-brand),
+    box-shadow 180ms var(--ease-brand);
 }
 /* State dot — one of the four reserved amber accents (20/80). Amber + pulse
  * ONLY in listening/speaking; dim silk at idle. */
@@ -747,12 +747,12 @@
   animation: pill-blink 0.9s ease-in-out infinite;
 }
 .pill[data-intel="knows"] .pill__dot::after {
-  animation: pill-dot-ring-arm 360ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: pill-dot-ring-arm 360ms var(--ease-brand) both;
   opacity: 0.62;
   transform: scale(1);
 }
 .pill[data-reaction-echo] .pill__dot::after {
-  animation: pill-dot-ring-echo 520ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: pill-dot-ring-echo 520ms var(--ease-brand) both;
   border-color: var(--brand-40);
   box-shadow: 0 0 10px var(--brand-22);
   opacity: 0.88;
@@ -804,8 +804,8 @@
   color: var(--silk);
   line-height: 1.25;
   transition:
-    color 160ms cubic-bezier(0.16, 1, 0.3, 1),
-    text-shadow 160ms cubic-bezier(0.16, 1, 0.3, 1);
+    color 160ms var(--ease-brand),
+    text-shadow 160ms var(--ease-brand);
 }
 .pill:hover .pill__label,
 .pill[data-intel="knows"] .pill__label {
@@ -816,16 +816,16 @@
     [data-reaction-echo]
   )
   .pill__label {
-  animation: pill-live-label-listen 280ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: pill-live-label-listen 280ms var(--ease-brand) both;
 }
 .pill[data-state="speaking"]:not([data-feedback]):not([data-peek="true"]):not(
     [data-reaction-echo]
   )
   .pill__label {
-  animation: pill-live-label-speak 320ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: pill-live-label-speak 320ms var(--ease-brand) both;
 }
 .pill[data-peek="true"] .pill__label {
-  animation: pill-peek-label-arm 260ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: pill-peek-label-arm 260ms var(--ease-brand) both;
 }
 .pill[data-reaction-echo] .pill__label {
   font-variation-settings: "wdth" 85, "wght" 760;
@@ -835,7 +835,7 @@
   text-shadow:
     0 0 10px var(--brand-40),
     0 0 16px var(--brand-22);
-  animation: pill-reaction-echo-kick 760ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: pill-reaction-echo-kick 760ms var(--ease-brand) both;
 }
 @keyframes pill-peek-label-arm {
   from {
@@ -933,7 +933,7 @@
   height: 16px;
   overflow: hidden;
   opacity: 1;
-  transition: opacity 160ms cubic-bezier(0.16, 1, 0.3, 1);
+  transition: opacity 160ms var(--ease-brand);
 }
 .pill[data-peek="true"] .pill__wave {
   opacity: 0.42;
@@ -945,7 +945,7 @@
 }
 .pill[data-state="speaking"] .pill__wave,
 .pill[data-state="expand"][data-face-wave="visible"] .pill__wave {
-  animation: pill-wave-arm 360ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: pill-wave-arm 360ms var(--ease-brand) both;
 }
 .pill[data-state="speaking"] .vmx-pill-wave__bar,
 .pill[data-state="expand"][data-face-wave="visible"] .vmx-pill-wave__bar {
@@ -954,7 +954,7 @@
     background var(--motion-snap) ease-out,
     box-shadow var(--motion-snap) ease-out,
     opacity var(--motion-snap) ease-out,
-    transform 180ms cubic-bezier(0.16, 1, 0.3, 1);
+    transform 180ms var(--ease-brand);
 }
 .pill[data-state="speaking"] .vmx-pill-wave__bar[data-lit="true"],
 .pill[data-state="expand"][data-face-wave="visible"] .vmx-pill-wave__bar[data-lit="true"] {
@@ -1010,8 +1010,8 @@
   pointer-events: none;
   overflow: hidden;
   transition:
-    opacity var(--motion-transition) cubic-bezier(0.16, 1, 0.3, 1),
-    transform var(--motion-transition) cubic-bezier(0.16, 1, 0.3, 1);
+    opacity var(--motion-transition) var(--ease-brand),
+    transform var(--motion-transition) var(--ease-brand);
 }
 .pill__notch::before {
   content: "";
@@ -1033,25 +1033,25 @@
     [data-reaction-echo]
   )
   .pill__notch {
-  animation: pill-next-notch-ready-a 560ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: pill-next-notch-ready-a 560ms var(--ease-brand) both;
 }
 .pill[data-next-pulse="b"]:not([data-open="true"]):not([data-feedback]):not(
     [data-reaction-echo]
   )
   .pill__notch {
-  animation: pill-next-notch-ready-b 560ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: pill-next-notch-ready-b 560ms var(--ease-brand) both;
 }
 .pill[data-next-pulse="a"]:not([data-open="true"]):not([data-feedback]):not(
     [data-reaction-echo]
   )
   .pill__notch::before {
-  animation: pill-next-notch-glint-a 520ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: pill-next-notch-glint-a 520ms var(--ease-brand) both;
 }
 .pill[data-next-pulse="b"]:not([data-open="true"]):not([data-feedback]):not(
     [data-reaction-echo]
   )
   .pill__notch::before {
-  animation: pill-next-notch-glint-b 520ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: pill-next-notch-glint-b 520ms var(--ease-brand) both;
 }
 @keyframes pill-next-notch-ready-a {
   from {
@@ -1190,12 +1190,12 @@
   opacity: 0.72;
   transform: translateY(0) scaleY(1);
   transition:
-    opacity 260ms cubic-bezier(0.16, 1, 0.3, 1),
-    transform 320ms cubic-bezier(0.16, 1, 0.3, 1);
+    opacity 260ms var(--ease-brand),
+    transform 320ms var(--ease-brand);
 }
 .pill[data-state="expand"][data-reaction-tone] .pill__expand::after {
   opacity: 0.88;
-  animation: pill-stage-rail 620ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: pill-stage-rail 620ms var(--ease-brand) both;
 }
 .pill[data-state="expand"][data-reaction-tone][data-reaction-pulse="a"] .pill__expand::after {
   animation-name: pill-stage-rail-a;
@@ -1266,7 +1266,7 @@
   pointer-events: none;
   mix-blend-mode: screen;
   transform: translateZ(0);
-  transition: opacity 140ms cubic-bezier(0.16, 1, 0.3, 1);
+  transition: opacity 140ms var(--ease-brand);
 }
 .pill[data-fx] .pill__fx {
   opacity: 0.95;
@@ -1317,7 +1317,7 @@
   opacity: 0.64;
   transform: scaleX(0);
   transform-origin: left center;
-  animation: pill-reaction-rail-settle 620ms cubic-bezier(0.16, 1, 0.3, 1) 80ms both;
+  animation: pill-reaction-rail-settle 620ms var(--ease-brand) 80ms both;
 }
 .pill[data-state="expand"][data-reaction-tone] .pill__reaction::after {
   left: -18px;
@@ -1331,7 +1331,7 @@
   filter: blur(8px);
   opacity: 0.22;
   transform: translate3d(-8px, 6px, 0) scale(0.72);
-  animation: pill-reaction-ink-bloom 720ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: pill-reaction-ink-bloom 720ms var(--ease-brand) both;
 }
 .pill[data-state="expand"][data-reaction-tone="clean"] .pill__reaction::before {
   background: linear-gradient(90deg, transparent, var(--glass-edge-up), var(--border-strong), transparent);
@@ -1377,13 +1377,13 @@
   text-shadow: 0 0 10px var(--brand-22);
   vertical-align: baseline;
   transform-origin: left center;
-  animation: pill-reaction-lead-in 280ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: pill-reaction-lead-in 280ms var(--ease-brand) both;
 }
 .pill__reaction-rest {
   position: relative;
   z-index: 1;
   color: var(--silk);
-  animation: pill-reaction-rest-in 240ms cubic-bezier(0.16, 1, 0.3, 1) 52ms both;
+  animation: pill-reaction-rest-in 240ms var(--ease-brand) 52ms both;
 }
 .pill[data-reaction-tone="clean"] .pill__reaction-lead {
   color: var(--silk);
@@ -1698,7 +1698,7 @@
     inset 0 -1px 0 var(--lg-rim-void);
 }
 .pill[data-state="expand"] .pill__expand .vmx-citation-chip {
-  animation: pill-receipt-chip-settle 260ms cubic-bezier(0.16, 1, 0.3, 1) 110ms both;
+  animation: pill-receipt-chip-settle 260ms var(--ease-brand) 110ms both;
 }
 .pill[data-state="expand"] .pill__expand .vmx-citation-chip:nth-child(2) {
   animation-delay: 138ms;
@@ -1747,7 +1747,7 @@
   opacity: 0.9;
   transform: scaleX(0);
   transform-origin: left;
-  animation: pill-receipt-draw 520ms cubic-bezier(0.22, 1, 0.36, 1) 80ms forwards;
+  animation: pill-receipt-draw 520ms var(--ease-draw) 80ms forwards;
 }
 .pill[data-reaction-tone="clean"] .pill__receipt-rule {
   background: linear-gradient(90deg, var(--silk-40), var(--silk-65));
@@ -1813,7 +1813,7 @@
     inset 0 -1px 0 var(--lg-rim-void);
 }
 .pill[data-state="expand"] .pill__decks .vmx-deck-chip {
-  animation: pill-receipt-chip-settle 260ms cubic-bezier(0.16, 1, 0.3, 1) 178ms both;
+  animation: pill-receipt-chip-settle 260ms var(--ease-brand) 178ms both;
 }
 .pill[data-state="expand"] .pill__decks .vmx-deck-chip:nth-child(2) {
   animation-delay: 206ms;
@@ -1896,11 +1896,11 @@
   transform: translateY(-6px);
   pointer-events: none;
   transition:
-    max-height 280ms cubic-bezier(0.16, 1, 0.3, 1),
-    padding-bottom 220ms cubic-bezier(0.16, 1, 0.3, 1),
-    border-top-width 220ms cubic-bezier(0.16, 1, 0.3, 1),
-    opacity 240ms cubic-bezier(0.16, 1, 0.3, 1),
-    transform 320ms cubic-bezier(0.16, 1, 0.3, 1);
+    max-height 280ms var(--ease-brand),
+    padding-bottom 220ms var(--ease-brand),
+    border-top-width 220ms var(--ease-brand),
+    opacity 240ms var(--ease-brand),
+    transform 320ms var(--ease-brand);
 }
 .pill__peek .vmx-next-card {
   margin: 0;
@@ -1911,10 +1911,10 @@
   border-radius: 0;
   background: transparent;
   transition:
-    box-shadow 180ms cubic-bezier(0.16, 1, 0.3, 1),
-    filter 180ms cubic-bezier(0.16, 1, 0.3, 1),
-    background 180ms cubic-bezier(0.16, 1, 0.3, 1),
-    transform 180ms cubic-bezier(0.16, 1, 0.3, 1);
+    box-shadow 180ms var(--ease-brand),
+    filter 180ms var(--ease-brand),
+    background 180ms var(--ease-brand),
+    transform 180ms var(--ease-brand);
 }
 .pill__peek .vmx-next-card[data-interactive="true"] {
   cursor: pointer;
@@ -1932,8 +1932,8 @@
   transform: scaleX(1);
   transform-origin: left center;
   transition:
-    opacity 180ms cubic-bezier(0.16, 1, 0.3, 1),
-    transform 220ms cubic-bezier(0.16, 1, 0.3, 1);
+    opacity 180ms var(--ease-brand),
+    transform 220ms var(--ease-brand);
 }
 .pill__peek .vmx-next-card[data-interactive="true"]:hover {
   background:
@@ -2011,14 +2011,14 @@
   box-shadow: 0 0 10px var(--brand-22);
 }
 .pill[data-peek="true"] .pill__peek .vmx-next-card__cue-rail::after {
-  animation: pill-peek-cue-commit 520ms cubic-bezier(0.16, 1, 0.3, 1) 60ms both;
+  animation: pill-peek-cue-commit 520ms var(--ease-brand) 60ms both;
 }
 .pill[data-peek="true"] .pill__peek .vmx-next-card__title {
-  animation: pill-peek-title-settle 280ms cubic-bezier(0.16, 1, 0.3, 1) 112ms both;
+  animation: pill-peek-title-settle 280ms var(--ease-brand) 112ms both;
 }
 .pill[data-peek="true"] .pill__peek .vmx-next-card__transition,
 .pill[data-peek="true"] .pill__peek .vmx-next-card__why {
-  animation: pill-peek-detail-settle 240ms cubic-bezier(0.16, 1, 0.3, 1) 148ms both;
+  animation: pill-peek-detail-settle 240ms var(--ease-brand) 148ms both;
 }
 /* Reveal: only when hovering (data-peek) AND a card is present. The :empty guard
  * is the CSS belt to index.ts's honest-silence (an empty mount stays invisible —
@@ -2032,7 +2032,7 @@
   pointer-events: auto;
 }
 .pill[data-peek="true"] .pill__peek:not(:empty) .vmx-next-card {
-  animation: pill-peek-settle 280ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: pill-peek-settle 280ms var(--ease-brand) both;
 }
 @keyframes pill-peek-settle {
   from {
@@ -2114,9 +2114,9 @@
     );
   overflow: hidden;
   transition:
-    --stage-pad-x 220ms cubic-bezier(0.16, 1, 0.3, 1),
-    --stage-pad-y 220ms cubic-bezier(0.16, 1, 0.3, 1),
-    filter 220ms cubic-bezier(0.16, 1, 0.3, 1);
+    --stage-pad-x 220ms var(--ease-brand),
+    --stage-pad-y 220ms var(--ease-brand),
+    filter 220ms var(--ease-brand);
 }
 .pill-demo-stage[data-hover-tone="clean"] {
   --stage-grid-line: var(--brand-03);
@@ -2224,7 +2224,7 @@
   opacity: 0;
   transform: translate3d(-50%, -50%, 0);
   mix-blend-mode: screen;
-  animation: pill-demo-stage-hit 760ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: pill-demo-stage-hit 760ms var(--ease-brand) both;
 }
 .pill-demo-stage__hit[data-tone="clean"] {
   animation-name: pill-demo-stage-hit-clean;
@@ -2297,10 +2297,10 @@
   opacity: 1;
   transform: translateY(0);
   transition:
-    border-color 180ms cubic-bezier(0.16, 1, 0.3, 1),
-    box-shadow 180ms cubic-bezier(0.16, 1, 0.3, 1),
-    opacity 180ms cubic-bezier(0.16, 1, 0.3, 1),
-    transform 220ms cubic-bezier(0.16, 1, 0.3, 1);
+    border-color 180ms var(--ease-brand),
+    box-shadow 180ms var(--ease-brand),
+    opacity 180ms var(--ease-brand),
+    transform 220ms var(--ease-brand);
 }
 .pill[data-open="true"] ~ .pill-demo-controls {
   z-index: 8;
@@ -2418,15 +2418,15 @@
     scale(var(--pad-scale));
   transform-style: preserve-3d;
   transition:
-    --pad-x 120ms cubic-bezier(0.16, 1, 0.3, 1),
-    --pad-y 120ms cubic-bezier(0.16, 1, 0.3, 1),
-    --pad-tilt-x 140ms cubic-bezier(0.16, 1, 0.3, 1),
-    --pad-tilt-y 140ms cubic-bezier(0.16, 1, 0.3, 1),
-    transform 140ms cubic-bezier(0.16, 1, 0.3, 1),
-    border-color 160ms cubic-bezier(0.16, 1, 0.3, 1),
-    color 160ms cubic-bezier(0.16, 1, 0.3, 1),
-    box-shadow 160ms cubic-bezier(0.16, 1, 0.3, 1),
-    background 160ms cubic-bezier(0.16, 1, 0.3, 1);
+    --pad-x 120ms var(--ease-brand),
+    --pad-y 120ms var(--ease-brand),
+    --pad-tilt-x 140ms var(--ease-brand),
+    --pad-tilt-y 140ms var(--ease-brand),
+    transform 140ms var(--ease-brand),
+    border-color 160ms var(--ease-brand),
+    color 160ms var(--ease-brand),
+    box-shadow 160ms var(--ease-brand),
+    background 160ms var(--ease-brand);
 }
 .pill-demo-controls button::before {
   content: attr(data-demo-key);
@@ -2451,8 +2451,8 @@
   transform-origin: left center;
   transform: scaleX(0.3);
   transition:
-    opacity 160ms cubic-bezier(0.16, 1, 0.3, 1),
-    transform 180ms cubic-bezier(0.16, 1, 0.3, 1);
+    opacity 160ms var(--ease-brand),
+    transform 180ms var(--ease-brand);
 }
 .pill-demo-controls button:hover,
 .pill-demo-controls button[aria-pressed="true"],
@@ -2518,28 +2518,28 @@
   --pad-rail-shift-end: -2px;
 }
 .pill-demo-controls button[aria-pressed="true"][data-hit-pulse="a"] {
-  animation: pill-demo-pad-armed-a 320ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: pill-demo-pad-armed-a 320ms var(--ease-brand) both;
 }
 .pill-demo-controls button[aria-pressed="true"][data-hit-pulse="b"] {
-  animation: pill-demo-pad-armed-b 320ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: pill-demo-pad-armed-b 320ms var(--ease-brand) both;
 }
 .pill-demo-controls button[aria-pressed="true"][data-hit-pulse="a"]::after {
-  animation: pill-demo-pad-rail-hit-a 320ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: pill-demo-pad-rail-hit-a 320ms var(--ease-brand) both;
 }
 .pill-demo-controls button[aria-pressed="true"][data-hit-pulse="b"]::after {
-  animation: pill-demo-pad-rail-hit-b 320ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: pill-demo-pad-rail-hit-b 320ms var(--ease-brand) both;
 }
 .pill-demo-controls button[data-release-pulse="a"] {
-  animation: pill-demo-pad-release-a 240ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: pill-demo-pad-release-a 240ms var(--ease-brand) both;
 }
 .pill-demo-controls button[data-release-pulse="b"] {
-  animation: pill-demo-pad-release-b 240ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: pill-demo-pad-release-b 240ms var(--ease-brand) both;
 }
 .pill-demo-controls button[data-release-pulse="a"]::after {
-  animation: pill-demo-pad-rail-release-a 240ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: pill-demo-pad-rail-release-a 240ms var(--ease-brand) both;
 }
 .pill-demo-controls button[data-release-pulse="b"]::after {
-  animation: pill-demo-pad-rail-release-b 240ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: pill-demo-pad-rail-release-b 240ms var(--ease-brand) both;
 }
 .pill-demo-controls button:active {
   --pad-lift: 1px;

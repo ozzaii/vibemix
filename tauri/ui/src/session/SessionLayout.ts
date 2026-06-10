@@ -303,7 +303,7 @@ const LAYOUT_CSS = `
     box-shadow:
       inset 0 1px 0 rgba(255, 251, 244, 0.028),
       inset 0 -2px 0 rgba(0, 0, 0, 0.64);
-    transition: border-color 180ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 180ms cubic-bezier(0.16, 1, 0.3, 1);
+    transition: border-color 180ms var(--ease-brand), box-shadow 180ms var(--ease-brand);
   }
   /* DELIGHT (impeccable, 2026-06-03): the persona is the co-host's character
    * dial — the control a DJ taps mid-set to swing hype → coach → teach. When you
@@ -318,7 +318,7 @@ const LAYOUT_CSS = `
     pointer-events: none;
     background: radial-gradient(120% 120% at 16% 118%, var(--amber-22), transparent 58%);
     opacity: 0;
-    transition: opacity 180ms cubic-bezier(0.16, 1, 0.3, 1);
+    transition: opacity 180ms var(--ease-brand);
   }
   .vmx-persona:hover::before,
   .vmx-persona:focus-visible::before { opacity: 1; }
@@ -910,7 +910,7 @@ const LAYOUT_CSS = `
     vertical-align: 0.16em;
     font-style: normal;
   }
-  .vmx-now[data-arrived="true"] { animation: vmx-rise 400ms cubic-bezier(0.16, 1, 0.3, 1); }
+  .vmx-now[data-arrived="true"] { animation: vmx-rise 400ms var(--ease-brand); }
   @keyframes vmx-rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
   /* THE RECEIPT — rule draws L→R, cite ignites at its terminus [signature] */
@@ -956,7 +956,7 @@ const LAYOUT_CSS = `
     box-shadow: 0 0 10px var(--amber-22);
     transform: scaleX(0); transform-origin: left;
   }
-  .vmx-receipt[data-arrived="true"] .vmx-receipt__rule { animation: vmx-draw 520ms cubic-bezier(0.22, 1, 0.36, 1) 360ms forwards; }
+  .vmx-receipt[data-arrived="true"] .vmx-receipt__rule { animation: vmx-draw 520ms var(--ease-draw) 360ms forwards; }
   /* The cited moment's waveform — the mock's receipt signature. Not data: a
    * material emblem that this cite IS an audio moment, breathing at phrase
    * tempo beside the timestamp. */
@@ -994,7 +994,7 @@ const LAYOUT_CSS = `
     font-variant-numeric: tabular-nums;
     text-shadow: var(--text-emboss);
   }
-  .vmx-receipt[data-arrived="true"] .vmx-cite { animation: vmx-ignite 380ms cubic-bezier(0.16, 1, 0.3, 1) 900ms both; }
+  .vmx-receipt[data-arrived="true"] .vmx-cite { animation: vmx-ignite 380ms var(--ease-brand) 900ms both; }
   .vmx-cite:hover { color: var(--brand-glow); text-shadow: 0 0 8px var(--brand-22); }
   .vmx-cite:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
   @keyframes vmx-draw { to { transform: scaleX(1); } }

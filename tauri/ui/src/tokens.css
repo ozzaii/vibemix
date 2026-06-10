@@ -249,6 +249,8 @@
 
   /* ─── CANONICAL: motion — one ease + BPM-locked beats ──────────────── */
   --ease-brand: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-draw:  cubic-bezier(0.22, 1, 0.36, 1);  /* receipt/meter draws — slightly rounder out */
+  --ease-snap:  cubic-bezier(0.18, 0.9, 0.18, 1); /* save-hit accents — symmetric snap */
   --bpm-beat: 461ms;   /* ~130 BPM, drives playhead + pulse */
   --bpm-bar:  1846ms;
 

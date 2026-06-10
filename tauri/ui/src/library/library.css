@@ -1424,7 +1424,7 @@ body {
   border-radius: 0;
   background: none;
   box-shadow: none;
-  animation: vmx-lib-chat-rise 0.34s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: vmx-lib-chat-rise 0.34s var(--ease-draw) both;
 }
 /* One column, top-to-bottom — a transcript, not a left/right chat. Viber spans
    the stream; the user line is a narrower recessed input in the SAME column,
@@ -1525,7 +1525,7 @@ body {
   background: linear-gradient(90deg, var(--brand-65), var(--brand-12) 56%, transparent);
   box-shadow: 0 0 5px var(--brand-12);
   transform-origin: left;
-  animation: vmx-lib-receipt-draw 0.52s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  animation: vmx-lib-receipt-draw 0.52s var(--ease-draw) forwards;
 }
 .vmx-lib-chat-turn[data-pending="true"] .body::after {
   width: 8px;
@@ -2538,8 +2538,8 @@ body {
   opacity: 1;
   transform: translateY(0);
   transition:
-    opacity 0.4s cubic-bezier(0.22, 1, 0.36, 1),
-    transform 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+    opacity 0.4s var(--ease-draw),
+    transform 0.5s var(--ease-draw);
 }
 
 @media (prefers-reduced-motion: reduce) {
