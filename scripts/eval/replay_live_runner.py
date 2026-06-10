@@ -17,7 +17,9 @@ import argparse
 import json
 import os
 import re
+import shutil
 import signal
+import struct
 import subprocess
 import sys
 import time
@@ -29,8 +31,6 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-_MUSIC_RE = re.compile(r"music=([0-9]+(?:\.[0-9]+)?)")
-_AUDIBLE_RE = re.compile(r"audible=1")
 _FATAL_RE = re.compile(r"(Traceback|\\bFATAL\\b)", re.IGNORECASE)
 _LLM_TO_TTS_DELTA_EVENT_TYPE = "llm_to_tts_delta_ms"
 _LATE_LLM_TO_TTS_BUDGET_MS = 6000.0
@@ -46,6 +46,10 @@ class LiveReplayConfig:
     base_debrief_port: int = 18865
     output_device: str | None = "BlackHole 2ch"
     python_executable: str = sys.executable
+    # Optional config.json written into each run's sandboxed HOME before boot —
+    # the only reliable per-run persona lever (boot seeds VIBEMIX_MODE/skill/lens
+    # from ConfigStore, clobbering shell env).
+    seed_config: Path | None = None
 
 
 @dataclass
@@ -63,8 +67,7 @@ class LiveReplayResult:
     recording_input_wav: Path | None
     recording_input_duration_s: float
     events_jsonl: Path | None
-    max_music: float
-    audible_seen: bool
+    recorded_rms: float
     replay_capture_seen: bool
     replay_midi_seen: bool
     replay_nowplaying_seen: bool
@@ -108,6 +111,10 @@ def run_live_replay_session(
     home_dir = run_dir / "home"
     run_dir.mkdir(parents=True, exist_ok=True)
     home_dir.mkdir(parents=True, exist_ok=True)
+    if config.seed_config is not None:
+        app_dir = home_dir / "Library" / "Application Support" / "vibemix"
+        app_dir.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(config.seed_config, app_dir / "config.json")
     stdout_path = run_dir / "stdout.log"
     stderr_path = run_dir / "stderr.log"
     ws_port = config.base_ws_port + index
@@ -171,7 +178,11 @@ def run_live_replay_session(
         if recording_input is not None and recording_input.exists()
         else 0.0
     )
-    max_music = _max_music(stdout or "")
+    recorded_rms = (
+        _wav_mid_rms(recording_input)
+        if recording_input is not None and recording_input.exists()
+        else 0.0
+    )
 
     return LiveReplayResult(
         scenario=scenario,
@@ -187,8 +198,7 @@ def run_live_replay_session(
         recording_input_wav=recording_input if recording_input and recording_input.exists() else None,
         recording_input_duration_s=recording_duration,
         events_jsonl=events_jsonl if events_jsonl and events_jsonl.exists() else None,
-        max_music=max_music,
-        audible_seen=bool(_AUDIBLE_RE.search(stdout or "")),
+        recorded_rms=recorded_rms,
         replay_capture_seen="-> replay capture:" in (stdout or ""),
         replay_midi_seen=("midi.jsonl" not in _session_optional_files(session_dir))
         or ("-> replay MIDI tape:" in (stdout or "")),
@@ -231,10 +241,17 @@ def _scenario_row(result: LiveReplayResult) -> dict[str, Any]:
         flags.append("ws_not_ready")
     if not result.voice_muted_seen:
         flags.append("voice_not_muted")
-    if result.max_music <= 0.01:
-        flags.append("no_music_meter")
-    if not result.audible_seen:
-        flags.append("no_audible_meter")
+    # Judged from the artifacts the app actually produced, not stdout meter
+    # lines — the old "[live] music=" producer (runtime/diag.py diag_loop) is
+    # never invoked, and "[event ...] audible=" only prints for events that
+    # PASS the speak gate, so a fully-gated (all-silent) run looked dead.
+    if result.recorded_rms < 0.005:
+        flags.append("no_recorded_audio")
+    # Perception is alive when the detector produced events OR the gate
+    # evaluated candidates — a gate that silences everything is shipped
+    # behavior, not a broken replay.
+    if events_summary["events"] == 0 and events_summary["speak_gates"] == 0:
+        flags.append("no_perception_activity")
     if result.recording_input_duration_s <= 0.1:
         flags.append("no_recorded_input")
     if events_summary["events"] > 0 and events_summary["llm_invokes"] == 0:
@@ -267,10 +284,10 @@ def _scenario_row(result: LiveReplayResult) -> dict[str, Any]:
             "replay_nowplaying_selected": result.replay_nowplaying_seen,
             "ws_ready": result.ws_seen,
             "voice_muted": result.voice_muted_seen,
-            "music_meter_max": round(result.max_music, 4),
-            "audible_seen": result.audible_seen,
+            "recorded_input_rms": round(result.recorded_rms, 4),
             "recorded_input_duration_s": round(result.recording_input_duration_s, 3),
             "events": events_summary["events"],
+            "speak_gates": events_summary["speak_gates"],
             "llm_invokes": events_summary["llm_invokes"],
             "cited_emits": events_summary["cited_emits"],
             "citation_zero_non_ack": events_summary["citation_zero_non_ack"],
@@ -294,9 +311,26 @@ def _session_optional_files(session_dir: Path) -> set[str]:
     return {p.name for p in session_dir.iterdir() if p.is_file()}
 
 
-def _max_music(stdout: str) -> float:
-    values = [float(match.group(1)) for match in _MUSIC_RE.finditer(stdout)]
-    return max(values) if values else 0.0
+def _wav_mid_rms(path: Path, window_s: float = 4.0) -> float:
+    """RMS of a mid-file window of an int16 PCM wav, normalized to 0..1."""
+    try:
+        with wave.open(str(path), "rb") as wf:
+            if wf.getsampwidth() != 2:
+                return 0.0
+            frames = wf.getnframes()
+            sr = wf.getframerate()
+            if frames <= 0 or sr <= 0:
+                return 0.0
+            span = min(frames, int(sr * window_s) * wf.getnchannels())
+            wf.setpos(max(0, frames // 2 - span // 2))
+            raw = wf.readframes(span)
+    except (wave.Error, OSError):
+        return 0.0
+    n = len(raw) // 2
+    if n == 0:
+        return 0.0
+    vals = struct.unpack(f"<{n}h", raw[: n * 2])
+    return (sum(v * v for v in vals) / n) ** 0.5 / 32768.0
 
 
 def _latest_recording_dir(home_dir: Path) -> Path | None:
@@ -334,6 +368,7 @@ def _events_summary(path: Path | None) -> dict[str, Any]:
     ]
     return {
         "events": len(event_rows),
+        "speak_gates": sum(1 for row in rows if _row_kind(row) == "speak_gate"),
         "llm_invokes": len(llm_invokes),
         "cited_emits": sum(
             1
@@ -395,6 +430,12 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
     parser.add_argument("--base-debrief-port", type=int, default=18865)
     parser.add_argument("--output-device", type=str, default="BlackHole 2ch")
     parser.add_argument("--python-executable", type=str, default=sys.executable)
+    parser.add_argument(
+        "--seed-config",
+        type=Path,
+        default=None,
+        help="config.json copied into each run's sandboxed HOME before boot (persona: mode/skill/lens)",
+    )
     return parser.parse_args(argv)
 
 
@@ -413,6 +454,7 @@ def main(argv: list[str] | None = None) -> int:
         base_debrief_port=args.base_debrief_port,
         output_device=args.output_device or None,
         python_executable=args.python_executable,
+        seed_config=args.seed_config.resolve() if args.seed_config else None,
     )
 
     jobs = max(1, int(args.jobs))

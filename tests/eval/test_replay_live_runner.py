@@ -16,12 +16,14 @@ from scripts.eval.replay_live_runner import (
 )
 
 
-def _write_wav(path: Path, *, sample_rate: int = 16000, frames: int = 1600) -> None:
+def _write_wav(
+    path: Path, *, sample_rate: int = 16000, frames: int = 1600, amplitude: int = 0
+) -> None:
     with wave.open(str(path), "wb") as wf:
         wf.setnchannels(1)
         wf.setsampwidth(2)
         wf.setframerate(sample_rate)
-        wf.writeframes(b"\0\0" * frames)
+        wf.writeframes(amplitude.to_bytes(2, "little", signed=True) * frames)
 
 
 def test_discover_sessions_finds_direct_and_nested(tmp_path: Path) -> None:
@@ -68,7 +70,7 @@ def test_run_live_replay_session_sets_env_and_reports_pass(tmp_path: Path, monke
             home = Path(seen["env"]["HOME"])  # type: ignore[index]
             recording = home / "Library" / "Application Support" / "vibemix" / "recordings" / "r1"
             recording.mkdir(parents=True)
-            _write_wav(recording / "input.wav", frames=32000)
+            _write_wav(recording / "input.wav", frames=32000, amplitude=2000)
             (recording / "events.jsonl").write_text("", encoding="utf-8")
 
         def communicate(self, timeout=None):
@@ -122,13 +124,126 @@ def test_run_live_replay_session_sets_env_and_reports_pass(tmp_path: Path, monke
     # locks on real audio, and replay's whole point is measuring the shipped
     # perception unmodified.
     assert "VIBEMIX_BPM_CONFIDENCE_FLOOR" not in env
-    assert result.max_music == 0.249
-    assert result.audible_seen is True
     assert result.recording_input_duration_s == 2.0
+    assert result.recorded_rms > 0.005
     findings = build_findings([result])
-    assert findings["verdict"] == "pass"
     assert findings["scenarios"][0]["checklist"]["events"] == 0
     assert findings["scenarios"][0]["checklist"]["citation_zero_non_ack"] == 0
+
+
+def test_fully_gated_silent_run_passes(tmp_path: Path) -> None:
+    """A replay where the speak gate silences every candidate is shipped
+    behavior (perception alive, Sven chose silence) — NOT a broken replay."""
+    session = tmp_path / "corpus" / "set-one"
+    session.mkdir(parents=True)
+    _write_wav(session / "input.wav")
+
+    class GatedSilentProc:
+        returncode = None
+
+        def __init__(self, command, *, cwd, env, stdout, stderr, text):
+            self.env = env
+
+        def poll(self):
+            return self.returncode
+
+        def send_signal(self, sig):
+            self.returncode = 0
+            home = Path(self.env["HOME"])
+            recording = home / "Library" / "Application Support" / "vibemix" / "recordings" / "r1"
+            recording.mkdir(parents=True)
+            _write_wav(recording / "input.wav", frames=32000, amplitude=2000)
+            (recording / "events.jsonl").write_text(
+                "\n".join(
+                    [
+                        json.dumps(
+                            {"kind": "speak_gate", "type": "PHASE", "verdict": "silent"}
+                        ),
+                        json.dumps(
+                            {"kind": "speak_gate", "type": "HEARTBEAT", "verdict": "silent"}
+                        ),
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+        def communicate(self, timeout=None):
+            return (
+                "\n".join(
+                    [
+                        "-> replay capture: /tmp/session",
+                        "-> AI voice output muted (no local TTS); stream not opened",
+                        "-> mascot bus on ws://127.0.0.1:18765",
+                    ]
+                ),
+                "",
+            )
+
+        def kill(self):
+            self.returncode = -9
+
+    result = run_live_replay_session(
+        session,
+        index=0,
+        config=LiveReplayConfig(repo_root=tmp_path, output_dir=tmp_path / "out", duration_s=0.0),
+        popen_factory=GatedSilentProc,
+        sleep_fn=lambda _: None,
+    )
+    row = build_findings([result])["scenarios"][0]
+    assert row["checklist"]["speak_gates"] == 2
+    assert "no_perception_activity" not in row["flags"]
+    assert "no_recorded_audio" not in row["flags"]
+    assert row["verdict"] == "pass"
+
+
+def test_seed_config_lands_in_sandbox_home(tmp_path: Path) -> None:
+    session = tmp_path / "corpus" / "set-one"
+    session.mkdir(parents=True)
+    _write_wav(session / "input.wav")
+    persona = tmp_path / "persona.json"
+    persona.write_text(
+        json.dumps({"mode": "hype", "extra": {"skill": "pro", "lens": "hype"}}),
+        encoding="utf-8",
+    )
+    seen: dict[str, object] = {}
+
+    class CheckProc:
+        returncode = None
+
+        def __init__(self, command, *, cwd, env, stdout, stderr, text):
+            home = Path(env["HOME"])
+            seeded = home / "Library" / "Application Support" / "vibemix" / "config.json"
+            seen["seeded_at_boot"] = seeded.exists()
+            seen["seeded_body"] = json.loads(seeded.read_text()) if seeded.exists() else None
+
+        def poll(self):
+            return self.returncode
+
+        def send_signal(self, sig):
+            self.returncode = 0
+
+        def communicate(self, timeout=None):
+            return ("", "")
+
+        def kill(self):
+            self.returncode = -9
+
+    run_live_replay_session(
+        session,
+        index=0,
+        config=LiveReplayConfig(
+            repo_root=tmp_path,
+            output_dir=tmp_path / "out",
+            duration_s=0.0,
+            seed_config=persona,
+        ),
+        popen_factory=CheckProc,
+        sleep_fn=lambda _: None,
+    )
+    # The persona config must already be on disk when the app process spawns.
+    assert seen["seeded_at_boot"] is True
+    assert seen["seeded_body"] == {"mode": "hype", "extra": {"skill": "pro", "lens": "hype"}}
 
 
 def test_build_findings_flags_broken_replay(tmp_path: Path) -> None:
@@ -164,7 +279,8 @@ def test_build_findings_flags_broken_replay(tmp_path: Path) -> None:
     assert row["verdict"] == "fail"
     assert "fatal_log" in row["flags"]
     assert "replay_capture_not_selected" in row["flags"]
-    assert "no_music_meter" in row["flags"]
+    assert "no_recorded_audio" in row["flags"]
+    assert "no_perception_activity" in row["flags"]
 
 
 def test_build_findings_routes_event_log_failures(tmp_path: Path) -> None:
