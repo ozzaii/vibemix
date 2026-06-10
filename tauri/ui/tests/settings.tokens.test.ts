@@ -111,39 +111,39 @@ describe("settings surface tokens (wave 3)", () => {
     expect(containsLegacyToken(renderedHtmlPlusStyles(el))).toBe(false);
   });
 
-  it("PerformanceGroup off-state renders without legacy refs + carries off markers", async () => {
+  it("PerformanceGroup off-state renders the OFF|ON rocker with OFF active", async () => {
     const { PerformanceGroup } = await import(
       "../src/settings/components/performance-group.js"
     );
     const el = PerformanceGroup(false);
     document.body.append(el);
     expect(containsLegacyToken(renderedHtmlPlusStyles(el))).toBe(false);
-    const toggle = el.querySelector<HTMLButtonElement>(".vmx-perf-toggle");
-    expect(toggle).not.toBeNull();
-    expect(toggle?.dataset.on).toBe("false");
-    expect(toggle?.getAttribute("aria-checked")).toBe("false");
-    expect(toggle?.textContent).toBe("OFF");
+    // One boolean vocabulary across the drawer: the recessed rocker, not a
+    // bespoke chip whose label IS the state.
+    const rocker = el.querySelector<HTMLElement>('.vmx-rocker[aria-label="lighter blur"]');
+    expect(rocker).not.toBeNull();
+    const active = rocker?.querySelector<HTMLElement>('.vmx-rocker__seg[data-active="true"]');
+    expect(active?.dataset.id).toBe("off");
+    expect(active?.getAttribute("aria-checked")).toBe("true");
   });
 
-  it("PerformanceGroup on-state carries the on markers (amber backlight via data-on)", async () => {
+  it("PerformanceGroup on-state lights the ON segment; clicking OFF applies locally", async () => {
     const { PerformanceGroup } = await import(
       "../src/settings/components/performance-group.js"
     );
     const el = PerformanceGroup(true);
     document.body.append(el);
     expect(containsLegacyToken(renderedHtmlPlusStyles(el))).toBe(false);
-    const toggle = el.querySelector<HTMLButtonElement>(".vmx-perf-toggle");
-    expect(toggle).not.toBeNull();
-    expect(toggle?.dataset.on).toBe("true");
-    expect(toggle?.getAttribute("aria-checked")).toBe("true");
-    expect(toggle?.textContent).toBe("ON");
-    // CSS rule for data-on="true" must reference --amber tokens (mock-
-    // verbatim amber backlight gradient) — proves the on-state styling
-    // is wired even though jsdom doesn't compute it.
-    const styles = Array.from(document.head.querySelectorAll("style"))
-      .map((s) => s.textContent ?? "")
-      .join("\n");
-    expect(styles).toMatch(/\.vmx-perf-toggle\[data-on="true"\][\s\S]*--amber/);
+    const activeOn = el.querySelector<HTMLElement>('.vmx-rocker__seg[data-active="true"]');
+    expect(activeOn?.dataset.id).toBe("on");
+    // Optimistic repaint + local-first apply: clicking OFF flips the lit
+    // segment and clears data-blur-perf on <html> before any ipc ack.
+    document.documentElement.setAttribute("data-blur-perf", "on");
+    el.querySelector<HTMLButtonElement>('.vmx-rocker__seg[data-id="off"]')?.click();
+    expect(
+      el.querySelector<HTMLElement>('.vmx-rocker__seg[data-active="true"]')?.dataset.id,
+    ).toBe("off");
+    expect(document.documentElement.getAttribute("data-blur-perf")).toBeNull();
   });
 
   it("applyBlurPerfPreference writes/clears data-blur-perf on <html>", async () => {

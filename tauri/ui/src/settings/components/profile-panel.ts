@@ -388,7 +388,12 @@ export function renderProfilePanel(
       render();
     } catch (err) {
       if (disposed) return;
-      setStatus(`load failed: ${(err as Error).message ?? err}`, true);
+      // Transport failure (no live session / bridge down) is an expected
+      // state, not a fault — one calm product sentence; the raw error
+      // stays in the console for whoever is actually debugging.
+      // eslint-disable-next-line no-console
+      console.warn("[profile-panel] load failed:", err);
+      setStatus("Your profile loads once a session runs. Start one and check back.", false);
     }
   }
 

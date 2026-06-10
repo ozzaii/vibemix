@@ -152,19 +152,21 @@ const CSS = `
      * proper-name voices ("Aoede", "Charon") now render natively. */
     color: inherit;
   }
+  /* Engraved caption, not a lit pill — AUTO is a passive fact, and spending
+   * brand on it crowded the drawer's 20/80 budget (state stays rose,
+   * furniture stays ink). */
   .vmx-picker__auto {
-    font-family: var(--type-display);
-    font-variation-settings: "wdth" 85, "wght" 600;
+    font-family: var(--type-mono);
+    font-weight: 600;
     font-size: 9px;
     letter-spacing: 0.24em;
     text-transform: uppercase;
     padding: 3px 7px;
     border-radius: 1px;
-    background: rgba(255, 165, 223, 0.08);
-    border: 1px solid var(--amber-22);
-    color: var(--amber);
+    border: 1px solid var(--border-subtle);
+    color: var(--text-muted);
     line-height: 1;
-    text-shadow: 0 0 4px var(--amber-22);
+    text-shadow: var(--text-emboss);
   }
   .vmx-picker__chev {
     font-family: var(--type-mono);

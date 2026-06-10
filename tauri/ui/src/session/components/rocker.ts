@@ -59,9 +59,11 @@ const CSS = `
     justify-content: center;
     gap: 6px;
     padding: 0 var(--sp-2);
-    font-family: var(--type-display);
-    font-variation-settings: "wdth" 85, "wght" 600;
-    font-size: 10.5px;
+    /* Mono = the engraved-hardware voice every machined label in the contract
+     * mock speaks; the sans variant read webbier at the same size. */
+    font-family: var(--type-mono);
+    font-weight: 600;
+    font-size: 10px;
     letter-spacing: 0.16em;
     text-transform: uppercase;
     line-height: 1;

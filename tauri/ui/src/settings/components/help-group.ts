@@ -33,11 +33,20 @@ import { registerStyle } from "../../session/components/_style-registry.js";
 import { mountShortcutsOverlay } from "../../session/components/shortcuts-overlay.js";
 import { renderSettingsGroup } from "./group.js";
 
-/** Hand-bumped per release. The settings drawer's About row reads this. */
-export const VIBEMIX_VERSION = "0.1.0-rc1";
+declare const __APP_VERSION__: string;
+declare const __BUILD_DATE__: string;
 
-/** Hand-bumped per release alongside VIBEMIX_VERSION. ISO-8601 date. */
-export const VIBEMIX_BUILD_DATE = "2026-05-14";
+/** Injected at build time (vite `define` reads the Cargo.toml package
+ *  version) so the About row can't drift from the shipped artifact the
+ *  way the old hand-bumped constant did — twice. Falls back when the
+ *  define isn't applied (vitest, bare tsc). */
+export const VIBEMIX_VERSION =
+  typeof __APP_VERSION__ !== "undefined" ? __APP_VERSION__ : "0.0.0-dev";
+
+/** Build date stamped by the same vite define; honest "unreleased" when
+ *  running un-built (dev server, tests). */
+export const VIBEMIX_BUILD_DATE =
+  typeof __BUILD_DATE__ !== "undefined" ? __BUILD_DATE__ : "unreleased";
 
 /** Public repo URL — opened by the GITHUB row. NOT in the capability
  *  allowlist today; see TODO in `openGithubRepo()`. */

@@ -76,9 +76,11 @@ const CSS = `
     justify-content: space-between;
     gap: var(--sp-3);
     padding: 13px var(--sp-4) 11px 18px;
-    font-family: var(--type-display);
-    font-variation-settings: "wdth" 85, "wght" 600;
-    font-size: 11px;
+    /* Engraved-hardware voice: every machined label in the contract mock is
+     * Geist Mono + wide tracking. Geist Sans here read softer/webbier. */
+    font-family: var(--type-mono);
+    font-weight: 600;
+    font-size: 10px;
     letter-spacing: 0.26em;
     text-transform: uppercase;
     color: var(--text-muted);
@@ -109,6 +111,9 @@ const CSS = `
     background: linear-gradient(90deg, var(--brand-12) 0%, rgba(255, 222, 242, 0.045) 18%, transparent 64%);
     opacity: 0.52;
   }
+  /* Engraved chip, not a lit one — the badge is a static caption, and a
+   * brand-filled pill here competed with the actual active controls for the
+   * eye (20/80). State stays rose; furniture stays ink. */
   .vmx-settings-group__badge {
     font-family: var(--type-mono);
     font-size: 9px;
@@ -116,14 +121,12 @@ const CSS = `
     text-transform: uppercase;
     padding: 3px var(--sp-2);
     border-radius: var(--rad-sm);
-    background: linear-gradient(180deg, var(--brand-12) 0%, var(--brand-04) 100%);
-    border: 1px solid var(--brand-22);
-    color: var(--brand);
+    color: var(--text-muted);
     line-height: 1;
-    text-shadow: 0 0 4px var(--brand-22);
+    text-shadow: var(--text-emboss);
     box-shadow:
-      inset 0 1px 0 rgba(255, 222, 242, 0.10),
-      inset 0 -1px 0 rgba(0, 0, 0, 0.40);
+      inset 0 0 0 1px rgba(255, 255, 255, 0.045),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.30);
   }
   /* Milled inset floor — the controls sit DOWN inside the recessed module.
    * Taller top breathing room than the tight bottom seat = internal rhythm. */

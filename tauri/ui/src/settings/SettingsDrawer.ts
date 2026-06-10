@@ -458,9 +458,9 @@ const CSS = `
     display: inline-flex;
     align-items: center;
     gap: 9px;
-    font-family: var(--type-display);
-    font-variation-settings: "wdth" 85, "wght" 600;
-    font-size: 10px;
+    font-family: var(--type-mono);
+    font-weight: 600;
+    font-size: 9.5px;
     letter-spacing: 0.22em;
     text-transform: uppercase;
     color: var(--text-muted);
@@ -478,7 +478,10 @@ const CSS = `
   }
   /* Voice identity readout — a recessed display window (glass-3 floor, inset
    * bezel), not a control: it shows what the instrument IS, no chevron. */
-  .vmx-settings-drawer__voice-readout {
+  /* Honest readout row — shared recipe for facts that are not choices
+   * (voice identity, auto output device). Interactive chrome (chevron,
+   * popover) appears only where choice exists. */
+  .vmx-settings-drawer__readout {
     display: flex;
     align-items: baseline;
     justify-content: space-between;
@@ -492,7 +495,7 @@ const CSS = `
       inset 0 -1px 0 rgba(0, 0, 0, 0.5),
       inset 0 1px 0 rgba(0, 0, 0, 0.3);
   }
-  .vmx-settings-drawer__voice-name {
+  .vmx-settings-drawer__readout-name {
     font-family: var(--type-mono);
     font-size: 11px;
     font-weight: 600;
@@ -501,7 +504,11 @@ const CSS = `
     text-shadow: 0 0 6px var(--brand-22);
     white-space: nowrap;
   }
-  .vmx-settings-drawer__voice-sub {
+  .vmx-settings-drawer__readout[data-quiet="true"] .vmx-settings-drawer__readout-name {
+    color: var(--text-secondary);
+    text-shadow: var(--text-emboss);
+  }
+  .vmx-settings-drawer__readout-sub {
     font-family: var(--type-mono);
     font-size: 9px;
     letter-spacing: 0.14em;
@@ -965,12 +972,12 @@ function renderDrawerBody(body: HTMLElement, modalSlot: HTMLElement): void {
   voiceLabel.className = "vmx-settings-drawer__label";
   voiceLabel.textContent = "VOICE";
   const voiceReadout = document.createElement("div");
-  voiceReadout.className = "vmx-settings-drawer__voice-readout";
+  voiceReadout.className = "vmx-settings-drawer__readout";
   const voiceName = document.createElement("span");
-  voiceName.className = "vmx-settings-drawer__voice-name";
+  voiceName.className = "vmx-settings-drawer__readout-name";
   voiceName.textContent = "SVEN · LOCAL VOICE";
   const voiceSub = document.createElement("span");
-  voiceSub.className = "vmx-settings-drawer__voice-sub";
+  voiceSub.className = "vmx-settings-drawer__readout-sub";
   voiceSub.textContent = "on-device, no cloud";
   voiceReadout.append(voiceName, voiceSub);
   voiceWrap.append(voiceLabel, voiceReadout);
@@ -1054,37 +1061,56 @@ function renderDrawerBody(body: HTMLElement, modalSlot: HTMLElement): void {
   // --- OUTPUT ---------------------------------------------------------------
   const outputBody = document.createElement("div");
   outputBody.style.cssText = "display:flex; flex-direction:column; gap: var(--sp-4);";
-  outputBody.append(
-    rememberPicker(
-      renderPicker({
-        label: "DEVICE",
-        value: formatOutputDeviceLabel(settings.output_device_id),
-        autoPill: !settings.output_device_id,
-        options: [
-          { id: "auto", label: "Auto device", sub: "system default" },
-          // Real device list is populated by the sidecar at boot and lives
-          // off ipc.settings.state; the picker here lets the user fall
-          // back to "auto" or pick a known id. v1 ships with a "auto"
-          // default — Phase 15 expands.
-          ...(settings.output_device_id
-            ? [
-                {
-                  id: settings.output_device_id,
-                  label: formatOutputDeviceLabel(settings.output_device_id),
-                  sub: settings.output_device_id,
-                },
-              ]
-            : []),
-        ],
-        onChange: (id) => {
-          void sendSettingsField(
-            "output_device_id",
-            id === "auto" ? null : id,
-          );
-        },
-      }),
-    ),
-  );
+  if (settings.output_device_id) {
+    // A real choice exists (the saved device vs auto) — the picker earns
+    // its chevron and popover.
+    outputBody.append(
+      rememberPicker(
+        renderPicker({
+          label: "DEVICE",
+          value: formatOutputDeviceLabel(settings.output_device_id),
+          autoPill: false,
+          options: [
+            { id: "auto", label: "Auto device", sub: "system default" },
+            {
+              id: settings.output_device_id,
+              label: formatOutputDeviceLabel(settings.output_device_id),
+              sub: settings.output_device_id,
+            },
+          ],
+          onChange: (id) => {
+            void sendSettingsField(
+              "output_device_id",
+              id === "auto" ? null : id,
+            );
+          },
+        }),
+      ),
+    );
+  } else {
+    // Fresh user: the real device list isn't enumerated yet, so a dropdown
+    // would open to the single option already selected — interactive
+    // furniture with no choice behind it. Render the honest readout until
+    // the sidecar exposes the enumerated list.
+    const deviceWrap = document.createElement("div");
+    deviceWrap.style.cssText = "display:flex; flex-direction:column; gap: var(--sp-2);";
+    deviceWrap.dataset.wire = "settings.output.device";
+    const deviceLabel = document.createElement("div");
+    deviceLabel.className = "vmx-settings-drawer__label";
+    deviceLabel.textContent = "DEVICE";
+    const deviceReadout = document.createElement("div");
+    deviceReadout.className = "vmx-settings-drawer__readout";
+    deviceReadout.dataset.quiet = "true";
+    const deviceName = document.createElement("span");
+    deviceName.className = "vmx-settings-drawer__readout-name";
+    deviceName.textContent = "Auto device";
+    const deviceSub = document.createElement("span");
+    deviceSub.className = "vmx-settings-drawer__readout-sub";
+    deviceSub.textContent = "system default";
+    deviceReadout.append(deviceName, deviceSub);
+    deviceWrap.append(deviceLabel, deviceReadout);
+    outputBody.append(deviceWrap);
+  }
   outputBody.append(
     renderRocker({
       ariaLabel: "output profile",

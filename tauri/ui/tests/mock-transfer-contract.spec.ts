@@ -35,6 +35,7 @@ import {
   SETTINGS_ALWAYS_GROUP_WIRES,
   SETTINGS_GROUP_WIRES,
   SETTINGS_INTERNAL_GROUP_WIRES,
+  SETTINGS_OUTPUT_CONTROL_WIRES,
   SETTINGS_PERSONA_CONTROL_WIRES,
   wireSelector,
   type MockTransferSurface,
@@ -224,6 +225,9 @@ function expectedRuntimeWireValues(surface: MockTransferRuntimeSurface): string[
       values.add(`${wire}.body`);
     }
     for (const wire of SETTINGS_PERSONA_CONTROL_WIRES) {
+      values.add(wire);
+    }
+    for (const wire of SETTINGS_OUTPUT_CONTROL_WIRES) {
       values.add(wire);
     }
   }

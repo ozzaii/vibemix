@@ -32,6 +32,7 @@
  *          in both dev and prod.
  */
 
+import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { defineConfig } from "vite";
@@ -39,8 +40,21 @@ import { viteStaticCopy } from "vite-plugin-static-copy";
 
 const projectRoot = fileURLToPath(new URL(".", import.meta.url));
 
+// The shipped artifact's version lives in the Tauri crate — read it at
+// config-eval time so the About row (help-group.ts) can't drift from the
+// DMG the way hand-bumped constants did.
+const cargoToml = readFileSync(
+  resolve(projectRoot, "../src-tauri/Cargo.toml"),
+  "utf8",
+);
+const appVersion = /^version\s*=\s*"([^"]+)"/m.exec(cargoToml)?.[1] ?? "0.0.0";
+
 export default defineConfig({
   clearScreen: false,
+  define: {
+    __APP_VERSION__: JSON.stringify(appVersion),
+    __BUILD_DATE__: JSON.stringify(new Date().toISOString().slice(0, 10)),
+  },
   server: {
     port: 1420,
     strictPort: true,

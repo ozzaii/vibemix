@@ -349,6 +349,14 @@ export const SETTINGS_PERSONA_CONTROL_WIRES = [
   "settings.persona.skill",
 ] as const;
 
+/* OUTPUT controls. The device row is an honest readout while no real
+ * device list is enumerated (fresh user, output_device_id null — the
+ * drawer's default state, which is also what the contract test mounts);
+ * it graduates to a picker once a saved device gives the row a choice. */
+export const SETTINGS_OUTPUT_CONTROL_WIRES = [
+  "settings.output.device",
+] as const;
+
 export const SETTINGS_MOCK_SOURCES = [
   "mocks/vibemix-settings-drawer.html",
 ] as const;
