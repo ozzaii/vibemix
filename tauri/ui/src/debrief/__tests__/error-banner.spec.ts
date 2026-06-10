@@ -45,7 +45,7 @@ describe("error-banner reason→copy map", () => {
   });
 
   it("port_in_use → user copy", () => {
-    expect(reasonToCopy("port_in_use")).toContain("8766");
+    expect(reasonToCopy("port_in_use")).toContain("already open");
   });
 
   it("unknown reason returns empty string", () => {

@@ -54,9 +54,9 @@ export function reasonMessage(reason: string | undefined, fallback: string): str
     case "session-mount-failed":
       return fallback || "Session UI failed to mount.";
     case "ws-unreachable":
-      return "vibemix-core stopped responding. The Restart button below will relaunch it.";
+      return "vibemix stopped responding. Restart below brings it back.";
     default:
-      return fallback || "(no error line captured)";
+      return fallback || "Something stopped and we couldn't read why. Restart usually fixes it.";
   }
 }
 

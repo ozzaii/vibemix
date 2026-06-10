@@ -27,9 +27,9 @@ const REASON_COPY: Record<DebriefErrorReason, string> = {
   llm_unavailable:
     "The coaching brain is unreachable, so drills and the voiced recap are skipped this time. Chapters and the replay below are still from your set.",
   port_in_use:
-    "Port 8766 is already taken by another process. Close the other debrief window and reopen.",
+    "Another debrief window is already open. Close it and reopen this one.",
   unknown_kind:
-    "Received an unknown message kind from the backend. Try reopening.",
+    "The review hit something it didn't understand. Try reopening.",
 };
 
 export function showErrorBanner(
@@ -77,7 +77,7 @@ export function showWorkingBanner(container: HTMLElement): void {
   const text = document.createElement("p");
   text.className = "vmx-debrief-error-text";
   text.textContent =
-    "Sven is still putting your debrief together — the first pass can take a minute.";
+    "Sven is still putting your debrief together. The first pass can take a minute.";
 
   container.append(text);
 }

@@ -1977,7 +1977,7 @@ function boot(): void {
     !decksMount ||
     !peekMount
   ) {
-    console.error(`${TAG} pill DOM skeleton missing — cannot mount`);
+    console.error(`${TAG} pill DOM skeleton missing: cannot mount`);
     return;
   }
 

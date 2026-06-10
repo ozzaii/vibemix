@@ -111,7 +111,7 @@ async function boot(): Promise<void> {
   const canvas = document.getElementById("mascot-canvas");
   if (!(canvas instanceof HTMLCanvasElement)) {
     console.error(
-      `${TAG} <canvas id="mascot-canvas"> missing from mascot.html — cannot mount renderer`,
+      `${TAG} <canvas id="mascot-canvas"> missing from mascot.html: cannot mount renderer`,
     );
     return;
   }
@@ -544,7 +544,7 @@ async function boot(): Promise<void> {
 
   function writeOverlayCaption(): void {
     if (!overlayCaptionEl) {
-      console.debug(`${TAG} .mascot-window__caption not present — caption skipped`);
+      console.debug(`${TAG} .mascot-window__caption not present: caption skipped`);
       return;
     }
     overlayCaptionEl.textContent =
@@ -716,7 +716,7 @@ async function boot(): Promise<void> {
     window.__mascot = handle;
     // eslint-disable-next-line no-console
     console.log(
-      `${TAG} DEV mode — window.__mascot exposed: requestState, getMachine, setMood, getMood; mockMode=${String(mockMode)}`,
+      `${TAG} DEV mode: window.__mascot exposed: requestState, getMachine, setMood, getMood; mockMode=${String(mockMode)}`,
     );
   }
 

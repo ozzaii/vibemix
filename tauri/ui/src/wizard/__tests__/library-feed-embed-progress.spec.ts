@@ -104,9 +104,9 @@ describe("library-feed embed progress (F10 frontend-half)", () => {
       status: "error",
       candidates: [],
       indexed: 0,
-      error: "indexing failed — first.mp3: unprobeable",
+      error: "indexing failed: first.mp3: unprobeable",
     };
     const text = renderStepLibraryFeed(state, callbacks()).textContent ?? "";
-    expect(text).toContain("indexing failed — first.mp3: unprobeable");
+    expect(text).toContain("indexing failed: first.mp3: unprobeable");
   });
 });

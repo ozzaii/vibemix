@@ -180,7 +180,7 @@ export function LearnGroup(): HTMLElement {
   resetRow.type = "button";
   resetRow.className = "vmx-settings-row vmx-settings-row--destructive";
   resetRow.setAttribute("aria-label", "reset learn progress");
-  resetRow.title = "wipes ~/.cache/vibemix/learn-progress.json; confirm dialog gates the action";
+  resetRow.title = "clears all completed lessons. cannot be undone.";
 
   const label = document.createElement("div");
   label.className = "vmx-settings-row__label";

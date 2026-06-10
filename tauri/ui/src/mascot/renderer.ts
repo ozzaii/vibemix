@@ -244,7 +244,7 @@ export class MascotRenderer {
     const skinnedMesh = findSkinnedMesh(characterRoot);
     if (!skinnedMesh) {
       throw new Error(
-        "MascotRenderer: character GLB has no SkinnedMesh — cannot build AnimationMixer",
+        "MascotRenderer: character GLB has no SkinnedMesh: cannot build AnimationMixer",
       );
     }
     this.mixer = new AnimationMixer(skinnedMesh);

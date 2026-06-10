@@ -854,8 +854,8 @@ async function startLibraryFeedImport(
           progress,
           error: wipeout
             ? progress.failure_reason
-              ? `indexing failed — ${progress.failure_reason}`
-              : "indexing failed — no tracks were indexed"
+              ? `indexing failed: ${progress.failure_reason}`
+              : "indexing failed: no tracks were indexed"
             : undefined,
         },
       });

@@ -198,7 +198,7 @@ export async function loadMascotAssets(
     manifest = (await response.json()) as Manifest;
   } catch (err) {
     const reason = err instanceof Error ? err.message : String(err);
-    throw new Error(`loadMascotAssets failed: manifest fetch — ${reason}`);
+    throw new Error(`loadMascotAssets failed: manifest fetch: ${reason}`);
   }
 
   if (typeof manifest.character !== "string" || manifest.character.length === 0) {
@@ -223,7 +223,7 @@ export async function loadMascotAssets(
   } catch (err) {
     const reason = err instanceof Error ? err.message : String(err);
     throw new Error(
-      `loadMascotAssets failed: character GLB load — ${manifest.character} — ${reason}`,
+      `loadMascotAssets failed: character GLB load: ${manifest.character} (${reason})`,
     );
   }
 
@@ -248,7 +248,7 @@ export async function loadMascotAssets(
     } catch (err) {
       const reason = err instanceof Error ? err.message : String(err);
       throw new Error(
-        `loadMascotAssets failed: character variant GLB load — ${mood}:${rel} — ${reason}`,
+        `loadMascotAssets failed: character variant GLB load: ${mood}:${rel} (${reason})`,
       );
     }
   }
@@ -259,7 +259,7 @@ export async function loadMascotAssets(
   for (const entry of manifest.animations) {
     if (typeof entry.file !== "string" || entry.file.length === 0) {
       throw new Error(
-        `loadMascotAssets failed: animation entry missing 'file' field — clip=${String(entry.clip)}`,
+        `loadMascotAssets failed: animation entry missing 'file' field: clip=${String(entry.clip)}`,
       );
     }
     const animUrl = resolveAssetUrl(manifestUrl, entry.file);
@@ -269,7 +269,7 @@ export async function loadMascotAssets(
     } catch (err) {
       const reason = err instanceof Error ? err.message : String(err);
       throw new Error(
-        `loadMascotAssets failed: animation GLB load — ${entry.file} — ${reason}`,
+        `loadMascotAssets failed: animation GLB load: ${entry.file} (${reason})`,
       );
     }
 

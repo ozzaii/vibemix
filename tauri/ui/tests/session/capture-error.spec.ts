@@ -96,7 +96,7 @@ describe("capture-failure surfacing (audit B-audio-firstrun)", () => {
     const s = defaultState();
     s.runState = "armed";
     s.notice = {
-      text: "input capture failed: PortAudioError — the deck is back on standby. Go live to retry.",
+      text: "input capture failed: PortAudioError. The deck is back on standby. Go live to retry.",
       tone: "error",
     };
     mountSessionLayout(host, s);

@@ -5,7 +5,7 @@
 // must communicate why it is disabled to motor-impaired + screen-reader users.
 // This spec pins the aria contract per UI-SPEC §Copywriting line 364:
 //
-//   "at least 45 seconds per lesson — that's the floor."  (verbatim tooltip)
+//   "at least 45 seconds per lesson. that's the floor."  (verbatim tooltip)
 //
 // Visual lockout = opacity 0.4 + `aria-disabled="true"` +
 // `data-min-dwell-locked="true"`. Silent unlock at t=45 s — no animation,
@@ -40,7 +40,7 @@ describe("test_min_dwell_aria.spec.ts (LESSON-04 a11y)", () => {
     const btn = LessonSkipButton({ onSkip: vi.fn() });
     document.body.append(btn);
 
-    expect(btn.title).toBe("at least 45 seconds per lesson — that's the floor.");
+    expect(btn.title).toBe("at least 45 seconds per lesson. that's the floor.");
 
     btn.dispose();
   });

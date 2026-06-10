@@ -43,7 +43,7 @@ const OPTIONS: Array<{
   {
     id: "pro",
     label: "pro",
-    desc: "tight already — vibemix stays out of the way unless you ask.",
+    desc: "tight already. vibemix stays out of the way unless you ask.",
     isDefault: false,
   },
 ];

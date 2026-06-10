@@ -116,7 +116,7 @@ export class AdditiveLayer {
     if (!loaded) {
       throw new Error(
         `AdditiveLayer.play failed: unknown state ${String(state)} ` +
-          `(not in clips map — check manifest.json + asset-loader)`,
+          `(not in clips map: check manifest.json + asset-loader)`,
       );
     }
 

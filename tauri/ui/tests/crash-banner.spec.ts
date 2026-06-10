@@ -58,7 +58,7 @@ describe("reasonMessage", () => {
   });
 
   it("never returns an empty string even with no reason + no fallback", () => {
-    expect(reasonMessage(undefined, "")).toBe("(no error line captured)");
+    expect(reasonMessage(undefined, "")).toBe("Something stopped and we couldn't read why. Restart usually fixes it.");
   });
 });
 

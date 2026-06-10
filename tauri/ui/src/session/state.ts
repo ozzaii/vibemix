@@ -250,7 +250,7 @@ function makeDefault(): SessionState {
       midiDevice: null,
     },
     settings: {
-      voice: "Adam",
+      voice: "Sven",
       mode: "hype",
       skill: "intermediate",
       lens: "hype",

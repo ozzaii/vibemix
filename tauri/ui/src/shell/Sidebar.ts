@@ -84,7 +84,7 @@ export function createSidebar(store: ShellStore): HTMLElement {
   sessionsAll.type = "button";
   sessionsAll.className = "sb-sessions-all";
   sessionsAll.textContent = "all sessions ›";
-  sessionsAll.setAttribute("aria-label", "All sessions — open debrief");
+  sessionsAll.setAttribute("aria-label", "All sessions, open debrief");
   sessionsAll.addEventListener("click", () => store.setActiveSurface("debrief"));
 
   const foot = document.createElement("div");

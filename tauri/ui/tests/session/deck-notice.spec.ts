@@ -93,7 +93,7 @@ describe("SessionLayout notice render", () => {
 
     renderSessionFrame(mounted, {
       ...defaultState(),
-      notice: { text: "couldn't go live — proxy setup failed", tone: "error" },
+      notice: { text: "couldn't go live. proxy setup failed", tone: "error" },
     });
     expect(el!.hidden).toBe(false);
     expect(el!.textContent).toContain("couldn't go live");
@@ -108,7 +108,7 @@ describe("render-loop projection + clears", () => {
   it("projects deckNotice → notice; Start click clears it for the retry", () => {
     setSessionState({
       runState: "armed",
-      deckNotice: { text: "couldn't go live — x", tone: "error", ts: 1 },
+      deckNotice: { text: "couldn't go live. x", tone: "error", ts: 1 },
     });
     const layout = _internals.projectToLayoutState(getSessionState());
     expect(layout.notice?.text).toContain("couldn't go live");

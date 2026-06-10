@@ -200,7 +200,7 @@ async function boot(): Promise<void> {
       window.__vibemixDev = getDevSurface();
       // eslint-disable-next-line no-console
       console.log(
-        "[boot] DEV mode — window.__vibemixDev exposed:",
+        "[boot] DEV mode: window.__vibemixDev exposed:",
         "advanceTo / currentStep / getState / setState / setStatusBar",
       );
     }

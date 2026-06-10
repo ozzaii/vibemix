@@ -90,7 +90,7 @@ export const MOCK_TRANSFER_CONTRACT: readonly MockTransferSurface[] = [
       { wire: "library.run", purpose: "active mode command button" },
       { wire: "library.stats", purpose: "corpus/model/backend stats" },
       { wire: "library.model-setup", purpose: "local model readiness and install" },
-      { wire: "library.agent-setup", purpose: "Codex/Viber setup hint" },
+      { wire: "library.agent-setup", purpose: "Viber setup hint" },
       { wire: "library.results-panel", purpose: "main result/rationale panel" },
       { wire: "library.rationale", purpose: "curate/build set notes" },
       { wire: "library.export", purpose: "Rekordbox export result line" },
@@ -380,7 +380,7 @@ const SESSION_RUNTIME_WIRE_PURPOSES: Record<
   "session.now-line": "current deck / phrase readout",
   "session.citation": "grounded evidence chip",
   "session.drop": "runtime drop-countdown chip",
-  "session.notice": "deck notice — THE user-visible ipc.error surface (lanes B+D)",
+  "session.notice": "deck notice: THE user-visible ipc.error surface (lanes B+D)",
   "session.meter": "audio health meter",
   "session.status": "runtime status footer",
 };

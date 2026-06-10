@@ -10,7 +10,7 @@
 //     button non-interactive. Click is short-circuited inside the
 //     handler (so SR clients reading the disabled state are not lied
 //     to). Hover/focus reveals the verbatim tooltip:
-//         "at least 45 seconds per lesson — that's the floor."
+//         "at least 45 seconds per lesson. that's the floor."
 //   - On unlock at t=45s: aria-disabled and data-min-dwell-locked are
 //     removed; no animation; no SR announcement (silent unlock per
 //     UI-SPEC §Accessibility line 333).
@@ -45,7 +45,7 @@ export interface LessonSkipHandle extends HTMLButtonElement {
 
 const DEFAULT_MIN_DWELL_MS = 45_000;
 const LOCK_TOOLTIP =
-  "at least 45 seconds per lesson — that's the floor.";
+  "at least 45 seconds per lesson. that's the floor.";
 
 /**
  * Build the "i got it" skip button. Returns a `<button>` with

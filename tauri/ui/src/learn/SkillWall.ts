@@ -179,7 +179,7 @@ export function renderSkillWall(rows: SkillWallRow[]): HTMLElement {
     empty.className = "skill-wall__empty";
     empty.textContent =
       rows.length === 0
-        ? "Your skills light up as you learn — and earn their stars in a live set."
+        ? "Your skills light up as you learn, and earn their stars in a live set."
         : "Nothing earned yet. Finish the current move and this wall starts filling.";
     section.append(head, empty);
     return section;

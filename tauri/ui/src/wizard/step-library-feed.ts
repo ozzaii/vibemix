@@ -47,12 +47,12 @@ export function voiceModelReadoutText(vm: VoiceModelState): string {
   const mb = (n: number): string => `${Math.round(n / (1024 * 1024))} MB`;
   if (vm.status === "downloading") {
     return vm.size > 0
-      ? `downloading voice — ${mb(vm.downloaded)} of ${mb(vm.size)}`
+      ? `downloading voice · ${mb(vm.downloaded)} of ${mb(vm.size)}`
       : "downloading voice";
   }
   if (vm.status === "ready") return "voice installed";
   if (vm.status === "error") {
-    return "voice download failed — vibemix opens with voice muted";
+    return "voice download failed. vibemix opens with voice muted";
   }
   return "preparing voice";
 }
@@ -617,7 +617,7 @@ function renderPrivacyCard(
     note.className = "wizard-feed-privacy__copy";
     note.dataset.role = "embed-privacy";
     note.textContent =
-      "Embedding locally on your device — your library never leaves this machine.";
+      "Embedding locally on your device. Your library never leaves this machine.";
 
     const progress = document.createElement("div");
     progress.className = "wizard-feed-progress";

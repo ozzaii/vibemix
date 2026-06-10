@@ -2428,7 +2428,7 @@ export function defaultState(): SessionState {
       errors: {},
     },
     claimPolicy: null,
-    persona: { skill: "INT", interaction: "HYPE", mood: "HYPE", voice: "Adam", genre: "techno" },
+    persona: { skill: "INT", interaction: "HYPE", mood: "HYPE", voice: "Sven", genre: "techno" },
     output: { device: "MacBook Pro Speakers", profile: "HP" },
     mode: "cohost",
     // SHIP-WIRE START-gate — this fixture default is "running" (the live deck)
