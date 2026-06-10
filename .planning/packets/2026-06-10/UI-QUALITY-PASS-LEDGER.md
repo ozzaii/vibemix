@@ -137,3 +137,18 @@ Gates: full vitest 1646 passed + 1 todo (178 files), npm run build green, tsc gr
 2. **Settings remainder**: S4 drawer-rebuild-kills-progress (module-scope job state rehydration); S6 failed-delete '—' copy; S8 DOCS/SOURCE rows → 404 (internal repo — gate or repoint at launch).
 3. **Carryovers**: v5→v6 rename — NEW BLOCKER FINDING: silk-65 etc are ALPHA composites, ink-80 etc are OPAQUE hexes; a mechanical rename changes rendering at ~1065 sites. Needs a token-design decision (alpha-preserving v6 names) before any sweep; NOT a sed job. Plus: NEXT UP (blocked), viber index.ts (other session), debrief de-boxing round 2 (page still grid-of-boxes, calmer now).
 4. **Live-verify lane**: updater prompt, tray gemini-down icon, deck fault flow, recomposed debrief on the real window — packaged-app eyeball.
+
+## SESSION 2026-06-10 CLOSE — 2 more commits (6fa57187, af49b250); every unblocked item consumed
+
+- [x] **Windows wizard parity, forward path** (6fa57187): the VB-CABLE kernel-driver install REMOVED from the Windows first-run (backend is WASAPI loopback — nothing consumes the cable; routing now darwin-only for the chain, which also dissolves the BlackHole-fallback-on-Windows dead end and the never-detected re-run loop); SHA-256 verification claim dropped from copy.json AND its onboarding_copy.json source mirror; driver row reads the real payload.version (no more hardcoded "Installed · 0.6.0"); both companion scripts emit downloading/verifying/installing states (row no longer frozen on "Checking…" through the download + admin prompt).
+- [x] **Settings S4/S6/S8** (af49b250): import-job state module-scoped — survives drawer rebuilds w/ progress+Cancel rehydration; "—" usage sentinel → "couldn't update · try again"; DOCS/SOURCE 404 rows DEV-gated until the repo flips public.
+
+### REMAINING — each item names its external gate (nothing further is actionable from this seat)
+- **W3 Windows mic stub** (always-granted + dead recovery): honest probe needs a WINDOWS RIG to verify (a WASAPI open attempt may itself trigger the OS consent dialog). Rust ms-settings deep-link rides the same verification.
+- **W8 SmartScreen step** (built+tested, never mounted): mount needs a HOSTED INSTALL DOC + capability entry; delete is a PRODUCT CALL — Kaan decides.
+- **v5→v6 rename**: BLOCKED on a token-design decision — silk-* are alpha composites, ink-* are opaque hexes; a mechanical rename re-renders ~1065 sites. Needs alpha-preserving v6 names first.
+- **NEXT UP slab**: blocked on live suggestion_service proof (drive-vibemix).
+- **viber index.ts P0s**: another session's uncommitted WIP.
+- **Debrief de-boxing round 2**: page is calmer post-recomposition; further frame-stripping is an eye call — do it WITH Kaan.
+- **Live-verify lane**: updater consent dialog, tray gemini-down icon, deck fault flow, recomposed debrief — all need the PACKAGED APP (native dialog/tray/windows unreachable from the browser preview).
+- **S7 profile-panel status wipe**: dev-only surface (DEV-gated group), P3 — fold into the next dev-tools touch.
