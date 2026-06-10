@@ -218,6 +218,21 @@ describe("openSettings / closeSettings", () => {
     expect(getSettingsUIState().open).toBe(false);
   });
 
+  it("a closed drawer is inert — its controls leave the tab order and a11y tree", () => {
+    // The drawer is only TRANSLATED offscreen when closed; without inert its
+    // rockers/pickers stayed keyboard-focusable from the session window
+    // (focus vanished into invisible controls — wave-2 deck-failure P1).
+    mountSettingsDrawer(document.body);
+    const drawer = document.querySelector<HTMLElement>(".vmx-settings-drawer");
+    expect(drawer?.hasAttribute("inert")).toBe(true);
+    expect(drawer?.getAttribute("aria-hidden")).toBe("true");
+    openSettings();
+    expect(drawer?.hasAttribute("inert")).toBe(false);
+    expect(drawer?.hasAttribute("aria-hidden")).toBe(false);
+    closeSettings();
+    expect(drawer?.hasAttribute("inert")).toBe(true);
+  });
+
   it("closeSettings clears in-flight capture + confirm state", () => {
     mountSettingsDrawer(document.body);
     openSettings();

@@ -652,6 +652,17 @@ export function mountSettingsDrawer(root: HTMLElement): void {
       const ui = getSettingsUIState();
       drawer.dataset.open = ui.open ? "true" : "false";
       backdrop.dataset.open = ui.open ? "true" : "false";
+      // A closed drawer is only translated offscreen — without `inert` its
+      // dozens of rockers/pickers stayed in the session window's tab order,
+      // so keyboard focus vanished into invisible controls. inert drops the
+      // whole subtree from focus AND the accessibility tree while closed.
+      if (ui.open) {
+        drawer.removeAttribute("inert");
+        drawer.removeAttribute("aria-hidden");
+      } else {
+        drawer.setAttribute("inert", "");
+        drawer.setAttribute("aria-hidden", "true");
+      }
     },
     unsubscribe: () => {
       document.removeEventListener("keydown", onKey);
