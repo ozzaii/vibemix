@@ -652,148 +652,115 @@ def run(
 ) -> dict[str, Any]:
     """Orchestrate the debrief generation + WS server.
 
-    Args:
-        session_dir: path to the recorded session.
-        client: a Gemini client (real or mock). When ``None``, we
-            construct ``google.genai.Client()`` lazily.
-        recordings_root: override the recordings root (test ergonomics).
-        serve: when True (production), block on ``serve_forever``.
-            When False (test ergonomics), return the assembled state dict
-            without starting the WS server.
-        port: WS server port; defaults to ``DEBRIEF_PORT`` (8766).
+    serve=True (production): bind 127.0.0.1:port FIRST, then generate,
+    emitting each frame as its stage completes. The renderer connects
+    during sidecar boot and watches the debrief fill in progressively;
+    errors are emitted on the already-bound socket and served until the
+    window closes (no one-shot race, no silent dead-end).
 
-    Returns:
-        On serve=False, returns the state dict
-        ``{chapters, drills, debrief, evidence_snapshot, voice_meta,
-        tldr_mp3_path, cache_hit}``.
-
-    Raises:
-        InvalidSessionDir / EventsMissing / SessionTooShort /
-        DebriefGenerationError / DrillsGenerationError — these are
-        caught and surfaced over the WS bus when serve=True;
-        propagated to the caller when serve=False (test harness).
+    serve=False (test harness): synchronous generation; returns the
+    state dict; raises the Plan 29-01 typed exceptions.
     """
-    try:
-        validated_session_dir = validate_session_dir_under_root(
-            session_dir, recordings_root
+    if not serve:
+        return _generate(
+            session_dir, client=client, recordings_root=recordings_root
         )
-    except InvalidSessionDir:
-        if serve:
-            _emit_error_and_exit(port, "invalid_session_dir", str(session_dir))
-            return {}
-        raise
+    return asyncio.run(
+        _serve_and_generate(
+            session_dir,
+            client=client,
+            recordings_root=recordings_root,
+            port=port,
+        )
+    )
 
-    # Cache-hit fast path.
+
+def _generate(
+    session_dir: Path | str,
+    *,
+    client: Any = None,
+    recordings_root: Path | None = None,
+    progress: Any = None,
+) -> dict[str, Any]:
+    """Build the debrief state, calling ``progress(stage, state)`` after
+    each completed stage (loaded / near_miss / chapters / drills / tldr).
+    Raises the typed exceptions; the served path maps them onto the bus.
+    """
+
+    def _stage(name: str, st: dict[str, Any]) -> None:
+        if progress is not None:
+            progress(name, st)
+
+    validated_session_dir = validate_session_dir_under_root(
+        session_dir, recordings_root
+    )
+
     cached = read_debrief(validated_session_dir)
-    if cached is not None:
-        logger.info(
-            "[debrief] cache hit on %s — skipping Gemini",
-            validated_session_dir,
-        )
-        try:
-            events, evidence_snapshot, voice_meta = load_session(validated_session_dir)
-        except (EventsMissing, SessionTooShort) as e:
-            if serve:
-                _emit_error_and_exit(port, e.reason, str(e))
-                return {}
-            raise
-        duration_s = _session_duration_s(events)
-        near_miss_payload = _build_debrief_near_miss_payload(
-            validated_session_dir,
-            events=events,
-            evidence_snapshot=evidence_snapshot,
-            duration_s=duration_s,
-        )
-        _write_back_profile_best_effort(events, evidence_snapshot)
-        state = {
-            "session_dir": validated_session_dir,
-            "chapters": [],  # already in `cached`
-            "drills": Drills(drills=[Drill(**d) for d in cached.get("drills", [])]) if cached.get("drills") else None,
-            "debrief": cached,
-            "evidence_snapshot": evidence_snapshot,
-            "voice_meta": voice_meta,
-            "duration_s": duration_s,
-            "near_miss_payload": near_miss_payload,
-            "tldr_mp3_path": validated_session_dir / TLDR_MP3_FILENAME,
-            "cache_hit": True,
-        }
-        if not serve:
-            return state
-        asyncio.run(_serve_loop(state, port))
-        return state
-
-    # First-time generation.
-    try:
-        events, evidence_snapshot, voice_meta = load_session(validated_session_dir)
-    except (EventsMissing, SessionTooShort) as e:
-        if serve:
-            _emit_error_and_exit(port, e.reason, str(e))
-            return {}
-        raise
+    events, evidence_snapshot, voice_meta = load_session(validated_session_dir)
     duration_s = _session_duration_s(events)
+    state: dict[str, Any] = {
+        "session_dir": validated_session_dir,
+        "chapters": [],
+        "drills": None,
+        "debrief": cached,
+        "evidence_snapshot": evidence_snapshot,
+        "voice_meta": voice_meta,
+        "duration_s": duration_s,
+        "near_miss_payload": None,
+        "tldr_mp3_path": validated_session_dir / TLDR_MP3_FILENAME,
+        "cache_hit": cached is not None,
+    }
+    _stage("loaded", state)
+
     near_miss_payload = _build_debrief_near_miss_payload(
         validated_session_dir,
         events=events,
         evidence_snapshot=evidence_snapshot,
         duration_s=duration_s,
     )
+    state["near_miss_payload"] = near_miss_payload
+    _stage("near_miss", state)
+
+    if cached is not None:
+        logger.info(
+            "[debrief] cache hit on %s — skipping Gemini",
+            validated_session_dir,
+        )
+        state["drills"] = (
+            Drills(drills=[Drill(**d) for d in cached.get("drills", [])])
+            if cached.get("drills")
+            else None
+        )
+        _write_back_profile_best_effort(events, evidence_snapshot)
+        _stage("chapters", state)  # rebuilt from `cached` by the emitter
+        _stage("drills", state)
+        _stage("tldr", state)
+        return state
 
     chapters = derive_chapters(validated_session_dir / "events.jsonl")
     chapter_summaries = _chapter_summaries(chapters)
     cited_critique = _build_cited_critique(events, chapters)
+    state["chapters"] = chapters
+    _stage("chapters", state)
 
     if client is None:
         client = _build_debrief_client()
-
     if client is None:
-        # No brain reachable (no key, no proxy auth). Chapters, near-miss,
-        # friend line, and the waveform are all local — serve those and
-        # flag the LLM gap honestly instead of failing the whole window.
-        # The cache is NOT written, so a later open retries generation.
-        state = {
-            "session_dir": validated_session_dir,
-            "chapters": chapters,
-            "drills": None,
-            "debrief": None,
-            "evidence_snapshot": evidence_snapshot,
-            "voice_meta": voice_meta,
-            "duration_s": duration_s,
-            "near_miss_payload": near_miss_payload,
-            "tldr_mp3_path": validated_session_dir / TLDR_MP3_FILENAME,
-            "cache_hit": False,
-            "llm_unavailable": True,
-        }
+        # Local frames already emitted via the stages above — the served
+        # runner maps this typed raise onto an honest llm_unavailable
+        # frame ON TOP of them. Cache untouched, so a later open retries.
         _write_back_profile_best_effort(events, evidence_snapshot)
-        if not serve:
-            raise DebriefGenerationError(
-                reason="llm_unavailable",
-                message="no GEMINI_API_KEY and no proxy auth available",
-            )
-        asyncio.run(_serve_loop(state, port))
-        return state
-
-    # Drills
-    try:
-        drills = generate_drills(
-            client, cited_critique, chapter_summaries, evidence_snapshot
+        raise DebriefGenerationError(
+            reason="llm_unavailable",
+            message="no GEMINI_API_KEY and no proxy auth available",
         )
-    except DrillsGenerationError as e:
-        if serve:
-            _emit_error_and_exit(port, e.reason, e.message)
-            return {}
-        raise
 
-    # TLDR
-    try:
-        tldr_mp3 = generate_tldr_mp3(client, chapter_summaries, cited_critique)
-    except DebriefGenerationError as e:
-        if serve:
-            _emit_error_and_exit(port, e.reason, e.message)
-            return {}
-        raise
+    drills = generate_drills(
+        client, cited_critique, chapter_summaries, evidence_snapshot
+    )
 
-    # Defense-in-depth: final stripper sweep on every text field
-    # before persistence. Plan 29-07 hardens this further.
+    # Defense-in-depth: final stripper sweep BEFORE the drills frame is
+    # emitted or persisted. Plan 29-07 hardens this further.
     cleaned_drills_list = []
     for d in drills.drills:
         cleaned_drills_list.append(
@@ -807,8 +774,11 @@ def run(
             )
         )
     drills = Drills(drills=cleaned_drills_list)
+    state["drills"] = drills
+    _stage("drills", state)
 
-    # Persist
+    tldr_mp3 = generate_tldr_mp3(client, chapter_summaries, cited_critique)
+
     debrief_dict = {
         "chapters": [
             {
@@ -833,24 +803,12 @@ def run(
         ],
     }
     write_debrief(validated_session_dir, debrief_dict, tldr_mp3)
-
+    # write_debrief persists a COPY enriched with tldr_sha256/tldr_path —
+    # re-read so emit_tldr_audio sees the sha (the cache-hit path proves
+    # read_debrief returns it).
+    state["debrief"] = read_debrief(validated_session_dir) or debrief_dict
     _write_back_profile_best_effort(events, evidence_snapshot)
-
-    state = {
-        "session_dir": validated_session_dir,
-        "chapters": chapters,
-        "drills": drills,
-        "debrief": debrief_dict,
-        "evidence_snapshot": evidence_snapshot,
-        "voice_meta": voice_meta,
-        "duration_s": duration_s,
-        "near_miss_payload": near_miss_payload,
-        "tldr_mp3_path": validated_session_dir / TLDR_MP3_FILENAME,
-        "cache_hit": False,
-    }
-    if not serve:
-        return state
-    asyncio.run(_serve_loop(state, port))
+    _stage("tldr", state)
     return state
 
 
@@ -865,43 +823,70 @@ def _write_back_profile_best_effort(
         logger.info("[debrief] profile updated from session evidence")
 
 
-def _emit_error_and_exit(port: int, reason: str, message: str) -> None:
-    """Best-effort: spawn a short-lived WS server emitting one error frame.
+async def _serve_and_generate(
+    session_dir: Path | str,
+    *,
+    client: Any = None,
+    recordings_root: Path | None = None,
+    port: int = 8766,
+) -> dict[str, Any]:
+    """Bind 127.0.0.1:port FIRST, then generate, emitting frames per stage.
 
-    The renderer retries with capped backoff (ws-client.ts); this keeps
-    the server up for 10 seconds so the error reaches the renderer
-    before the process exits.
+    Every failure becomes an ipc.debrief.error frame on the already-bound
+    socket, and the server keeps serving (frames + tooltip RPC) until the
+    window closes and the Rust shell reaps this process — a retrying
+    renderer can never miss the verdict.
     """
-    logger.info("[debrief] emit_error_and_exit: reason=%r", reason)
-    try:
-        from vibemix.debrief.ws_server import DebriefWsServer
-
-        async def _one_shot():
-            server = DebriefWsServer(port=port)
-            server.emit_error(reason, message)
-            # The renderer retries with up to 2s backoff for up to 120s
-            # (ws-client.ts RECONNECT_BUDGET_MS) — hold the error frame
-            # long enough that a mid-backoff client cannot miss it.
-            await server.serve_for_seconds(10.0)
-
-        asyncio.run(_one_shot())
-    except Exception as e:
-        logger.error("[debrief] failed to emit error: %s", e)
-
-
-async def _serve_loop(state: dict, port: int) -> None:
     from vibemix.debrief.ws_server import DebriefWsServer
 
-    server = DebriefWsServer(port=port, state=state)
-    _enqueue_frames_for_state(server, state)
-    await server.serve_forever()
+    server = DebriefWsServer(port=port)
+    bound = asyncio.Event()
+    serve_task = asyncio.create_task(server.serve_forever(bound=bound))
+    await bound.wait()
 
+    loop = asyncio.get_running_loop()
 
-def _enqueue_frames_for_state(server: Any, state: dict) -> None:
-    """Pre-fill the emit queue: progressive frames + honest LLM-gap notice."""
-    server.enqueue_initial_frames()
-    if state.get("llm_unavailable"):
-        server.emit_error(
-            "llm_unavailable",
-            "no direct Gemini key and no proxy auth — drills + voiced TLDR skipped",
+    def _on_stage(stage: str, state: dict[str, Any]) -> None:
+        # Runs on the executor thread — hop to the loop before touching
+        # the server (its connections/history live on the loop).
+        loop.call_soon_threadsafe(_emit_stage_frames, server, stage, state)
+
+    state: dict[str, Any] = {}
+    try:
+        state = await loop.run_in_executor(
+            None,
+            lambda: _generate(
+                session_dir,
+                client=client,
+                recordings_root=recordings_root,
+                progress=_on_stage,
+            ),
         )
+        server.state = state
+    except InvalidSessionDir:
+        server.emit_error("invalid_session_dir", str(session_dir))
+    except (EventsMissing, SessionTooShort) as e:
+        server.emit_error(e.reason, str(e))
+    except (DebriefGenerationError, DrillsGenerationError) as e:
+        server.emit_error(e.reason, e.message)
+    except Exception as e:  # never a silent dead-end
+        logger.exception("[debrief] generation failed")
+        server.emit_error("sidecar_crashed", f"{type(e).__name__}: {e}")
+
+    await serve_task
+    return state
+
+
+def _emit_stage_frames(server: Any, stage: str, state: dict[str, Any]) -> None:
+    """Map a generation stage onto its progressive ws frames."""
+    server.state = state
+    if stage == "loaded":
+        server.emit_session_loaded()
+    elif stage == "near_miss":
+        server.emit_near_miss()
+    elif stage == "chapters":
+        server.emit_chapter_list()
+    elif stage == "drills":
+        server.emit_drills()
+    elif stage == "tldr":
+        server.emit_tldr_audio()

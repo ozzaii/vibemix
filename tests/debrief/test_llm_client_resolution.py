@@ -5,7 +5,6 @@ whole-window crash for the default packaged proxy-mode user."""
 
 from __future__ import annotations
 
-import asyncio
 import json
 import wave
 from pathlib import Path
@@ -92,35 +91,15 @@ def test_run_serve_false_raises_typed_llm_unavailable(monkeypatch, tmp_path):
     assert ei.value.reason == "llm_unavailable"
 
 
-def test_degraded_serve_state_enqueues_local_frames_plus_llm_error(tmp_path):
-    from vibemix.debrief.main import _enqueue_frames_for_state
-    from vibemix.debrief.ws_server import DebriefWsServer
+def test_generate_stages_fire_before_llm_unavailable_raise(monkeypatch, tmp_path):
+    root = tmp_path / "recordings"
+    root.mkdir()
+    sess = _build_session(root)
+    monkeypatch.setattr("vibemix.debrief.main._build_debrief_client", lambda: None)
+    from vibemix.debrief.main import _generate
 
-    sess = tmp_path / "20260515-aaaa"
-    sess.mkdir()
-    state = {
-        "session_dir": sess,
-        "chapters": [],
-        "drills": None,
-        "debrief": None,
-        "evidence_snapshot": {},
-        "voice_meta": None,
-        "duration_s": 600.0,
-        "near_miss_payload": None,
-        "tldr_mp3_path": sess / "debrief_tldr.mp3",
-        "cache_hit": False,
-        "llm_unavailable": True,
-    }
-    server = DebriefWsServer(port=8766, state=state)
-    _enqueue_frames_for_state(server, state)
-    frames = []
-    while True:
-        try:
-            frames.append(json.loads(server._queue.get_nowait()))
-        except asyncio.QueueEmpty:
-            break
-    kinds = [f["type"] for f in frames]
-    assert kinds[0] == "ipc.debrief.session-loaded"
-    assert "ipc.debrief.chapter-list" in kinds
-    assert kinds[-1] == "ipc.debrief.error"
-    assert frames[-1]["payload"]["reason"] == "llm_unavailable"
+    stages: list[str] = []
+    with pytest.raises(DebriefGenerationError) as ei:
+        _generate(sess, recordings_root=root, progress=lambda s, st: stages.append(s))
+    assert ei.value.reason == "llm_unavailable"
+    assert stages == ["loaded", "near_miss", "chapters"]

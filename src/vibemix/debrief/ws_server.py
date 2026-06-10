@@ -61,7 +61,11 @@ class DebriefWsServer:
         self.host = host
         self.port = port
         self.state = state or {}
-        self._queue: asyncio.Queue[str] = asyncio.Queue()
+        # Every emitted frame, in emit order. New connections replay the
+        # full history, then receive subsequent frames live — a client
+        # that connects mid-generation (or reconnects after a drop) still
+        # sees every progressive frame exactly once.
+        self._history: list[str] = []
         self._connections: set[Any] = set()
 
     # ---------------------------------------------------------------
@@ -69,17 +73,21 @@ class DebriefWsServer:
     # ---------------------------------------------------------------
 
     def enqueue_initial_frames(self) -> None:
-        """Push the progressive frames onto the emit queue.
+        """Emit the full progressive frame set from ``self.state``.
 
-        Order: session-loaded → chapter-list → drills → tldr-audio.
+        Order: session-loaded → near-miss → chapter-list → drills →
+        tldr-audio. The served first-time path calls the per-stage
+        emitters below as each generation stage completes; this
+        composition remains for the cache-hit/test path.
         """
-        from vibemix.ui_bus import (
-            DebriefChapterList,
-            DebriefDrills,
-            DebriefNearMiss,
-            DebriefSessionLoaded,
-            DebriefTldrAudio,
-        )
+        self.emit_session_loaded()
+        self.emit_near_miss()
+        self.emit_chapter_list()
+        self.emit_drills()
+        self.emit_tldr_audio()
+
+    def emit_session_loaded(self) -> None:
+        from vibemix.ui_bus import DebriefSessionLoaded
 
         session_dir = self.state.get("session_dir")
         session_id = session_dir.name if session_dir else "unknown"
@@ -87,8 +95,6 @@ class DebriefWsServer:
         duration_s = float(self.state.get("duration_s") or 0.0)
         if duration_s <= 0.0 and voice_meta:
             duration_s = voice_meta.duration_s
-
-        # 1. session-loaded
         self._enqueue(
             DebriefSessionLoaded.make(
                 session_id=session_id,
@@ -97,27 +103,33 @@ class DebriefWsServer:
             )
         )
 
-        near_miss_payload = self.state.get("near_miss_payload")
-        if near_miss_payload is not None:
-            self._enqueue(
-                DebriefNearMiss.make(
-                    input_wav_relative_path=near_miss_payload.input_wav_relative_path,
-                    t_center=near_miss_payload.t_center,
-                    window=near_miss_payload.window,
-                    receipt_text=near_miss_payload.receipt_text,
-                    friend_line_text=near_miss_payload.friend_line_text,
-                    duration_s=near_miss_payload.duration_s,
-                    ear_test_clip_relative_path=(
-                        near_miss_payload.ear_test_clip_relative_path
-                    ),
-                    friend_line_audio_relative_path=(
-                        near_miss_payload.friend_line_audio_relative_path
-                    ),
-                    waveform_peaks=near_miss_payload.waveform_peaks,
-                )
-            )
+    def emit_near_miss(self) -> None:
+        from vibemix.ui_bus import DebriefNearMiss
 
-        # 2. chapter-list
+        near_miss_payload = self.state.get("near_miss_payload")
+        if near_miss_payload is None:
+            return
+        self._enqueue(
+            DebriefNearMiss.make(
+                input_wav_relative_path=near_miss_payload.input_wav_relative_path,
+                t_center=near_miss_payload.t_center,
+                window=near_miss_payload.window,
+                receipt_text=near_miss_payload.receipt_text,
+                friend_line_text=near_miss_payload.friend_line_text,
+                duration_s=near_miss_payload.duration_s,
+                ear_test_clip_relative_path=(
+                    near_miss_payload.ear_test_clip_relative_path
+                ),
+                friend_line_audio_relative_path=(
+                    near_miss_payload.friend_line_audio_relative_path
+                ),
+                waveform_peaks=near_miss_payload.waveform_peaks,
+            )
+        )
+
+    def emit_chapter_list(self) -> None:
+        from vibemix.ui_bus import DebriefChapterList
+
         chapters = self.state.get("chapters") or []
         if not chapters and self.state.get("debrief"):
             # Cache-hit: rebuild ChapterRegion-like records from the dict.
@@ -144,26 +156,32 @@ class DebriefWsServer:
             )
         )
 
-        # 3. drills
+    def emit_drills(self) -> None:
+        from vibemix.ui_bus import DebriefDrills
+
         drills = self.state.get("drills")
-        if drills is not None:
-            from vibemix.debrief.main import _drill_to_payload
+        if drills is None:
+            return
+        from vibemix.debrief.main import _drill_to_payload
 
-            drill_payloads = tuple(_drill_to_payload(d) for d in drills.drills)
-            self._enqueue(DebriefDrills.make(drills=drill_payloads))
+        drill_payloads = tuple(_drill_to_payload(d) for d in drills.drills)
+        self._enqueue(DebriefDrills.make(drills=drill_payloads))
 
-        # 4. tldr-audio
+    def emit_tldr_audio(self) -> None:
+        from vibemix.ui_bus import DebriefTldrAudio
+
         debrief = self.state.get("debrief") or {}
         tldr_sha256 = debrief.get("tldr_sha256")
-        if tldr_sha256:
-            self._enqueue(
-                DebriefTldrAudio.make(
-                    audio_relative_path=debrief.get("tldr_path", "debrief_tldr.mp3"),
-                    duration_s=_estimate_mp3_duration(self.state.get("tldr_mp3_path")),
-                    tldr_sha256=tldr_sha256,
-                    mime_type="audio/mpeg",
-                )
+        if not tldr_sha256:
+            return
+        self._enqueue(
+            DebriefTldrAudio.make(
+                audio_relative_path=debrief.get("tldr_path", "debrief_tldr.mp3"),
+                duration_s=_estimate_mp3_duration(self.state.get("tldr_mp3_path")),
+                tldr_sha256=tldr_sha256,
+                mime_type="audio/mpeg",
             )
+        )
 
     def emit_error(self, reason: str, message: str) -> None:
         """Push an :class:`DebriefError` frame onto the queue."""
@@ -174,44 +192,48 @@ class DebriefWsServer:
     def _enqueue(self, wrapper: Any) -> None:
         try:
             raw = wrapper.to_json()
-            self._queue.put_nowait(raw)
-            logger.info(
-                "[debrief] emit %s %d bytes",
-                wrapper.type,
-                len(raw),
-            )
         except Exception as e:
             logger.error("[debrief] enqueue failed: %s", e)
+            return
+        self._history.append(raw)
+        logger.info("[debrief] emit %s %d bytes", wrapper.type, len(raw))
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            return  # pre-loop enqueue — history replays on connect
+        if self._connections:
+            loop.create_task(self._broadcast(raw))
+
+    async def _broadcast(self, raw: str) -> None:
+        for ws in list(self._connections):
+            try:
+                await ws.send(raw)
+            except Exception:
+                self._connections.discard(ws)
 
     # ---------------------------------------------------------------
     # Lifecycle
     # ---------------------------------------------------------------
 
     async def _handler(self, websocket) -> None:
-        """One connection — drain emit queue + dispatch tooltip requests."""
-        self._connections.add(websocket)
+        """One connection — replay history, then live frames + inbound RPC."""
         logger.info("[debrief] client connected %s", websocket.remote_address)
         try:
-            # Send everything currently buffered.
-            await self._drain_queue(websocket)
+            # Replay everything emitted so far. Only AFTER the replay
+            # catches up does the connection join the live-broadcast set —
+            # the no-await window between loop exit and add() makes the
+            # handoff gapless and duplicate-free on the single-threaded loop.
+            sent = 0
+            while sent < len(self._history):
+                await websocket.send(self._history[sent])
+                sent += 1
+            self._connections.add(websocket)
             async for raw in websocket:
                 await self._dispatch_inbound(websocket, raw)
         except Exception as e:
             logger.info("[debrief] connection ended: %s", type(e).__name__)
         finally:
             self._connections.discard(websocket)
-
-    async def _drain_queue(self, websocket) -> None:
-        """Send everything currently in the queue without blocking."""
-        while True:
-            try:
-                raw = self._queue.get_nowait()
-            except asyncio.QueueEmpty:
-                return
-            try:
-                await websocket.send(raw)
-            except Exception:
-                return
 
     async def _dispatch_inbound(self, websocket, raw: str) -> None:
         try:
@@ -346,8 +368,8 @@ class DebriefWsServer:
             found=True,
         ).to_json()
 
-    async def serve_forever(self) -> None:
-        """Block until cancelled."""
+    async def serve_forever(self, *, bound: asyncio.Event | None = None) -> None:
+        """Block until cancelled. Sets ``bound`` once the port is listening."""
         if websockets is None:
             raise RuntimeError("websockets package not installed")
         try:
@@ -355,6 +377,8 @@ class DebriefWsServer:
                 logger.info(
                     "[debrief] WS server bound to %s:%d", self.host, self.port
                 )
+                if bound is not None:
+                    bound.set()
                 await asyncio.Future()
         except OSError as e:
             # Port already in use → graceful exit with error.
