@@ -89,7 +89,7 @@ function formatBytes(bytes: number): string {
  *  ellipsis while counting, a quiet dash when the sidecar can't say. */
 function formatUsageLine(usage: RecordingsUsage): string {
   if (usage.bytes_total === -1) return "loading…";
-  if (usage.bytes_total === -2) return "—";
+  if (usage.bytes_total === -2) return "couldn't update · try again";
   const noun = usage.sessions === 1 ? "session" : "sessions";
   return `${usage.sessions} ${noun} · ${formatBytes(usage.bytes_total)}`;
 }

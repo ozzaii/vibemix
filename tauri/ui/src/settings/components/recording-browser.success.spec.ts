@@ -124,7 +124,7 @@ describe("recording-browser success-criteria — Test E: disk-usage line is the 
     const usage = handle.root.querySelector<HTMLElement>(
       ".vmx-rec-browser__usage",
     );
-    expect(usage?.textContent).toBe("—");
+    expect(usage?.textContent).toBe("couldn't update · try again");
 
     // 2. Empty-state body STILL renders (single-channel discipline — the
     //    list area is independent of the disk-usage error sentinel).

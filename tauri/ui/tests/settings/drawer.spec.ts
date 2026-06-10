@@ -541,7 +541,7 @@ describe("Phase 15: recording browser wiring", () => {
     await loadRecordings();
 
     const usage = document.querySelector<HTMLElement>(".vmx-rec-browser__usage");
-    expect(usage?.textContent).toBe("—");
+    expect(usage?.textContent).toBe("couldn't update · try again");
 
     const slice = getSettingsUIState().recordings;
     expect(slice.loading).toBe(false);

@@ -172,7 +172,7 @@ describe("recording-browser — Test 2: setUsage formatting", () => {
     const usage = handle.root.querySelector<HTMLElement>(
       ".vmx-rec-browser__usage",
     );
-    expect(usage?.textContent).toBe("—");
+    expect(usage?.textContent).toBe("couldn't update · try again");
   });
 });
 

@@ -272,6 +272,15 @@ const CSS = `
 
 registerStyle("vmx-library-panel", CSS);
 
+// Module-scope import-job memory. The drawer rebuilds its WHOLE body on any
+// settings-UI state change (close/reopen, recordings push, hotkey capture),
+// disposing this panel mid-import while the backend keeps embedding — the
+// fresh mount used to show the idle "Choose folder" state with no progress
+// and no Cancel, and re-clicking import got the silent already-running
+// rejection. A new mount rehydrates from here instead.
+let moduleJobActive = false;
+let moduleLastProgress: LibraryImportProgress | null = null;
+
 export async function renderLibraryPanel(
   opts: LibraryPanelOptions = {},
 ): Promise<LibraryPanelHandle> {
@@ -427,6 +436,7 @@ export async function renderLibraryPanel(
   }
   function showImportProgress(p: LibraryImportProgress): void {
     if (!activeJob || disposed) return;
+    moduleLastProgress = p;
     const pct = p.total > 0 ? (Math.min(p.done, p.total) / p.total) * 100 : 0;
     fill.style.width = `${pct.toFixed(1)}%`;
     label.textContent = sourceProgressNote(p);
@@ -434,6 +444,8 @@ export async function renderLibraryPanel(
     setStatus(sourceProgressNote(p));
     if (!sourceProgressDone(p)) return;
     activeJob = false;
+    moduleJobActive = false;
+    moduleLastProgress = null;
     fill.style.width = p.cancelled ? fill.style.width : "100%";
     hideProgress();
     setStatus(sourceDoneNote(p));
@@ -470,11 +482,14 @@ export async function renderLibraryPanel(
     label.textContent = "Preparing folder…";
     fileLog.replaceChildren();
     activeJob = true;
+    moduleJobActive = true;
+    moduleLastProgress = null;
     await ensureProgressSubscription();
     try {
       await start();
     } catch (e) {
       activeJob = false;
+      moduleJobActive = false;
       hideProgress();
       setStatus(`${failureLabel}: ${(e as Error).message ?? e}`);
     }
@@ -660,6 +675,20 @@ export async function renderLibraryPanel(
     }
   } catch (err) {
     // Tauri webview API unavailable (jsdom test env) — drop wiring skipped.
+  }
+
+  // Rehydrate a job that survived a drawer rebuild: re-arm the progress UI
+  // (incl. Cancel — import_cancel is stateless) and replay the last frame so
+  // the bar paints instantly instead of sitting empty until the next tick.
+  if (moduleJobActive) {
+    activeJob = true;
+    showProgress();
+    void ensureProgressSubscription();
+    if (moduleLastProgress) {
+      showImportProgress(moduleLastProgress);
+    } else {
+      label.textContent = "Preparing folder…";
+    }
   }
 
   return {

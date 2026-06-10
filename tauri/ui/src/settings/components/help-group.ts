@@ -295,16 +295,23 @@ export function HelpGroup(props: HelpGroupProps = {}): HTMLElement {
   // below — the README is the entry point and lives at repo root.
   // Two rows, two intents: docs (read the guide) vs source (browse
   // the code). Both routed through the existing capability allowlist.
-  body.append(
-    buildRow({
-      label: "DOCS",
-      sub: "guide + troubleshooting",
-      chev: "↗",
-      ariaLabel: "open vibemix docs in your browser",
-      title: "open the vibemix docs (README + troubleshooting) on github",
-      onClick: openGithubRepo,
-    }),
-  );
+  // DEV-gated until the repo flips public at launch: bravoh-ai/vibemix is
+  // INTERNAL visibility today, so for any real user both rows resolve to a
+  // GitHub 404 — a help row promising the troubleshooting guide it cannot
+  // open. Flip the gate off (or repoint at hosted docs) with the launch
+  // repo-visibility change.
+  if (import.meta.env.DEV) {
+    body.append(
+      buildRow({
+        label: "DOCS",
+        sub: "guide + troubleshooting",
+        chev: "↗",
+        ariaLabel: "open vibemix docs in your browser",
+        title: "open the vibemix docs (README + troubleshooting) on github",
+        onClick: openGithubRepo,
+      }),
+    );
+  }
 
   body.append(
     buildRow({
@@ -347,16 +354,18 @@ export function HelpGroup(props: HelpGroupProps = {}): HTMLElement {
     }),
   );
 
-  body.append(
-    buildRow({
-      label: "SOURCE",
-      sub: "bravoh-ai/vibemix",
-      chev: "↗",
-      ariaLabel: "open vibemix github repository",
-      title: "open the vibemix github repository in your browser",
-      onClick: openGithubRepo,
-    }),
-  );
+  if (import.meta.env.DEV) {
+    body.append(
+      buildRow({
+        label: "SOURCE",
+        sub: "bravoh-ai/vibemix",
+        chev: "↗",
+        ariaLabel: "open vibemix github repository",
+        title: "open the vibemix github repository in your browser",
+        onClick: openGithubRepo,
+      }),
+    );
+  }
 
   body.append(
     buildRow({
