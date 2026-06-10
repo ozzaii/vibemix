@@ -79,7 +79,7 @@ describe("citation-diagnostics — Test 2: bypass badge active state", () => {
 });
 
 describe("citation-diagnostics — Test 3: lastUnverifiedResponse truncates at 60 chars", () => {
-  it("renders first 60 chars + '...' + full text in title attribute", () => {
+  it("renders first 60 chars + '…' + full text in title attribute", () => {
     const fullText = "x".repeat(200);
     const handle = renderCitationDiagnostics({
       slopRatio: 0.6,
@@ -93,11 +93,11 @@ describe("citation-diagnostics — Test 3: lastUnverifiedResponse truncates at 6
       ".citation-diag-last-unverified",
     );
     expect(subtitle).not.toBeNull();
-    expect(subtitle!.textContent).toBe(`${"x".repeat(60)}...`);
+    expect(subtitle!.textContent).toBe(`${"x".repeat(60)}…`);
     expect(subtitle!.title).toBe(fullText);
   });
 
-  it("renders the full text without '...' when length <= 60", () => {
+  it("renders the full text without '…' when length <= 60", () => {
     const shortText = "Short unverified claim under 60 chars.";
     const handle = renderCitationDiagnostics({
       slopRatio: 0.6,
@@ -112,7 +112,7 @@ describe("citation-diagnostics — Test 3: lastUnverifiedResponse truncates at 6
     );
     expect(subtitle).not.toBeNull();
     expect(subtitle!.textContent).toBe(shortText);
-    expect(subtitle!.textContent).not.toContain("...");
+    expect(subtitle!.textContent).not.toContain("…");
     expect(subtitle!.title).toBe(shortText);
   });
 });

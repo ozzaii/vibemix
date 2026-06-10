@@ -66,6 +66,49 @@ export function reasonToCopy(reason: string): string {
   return (REASON_COPY as Record<string, string>)[reason] ?? "";
 }
 
+/** The panels each boot with a skeleton line claiming live work
+ *  ("Generating drills…"). A terminal error must resolve those too: a
+ *  banner saying drills are skipped over a panel still claiming
+ *  generation is two instruments disagreeing. Scoped per reason — a
+ *  TL;DR-only failure leaves panels whose work is still real alone. */
+export const SKELETON_TERMINAL_COPY = {
+  morning: "Nothing to listen back to this time.",
+  tldr: "No recap this time.",
+  drills: "No drills this time.",
+} as const;
+
+export type SkeletonHostKey = keyof typeof SKELETON_TERMINAL_COPY;
+
+export interface SkeletonHosts {
+  morning: HTMLElement | null;
+  tldr: HTMLElement | null;
+  drills: HTMLElement | null;
+}
+
+export function resolveSkeletonsToTerminal(
+  hosts: SkeletonHosts,
+  reason: string,
+): void {
+  const scope: SkeletonHostKey[] =
+    reason === "tldr_generation_failed"
+      ? ["tldr"]
+      : reason === "drills_generation_failed"
+        ? ["drills"]
+        : ["morning", "tldr", "drills"];
+  for (const key of scope) {
+    const host = hosts[key];
+    // No skeleton means a success frame already resolved this panel —
+    // never overwrite real content with terminal copy.
+    if (!host || !host.querySelector(".vmx-debrief-skeleton")) continue;
+    host.textContent = "";
+    const line = document.createElement("p");
+    line.className = "vmx-debrief-skeleton";
+    line.dataset.state = "settled";
+    line.textContent = SKELETON_TERMINAL_COPY[key];
+    host.append(line);
+  }
+}
+
 /** Honest waiting line while the sidecar boots/generates — NOT an error.
  *  No dismiss control; the window clears it on the first successful
  *  connection (see debrief-window.ts `open` listener). */

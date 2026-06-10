@@ -163,7 +163,7 @@ function clampStatusText(raw: string, max = 48): string {
   const clipped = text.slice(0, max - 3);
   const lastSpace = clipped.lastIndexOf(" ");
   const body = lastSpace >= 18 ? clipped.slice(0, lastSpace) : clipped;
-  return `${body.trim()}...`;
+  return `${body.trim()}…`;
 }
 
 function cleanString(raw: unknown): string | undefined {

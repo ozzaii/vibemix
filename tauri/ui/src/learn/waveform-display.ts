@@ -77,7 +77,7 @@ function cleanLabel(value: string | null | undefined, max = SOURCE_LABEL_MAX): s
   const text = `${value ?? ""}`.trim().replace(/\s+/g, " ");
   if (!text) return "";
   if (text.length <= max) return text;
-  return `${text.slice(0, Math.max(1, max - 3)).trimEnd()}...`;
+  return `${text.slice(0, Math.max(1, max - 3)).trimEnd()}…`;
 }
 
 function deckSourceLabel(deck: DeckId, row: WaveformDeck | undefined): string {

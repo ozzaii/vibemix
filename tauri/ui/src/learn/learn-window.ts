@@ -2690,7 +2690,7 @@ function pluralizeHint(count: number): string {
 
 function shortTrackId(trackId: string): string {
   if (trackId.length <= 16) return trackId;
-  return `${trackId.slice(0, 8)}...${trackId.slice(-4)}`;
+  return `${trackId.slice(0, 8)}…${trackId.slice(-4)}`;
 }
 
 function exemplarPlaySource(

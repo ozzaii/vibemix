@@ -346,7 +346,7 @@ export function pillReactionDisplayText(
   const wordBreak = body.lastIndexOf(" ");
   if (wordBreak >= 36) body = body.slice(0, wordBreak).trimEnd();
   body = body.replace(/[.,;:!?]+$/, "");
-  return `${lead ? `${lead} ` : ""}${body}...`;
+  return `${lead ? `${lead} ` : ""}${body}…`;
 }
 
 export function pillReactionLeadParts(text: string): PillReactionLeadParts {

@@ -1359,6 +1359,14 @@
   box-shadow: 0 0 10px var(--brand-50);
 }
 
+/* Settled terminal copy — the work ended, so the lit rose dot dims to a
+ * quiet neutral. A glowing sign-of-life over "no drills this time" would
+ * claim activity that stopped. */
+.vmx-debrief-skeleton[data-state="settled"]::before {
+  background: var(--text-muted);
+  box-shadow: none;
+}
+
 .vmx-debrief-error-banner {
   position: fixed;
   top: calc(var(--titlebar-h) + var(--sp-3));

@@ -26,7 +26,11 @@ import {
   showCitationTooltip,
   type CitationTooltipPayload,
 } from "./components/citation-tooltip.js";
-import { showErrorBanner, showWorkingBanner } from "./components/error-banner.js";
+import {
+  showErrorBanner,
+  showWorkingBanner,
+  resolveSkeletonsToTerminal,
+} from "./components/error-banner.js";
 import { DebriefWsClient } from "./ws-client.js";
 import { parseDebriefBootUrl } from "./url-state.js";
 
@@ -52,12 +56,15 @@ const tldrEl = document.getElementById("vmx-debrief-tldr-player");
 const tldrPanelEl = document.getElementById("vmx-debrief-tldr");
 const waveformEl = document.getElementById("vmx-debrief-waveform");
 
+const skeletonHosts = { morning: morningEl, tldr: tldrEl, drills: drillsEl };
+
 if (isMockMode) {
   mountMockDebrief();
 } else if (!sessionDir) {
   if (errorBanner) {
     showErrorBanner(errorBanner, "invalid_session_dir");
   }
+  resolveSkeletonsToTerminal(skeletonHosts, "invalid_session_dir");
 } else {
   const client = new DebriefWsClient(8766);
 
@@ -173,6 +180,7 @@ if (isMockMode) {
     if (errorBanner) {
       showErrorBanner(errorBanner, detail.reason, detail?.message ?? "");
     }
+    resolveSkeletonsToTerminal(skeletonHosts, detail.reason);
   });
 
   // Honest in-between state: the sidecar binds 8766 only after boot (and,
@@ -250,6 +258,7 @@ if (isMockMode) {
       const event = await import("@tauri-apps/api/event");
       event.listen("sidecar-debrief-crashed", () => {
         if (errorBanner) showErrorBanner(errorBanner, "sidecar_crashed");
+        resolveSkeletonsToTerminal(skeletonHosts, "sidecar_crashed");
       });
       // Phase 44-03 / LAUNCH-02 — focus-existing deep-link channel.
       // When a chip is clicked in the live session UI AND a debrief

@@ -314,7 +314,7 @@ describe("pillReactionDisplayText — long reaction booth glance", () => {
       "LIT AFF. That echo-out lands clean, bass swap is locked, ride the vocal for eight bars before you touch the filter.";
     const display = pillReactionDisplayText(text, "long");
     expect(display).toMatch(/^LIT AFF\. /);
-    expect(display.endsWith("...")).toBe(true);
+    expect(display.endsWith("…")).toBe(true);
     expect(display.length).toBeLessThan(text.length);
     expect(display.length).toBeLessThanOrEqual(92);
   });

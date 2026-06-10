@@ -45,7 +45,8 @@ export function mountTimelinePlaceholder(
   if (chapters.length === 0 || totalDurationS <= 0) {
     const empty = document.createElement("p");
     empty.className = "vmx-debrief-timeline-empty";
-    empty.textContent = "No regions to render.";
+    empty.textContent =
+      "No moments yet. Play a set with me live and they'll land here.";
     container.append(empty);
     return;
   }

@@ -151,7 +151,7 @@ export function renderCitationDiagnostics(
       const fullText = props.lastUnverifiedResponse as string;
       const truncated
         = fullText.length > TRUNCATE_AT
-          ? `${fullText.slice(0, TRUNCATE_AT)}...`
+          ? `${fullText.slice(0, TRUNCATE_AT)}…`
           : fullText;
       if (lastUnverifiedEl === null) {
         lastUnverifiedEl = document.createElement("div");

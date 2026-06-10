@@ -87,6 +87,11 @@ const BANS: Ban[] = [
     why: "internal cache paths are engineering notes, not user copy (bare path VALUES on data rows pass; sentences embedding them do not)",
     hits: (s) => /(~\/\.cache|\/Users\/)/.test(s) && /\s/.test(s.trim()),
   },
+  {
+    id: "ascii-ellipsis",
+    why: "trailing-off copy uses the single … glyph; three ASCII dots regress per-surface (one debrief screen rendered both forms at once)",
+    hits: (s) => s.includes("..."),
+  },
 ];
 
 function walk(dir: string): string[] {

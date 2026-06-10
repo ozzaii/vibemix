@@ -511,7 +511,7 @@ export function mountDebriefDock(
       retryTimer = null;
     }
     status.textContent = "loading sessions";
-    list.replaceChildren(renderEmpty("Checking recordings..."));
+    list.replaceChildren(renderEmpty("Checking recordings…"));
     refreshButton.disabled = true;
     try {
       const reply = await sendIpcRequest<RecordingsListResult>(
@@ -525,7 +525,7 @@ export function mountDebriefDock(
       if (disposed) return;
       if (attempt < 3) {
         status.textContent = "waiting for recorder";
-        list.replaceChildren(renderEmpty("The session bus is still waking up. Checking again..."));
+        list.replaceChildren(renderEmpty("The session bus is still waking up. Checking again…"));
         retryTimer = setTimeout(() => {
           void refresh(attempt + 1);
         }, 1200);

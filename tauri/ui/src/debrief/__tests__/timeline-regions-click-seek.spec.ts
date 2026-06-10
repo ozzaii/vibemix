@@ -72,7 +72,7 @@ describe("timeline placeholder", () => {
     const div = document.createElement("div");
     document.body.append(div);
     mountTimelinePlaceholder(div, [], 0);
-    expect(div.textContent).toContain("No regions to render");
+    expect(div.textContent).toContain("No moments yet");
   });
 
   it("renders real master-input peaks when supplied", () => {

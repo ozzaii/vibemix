@@ -5,8 +5,10 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import {
   reasonToCopy,
+  resolveSkeletonsToTerminal,
   showErrorBanner,
   showWorkingBanner,
+  type SkeletonHosts,
 } from "../components/error-banner.js";
 
 afterEach(() => {
@@ -85,5 +87,57 @@ describe("showErrorBanner mounts dom", () => {
     expect(host.dataset.reason).toBe("still_working");
     expect(host.textContent).toContain("still putting your debrief together");
     expect(host.querySelector("button")).toBeNull();
+  });
+});
+
+describe("resolveSkeletonsToTerminal", () => {
+  function skeletonHost(): HTMLElement {
+    const host = document.createElement("div");
+    const p = document.createElement("p");
+    p.className = "vmx-debrief-skeleton";
+    p.textContent = "Generating…";
+    host.append(p);
+    return host;
+  }
+
+  function hosts(): SkeletonHosts {
+    return { morning: skeletonHost(), tldr: skeletonHost(), drills: skeletonHost() };
+  }
+
+  it("a terminal error settles all three skeletons", () => {
+    const h = hosts();
+    resolveSkeletonsToTerminal(h, "invalid_session_dir");
+    for (const host of [h.morning!, h.tldr!, h.drills!]) {
+      const line = host.querySelector<HTMLElement>(".vmx-debrief-skeleton");
+      expect(line?.dataset.state).toBe("settled");
+      expect(line?.textContent).not.toContain("Generating");
+    }
+  });
+
+  it("a tldr-only failure leaves the other panels' live work alone", () => {
+    const h = hosts();
+    resolveSkeletonsToTerminal(h, "tldr_generation_failed");
+    expect(h.tldr!.textContent).toBe("No recap this time.");
+    expect(h.morning!.textContent).toBe("Generating…");
+    expect(h.drills!.textContent).toBe("Generating…");
+  });
+
+  it("never overwrites a panel a success frame already resolved", () => {
+    const h = hosts();
+    h.drills!.textContent = "";
+    const real = document.createElement("article");
+    real.textContent = "real drill content";
+    h.drills!.append(real);
+    resolveSkeletonsToTerminal(h, "sidecar_crashed");
+    expect(h.drills!.textContent).toBe("real drill content");
+  });
+
+  it("tolerates null hosts", () => {
+    expect(() =>
+      resolveSkeletonsToTerminal(
+        { morning: null, tldr: null, drills: null },
+        "sidecar_crashed",
+      ),
+    ).not.toThrow();
   });
 });
