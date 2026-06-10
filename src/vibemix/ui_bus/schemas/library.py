@@ -45,6 +45,10 @@ class LibraryImportProgressPayload:
             (``"Artist — Title"``). Empty string when none yet.
         cache_hits: count of tracks served by the content-hash cache.
         cancelled: ``True`` on the final tick when the user pressed cancel.
+        failed: count of files that failed probe/embed so far (the final
+            tick carries the run total). 0 when none.
+        failure_reason: first failure as ``"<filename>: <error>"`` on the
+            final tick when any file failed; empty otherwise.
     """
 
     total: int
@@ -52,6 +56,8 @@ class LibraryImportProgressPayload:
     current_track_name: str
     cache_hits: int
     cancelled: bool = False
+    failed: int = 0
+    failure_reason: str = ""
     schema_version: str = "1"
 
 

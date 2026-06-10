@@ -1999,6 +1999,8 @@ class LibraryImportProgress:
         current_track_name: str,
         cache_hits: int,
         cancelled: bool = False,
+        failed: int = 0,
+        failure_reason: str = "",
     ) -> LibraryImportProgress:
         return cls(
             type="ipc.library.import_progress",
@@ -2009,6 +2011,8 @@ class LibraryImportProgress:
                 current_track_name=current_track_name,
                 cache_hits=cache_hits,
                 cancelled=cancelled,
+                failed=failed,
+                failure_reason=failure_reason,
             ),
         )
 

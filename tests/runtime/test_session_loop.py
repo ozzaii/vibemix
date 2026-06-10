@@ -999,3 +999,110 @@ def test_session_start_failure_emits_ipc_error_with_cause(fake_bus: FakeBus) -> 
     assert len(errs) == 1
     assert errs[0]["payload"]["original_type"] == "ipc.session.start"
     assert "proxy /register rejected" in errs[0]["payload"]["reason"]
+
+
+def test_folder_import_total_failure_surfaces_failed_and_ipc_error(
+    fake_bus: FakeBus, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A 100%-failed folder import must NOT look like success on the wire."""
+    import vibemix.library as library_mod
+
+    folder = tmp_path / "crate"
+    folder.mkdir()
+
+    class FakeStore:
+        def close(self) -> None:
+            pass
+
+    def fake_ingest_folder(folder_arg, embedder, store, **kwargs):
+        progress = kwargs["progress"]
+        progress("[1/2] err first.mp3  ~€0.0000")
+        progress("[2/2] err second.mp3  ~€0.0000")
+        return SimpleNamespace(
+            total=2,
+            embedded=0,
+            skipped_cached=0,
+            failed=2,
+            failures=[
+                (str(folder / "first.mp3"), "unprobeable"),
+                (str(folder / "second.mp3"), "unprobeable"),
+            ],
+        )
+
+    monkeypatch.setattr(library_mod, "build_embedder", lambda *a, **k: object())
+    monkeypatch.setattr(library_mod, "open_store", lambda *a, **k: FakeStore())
+    monkeypatch.setattr(library_mod, "ingest_folder", fake_ingest_folder)
+
+    loop = SessionLoop(fake_bus)
+
+    async def _run() -> None:
+        await loop._on_library_import(
+            {
+                "type": "ipc.library.import",
+                "ts": "2026-06-05T00:00:00Z",
+                "payload": {"path": str(folder), "schema_version": "1"},
+            }
+        )
+        assert loop._library_import_task is not None
+        await loop._library_import_task
+
+    asyncio.run(_run())
+
+    progress = fake_bus.emitted_by_type("ipc.library.import_progress")
+    assert [p["payload"]["failed"] for p in progress] == [1, 2, 2]
+    final = progress[-1]["payload"]
+    assert final["failure_reason"] == "first.mp3: unprobeable"
+    errors = fake_bus.emitted_by_type("ipc.error")
+    assert len(errors) == 1
+    assert errors[0]["payload"]["original_type"] == "ipc.library.import"
+    assert "all 2 files failed" in errors[0]["payload"]["reason"]
+    assert "first.mp3: unprobeable" in errors[0]["payload"]["reason"]
+
+
+def test_folder_import_partial_failure_reports_failed_without_ipc_error(
+    fake_bus: FakeBus, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import vibemix.library as library_mod
+
+    folder = tmp_path / "crate"
+    folder.mkdir()
+
+    class FakeStore:
+        def close(self) -> None:
+            pass
+
+    def fake_ingest_folder(folder_arg, embedder, store, **kwargs):
+        progress = kwargs["progress"]
+        progress("[1/2] ok first.mp3  ~€0.0000")
+        progress("[2/2] err second.mp3  ~€0.0000")
+        return SimpleNamespace(
+            total=2,
+            embedded=1,
+            skipped_cached=0,
+            failed=1,
+            failures=[(str(folder / "second.mp3"), "decode error")],
+        )
+
+    monkeypatch.setattr(library_mod, "build_embedder", lambda *a, **k: object())
+    monkeypatch.setattr(library_mod, "open_store", lambda *a, **k: FakeStore())
+    monkeypatch.setattr(library_mod, "ingest_folder", fake_ingest_folder)
+
+    loop = SessionLoop(fake_bus)
+
+    async def _run() -> None:
+        await loop._on_library_import(
+            {
+                "type": "ipc.library.import",
+                "ts": "2026-06-05T00:00:00Z",
+                "payload": {"path": str(folder), "schema_version": "1"},
+            }
+        )
+        assert loop._library_import_task is not None
+        await loop._library_import_task
+
+    asyncio.run(_run())
+
+    final = fake_bus.emitted_by_type("ipc.library.import_progress")[-1]["payload"]
+    assert final["failed"] == 1
+    assert final["failure_reason"] == "second.mp3: decode error"
+    assert fake_bus.emitted_by_type("ipc.error") == []

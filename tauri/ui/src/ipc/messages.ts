@@ -722,6 +722,8 @@ export interface LibraryImportProgress {
     current_track_name: string;
     cache_hits: number;
     cancelled: boolean;
+    failed?: number;
+    failure_reason?: string;
     schema_version: "1";
   };
 }

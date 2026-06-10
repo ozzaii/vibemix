@@ -811,15 +811,18 @@ class SessionLoop:
             embedder = build_embedder()
             store = open_store()
             cache_hits = 0
+            failed_seen = 0
             try:
                 def _progress(line: str) -> None:
-                    nonlocal cache_hits
+                    nonlocal cache_hits, failed_seen
                     parsed = _parse_folder_import_progress(line)
                     if parsed is None:
                         return
                     total, done, status, filename = parsed
                     if status == "skip":
                         cache_hits += 1
+                    elif status == "err":
+                        failed_seen += 1
                     future = asyncio.run_coroutine_threadsafe(
                         self._emit_library_import_progress(
                             total=total,
@@ -827,6 +830,7 @@ class SessionLoop:
                             current_track_name=filename,
                             cache_hits=cache_hits,
                             cancelled=self._library_import_cancel_requested,
+                            failed=failed_seen,
                         ),
                         loop,
                     )
@@ -848,13 +852,31 @@ class SessionLoop:
 
         report = await loop.run_in_executor(None, _worker)
         await self._refresh_library_registry()
+        total = int(getattr(report, "total", 0))
+        failed = int(getattr(report, "failed", 0))
+        failures = list(getattr(report, "failures", []) or [])
+        first_failure = ""
+        if failures:
+            failed_path, failed_err = failures[0]
+            first_failure = f"{Path(failed_path).name}: {failed_err}"
         await self._emit_library_import_progress(
-            total=int(getattr(report, "total", 0)),
-            done=int(getattr(report, "total", 0)),
+            total=total,
+            done=total,
             current_track_name="",
             cache_hits=int(getattr(report, "skipped_cached", 0)),
             cancelled=False,
+            failed=failed,
+            failure_reason=first_failure,
         )
+        # No-silent-dead-ends: a run where EVERY file failed must be loud —
+        # otherwise the bar walks to done==total and reads as success while
+        # the library stays empty (the packaged-ffprobe wipeout shape).
+        if total > 0 and failed >= total:
+            await self._emit_ipc_error(
+                f"library.import failed: all {total} files failed"
+                + (f" (first: {first_failure})" if first_failure else ""),
+                "ipc.library.import",
+            )
 
     @staticmethod
     def _catalog_source_for_import_path(source_path: Path):
@@ -907,6 +929,7 @@ class SessionLoop:
             current_track_name="",
             cache_hits=int(getattr(report, "skipped_cached", 0)),
             cancelled=False,
+            failed=int(getattr(report, "failed", 0)),
         )
 
     async def _start_xml_import(self, xml_path: Path) -> None:
@@ -966,6 +989,8 @@ class SessionLoop:
         current_track_name: str,
         cache_hits: int,
         cancelled: bool,
+        failed: int = 0,
+        failure_reason: str = "",
     ) -> None:
         progress = LibraryImportProgress.make(
             total=max(0, total),
@@ -973,6 +998,8 @@ class SessionLoop:
             current_track_name=current_track_name[:200],
             cache_hits=max(0, cache_hits),
             cancelled=cancelled,
+            failed=max(0, failed),
+            failure_reason=failure_reason[:200],
         )
         await self.bus.emit(json.loads(progress.to_json()))
 
