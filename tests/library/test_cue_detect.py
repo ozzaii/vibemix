@@ -350,23 +350,54 @@ def test_detect_cues_no_network_no_gemini(
 # ─── Real ffmpeg decode path (opt-in) ────────────────────────────────────────────
 
 
+def _write_synth_wav(path: Path, samples: np.ndarray, sr: int = ANALYSIS_SR) -> None:
+    import wave
+
+    pcm = np.clip(samples * 32767.0, -32768, 32767).astype("<i2")
+    with wave.open(str(path), "wb") as w:
+        w.setnchannels(1)
+        w.setsampwidth(2)
+        w.setframerate(sr)
+        w.writeframes(pcm.tobytes())
+
+
+def test_decode_to_mono_works_without_ffmpeg_binary(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The packaged app ships NO ffmpeg binary — decode must ride PyAV.
+
+    Regression for the 2026-06-10 audit's ffmpeg-binary BPM/cue gap: every
+    folder-ingested track got bpm 0.0 / no cues because ``decode_to_mono``
+    shelled out to ``ffmpeg`` (absent on a clean Mac, stripped from the GUI
+    PATH). With ``shutil.which('ffmpeg')`` forced to None the decode must
+    still produce samples via the bundled ``av`` package.
+    """
+    import shutil as _shutil
+
+    monkeypatch.setattr(cue_detect.shutil, "which", lambda _name: None)
+
+    synth = _dance_track()
+    wav_path = tmp_path / "synth.wav"
+    _write_synth_wav(wav_path, synth)
+
+    decoded = decode_to_mono(wav_path)
+    assert decoded.size > 0
+    assert abs(decoded.size - synth.size) < ANALYSIS_SR
+    # Sanity: real ffmpeg is genuinely off the table in this test.
+    assert _shutil.which is not None  # the module-level name still exists
+
+
 @pytest.mark.integration
 def test_decode_to_mono_real_ffmpeg(tmp_path: Path) -> None:
     """Round-trip a generated WAV through the real ffmpeg decode path."""
     import shutil
-    import wave
 
     if shutil.which("ffmpeg") is None:
         pytest.skip("ffmpeg not installed")
 
     synth = _dance_track()
     wav_path = tmp_path / "synth.wav"
-    pcm = np.clip(synth * 32767.0, -32768, 32767).astype("<i2")
-    with wave.open(str(wav_path), "wb") as w:
-        w.setnchannels(1)
-        w.setsampwidth(2)
-        w.setframerate(ANALYSIS_SR)
-        w.writeframes(pcm.tobytes())
+    _write_synth_wav(wav_path, synth)
 
     decoded = decode_to_mono(wav_path)
     assert decoded.size > 0

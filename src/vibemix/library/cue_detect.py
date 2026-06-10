@@ -227,12 +227,34 @@ def _require_ffmpeg() -> str:
 def decode_to_mono(audio_path: Path, sample_rate: int = ANALYSIS_SR) -> np.ndarray:
     """Decode ``audio_path`` to a mono float32 array at ``sample_rate``.
 
-    Reuses ffmpeg exactly the way ``library.embed`` does (subprocess, hard dep),
-    but pipes raw PCM to stdout instead of writing mp3 tempfiles — cue detection
-    needs the samples in memory. Output is little-endian float32 in [-1, 1],
-    single channel. Returns a zero-length array on a decode that yields no audio
+    Primary path is the bundled PyAV decoder (``audio_decode.load_audio_mono``)
+    — the SAME library decode the CLAP/CUE ingest already trusts, with NO
+    dependency on a system ffmpeg binary. This is the 2026-06-10 fix for the
+    packaged-app gap: ``open -a`` strips the shell PATH and a fresh Mac has no
+    ffmpeg, so the old ``_require_ffmpeg`` shell-out raised and every
+    folder-ingested track silently landed bpm 0.0 / no cues. The legacy ffmpeg
+    binary stays as a fallback only when PyAV is unavailable (it never is in
+    the shipped bundle — ``av`` is a core dep). Output is float32 in [-1, 1],
+    single channel; a decode that yields no audio returns a zero-length array
     (the caller treats that as "no structure" and returns []).
     """
+    from vibemix.library.audio_decode import AudioDecodeError, load_audio_mono
+
+    try:
+        return load_audio_mono(audio_path, target_sr=sample_rate)
+    except AudioDecodeError as exc:
+        # PyAV reached but could not decode (empty / corrupt / no frames):
+        # honest empty array so the caller degrades to "no structure", matching
+        # the prior ffmpeg-yields-nothing contract.
+        if "no audio frames" in str(exc):
+            return np.zeros(0, dtype=np.float32)
+        # PyAV itself is missing (packaging drift) — fall back to the ffmpeg
+        # binary if the host happens to have one.
+        return _decode_to_mono_ffmpeg(audio_path, sample_rate)
+
+
+def _decode_to_mono_ffmpeg(audio_path: Path, sample_rate: int) -> np.ndarray:
+    """Legacy ffmpeg-binary decode — fallback only when PyAV is unavailable."""
     ffmpeg = _require_ffmpeg()
     cmd = [
         ffmpeg,
