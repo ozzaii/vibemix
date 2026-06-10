@@ -27,6 +27,7 @@ import {
   type LibrarySetupCandidate,
 } from "../library/api.js";
 import { registerShortcuts } from "../session/shortcuts.js";
+import { listenTauri } from "../tauri-runtime.js";
 import { StatusBar } from "./components/status-bar.js";
 import type { StatusBarProps } from "./components/status-bar.js";
 import { StepIndicator } from "./components/step-indicator.js";
@@ -900,6 +901,46 @@ async function finishLaunchStep(): Promise<void> {
   await completeWizard();
 }
 
+// ---------------------------------------------------------------------------
+// Wizard → live handoff. After a clean wizard exit the Rust watchdog respawns
+// the sidecar WITHOUT --wizard and emits sidecar-state
+// {state:"restarting", reason:"wizard-handoff"} (sidecar.rs). main.ts decides
+// the surface ONCE per page load, so the webview must reload for boot() to
+// re-read first_run_completed=true and mount the shell app in this window —
+// without this the user parks on the dead "loading vibemix…" placeholder.
+// ---------------------------------------------------------------------------
+
+/** Test seam — jsdom's window.location.reload is not stubbable. */
+export const _handoffHooks = {
+  reload(): void {
+    window.location.reload();
+  },
+};
+
+let handoffListenerAttached = false;
+
+/** DEV/test-only: clear the once-guard so each spec can re-arm the listener. */
+export function _resetWizardHandoffForTests(): void {
+  handoffListenerAttached = false;
+}
+
+async function armWizardHandoffReload(): Promise<void> {
+  if (handoffListenerAttached) return;
+  handoffListenerAttached = true;
+  await listenTauri<{ state?: string; reason?: string }>(
+    "sidecar-state",
+    (event) => {
+      const payload = event.payload ?? {};
+      if (
+        payload.state === "restarting" &&
+        payload.reason === "wizard-handoff"
+      ) {
+        _handoffHooks.reload();
+      }
+    },
+  );
+}
+
 async function completeWizard(): Promise<void> {
   // The collapsed wizard no longer carries a device/controller step; output
   // device stays "auto" (empty id) and is set on the deck Settings drawer,
@@ -912,7 +953,12 @@ async function completeWizard(): Promise<void> {
     target_window_id: null as string | null,
   };
   try {
-    await emitIpc("ipc.wizard.done", payload);
+    // Arm the reload listener BEFORE the sidecar can exit — the handoff
+    // event must never race past an unattached listener.
+    await armWizardHandoffReload();
+    // Persist first_run_completed BEFORE ipc.wizard.done: the Rust watchdog
+    // re-reads is_first_run() the moment the wizard process exits, and the
+    // exit is fast now that wizard-done no longer blocks on a model download.
     await invoke("write_first_run_state", {
       state: {
         first_run_completed: true,
@@ -924,6 +970,7 @@ async function completeWizard(): Promise<void> {
         blackhole_install_seen: false,
       },
     });
+    await emitIpc("ipc.wizard.done", payload);
   } catch (err) {
     // Without surfacing this, the wizard advances to "done" but the
     // first_run_completed flag isn't persisted → wizard silently

@@ -396,9 +396,11 @@ describe("first-run continuity smoke (POLISH-03)", () => {
     // test routes the same path via "Index this").
     vi.mocked(libraryImportFromAction).mockClear();
     openCta!.click();
-    // finishLaunchStep + the fire-and-forget auto-ingest both resolve through
-    // mocked seams; flush the microtask queue so the import call lands.
-    for (let i = 0; i < 6; i++) await Promise.resolve();
+    // finishLaunchStep + the auto-ingest both resolve through mocked seams;
+    // flush the microtask queue so the import call lands. Budget is generous:
+    // lane A added awaits to the completion path (handoff listener arming,
+    // write-before-done ordering, awaited auto-ingest).
+    for (let i = 0; i < 20; i++) await Promise.resolve();
 
     // RED before the fix: finishLaunchStep only persisted prefs + completed the
     // wizard, never touching the import path → 0 calls.
