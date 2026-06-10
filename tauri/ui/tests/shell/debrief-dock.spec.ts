@@ -98,21 +98,40 @@ describe("DebriefDock", () => {
     expect(host.textContent).toContain("2 sessions");
   });
 
-  it("uses material depth instead of stroked empty boxes", () => {
+  it("stage-as-page: dock and mast are flat, readiness is the one lead card, rows are hairline", () => {
     const host = document.createElement("div");
     mountDebriefDock(host, { autoRefresh: false });
     const css = styleText("shell-debrief-dock");
     const dock = cssBlock(css, ".debrief-dock");
     const mast = cssBlock(css, ".debrief-dock__mast");
     const readiness = cssBlock(css, ".debrief-dock__readiness");
+    const row = cssBlock(css, ".debrief-dock__row");
     const empty = cssBlock(css, ".debrief-dock__empty");
 
-    expect(dock).toContain("border: 0");
-    expect(dock).toContain("var(--bevel-raised)");
-    expect(mast).toContain("var(--bevel-raised)");
-    expect(readiness).toContain("var(--bevel-raised)");
-    expect(empty).not.toContain("border: 1px");
+    // No plates-inside-plates: only the readiness lead card carries a raised
+    // material; the dock, mast, rows and empty state sit flush on the stage.
+    expect(dock).not.toContain("var(--bevel-raised)");
+    expect(dock).not.toContain("background");
+    expect(mast).not.toContain("var(--bevel-raised)");
+    expect(mast).not.toContain("background");
+    expect(row).not.toContain("var(--bevel-raised)");
+    expect(row).toContain("border-bottom: 1px solid var(--border-subtle)");
+    expect(empty).not.toContain("box-shadow");
+    expect(empty).not.toContain("background");
+    expect(readiness).toContain("border: 1px solid var(--border-default)");
+    expect(readiness).toContain("var(--r-sm)");
     expect(css).not.toContain("border: 1px dashed var(--border-default)");
+  });
+
+  it("cold boot hides the sentinel stat wall until real session data exists", () => {
+    const host = document.createElement("div");
+    mountDebriefDock(host, { autoRefresh: false });
+    const readiness = host.querySelector<HTMLElement>(".debrief-dock__readiness");
+    expect(readiness?.dataset.state).toBe("empty");
+    const css = styleText("shell-debrief-dock");
+    expect(css).toContain(
+      '.debrief-dock__readiness[data-state="empty"] .debrief-dock__payback',
+    );
   });
 
   it("lists recent recordings and opens the real debrief window for ready sessions", async () => {
@@ -132,7 +151,8 @@ describe("DebriefDock", () => {
     expect(host.textContent).toContain("review is armed");
     expect(host.textContent).toContain("is ready, with the why behind every call");
     expect(host.textContent).toContain("last set");
-    expect(host.textContent).toContain("blocker");
+    expect(host.textContent).toContain("waiting on");
+    expect(host.textContent).toContain("you get");
     expect(host.textContent).toContain("open your review");
     expect(host.textContent).toContain("one drill or Viber move");
     expect(host.textContent).toContain("2026-06-03 00:15");

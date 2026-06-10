@@ -27,6 +27,10 @@ const MIN_DEBRIEF_EVENTS = 5;
 const MAX_VISIBLE_SESSIONS = 5;
 
 const CSS = `
+  /* Stage-as-page: the shell surface behind IS the room. The dock owns no
+   * plate of its own — the readiness card below is the ONE raised object,
+   * everything else sits flush on the stage (kills the plates-inside-plates
+   * nesting the contract bans). */
   .debrief-dock {
     position: relative;
     width: min(1060px, calc(100vw - var(--sp-8)));
@@ -34,38 +38,11 @@ const CSS = `
     min-height: min(640px, calc(100vh - var(--sp-8)));
     display: grid;
     grid-template-columns: minmax(250px, 0.72fr) minmax(0, 1fr);
-    gap: var(--sp-5);
+    gap: var(--sp-6);
     padding: var(--sp-5);
     color: var(--text-secondary);
-    background:
-      linear-gradient(135deg, var(--brand-08), transparent 34%),
-      linear-gradient(180deg, rgba(255, 222, 242, 0.034), transparent 22%, rgba(0, 0, 0, 0.22) 100%),
-      rgba(34, 29, 32, 0.76);
-    border: 0;
-    border-radius: var(--rad-md);
-    box-shadow:
-      var(--bevel-raised),
-      0 24px 80px rgba(0, 0, 0, 0.38),
-      0 0 96px -40px var(--brand-22);
-    overflow: hidden;
-  }
-  .debrief-dock::before {
-    content: "";
-    position: absolute;
-    inset: 14px;
-    pointer-events: none;
-    border-radius: var(--rad-sm);
-    background:
-      linear-gradient(90deg, transparent 0 34%, var(--brand-04) 34.2%, transparent 34.6% 100%),
-      linear-gradient(180deg, rgba(255, 222, 242, 0.026), transparent 18%);
-    box-shadow:
-      inset 0 1px 0 rgba(255, 210, 240, 0.045),
-      inset 0 -1px 0 rgba(0, 0, 0, 0.32);
-    opacity: 0.72;
   }
   .debrief-dock > * {
-    position: relative;
-    z-index: 1;
     min-width: 0;
   }
   .debrief-dock__mast {
@@ -74,14 +51,7 @@ const CSS = `
     flex-direction: column;
     justify-content: space-between;
     gap: var(--sp-5);
-    padding: var(--sp-4);
-    border-radius: var(--rad-sm);
-    background:
-      linear-gradient(180deg, rgba(255, 222, 242, 0.028), transparent 30%, rgba(0, 0, 0, 0.16) 100%),
-      rgba(48, 42, 46, 0.42);
-    box-shadow:
-      var(--bevel-raised),
-      0 14px 38px rgba(0, 0, 0, 0.22);
+    padding: var(--sp-2) 0;
   }
   .debrief-dock__kicker,
   .debrief-dock__status,
@@ -185,24 +155,49 @@ const CSS = `
     border-color: var(--brand-22);
     background: var(--brand-04);
   }
+  /* The ONE lead card on the stage — the mock's .nr.lead recipe: brand wash
+   * over warm void, full 1px border, machined seat, 2px brand bar at the
+   * left edge. */
   .debrief-dock__readiness {
+    position: relative;
     display: grid;
     grid-template-columns: 1fr;
     gap: var(--sp-3);
     align-items: start;
-    padding: var(--sp-3);
-    border-radius: var(--rad-sm);
+    padding: var(--sp-4) var(--sp-4) var(--sp-4) calc(var(--sp-4) + 4px);
+    border: 1px solid var(--border-default);
+    border-radius: var(--r-sm);
     background:
-      linear-gradient(180deg, rgba(255, 222, 242, 0.026), transparent 52%),
-      rgba(0, 0, 0, 0.22);
+      linear-gradient(180deg, var(--brand-08) 0%, var(--brand-04) 50%, transparent 100%),
+      linear-gradient(180deg, var(--void-8) 0%, var(--void-5) 100%);
     box-shadow:
-      var(--bevel-raised),
-      0 12px 34px rgba(0, 0, 0, 0.20);
+      inset 0 1px 0 rgba(255, 255, 255, 0.06),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.35),
+      0 8px 24px rgba(0, 0, 0, 0.32);
+  }
+  .debrief-dock__readiness::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 18px;
+    bottom: 18px;
+    width: 2px;
+    border-radius: 0 1px 1px 0;
+    background: var(--brand);
+    box-shadow: 0 0 6px var(--brand-50);
   }
   .debrief-dock__readiness[data-state="ready"] {
-    background:
-      linear-gradient(180deg, var(--brand-08), transparent 60%),
-      rgba(0, 0, 0, 0.22);
+    border-color: var(--brand-22);
+  }
+  /* Cold boot: one serif line carries it — no wall of pending/checking
+   * sentinel cells pretending to be data. */
+  .debrief-dock__readiness[data-state="empty"] .debrief-dock__payback,
+  .debrief-dock__readiness[data-state="empty"] .debrief-dock__readiness-metrics {
+    display: none;
+  }
+  .debrief-dock__readiness[data-state="empty"]::before {
+    background: var(--brand-35);
+    box-shadow: none;
   }
   .debrief-dock__readiness-kicker {
     color: var(--brand);
@@ -210,11 +205,12 @@ const CSS = `
   .debrief-dock__readiness-title {
     margin: 4px 0 0;
     color: var(--text-primary);
-    font-family: var(--type-display);
-    font-variation-settings: "wdth" 88, "wght" 650;
-    font-size: 18px;
+    font-family: var(--type-serif);
+    font-size: 24px;
+    font-weight: 400;
     line-height: 1.1;
-    letter-spacing: 0.02em;
+    letter-spacing: 0;
+    text-shadow: var(--text-3d);
   }
   .debrief-dock__readiness-sub {
     margin: var(--sp-1) 0 0;
@@ -285,43 +281,49 @@ const CSS = `
   .debrief-dock__list {
     display: grid;
     align-content: start;
-    gap: var(--sp-2);
+    gap: 0;
     min-height: 0;
     overflow: auto;
   }
   .debrief-dock__empty {
     display: grid;
     place-items: center;
-    min-height: 260px;
+    min-height: 200px;
     padding: var(--sp-5);
-    border-radius: var(--rad-sm);
-    background:
-      linear-gradient(180deg, rgba(255, 222, 242, 0.020), transparent 48%),
-      rgba(0, 0, 0, 0.14);
-    box-shadow:
-      inset 0 1px 0 rgba(255, 222, 242, 0.040),
-      inset 0 -1px 0 rgba(0, 0, 0, 0.34);
     color: var(--text-muted);
     text-align: center;
   }
+  /* Hairline list rows on the stage — the mock's .nr: bottom seam, 2px left
+   * state bar (transparent at rest, brand when the row is the live one). */
   .debrief-dock__row {
+    position: relative;
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
     gap: var(--sp-4);
     align-items: center;
-    padding: var(--sp-3);
-    border-radius: var(--rad-sm);
-    background:
-      linear-gradient(180deg, rgba(255, 222, 242, 0.018), transparent 50%),
-      rgba(0, 0, 0, 0.20);
-    box-shadow:
-      var(--bevel-raised),
-      0 10px 28px rgba(0, 0, 0, 0.20);
+    padding: var(--sp-3) var(--sp-3) var(--sp-3) var(--sp-4);
+    border-bottom: 1px solid var(--border-subtle);
+    transition: background 200ms var(--ease-brand);
   }
-  .debrief-dock__row[data-ready="true"] {
-    background:
-      linear-gradient(180deg, var(--brand-08), transparent 58%),
-      rgba(0, 0, 0, 0.20);
+  .debrief-dock__row::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 12px;
+    bottom: 12px;
+    width: 2px;
+    border-radius: 0 1px 1px 0;
+    background: transparent;
+    transition: background 250ms var(--ease-brand);
+  }
+  .debrief-dock__row:hover {
+    background: var(--brand-04);
+  }
+  .debrief-dock__row:hover::before {
+    background: var(--brand-35);
+  }
+  .debrief-dock__row[data-ready="true"]::before {
+    background: var(--brand);
   }
   .debrief-dock__row-head {
     display: flex;
@@ -367,22 +369,25 @@ const CSS = `
   .debrief-dock__row[data-ready="true"] .debrief-dock__payoff {
     color: var(--brand);
   }
+  /* Squared recessed rail with a flat fill — not the rounded-gradient-glow
+   * loading pill this surface's own contract bans. */
   .debrief-dock__meter {
     position: relative;
-    height: 4px;
+    height: 3px;
     margin-top: var(--sp-3);
     overflow: hidden;
-    border-radius: 999px;
-    background: rgba(255, 222, 242, 0.055);
+    border-radius: 1px;
+    background: rgba(0, 0, 0, 0.4);
+    box-shadow:
+      inset 0 1px 2px rgba(0, 0, 0, 0.55),
+      0 1px 0 rgba(255, 255, 255, 0.03);
   }
   .debrief-dock__meter::before {
     content: "";
     position: absolute;
     inset: 0 auto 0 0;
     width: var(--ready-pct, 0%);
-    border-radius: inherit;
-    background: linear-gradient(90deg, var(--brand-22), var(--brand));
-    box-shadow: 0 0 12px var(--brand-22);
+    background: var(--brand-50);
   }
   .debrief-dock__open {
     min-width: 128px;
@@ -466,15 +471,15 @@ export function mountDebriefDock(
     '<div class="debrief-dock__status" role="status" aria-live="polite">ready when you are</div>' +
     '<button class="debrief-dock__refresh" type="button">Refresh</button>' +
     "</div>" +
-    '<section class="debrief-dock__readiness" aria-label="next debrief readiness">' +
+    '<section class="debrief-dock__readiness" aria-label="next debrief readiness" data-state="empty">' +
     '<div><div class="debrief-dock__readiness-kicker">next review</div>' +
     '<h3 class="debrief-dock__readiness-title">checking recorder</h3>' +
     '<p class="debrief-dock__readiness-sub">Waiting for local session evidence.</p></div>' +
     '<div class="debrief-dock__payback" aria-label="fastest payback path">' +
     '<div class="debrief-dock__payback-cell"><span class="debrief-dock__payback-label">last set</span><strong class="debrief-dock__payback-value" data-payback="target">pending</strong></div>' +
-    '<div class="debrief-dock__payback-cell"><span class="debrief-dock__payback-label">blocker</span><strong class="debrief-dock__payback-value" data-payback="blocker">checking</strong></div>' +
+    '<div class="debrief-dock__payback-cell"><span class="debrief-dock__payback-label">waiting on</span><strong class="debrief-dock__payback-value" data-payback="blocker">checking</strong></div>' +
     '<div class="debrief-dock__payback-cell"><span class="debrief-dock__payback-label">action</span><strong class="debrief-dock__payback-value" data-payback="action">wait</strong></div>' +
-    '<div class="debrief-dock__payback-cell"><span class="debrief-dock__payback-label">unlocks</span><strong class="debrief-dock__payback-value" data-payback="unlocks">review</strong></div>' +
+    '<div class="debrief-dock__payback-cell"><span class="debrief-dock__payback-label">you get</span><strong class="debrief-dock__payback-value" data-payback="unlocks">review</strong></div>' +
     "</div>" +
     '<dl class="debrief-dock__readiness-metrics">' +
     '<div class="debrief-dock__readiness-metric"><dt>length</dt><dd>pending</dd></div>' +

@@ -79,14 +79,16 @@ describe("drills-panel", () => {
     ]);
 
     const button = div.querySelector<HTMLButtonElement>(".vmx-drill-learn");
-    expect(button?.textContent).toBe("Lessons land after launch");
+    expect(button?.textContent).toBe("Lesson coming");
     expect(button?.dataset.lessonId).toBe("L2.01");
     expect(button?.disabled).toBe(true);
-    expect(div.querySelector(".vmx-drill-learn-meta")?.textContent).toContain(
-      "L2.01",
-    );
+    // The raw lesson id stays machine-side (dataset); the visible meta speaks
+    // the skill's name, not internal course coordinates.
+    const meta = div.querySelector(".vmx-drill-learn-meta")?.textContent ?? "";
+    expect(meta).toContain("beatmatching");
+    expect(meta).not.toContain("L2.01");
     expect(div.querySelector(".vmx-drill-learn-reason")?.textContent).toContain(
-      "Practice routing is parked for launch.",
+      "I'll drill this with you when lessons open.",
     );
   });
 

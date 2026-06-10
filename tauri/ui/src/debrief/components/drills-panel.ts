@@ -140,16 +140,16 @@ export function mountDrillsPanel(
       button.dataset.lessonId = referral.lesson_id;
       button.disabled = true;
       button.setAttribute("aria-disabled", "true");
-      button.textContent = "Lessons land after launch";
-      button.title = "Learning engine is parked for launch.";
+      button.textContent = "Lesson coming";
+      button.title = "Lessons aren't open yet.";
 
       const meta = document.createElement("span");
       meta.className = "vmx-drill-learn-meta";
-      meta.textContent = `${referral.skill_label} · ${referral.lesson_id}`;
+      meta.textContent = referral.skill_label;
 
       const reason = document.createElement("span");
       reason.className = "vmx-drill-learn-reason";
-      reason.textContent = `Practice routing is parked for launch. ${referral.reason}`;
+      reason.textContent = `I'll drill this with you when lessons open. ${referral.reason}`;
 
       route.append(button, meta, reason);
       article.append(route);
