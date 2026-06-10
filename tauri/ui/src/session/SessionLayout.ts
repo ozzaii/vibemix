@@ -150,6 +150,9 @@ export interface SessionState {
    *  live deck. defaultState() leaves it "running" so existing fixtures keep
    *  the live deck; the render-loop projection drives the armed boot. */
   runState?: "armed" | "running";
+  /** Deck-visible failure notice — THE single ipc.error surface (see
+   *  ws-bridge.DECK_NOTICE_ERROR_TYPES). Null hides the line. */
+  notice?: { text: string; tone: "error" | "info" } | null;
   /** Start gate handlers — the render-loop wires onStart/onStop to
    *  ipc.session.start / ipc.session.stop + optimistic setSessionState. The
    *  deck also flips data-runstate locally on click (repaint convention).
@@ -178,6 +181,8 @@ export interface Mounted {
   now: HTMLElement;
   receipt: HTMLElement;
   dropSlot: HTMLElement;
+  /** Deck notice line (THE ipc.error surface). */
+  notice: HTMLElement;
   cite: HTMLElement;
   bpm: HTMLElement;
   key: HTMLElement;
@@ -430,6 +435,26 @@ const LAYOUT_CSS = `
   button.vmx-live__s { background: none; border: none; padding: 0; text-align: right; font: inherit; letter-spacing: inherit; text-transform: inherit; color: inherit; }
   .vmx-session[data-mode="fault"] .vmx-live__s--fault { pointer-events: auto; cursor: pointer; }
   .vmx-session[data-mode="fault"] .vmx-live__s--fault:hover { color: var(--amber); text-shadow: var(--glow-soft); }
+
+  /* --- deck notice — THE user-visible ipc.error surface (lanes B+D). A
+   * failed GO LIVE names its cause ON the deck instead of dying in the
+   * operator log. Amber = the established fault vocabulary; hidden when
+   * null so the deck stays clean at rest. */
+  .vmx-deck__notice {
+    justify-self: center;
+    align-self: end;
+    max-width: 72ch;
+    margin: 0 auto;
+    padding: 6px 16px;
+    font-family: var(--type-mono);
+    font-size: 11px;
+    letter-spacing: 0.04em;
+    color: var(--amber-pale);
+    border: 1px solid var(--amber-40);
+    border-radius: 999px;
+    background: rgba(0, 0, 0, 0.35);
+  }
+  .vmx-deck__notice[hidden] { display: none; }
 
   /* --- SHIP-WIRE START-gate ------------------------------------------------
      The deck is armed (idle, no reactions) until the user presses Start, then
@@ -1508,6 +1533,17 @@ export function mountSessionLayout(
   speak.append(voice, armed);
   deck.append(speak);
 
+  // --- deck notice — THE user-visible ipc.error surface (lanes B+D).
+  // ws-bridge.applyIpcError writes SessionState.deckNotice; the render-loop
+  // projects it here. Hidden whenever null. role=status so screen readers
+  // announce the failure without stealing focus.
+  const notice = document.createElement("p");
+  notice.className = "vmx-deck__notice";
+  notice.dataset.wire = "session.notice";
+  notice.setAttribute("role", "status");
+  notice.hidden = true;
+  deck.append(notice);
+
   // --- foot (bpm · key · live meter)
   const foot = document.createElement("div");
   foot.className = "vmx-deck__foot";
@@ -1587,6 +1623,7 @@ export function mountSessionLayout(
     now,
     receipt,
     dropSlot,
+    notice,
     cite,
     bpm,
     key,
@@ -1914,6 +1951,16 @@ function applyState(mounted: Mounted, next: SessionState, isMount: boolean): voi
       muteBtn.setAttribute("aria-pressed", next.status.muted ? "true" : "false");
       muteBtn.setAttribute("aria-label", next.status.muted ? "unmute co-host" : "mute co-host");
     }
+  }
+
+  // --- deck notice (THE ipc.error surface — null hides the line) ---
+  const nextNotice = next.notice ?? null;
+  const prevNotice = prev.notice ?? null;
+  if (isMount || prevNotice !== nextNotice) {
+    mounted.notice.textContent = nextNotice ? nextNotice.text : "";
+    if (nextNotice) mounted.notice.dataset.tone = nextNotice.tone;
+    else delete mounted.notice.dataset.tone;
+    mounted.notice.hidden = nextNotice === null;
   }
 
   // --- status row inputs (silk-dim; red on a dropped input) ---

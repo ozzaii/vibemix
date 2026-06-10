@@ -303,6 +303,7 @@ export const SESSION_RUNTIME_WIRES = [
   "session.now-line",
   "session.citation",
   "session.drop",
+  "session.notice",
   "session.meter",
   "session.status",
 ] as const;
@@ -369,6 +370,7 @@ const SESSION_RUNTIME_WIRE_PURPOSES: Record<
   "session.now-line": "current deck / phrase readout",
   "session.citation": "grounded evidence chip",
   "session.drop": "runtime drop-countdown chip",
+  "session.notice": "deck notice — THE user-visible ipc.error surface (lanes B+D)",
   "session.meter": "audio health meter",
   "session.status": "runtime status footer",
 };

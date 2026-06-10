@@ -980,3 +980,22 @@ def test_runtime_package_reexports_session_loop() -> None:
 
     assert SL is SessionLoop
     assert rs is run_session
+
+
+def test_session_start_failure_emits_ipc_error_with_cause(fake_bus: FakeBus) -> None:
+    """The GO LIVE failure envelope must carry the CAUSE, not just the
+    exception class — the deck notice renders this string verbatim."""
+
+    async def boom() -> None:
+        raise RuntimeError("proxy setup failed: proxy /register rejected (status=401)")
+
+    loop = SessionLoop(fake_bus, session_start=boom, session_is_active=lambda: False)
+    loop.register_handlers()
+    _drive(
+        fake_bus,
+        {"type": "ipc.session.start", "ts": "2026-06-10T00:00:00+00:00", "payload": {}},
+    )
+    errs = fake_bus.emitted_by_type("ipc.error")
+    assert len(errs) == 1
+    assert errs[0]["payload"]["original_type"] == "ipc.session.start"
+    assert "proxy /register rejected" in errs[0]["payload"]["reason"]

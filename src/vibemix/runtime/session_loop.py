@@ -391,7 +391,7 @@ class SessionLoop:
             await self.bus.emit(
                 json.loads(
                     IpcError.make(
-                        reason=f"session.start failed: {type(exc).__name__}",
+                        reason=f"session.start failed: {type(exc).__name__}: {str(exc)[:300]}",
                         original_type="ipc.session.start",
                     ).to_json()
                 )
@@ -411,7 +411,7 @@ class SessionLoop:
             await self.bus.emit(
                 json.loads(
                     IpcError.make(
-                        reason=f"session.stop failed: {type(exc).__name__}",
+                        reason=f"session.stop failed: {type(exc).__name__}: {str(exc)[:300]}",
                         original_type="ipc.session.stop",
                     ).to_json()
                 )

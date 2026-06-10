@@ -101,6 +101,16 @@ export type SharedLens = "hype" | "critique" | "tutor";
  * Mirrors the optimistic-repaint pattern the rocker uses for mood/skill. */
 export type SessionMode = "cohost" | "learn" | "build" | "debrief";
 
+/** Deck-visible failure notice — THE single user-facing ipc.error surface
+ *  (shared lanes B+D contract). ws-bridge.applyIpcError is the only writer;
+ *  the Start/Stop click handlers clear it. */
+export interface DeckNotice {
+  text: string;
+  tone: "error" | "info";
+  /** Date.now() at arrival — lets future UX expire stale notices. */
+  ts: number;
+}
+
 export interface SettingsView {
   voice: string;
   mode: "hype" | "coach";
@@ -199,6 +209,8 @@ export interface SessionState {
    *  Optional so older snapshots / mock patches that omit it leave the field
    *  untouched (render-loop defaults the projection to "running"). */
   runState?: "armed" | "running";
+  /** Deck notice (see DeckNotice). Null/absent hides the line. */
+  deckNotice?: DeckNotice | null;
 }
 
 export const TRANSCRIPT_RING_CAP = 200;
@@ -265,6 +277,7 @@ function makeDefault(): SessionState {
     // reactions, the deck shows a single Start control. Pressing Start flips
     // to "running" (optimistic) and fires ipc.session.start.
     runState: "armed",
+    deckNotice: null,
   };
 }
 

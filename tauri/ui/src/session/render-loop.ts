@@ -74,7 +74,7 @@ function cohostMuteHandler(): void {
 function sessionStartHandler(): void {
   if (getSessionState().runState === "running") return;
   holdRunStateReconciliation();
-  setSessionState({ runState: "running" });
+  setSessionState({ runState: "running", deckNotice: null });
   void emitIpc("ipc.session.start", {}).catch((err: unknown) => {
     // eslint-disable-next-line no-console
     console.warn("[render-loop] session.start emitIpc failed:", err);
@@ -88,7 +88,7 @@ function sessionStartHandler(): void {
 function sessionStopHandler(): void {
   if (getSessionState().runState !== "running") return;
   holdRunStateReconciliation();
-  setSessionState({ runState: "armed" });
+  setSessionState({ runState: "armed", deckNotice: null });
   void emitIpc("ipc.session.stop", {}).catch((err: unknown) => {
     // eslint-disable-next-line no-console
     console.warn("[render-loop] session.stop emitIpc failed:", err);
@@ -421,6 +421,8 @@ function projectToLayoutState(s: BridgeSessionState): LayoutSessionState {
     // fixtures/snapshots keep the live deck; the real boot sets runState
     // "armed" in makeDefault(), which drives the idle Start gate here.
     runState: s.runState ?? "running",
+    // THE ipc.error surface — ws-bridge.applyIpcError writes deckNotice.
+    notice: s.deckNotice ?? null,
     onStart: sessionStartHandler,
     onStop: sessionStopHandler,
   };

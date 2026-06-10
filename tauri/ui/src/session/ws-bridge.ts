@@ -57,6 +57,7 @@ import type {
   MascotMood,
   MetersTriple,
   SessionMode,
+  SessionState,
   SharedLens,
   SkillLevel,
 } from "./state.js";
@@ -607,14 +608,50 @@ export function applyMuteAck(p: WireMutePayload): void {
   // the next ipc.settings.state will overwrite muted anyway.
 }
 
-/** Generic sidecar error broadcast. The live deck has no general toast rail,
- *  so the shippable path is the operator log: visible in DevTools and in
- *  ui.log via debug_log. */
+/** Sidecar error broadcast. Every error still lands in the operator log
+ *  (DevTools + ui.log via debug_log); whitelisted original_types ALSO
+ *  surface on the deck through SessionState.deckNotice — THE single
+ *  user-facing ipc.error surface (shared lanes B+D contract). Lane B adds
+ *  its types to DECK_NOTICE_ERROR_TYPES instead of building a second rail. */
+export const DECK_NOTICE_ERROR_TYPES: ReadonlySet<string> = new Set([
+  "ipc.session.start",
+  "ipc.session.stop",
+  // Capture-open failure — already emitted end-to-end by the sidecar
+  // (__main__._set_input_stream_error); pre-included for lane B.
+  "audio.capture",
+]);
+
+function deckNoticeText(originalType: string, reason: string): string {
+  if (originalType === "ipc.session.start") {
+    return `couldn't go live — ${reason.replace(/^session\.start failed:\s*/i, "")}`;
+  }
+  if (originalType === "ipc.session.stop") {
+    return `couldn't stop cleanly — ${reason.replace(/^session\.stop failed:\s*/i, "")}`;
+  }
+  return reason;
+}
+
 export function applyIpcError(p: WireIpcErrorPayload): void {
   vmxLog("[vmx:error]", "ipc.error", {
     original_type: p.original_type,
     reason: p.reason,
   });
+  const original = p.original_type ?? "";
+  if (!DECK_NOTICE_ERROR_TYPES.has(original)) return;
+  const patch: Partial<SessionState> = {
+    deckNotice: {
+      text: deckNoticeText(original, p.reason),
+      tone: "error",
+      ts: Date.now(),
+    },
+  };
+  if (original === "ipc.session.start") {
+    // The optimistic GO LIVE repaint was wrong — the backend never went
+    // live. Reveal the Start gate so the deck stops claiming a session
+    // that does not exist.
+    patch.runState = "armed";
+  }
+  setSessionState(patch);
 }
 
 /** Anti-slop telemetry from the co-host loop. Store it for the Settings
