@@ -52,4 +52,23 @@ describe("selectReactionIntent", () => {
       ),
     ).toBeNull();
   });
+
+  it("selects intents off the REAL flat live frame (no type key)", () => {
+    const selected = selectReactionIntent(
+      {
+        music: 0.4,
+        voice: 0.0,
+        mic: 0.0,
+        bpm: 128,
+        reaction_intent: "headbang",
+        reaction_intent_seq: 3,
+      },
+      2,
+    );
+    expect(selected).toEqual({
+      intent: "headbang",
+      seq: 3,
+      state: "react_drop",
+    });
+  });
 });

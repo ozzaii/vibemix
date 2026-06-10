@@ -1,3 +1,4 @@
+import { isSnapshotFrame } from "./snapshot-frame.js";
 import { MASCOT_REACTIONS } from "./types.js";
 import type { MascotReaction, MascotState } from "./types.js";
 
@@ -22,9 +23,8 @@ export function selectReactionIntent(
   message: unknown,
   lastSeq: number,
 ): ReactionIntentSelection | null {
-  if (!message || typeof message !== "object") return null;
+  if (!isSnapshotFrame(message)) return null;
   const m = message as Record<string, unknown>;
-  if (m.type !== "snapshot") return null;
   const intent = m.reaction_intent;
   if (typeof intent !== "string") return null;
   if (!MASCOT_REACTIONS.includes(intent as MascotReaction)) return null;

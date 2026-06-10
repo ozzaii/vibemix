@@ -46,6 +46,7 @@ import {
 } from "./mood.js";
 import { selectReactionIntent } from "./reaction-intent.js";
 import { MascotRenderer } from "./renderer.js";
+import { isSnapshotFrame } from "./snapshot-frame.js";
 import {
   applyTransition,
   initialMachineState,
@@ -211,8 +212,9 @@ async function boot(): Promise<void> {
   function handleMessage(message: unknown): void {
     const now = performance.now();
 
-    // Typed ipc.learn.* envelopes carry a `type` string; the 30Hz mascot
-    // frame carries type:"snapshot". Route the two teaching-focus envelopes
+    // Typed ipc.learn.* envelopes carry a `type` string; the live 30Hz
+    // mascot frame is FLAT — no `type` key (see snapshot-frame.ts).
+    // Route the two teaching-focus envelopes
     // BEFORE the snapshot branch — they drive the particle organism's focus
     // mechanic (control_rect registers a screen rect; teaching_focus fires the
     // dissolve→stream→reform). Grounding: no organism motion without one of
@@ -241,11 +243,7 @@ async function boot(): Promise<void> {
     // Snapshots are state-READERS — they update the dispatcher's view
     // of bpm/confidence/downbeat/mood. Snapshots do NOT trigger
     // transitions on their own (events do).
-    if (
-      message &&
-      typeof message === "object" &&
-      (message as { type?: unknown }).type === "snapshot"
-    ) {
+    if (isSnapshotFrame(message)) {
       const m = message as Record<string, unknown>;
       const bpm = typeof m.bpm === "number" ? m.bpm : currentSnapshot.bpm;
       const conf =
