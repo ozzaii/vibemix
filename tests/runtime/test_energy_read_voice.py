@@ -140,6 +140,58 @@ def test_lifting_arc_with_sub_rose_delta_prefers_delta_body() -> None:
     assert "controlling the added weight in the next phrase" in line
 
 
+def test_slight_deltas_do_not_select_a_body() -> None:
+    """Iter7 (n=3 replication, 2026-06-10): 4 of 5 should_NOT lines across the
+    replication pool fired brightness vocabulary from slight-magnitude deltas
+    ("That brightness share just ticked up…") — a relative blip stated as an
+    audible claim the judge's ears refute. Slight deltas stay in the receipt's
+    evidence clause but no longer pick the forward body; with nothing else to
+    say, the read is a no-info body and stays silent."""
+    line = build_energy_read_voice_line(
+        None,
+        event_type="PHASE",
+        evidence_registry=EvidenceRegistry(),
+        state=_state(phase=""),
+        audio_delta_items=["brightness share rose 17% (slight)"],
+    )
+    assert line is None
+
+
+def test_slight_delta_skipped_in_favor_of_clear_delta() -> None:
+    """A slight sub blip must not shadow a clear mid move — body selection
+    reads the first NON-slight match."""
+    line = build_energy_read_voice_line(
+        None,
+        event_type="PHASE",
+        evidence_registry=EvidenceRegistry(),
+        state=_state(phase=""),
+        audio_delta_items=[
+            "sub energy fell 4% (slight)",
+            "brightness share rose 31% (clear)",
+        ],
+    )
+    assert isinstance(line, str)
+    assert "using the added brightness as the forward cue" in line
+
+
+def test_mid_rise_speaks_mid_language_not_brightness() -> None:
+    """Iter7 vocab honesty: the 6a dumps caught a receipt saying "the added
+    brightness" when the clear delta was MID (+25%) — the judge ruled the
+    brightness claim fabricated against low actual highs. A mid rise now gets
+    mid-true language; brightness vocabulary fires only on brightness/high
+    deltas."""
+    line = build_energy_read_voice_line(
+        None,
+        event_type="PHASE",
+        evidence_registry=EvidenceRegistry(),
+        state=_state(phase=""),
+        audio_delta_items=["mid energy rose 25% (clear)"],
+    )
+    assert isinstance(line, str)
+    assert "letting the new mids sit before adding anything on top" in line
+    assert "brightness" not in line.split("Live deltas:")[0]
+
+
 def test_unmatched_deltas_fall_to_no_info_body_and_stay_silent() -> None:
     """Auditor follow-up (b): pin the third no-info body. Deltas that match no
     rule ('stereo width rose'), no arc, no phase read → 'the current

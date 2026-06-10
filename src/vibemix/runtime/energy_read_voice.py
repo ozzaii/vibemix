@@ -277,11 +277,22 @@ def _forward_body(
     # is an earned "leave low-end space" nudge, not a steady read.
     for raw in deltas:
         text = str(raw).casefold()
+        # Iter7 (n=3 replication, 2026-06-10): slight-magnitude deltas stay in
+        # the receipt's evidence clause but never pick the body — 4/5 judged
+        # should_NOT lines were relative blips voiced as audible claims
+        # ("That brightness share just ticked up…") the judge's ears refuted.
+        if "(slight)" in text:
+            continue
         if ("sub energy" in text or "low energy" in text or "rms" in text) and "fell" in text:
             return "leaving low-end space before the next push"
         if ("sub energy" in text or "low energy" in text or "rms" in text) and "rose" in text:
             return "controlling the added weight in the next phrase"
-        if ("mid energy" in text or "high energy" in text or "brightness" in text) and "rose" in text:
+        # Mid is split from brightness (iter7): a clear mid rise rendered as
+        # "the added brightness" was judged fabricated against low actual
+        # highs — each band speaks its own vocabulary.
+        if "mid energy" in text and "rose" in text:
+            return "letting the new mids sit before adding anything on top"
+        if ("high energy" in text or "brightness" in text) and "rose" in text:
             return "using the added brightness as the forward cue"
         if ("mid energy" in text or "high energy" in text or "brightness" in text) and "fell" in text:
             return "keeping the top-end space intentional"
