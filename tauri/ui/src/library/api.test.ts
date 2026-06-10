@@ -16,6 +16,7 @@ import {
   libraryChat,
   libraryCueFolder,
   libraryEmbedFolder,
+  libraryImportOutcome,
   libraryModels,
   librarySearch,
   librarySimilar,
@@ -25,6 +26,7 @@ import {
   normalizeCurateResult,
   normalizeCueResult,
   normalizeEmbedProgress,
+  normalizeLibraryImportProgress,
   normalizeLiveContextPayload,
   normalizeLiveMovePayload,
   normalizeModelsResult,
@@ -1696,5 +1698,35 @@ describe("runtime response normalizers", () => {
 
     expect(moves).toHaveBeenNthCalledWith(1, ["A_low: cut->killed"]);
     expect(moves).toHaveBeenNthCalledWith(2, []);
+  });
+
+  it("defaults missing failure fields on import progress (old sidecar frames)", () => {
+    const p = normalizeLibraryImportProgress({
+      total: 3,
+      done: 3,
+      current_track_name: "",
+      cache_hits: 1,
+      cancelled: false,
+    });
+    expect(p.failed).toBe(0);
+    expect(p.failure_reason).toBe("");
+    expect(libraryImportOutcome(p)).toBe("done");
+  });
+
+  it("classifies a total-wipeout import as failed and a partial run as partial", () => {
+    const wipeout = normalizeLibraryImportProgress({
+      total: 4,
+      done: 4,
+      current_track_name: "",
+      cache_hits: 0,
+      cancelled: false,
+      failed: 4,
+      failure_reason: "first.mp3: unprobeable",
+    });
+    expect(wipeout.failed).toBe(4);
+    expect(wipeout.failure_reason).toBe("first.mp3: unprobeable");
+    expect(libraryImportOutcome(wipeout)).toBe("failed");
+    expect(libraryImportOutcome({ ...wipeout, failed: 1 })).toBe("partial");
+    expect(libraryImportOutcome({ ...wipeout, cancelled: true })).toBe("cancelled");
   });
 });

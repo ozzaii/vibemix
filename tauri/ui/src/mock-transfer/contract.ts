@@ -140,6 +140,8 @@ export const MOCK_TRANSFER_CONTRACT: readonly MockTransferSurface[] = [
       "ipc.library.import_progress.cancelled",
       "ipc.library.import_progress.current_track_name",
       "ipc.library.import_progress.done",
+      "ipc.library.import_progress.failed",
+      "ipc.library.import_progress.failure_reason",
       "ipc.library.import_progress.total",
     ],
     outbound: [

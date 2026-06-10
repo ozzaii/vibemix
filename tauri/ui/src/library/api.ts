@@ -482,6 +482,10 @@ export interface LibraryImportProgress {
   current_track_name: string;
   cache_hits: number;
   cancelled: boolean;
+  /** Files failed so far; the final frame carries the run total. */
+  failed?: number;
+  /** First failure as "<filename>: <error>" on the final frame. */
+  failure_reason?: string;
 }
 
 // ── Runtime response guards ────────────────────────────────────────────────
@@ -2378,7 +2382,29 @@ export function normalizeLibraryImportProgress(
       root.cancelled,
       "ipc.library.import_progress.cancelled",
     ),
+    failed: asFiniteNumber(
+      root.failed ?? 0,
+      "ipc.library.import_progress.failed",
+    ),
+    failure_reason: asString(
+      root.failure_reason ?? "",
+      "ipc.library.import_progress.failure_reason",
+    ),
   };
+}
+
+export type LibraryImportOutcome = "cancelled" | "failed" | "partial" | "done";
+
+/** Classify a terminal import frame. "failed" == total wipeout (every file
+ *  failed) — the UI must render it as a failure, never "library indexed". */
+export function libraryImportOutcome(
+  p: LibraryImportProgress,
+): LibraryImportOutcome {
+  if (p.cancelled) return "cancelled";
+  const failed = p.failed ?? 0;
+  const total = p.total > 0 ? p.total : p.done;
+  if (failed > 0 && total > 0 && failed >= total) return "failed";
+  return failed > 0 ? "partial" : "done";
 }
 
 export function normalizeModelProgress(value: unknown): LibraryModelProgress {

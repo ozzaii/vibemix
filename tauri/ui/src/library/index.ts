@@ -32,6 +32,7 @@ import {
   libraryEmbedFolder,
   libraryImport,
   libraryImportFromAction,
+  libraryImportOutcome,
   libraryModels,
   libraryRevealExport,
   librarySearch,
@@ -1314,9 +1315,11 @@ function isImportProgressTerminal(p: LibraryImportProgress): boolean {
 function importDoneNote(p: LibraryImportProgress): string {
   if (p.cancelled) return "cancelled";
   const processed = p.total > 0 ? p.total : p.done;
+  const failed = p.failed ?? 0;
   const parts: string[] = [];
   if (processed > 0) parts.push(`${processed} processed`);
   if (p.cache_hits > 0) parts.push(`${p.cache_hits} cached`);
+  if (failed > 0) parts.push(`${failed} failed`);
   if (parts.length > 0) return parts.join(" · ");
   return p.total > 0 ? `${p.total} scanned` : "no audio indexed";
 }
@@ -1324,12 +1327,45 @@ function importDoneNote(p: LibraryImportProgress): string {
 function renderImportDone(p: LibraryImportProgress): void {
   const total = p.total > 0 ? p.total : p.done;
   const note = importDoneNote(p);
+  const outcome = libraryImportOutcome(p);
   setProgress(total, total, 0, note);
-  clearIngestError();
+  if (outcome === "failed" || outcome === "partial") {
+    const el = $maybe("vmx-lib-ingest-error");
+    if (el) {
+      const title = document.createElement("div");
+      title.className = "title";
+      title.textContent =
+        outcome === "failed" ? "index failed" : "index completed with errors";
+      const body = document.createElement("div");
+      body.className = "msg";
+      body.textContent = p.failure_reason || note;
+      const hint = document.createElement("div");
+      hint.className = "hint";
+      hint.textContent =
+        outcome === "failed"
+          ? ingestErrorHint(p.failure_reason || note)
+          : "Viber can use the indexed tracks now; retry later for the failed files.";
+      el.replaceChildren(title, body, hint);
+      el.hidden = false;
+      el.title = p.failure_reason || note;
+    }
+  } else {
+    clearIngestError();
+  }
   $("vmx-lib-rcount").textContent =
-    p.cancelled ? "cancelled" : total > 0 ? `${total} processed` : "indexed";
+    outcome === "cancelled"
+      ? "cancelled"
+      : outcome === "failed"
+        ? "failed"
+        : total > 0
+          ? `${total} processed`
+          : "indexed";
   $("vmx-lib-scope-state").textContent =
-    p.cancelled ? "index cancelled" : "library indexed";
+    outcome === "cancelled"
+      ? "index cancelled"
+      : outcome === "failed"
+        ? "index failed"
+        : "library indexed";
 }
 
 function embeddingLabel(stats: LibraryStats): string {
@@ -2262,9 +2298,18 @@ async function runLibrarySetupImport(
           if (finished) return;
           els.status.textContent = importProgressNote(p);
           if (isImportProgressTerminal(p)) {
+            const outcome = libraryImportOutcome(p);
             finish(
-              p.cancelled ? "index cancelled" : `indexed · ${importDoneNote(p)}`,
-              p.cancelled ? "index cancelled" : "library indexed",
+              outcome === "cancelled"
+                ? "index cancelled"
+                : outcome === "failed"
+                  ? `index failed · ${p.failure_reason || importDoneNote(p)}`
+                  : `indexed · ${importDoneNote(p)}`,
+              outcome === "cancelled"
+                ? "index cancelled"
+                : outcome === "failed"
+                  ? "index failed"
+                  : "library indexed",
             );
           }
         }),
