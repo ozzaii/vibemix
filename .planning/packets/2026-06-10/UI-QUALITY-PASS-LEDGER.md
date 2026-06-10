@@ -79,3 +79,24 @@ Framework question settled: **stay-tauri (0.86)** — `.planning/research/2026-0
 4. **Critic gaps**: tray.rs classify() Error lane keyed to livekit=down (never emitted — dead lane, harmless but lying code); updater unaudited; settings interior failure states; Windows wizard parity.
 5. **Carryovers**: v5→v6 rename sweep (+legacy-gate rewrite SAME commit); NEXT UP (blocked on live suggestion_service proof); viber index.ts P0s (STILL another session's dirty WIP — copy-contract EXCLUDED entry waits on it); screen-noun P2 unification (screen proof/capture/recording/grounding).
 6. **Packaging lane**: investigate the pre-existing cargo resource-walk failure before the next DMG (does NOT block dev — vite/vitest unaffected; bundling may be).
+
+---
+
+## SESSION 2026-06-10 LATE NIGHT (impeccable continuation) — 7 commits ab24672d..d94fcff7
+
+Queue executed: NEXT QUEUE v2 #1 (debrief interior, the 4.5/10 surface) end-to-end, plus the impeccable-run arming task. Re-pinned all 10 audit findings against HEAD first (6-agent fan-out): 2 already closed (gold verdict was re-toned in 09fe253c; lesson_id/"parked" copy fixed by the copy sweep), 8 fixed below. Suite 1644 green + 1 todo (178 files), build green, key fixes live-verified in the browser at 1440x900.
+
+- [x] **frontend-enforcement SKILL.md refresh** (ab24672d): was STALE v5 (phosphor-amber #ff8a1a accent / charcoal #14171c dominant / faux-3D bevels / DSEG7 fonts) — any agent leaning on it polished the wrong contract. Rewritten from DESIGN.md: One-Rose, gold quarantine, hex-outside-tokens, inset-bezel tactility, Saira/JBM/Instrument-Serif lock, copy-contract + idle≠fault gates, authority chain (pink mock → DESIGN.md → this file).
+- [x] **Skeleton terminal states** (f88991f0): resolveSkeletonsToTerminal settles "Generating…" skeletons on terminal errors (scoped per reason; success frames never overwritten; settled dot dims to neutral). Timeline empty copy teaches. NEW gate ban: ascii-ellipsis (7 violations normalized to … across debrief/dock/pill/learn/settings).
+- [x] **Noun unification** (f2e6ee52): moments (sidebar/HUD/hover/empty; verdict TRACKS stays — different concept), recap (panel title, skeleton, errors), debrief (window + DebriefDock + surfaces; "review" survives only as a verb). Error copy: "expected layout"/"event data"/"≥ 5 minutes" rewritten in co-host voice; unmapped reasons no longer echo raw sidecar prose (console.warn instead).
+- [x] **Evidence tooltip anchored** (8e7e0435): chip/region clicks carry viewport coords (keyboard → element rect), window stashes across the ws round-trip, tooltip opens at the click clamped to viewport, position:fixed. NEW citation-tooltip.spec.ts (8 tests). Note: mock mode never wired citation-click — chips are dead in mock only (pre-existing).
+- [x] **Recap well clipping** (378cda6c): align-content start (center split overflow across BOTH clipped edges), min-content row floor, max-height:940px diet for mock rail/HUD. Live re-measured: meta whole, rail whole, contentFits=true. Morning panel mock-overflow (283 vs 219) is PRE-EXISTING and untouched.
+- [x] **Color-literal sweep** (1648274c): 26 literals → tokens (retired v5 silk ×4, retired amber-orange hover, fault-red ×2 via NEW --danger-10/--danger-58 in tokens.css, 19 rose ladder steps, border-pink rivets, cool blue-cast root/titlebar darks → warm glass-3/void-85). One sanctioned literal remains: signal-bar runtime alpha (documented in place).
+- [x] **Feedback honesty + dead chrome** (d94fcff7): "Was this call right?" caption, un-vote on re-click (local only, no fake retraction), sendMomentFeedback→boolean + moment-feedback-rejected reverts pressed state on closed socket. Deleted: phantom "ear" grid rows, ~40 lines of unmounted titlebar __status styles, the permanently-empty session slot.
+
+### NEXT QUEUE v3 (carried forward, leverage order)
+1. **Pill rose budget** (design pass — needs live screenshots, `localhost:1420/pill.html` + capture): 5+ simultaneous rose accents per reaction vs One-Rose.
+2. **Warming ≠ live-listening** (python wire): owned by the go-live-deterministic packet (capture-callback-gated "started" + ARMED status). Same lane: "audio input dropped" fault dead-wired; armed-gate "checking" states ride never-faulting values.
+3. **Critic gaps**: tray.rs classify() Error lane keyed to never-emitted livekit=down (dead lane); updater unaudited; settings interior failure states; Windows wizard parity.
+4. **Carryovers**: v5→v6 rename sweep (+legacy-gate rewrite SAME commit); NEXT UP (blocked on live suggestion_service proof); viber index.ts P0s (other session's dirty WIP — copy-contract EXCLUDED entry waits); screen-noun P2; debrief mock-mode citation chips dead (no listener) + morning panel mock overflow (both pre-existing, low).
+5. **Packaging lane**: pre-existing bare `cargo check` failure ("Not a directory" resource walk; compile-verify via TAURI_CONFIG='{"bundle":{"resources":[]}}') — investigate before next DMG.
