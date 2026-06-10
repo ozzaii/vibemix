@@ -28,7 +28,7 @@
       "bravoh_probe": "Bravoh proxy: reachable",
       "stopwatch": "{ms} ms",
       "fallback_heading": "BlackHole couldn't auto-install",
-      "fallback_body": "Run this in Terminal, then click retry: brew install blackhole-2ch",
+      "fallback_body": "Auto-install didn't finish. Download the free installer from existential.audio/blackhole, run it, then continue.",
       "continue_cta": "Continue"
     },
     "format_check": {

@@ -250,6 +250,16 @@ export function createStepDriverFetch(
   function showFallback(): void {
     fallback.style.display = "block";
     setRowState("driver", "fail");
+    // No dead-end (product bar): auto-install failed, but the wizard must
+    // stay walkable. The fallback card names the manual installer path;
+    // Continue arms so the user can keep going — the deck's armed gate
+    // re-surfaces a missing capture device after launch.
+    continueBtn.removeAttribute("disabled");
+    continueBtn.setAttribute("aria-disabled", "false");
+    if (stopwatchTimer !== undefined) {
+      clearInterval(stopwatchTimer);
+      stopwatchTimer = undefined;
+    }
   }
 
   // Invoke companion fetch via Tauri command (Plan 49-04 provides the

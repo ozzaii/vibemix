@@ -72,6 +72,8 @@ import { libraryImportFromAction } from "../../library/api.js";
 // STEP_ORDER changes, the assertion below catches the drift.
 const STEP_ORDER: WizardStep[] = [
   "permissions",
+  "forewarning",
+  "driver-fetch",
   "library-feed",
 ];
 
@@ -170,6 +172,8 @@ describe("first-run continuity smoke (POLISH-03)", () => {
     // the live order; this guards the mirror used for the loop.)
     expect(STEP_ORDER).toEqual([
       "permissions",
+      "forewarning",
+      "driver-fetch",
       "library-feed",
     ]);
   });
@@ -183,7 +187,7 @@ describe("first-run continuity smoke (POLISH-03)", () => {
     expect(currentStep()).toBe("permissions");
   });
 
-  it("drives the full STEP_ORDER chain with no dead-end and reaches launch", () => {
+  it("drives the full STEP_ORDER chain with no dead-end and reaches launch", async () => {
     // Start from intro (beforeEach). Step into permissions to begin the chain.
     advanceTo("permissions");
     vi.advanceTimersByTime(300);
@@ -199,6 +203,12 @@ describe("first-run continuity smoke (POLISH-03)", () => {
       // Drive the gated step into its armed state (sidecar-success analogue).
       armStep(step);
       renderCurrentStep();
+      if (step === "driver-fetch") {
+        // run_companion_fetch (mocked invoke) resolves + probe-row stubs land.
+        await Promise.resolve();
+        await Promise.resolve();
+        vi.advanceTimersByTime(400);
+      }
 
       // (b) a forward affordance exists and is enabled — never stuck.
       expect(hasEnabledForwardControl(primary())).toBe(true);

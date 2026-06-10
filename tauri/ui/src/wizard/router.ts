@@ -48,6 +48,8 @@ import {
   renderStepLibraryFeed,
   type LibraryFeedState,
 } from "./step-library-feed.js";
+import { createStepDriverFetch } from "./step-driver-fetch.js";
+import { createStepForewarning } from "./step-forewarning.js";
 
 export type WizardStep =
   | "intro"
@@ -152,6 +154,18 @@ function setState(
 
 const STEP_ORDER: WizardStep[] = [
   "permissions",
+  // Audit B-audio-firstrun (2026-06-10): the Phase-49 BlackHole install chain
+  // was typed + built but never advanced into — a truly-fresh Mac completed
+  // the wizard, then the live sidecar exited 3 (MasterCaptureNotFound) before
+  // the ws bus served, landing on a crash banner that tells a DJ to brew.
+  // The chain now sits in the forward path and is SKIPPED when
+  // ipc.calibration.list_devices reports blackhole_present (see
+  // advancePastPermissions). format-check stays unwired on purpose:
+  // run_audio_config shells a system python3 (a CLT stub on a fresh Mac) and
+  // live capture opens the device-native rate + resamples, so a 44.1k
+  // BlackHole no longer needs a 48k repair to ship audio.
+  "forewarning",
+  "driver-fetch",
   "library-feed",
 ];
 
@@ -170,9 +184,14 @@ function indexOf(step: WizardStep): number {
 }
 
 function stepStripFor(current: WizardStep): HTMLElement {
-  const idx = indexOf(current);
+  // forewarning + driver-fetch are one strip stop ("audio") — the consent
+  // card and the install rows are two beats of the same step.
+  const effective: WizardStep =
+    current === "forewarning" ? "driver-fetch" : current;
+  const idx = indexOf(effective);
   const stepsConfig: Array<{ id: WizardStep; label: string }> = [
     { id: "permissions", label: "permissions" },
+    { id: "driver-fetch", label: "audio" },
     { id: "library-feed", label: "music" },
   ];
   return StepIndicator({
@@ -233,6 +252,12 @@ export function back(): void {
     case "permissions":
       // Permissions is the first wizard step proper; back returns to intro.
       advanceTo("intro");
+      return;
+    case "forewarning":
+      advanceTo("permissions");
+      return;
+    case "driver-fetch":
+      advanceTo("forewarning");
       return;
     case "library-feed":
       advanceTo("permissions");
@@ -306,6 +331,11 @@ function ensureWizardShortcuts(): void {
 
 export function renderCurrentStep(): void {
   ensureWizardShortcuts();
+  // Leaving driver-fetch drops the cached mount so a re-entry re-runs the
+  // probe (the companion script's already_installed check keeps it idempotent).
+  if (wizardState.currentStep !== "driver-fetch" && driverFetchEl !== null) {
+    driverFetchEl = null;
+  }
   const stepStripMount = document.getElementById("wizard-step-strip");
   const primaryMount = document.getElementById("wizard-primary");
   const statusMount = document.getElementById("status-bar");
@@ -337,7 +367,7 @@ export function renderCurrentStep(): void {
     case "permissions":
       primary = renderStep1(wizardState.step1, {
         platform: wizardState.platform,
-        onContinue: () => advanceTo("library-feed"),
+        onContinue: () => void advancePastPermissions(),
         onBack: () => back(),
         onGrantScreen: () => {
           void invoke("open_screen_recording_settings").catch((err) => {
@@ -404,6 +434,27 @@ export function renderCurrentStep(): void {
         onOpenVibemix: () => void finishLaunchStep(),
         onBack: () => back(),
       });
+      break;
+    case "forewarning":
+      primary = createStepForewarning({
+        platform: wizardState.platform,
+        onContinue: () => advanceTo("driver-fetch"),
+        onBack: () => back(),
+      });
+      break;
+    case "driver-fetch":
+      // Mount-once cache: createStepDriverFetch fires run_companion_fetch on
+      // creation (download + macOS admin-password dialog after the
+      // forewarning consent card) — a status-bar or setState rerender must
+      // NOT refire the installer.
+      if (driverFetchEl === null) {
+        driverFetchEl = createStepDriverFetch({
+          platform: wizardState.platform,
+          onContinue: () => advanceTo("library-feed"),
+          onBack: () => back(),
+        });
+      }
+      primary = driverFetchEl;
       break;
     case "skill-level":
       primary = renderStepSkillLevel(wizardState.skillLevel, {
@@ -515,6 +566,7 @@ let hasTriedScreenRestart = false;
 let screenRestartFocusHandler: (() => void) | null = null;
 let libraryFeedBootStarted = false;
 let smokeTestStarted = false;
+let driverFetchEl: HTMLElement | null = null;
 
 /** Poll ipc.permission.check @1Hz for both kinds while Step 1 is active. */
 function startStep1PermissionPoll(): void {
@@ -592,6 +644,42 @@ function startStep1PermissionPoll(): void {
   // Initial poll, then every 1s.
   void poll();
   step1PollTimer = window.setInterval(() => void poll(), 1000);
+}
+
+/** Audit B-audio-firstrun — the post-permissions fork. A fresh Mac without
+ *  BlackHole used to sail through the wizard and then hit the sidecar's
+ *  exit-3 crash banner. Probe the sidecar device list (wizard.py
+ *  _on_list_devices flags blackhole_present) and only surface the install
+ *  chain when the driver is genuinely absent. Probe failure routes INTO the
+ *  chain (fail-closed): with the driver present the companion script's own
+ *  probe exits "already_installed" in under a second, so the worst case of
+ *  a bus hiccup is one extra Continue — never a dead deck. Windows rigs
+ *  (VB-CABLE, never BlackHole) always take the chain; fetch_drivers.ps1
+ *  performs the equivalent already-installed probe. */
+async function advancePastPermissions(): Promise<void> {
+  if (wizardState.platform === "linux") {
+    advanceTo("library-feed");
+    return;
+  }
+  try {
+    const reply = await sendIpcRequest(
+      "ipc.calibration.list_devices",
+      {},
+      "ipc.calibration.device_list",
+      3_000,
+    );
+    const present = Boolean(
+      (reply as { payload: { blackhole_present: boolean } }).payload
+        .blackhole_present,
+    );
+    if (present) {
+      advanceTo("library-feed");
+      return;
+    }
+  } catch (err) {
+    console.warn("[router] blackhole probe failed:", err);
+  }
+  advanceTo("forewarning");
 }
 
 function libraryFeedStatus(
