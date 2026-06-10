@@ -1,0 +1,1158 @@
+{
+ "verdict": {
+  "cases": [
+   {
+    "option": "Full native Swift/SwiftUI (AppKit where needed) rewrite of the vibemix UI",
+    "strongest_case": "vibemix is not a web app that happens to be downloaded \u2014 it is an instrument that lives ON STAGE next to Rekordbox and Serato, and its entire thesis (\"real DJ friend, no AI slop\") is carried by surfaces the web stack is structurally worst at. The one surface everyone \u2014 including the 2026-06-05 rejection doc itself \u2014 concedes only native truly nails is the product's most public face: a non-activating, fullScreenAuxiliary NSPanel HUD floating over a fullscreen DJ app. Tauri still lacks the primitive (open issues tauri#11488/#13034); today it's bought via third-party crates working around the shell. Worse, WKWebView throttles rAF/timers for occluded and non-frontmost windows \u2014 the always-on-top pill over fullscreen Rekordbox is precisely the throttled case \u2014 while a native CADisplayLink/Metal render loop is exempt and drives 120Hz ProMotion meters. The platform winds in 2026 blow native on BOTH OSes: macOS 26's Liquid Glass makes custom-drawn web facsimiles of OS materials read more dated every release (vibemix's hand-painted \"textured instrument\" CSS competes against first-class glassEffect/NSVisualEffectView), and Microsoft at Build 2026 formally declared WinUI \"the production platform for Windows apps\" while publicly campaigning to kill \"web app slop\" on Windows 11. The audience \u2014 pro-audio users whose reference apps are all native C++ \u2014 can smell webview jank in a waveform.\n\nAnd uniquely for THIS codebase, the rewrite is far cheaper than the scary LOC totals suggest, because the UI is already a thin client. ALL real work (audio DSP, AI brain, state) lives in the Python sidecar behind a broadcast JSON socket \u2014 `IpcRouterBus` in `src/vibemix/runtime/ws_bus.py` sends to ALL connected clients on `127.0.0.1:8765`, nothing in the protocol is Tauri-specific, and the 83-type `messages.schema.json` ports mechanically to Swift `Codable`. The engine (the actual product) reuses 100%. A native rewrite doesn't just re-skin: it DELETES whole layers \u2014 the ~9.1k-line Rust shell, the wry bridge, the ajv schema-codegen pipeline, the WKWebView-vs-WebView2 dual-engine QA matrix, and 8 separate webview surfaces (`tauri/ui/*.html`) each carrying its own JS context on a hot gig laptop already running Rekordbox + Python DSP + local Chatterbox TTS + CLAP ONNX. There's no React to unwind \u2014 the vanilla TS is already organized as windows/surfaces, which is exactly how SwiftUI scenes decompose. Bonus the rejection doc missed: `tauri.conf.json5:112` sets `macOSPrivateApi: true` (required for the transparent windows), which is a Mac App Store disqualifier \u2014 a native app needs zero private API for transparency/vibrancy, unlocking MAS distribution, IAP (a real assist on the API-key/payments problem), and the trust halo a paid desktop product wants. If vibemix intends to be \"the next Serato,\" the end-state UI is native; the only honest argument is about WHEN.",
+    "real_wins": [
+     "The pill/HUD becomes first-class: non-activating NSPanel + .fullScreenAuxiliary + tracking areas + Spaces behavior natively, instead of tauri-nspanel crates patching around missing Tauri primitives (tauri#11488/#13034 still open). This is the product's most visible surface and the one even the 2026-06-05 rejection doc admits only native truly nails.",
+     "No webview throttling on the surfaces that matter: WKWebView throttles rAF/timers for occluded/non-frontmost windows \u2014 exactly the floating pill + mascot over fullscreen Rekordbox. Native CADisplayLink/Metal render loops are exempt and drive 120Hz ProMotion waveforms/meters with lower jitter.",
+     "True OS materials that age WITH the OS: macOS 26 Liquid Glass / NSVisualEffectView first-class instead of CSS backdrop-filter facsimiles; on Windows, WinUI 3 acrylic/mica natively \u2014 and Microsoft at Build 2026 just declared WinUI THE production platform while campaigning against web-app slop (windowslatest.com 2026-06-04).",
+     "Real memory/CPU headroom on gig laptops: one native process replaces 8 webview surfaces (tauri/ui/*.html), each with its own JS heap + the three.js runtime \u2014 on a machine simultaneously running Rekordbox/Serato, the Python DSP sidecar, Chatterbox TTS, and CLAP ONNX, the UI's footprint is a genuine performance budget line, not vanity.",
+     "Mac App Store path unlocked: tauri.conf.json5:112 `macOSPrivateApi: true` (needed for transparent windows) is a MAS disqualifier today; native transparency/vibrancy uses no private API \u2192 MAS distribution, IAP, discovery, trust for a paid product.",
+     "Unusually cheap engine reuse \u2014 verified, not hoped: IpcRouterBus broadcasts JSON to all clients on 127.0.0.1:8765; a Swift app subscribes to the SAME socket the webviews use, the 83-type schema maps to Codable, and the entire Python engine (the actual product) transfers untouched. The rewrite is views-only by construction.",
+     "Deletes whole layers instead of porting them: ~9.1k lines of Rust window plumbing, the ajv codegen pipeline, and the WKWebView-vs-WebView2 cross-engine QA matrix all disappear; native a11y (VoiceOver-correct controls), real menu bar, native windowing come free instead of being maintained by hand in ARIA + custom chrome.",
+     "Brand-fit with the audience: DJs' reference software (Serato, Rekordbox, Ableton) is all native; 'instrument, not app' perceived quality compounds the anti-slop positioning."
+    ],
+    "costs": [
+     "4-7 months of focused rebuild for ~59.4k lines of non-test TS + ~12.9k CSS across 8 surfaces (measured in-repo), executed by a solo founder who doesn't write Swift, on a team whose stated priority is Bravoh \u2014 while launch is THE goal. The rewrite torches the launch window.",
+     "Discards 37.9k lines of tests / 1,577 green vitest specs \u2014 the encoded anti-slop behavioral contract (Invariant #5 idle-vs-fault guard, optimistic-repaint settings rule, citation-gated reaction UI, the pill focus dance). Each of those is a shipped bug fix that a rewrite re-discovers in production, per the classic rewrite failure mode.",
+     "The three.js GPGPU particle organism / mascot \u2014 explicitly the visual soul \u2014 has no Swift port path; Three.js\u2192Metal/SceneKit is a research project, not a translation. It either ships degraded or blocks the rewrite's tail.",
+     "The agentic dev loop that actually builds this product (drive-vibemix skill, ws_observe MCP, vitest, Playwright screenshots) is web-tuned; Xcode-cycle agent iteration is materially slower, so the 'Claude/Codex write the Swift' mitigation is weaker than it sounds.",
+     "Migration limbo: old Tauri UI must keep shipping fixes while the native one is built (Kaan demos to Francesco/DJs continuously) \u2014 dual-maintenance is the documented stall mode (68% of strangler migrations stall <90 days per the prior decision's sources), and there is no second engineer to hold one of the two lanes.",
+     "The 'textured instrument' design contract (mocks/vibemix-bravoh-grade-pink.html, Kaan-approved 2026-06-10, 8 commits just landed) is custom-drawn, not OS chrome \u2014 so native buys the WINDOW and MATERIAL wins, but every slab, engraved label, and rose key-light still gets hand-rebuilt in SwiftUI Canvas/Metal; the 12.9k CSS doesn't translate, it re-paints."
+    ],
+    "killers": [
+     "THE killer \u2014 SwiftUI/AppKit does not exist on Windows, and v1 is bindingly macOS+Windows. The researched June-2026 Swift-on-Windows reality: the TOOLCHAIN is real (officially supported since 2020; Swift.org chartered a dedicated Windows workgroup in Jan 2026), but there is no Swift UI framework for Windows \u2014 the path is writing a SECOND application against WinUI 3 through swift-winrt language projections. So 'one full native Swift rewrite' is actually TWO UI rewrites (SwiftUI on macOS + Swift/WinRT+WinUI on Windows) sharing models but zero views \u2014 on a solo team, that is roughly 1.7-2x the already-fatal cost. (Sources: swift.org/blog/whats-new-in-swift-february-2026, swift.org/install/windows, github.com/thebrowsercompany/swift-winrt, infoworld.com on Swift+WinUI.)",
+     "The Swift-on-Windows ecosystem just lost its industrial patron: The Browser Company \u2014 the entity that funded swift-winrt/swift-winui and proved the lane with Arc on Windows \u2014 was acquired by Atlassian (completed Oct 2025) to build Dia; Arc is in maintenance mode, and thebrowsercompany/swift-winui's own README now calls itself 'an outdated snapshot... provided for illustration purposes.' Betting v1 of a commercial product on that lane in 2026 is betting on an orphaned frontier toolchain. (Sources: businesswire.com Atlassian completion 2025-10-21, techcrunch.com 2025-09-04, github.com/thebrowsercompany/swift-winui.)",
+     "Constraint stack: solo engineer + Bravoh-takes-priority + tight budget + launch-is-the-goal means the four revisit-gates set in .planning/packets/2026-06-05/NATIVE-UI-DECISION.md \u00a75 (shipped+paying users, funded native headcount, spike-proven felt delta, real Windows answer) are ALL currently unmet \u2014 the rewrite can't be funded without violating at least one binding constraint."
+    ],
+    "bottom_line": "The founder's instinct is RIGHT about where the web stack is weakest (the floating HUD, OS materials, webview throttling, gig-laptop footprint) and this codebase's ws-bus thin-client boundary makes a native rewrite unusually cheap for the macOS half \u2014 but 'full native Swift' under the binding macOS+Windows v1 charter is secretly TWO rewrites, because SwiftUI does not exist on Windows and the Swift/WinRT-on-WinUI lane just lost its flagship patron to the Atlassian acquisition. Verdict as advocate: native macOS is the correct END-STATE and the ws-bus boundary should be treated as the deliberate seam that keeps it cheap to do post-launch \u2014 but for v1 it is killed by the Windows constraint plus solo-engineer math; buy the genuinely-native wins surgically now (NSPanel + vibrancy on the pill) and pull the trigger on Swift only when the four \u00a75 gates hold, starting with the pill as the one-week proof spike."
+   },
+   {
+    "option": "Rewrite the vibemix UI in Flutter desktop (Dart, Impeller/Skia renderer), keeping the Python sidecar and the existing ws/JSON IPC contract untouched",
+    "strongest_case": "vibemix is the rare app where Flutter's \"we render every pixel ourselves\" model is a pure win and the WebView's entire value proposition is dead weight. The design contract (mocks/vibemix-bravoh-grade-pink.html) uses ZERO native widgets \u2014 machined slabs, rose key-light, engraved mono labels, all custom-drawn \u2014 so Tauri buys vibemix nothing except two DIFFERENT browser engines to fight: WKWebView (Safari engine) on macOS and WebView2 (Chromium) on Windows. Every pixel of the Kaan-approved contract must be re-verified per engine; backdrop-filter, color management, WebGL throttling, and font rasterization all diverge, and the Windows half of that QA matrix is essentially unexercised today. Flutter collapses this to one GPU-accelerated renderer that is pixel-identical on both v1 platforms, and upgrades the material language itself: the rose key-light, slab speculars, and the parked GPGPU particle organism become first-class FragmentShader/CustomPainter work instead of CSS approximations and three.js-inside-WKWebView. Golden-file widget tests then turn the design contract from a vibe-checked HTML mock into a machine-enforced artifact \u2014 strictly better than today's pixelmatch arrangement.\n\nCrucially, the rewrite scope is the UI half ONLY. The architecture already firewalls it: the Python sidecar does all real work (audio DSP, state, Sven's brain), the wire is formalized in src/ipc/messages.schema.json, and the bus is plain JSON over 127.0.0.1:8765. Regenerate Dart types from the same schema, spawn the same sidecar via Process, and Invariants 1-5 never get touched. Among the candidates only Flutter combines that with solo-dev/agent viability: Dart has by far the largest LLM training corpus of any non-web option (Claude/Codex are productive in it; Slint DSL, QML, and iced are comparative deserts), hot reload matches the agent-iterate-on-design loop, desktop is stable on Windows/macOS with Impeller landing there through 2026 (https://docs.flutter.dev/platform-integration/desktop, https://softaims.com/blog/flutter-3-impeller-wasm-features-2026), and the runtime footprint is sane \u2014 unlike Compose Multiplatform's JVM at 108-146MB for hello-world (https://github.com/JetBrains/compose-multiplatform/issues/1632). Qt/QML is the only other adult-grade option and loses on dual-language friction, LGPL/commercial licensing overhead for a signed commercial binary, and agent fit. The Rust trio self-eliminates: egui is wrong for consumer-grade typography/compositing, iced is pre-1.0 churn (https://www.boringcactus.com/2025/04/13/2025-survey-of-rust-gui-libraries.html), and gpui's Windows backend is still maturing while its API tracks Zed's internal needs (https://crates.io/crates/gpui).",
+    "real_wins": [
+     "One renderer on macOS+Windows: eliminates the WKWebView-vs-WebView2 dual-engine QA matrix entirely \u2014 the approved design renders pixel-identical on both v1 platforms, and the (currently untested) Windows visual surface comes for free instead of as a second hardening pass",
+     "Design-language upgrade, not just parity: fragment shaders + CustomPainter are a strictly stronger material system than CSS for lit/textured surfaces \u2014 the rose key-light, slab speculars, and the parked curl-noise organism (rejected at 0.1/10 as a web attempt) become native GPU work at 120Hz instead of three.js fighting WKWebView throttling",
+     "The rewrite is UI-half only: the Python sidecar (all DSP/AI/state), the ws bus on 8765/8766, and messages.schema.json survive verbatim \u2014 codegen Dart instead of TS from the same schema; none of the five cardinal invariants are touched",
+     "Golden-file widget tests make the design contract machine-enforced (matchesGoldenFile per surface vs today's mock-by-eye + pixelmatch), and widget tests replace the jsdom-approximation layer with tests that exercise the real renderer",
+     "Best agent/solo-dev fit of any non-web option: huge Dart corpus in LLM training data, hot reload for design iteration, single language, first-class tooling \u2014 versus QML/Slint-DSL/iced where Claude/Codex output quality drops measurably",
+     "Sane runtime: ~30MB engine overhead, no JVM (Compose burns 108-146MB on hello-world), no Chromium; ships as a normal signable/notarizable .app + MSIX/installer, so the existing signing pipeline concept carries over"
+    ],
+    "costs": [
+     "Rebuild of 61,234 lines of TS + 12,952 lines of CSS across six surfaces (session deck, wizard, library/Viber, debrief, learn, settings, mascot overlay) \u2014 with agents and the sidecar untouched, realistically 2-4 months of focused solo-engineer time to true parity, not weeks",
+     "The 37,943-line test corpus (1,577 green vitest tests) is torched and must be re-expressed as widget/golden/integration_test suites; the web-tuned agent infrastructure (frontend-enforcement skill keyed to HTML mocks, vitest QA hooks, qa-blitz, Playwright e2e) all needs re-tooling",
+     "The three.js mascot/particle layer and the HTML mock workflow die: mocks/*.html stops being a 1:1 contract you can diff CSS against \u2014 the design source of truth has to migrate to golden images, a real workflow change for how Kaan approves UI",
+     "Platform-shell risk to spike FIRST: Flutter desktop multi-window (debrief is a second window on 8766) only recently matured, and the transparent always-on-top mascot overlay needs window_manager/community plugins on both OSes \u2014 feasible but the community-maintained edge of the ecosystem",
+     "Tauri/Rust shell knowledge and the shipped signed+notarized vibemix-0.0.1.dmg pipeline get partially rebuilt (sidecar bundling, provenance guard, notarization scripts re-pointed at a Flutter .app)",
+     "Opportunity cost is the real currency: every week on the rewrite is a week not spent on the actual release blocker \u2014 Sven's friend-score and the grounded-voice bar \u2014 which no renderer change improves"
+    ],
+    "killers": [
+     "Schedule: launch is THE goal, Kaan is a solo engineer with Bravoh taking priority, and a signed DMG already exists \u2014 a 2-4 month UI re-platform pre-launch is functionally a launch cancellation, and the 2026-06-05 evaluation already rejected a full rewrite on exactly these grounds",
+     "Wrong diagnosis: every documented UI failure (soulless shell, dark wiring, dead Viber chat, broken go-live feedback) is a design/wiring problem the teardowns trace to specific TS/Python seams \u2014 none is a WebView engine limitation; Flutter would faithfully re-implement the same problems in a new language",
+     "The dual-engine pain Flutter solves has a 10x-cheaper mitigation: a WebView2 CI lane + a constrained CSS subset costs days, not months"
+    ],
+    "bottom_line": "Flutter desktop is the single honest winner among cross-platform candidates for vibemix \u2014 the only toolkit where a zero-native-widget, fully custom-material product gains (one pixel-identical GPU renderer on both v1 platforms, shaders as the native material primitive, golden-test-enforced design contract, sidecar untouched) while staying viable for a solo engineer driving LLM agents. But it wins the comparison, not the decision: pre-launch, the rewrite's 2-4 month bill lands entirely on the schedule of a product whose actual release blocker is voice quality, not rendering. The defensible move is Flutter as the v2 re-platform candidate \u2014 spike multi-window + transparent overlay + one shader-built deck surface in a week post-launch \u2014 and pay the WebView2 CI-lane tax now. Sources: https://docs.flutter.dev/platform-integration/desktop, https://softaims.com/blog/flutter-3-impeller-wasm-features-2026, https://github.com/JetBrains/compose-multiplatform/issues/1632, https://www.boringcactus.com/2025/04/13/2025-survey-of-rust-gui-libraries.html, https://crates.io/crates/gpui, https://github.com/longbridge/gpui-component"
+   },
+   {
+    "option": "Stay on Tauri 2 + framework-free TypeScript/CSS; raise the quality ceiling in-place (vibrancy/NSPanel/native-chrome upgrades inside the existing shell, with the parked Swift pill spike as the only scoped native lane)",
+    "strongest_case": "The founder's premise dissolves on contact with the repo: there is no React to remove. The UI is 61,234 lines of framework-free vanilla TS with exactly one runtime npm dependency (three.js, confirmed in /Users/ozai/projects/dj-set-ai/tauri/ui/package.json) rendered by the SYSTEM WebView \u2014 WKWebView on macOS, WebView2 on Windows \u2014 behind a Rust parent process. No bundled Chromium, no Node runtime. That means the thing people hate about \"web apps\" (Electron's 100-300MB idle RAM, 85MB+ installers) literally isn't in this build: Tauri apps idle around 30-40MB vs 200-300MB for Electron and ship single-digit-MB shells ([gethopp benchmark](https://www.gethopp.app/blog/tauri-vs-electron), [PkgPulse 2026](https://www.pkgpulse.com/guides/electron-vs-tauri-2026)). On Windows, WebView2 IS Chromium shared with the OS \u2014 Windows users get Electron-class rendering fidelity without vibemix shipping or paying for it. And critically for vibemix's design language: the Kaan-approved contract (mocks/vibemix-bravoh-grade-pink.html) is 100% custom-drawn textured-instrument material with ZERO native widgets \u2014 exactly like Serato, Rekordbox, and Ableton, whose \"native\" C++ UIs are also fully custom-drawn, not OS chrome. A native toolkit's one genuine gift \u2014 free system widgets \u2014 is the one thing this product deliberately doesn't use. Premium is craft, not toolkit: Raycast 2.0 migrated FROM hand-built Swift+AppKit TO React-in-a-WebView and kept its premium reputation ([Raycast deep dive](https://www.raycast.com/blog/a-technical-deep-dive-into-the-new-raycast)); Linear, VS Code, Figma, and the ChatGPT/Claude desktop apps all clear the bar on web stacks (table in .planning/packets/2026-06-05/NATIVE-UI-DECISION.md).\n\nMeanwhile the native-feel ceiling inside Tauri is high and partially already cashed in: pill_window.rs:112-120 already applies a REAL NSVisualEffectView (window_vibrancy::apply_vibrancy, HudWindow material) \u2014 not a CSS backdrop-filter fake; mascot_window.rs, pill_window.rs, and overlay.rs already ship transparent + always-on-top + click-through floating windows; tauri.conf.json5 already runs native macOS decorations with Overlay titleBarStyle (integrated traffic lights) and macOSPrivateApi. The remaining gap \u2014 a non-activating HUD panel that floats over fullscreen Rekordbox without stealing focus \u2014 has a documented ~40-line additive recipe (tauri-nspanel v2.1 branch, MIT, production-proven in Cap/Screenpipe/Overlayed) plus apply_acrylic for the Windows analog, both mapped step-by-step with gotchas in NATIVE-UI-DECISION.md \u00a74. Against that, the alternative reproduces 272 UI files (~57.8k TS + ~11.5k CSS), 83 IPC message types, ~9.1k lines of Rust window plumbing, and discards ~38k LOC / 1,500+ green tests of hard-won anti-slop behavioral contract (Invariant #5 idle-grounding guard, optimistic-repaint rule, pill focus dance) \u2014 a measured 4-7 month solo detour in a language Kaan doesn't write, which then forces either dropping Windows (charter violation) or a THIRD UI. The scoped escape valve already exists and is correctly scoped: the parked Swift Liquid-Glass pill spike talks to the same 127.0.0.1:8765 bus the webviews use (IpcRouterBus broadcasts to ALL clients; the protocol is UI-agnostic), so if one surface ever empirically proves a felt delta the crates can't reach, it can go native without touching Windows parity or the other 12 surfaces.",
+    "real_wins": [
+     "Ships v1 on BOTH charter platforms (macOS + Windows) from one 61k-line codebase a solo founder already knows \u2014 no third UI, no Swift learning curve while Bravoh takes priority",
+     "Keeps the ~38k LOC / 1,500+ green-test behavioral net (the anti-slop release gate's regression armor) and the 83-type IPC codegen layer intact \u2014 these are 'collected bug fixes' a rewrite re-discovers in production",
+     "Native-feel headroom is real and mostly additive: window-vibrancy ALREADY live in pill_window.rs (real NSVisualEffectView HudWindow); tauri-nspanel non-activating fullScreenAuxiliary panel is a documented ~40-line injection; apply_acrylic covers Windows; native overlay titlebar/traffic-lights + tray + plugin-dialog file dialogs already shipped",
+     "Runtime footprint is NOT Electron: system WebView means no bundled Chromium, ~single-digit-MB shell, idle RAM in the tens not hundreds of MB ([gethopp](https://www.gethopp.app/blog/tauri-vs-electron)); on Windows, WebView2 = the OS's own Chromium for free",
+     "The custom-drawn 'textured instrument' design language (zero native widgets, per the approved pink mock) renders identically well in a WebView \u2014 same approach as Serato/Ableton's custom-drawn C++ UIs; GPU work (three.js organism, WebGL\u2192Metal via ANGLE) already runs in-shell",
+     "The parked Swift Liquid-Glass pill spike remains the correctly-scoped native lane: one macOS-gated surface on the same ws bus, zero Windows-parity damage, gated on a PROVEN felt delta rather than vibes",
+     "Every hour spent is product polish, not platform migration \u2014 consistent with ship-when-ready, tight budget, and Sven's voice (not the toolkit) being the actual launch-blocking quality gap"
+    ],
+    "costs": [
+     "Memory honesty: WebKit webviews carry real overhead (tauri#5889 measured >90MB deltas in some workloads \u2014 [issue](https://github.com/tauri-apps/tauri/issues/5889)), and vibemix has 8 HTML entry points = up to 8 webview process trees; the three.js GPGPU organism costs more in a webview than a hand-tuned Metal layer would",
+     "Two rendering engines forever: WKWebView (Safari-class, lags Chromium features, its own backdrop-filter/canvas perf quirks) vs WebView2 (Chromium) means every visual change needs cross-engine verification \u2014 the pixel-perfect textured materials must be tested on both",
+     "Input/compositing latency: a webview adds roughly a compositor hop over raw AppKit drawing; scroll momentum is native (WKWebView uses the system scroller) but live-resize and sub-frame hover response on the pill will always have a slight seam vs a true AppKit layer (NATIVE-UI-DECISION.md \u00a74 'honest gaps')",
+     "Accessibility is hand-rolled: no free native a11y tree \u2014 ARIA on custom-drawn widgets is a maintenance line-item (a SwiftUI panel would be VoiceOver-correct for free)",
+     "Plain Tauri cannot draw over fullscreen DJ apps in the built artifact \u2014 the nspanel work (tauri #11488 gap) is mandatory engineering, ~40 lines plus the documented tauri-plugin-store panic gotcha to test, and Windows acrylic corner-rounding stays the weaker story (no radius arg)",
+     "Framework-free at 61k LOC means the discipline burden is all in-house: no ecosystem patterns, hand-maintained pub/sub gotchas (the documented optimistic-repaint rule exists because state.ts has no reactivity)"
+    ],
+    "killers": [],
+    "bottom_line": "Staying violates no binding constraint and the feared 'web tax' mostly isn't there (no React, no bundled Chromium, tens-of-MB idle RAM); the genuine native gaps \u2014 vibrancy, non-activating fullscreen HUD, native chrome \u2014 are reachable inside Tauri (vibrancy already shipped), while leaving costs a measured 4-7 month solo rewrite plus a forced Windows-charter breach, for a product whose launch-blocking quality gap is Sven's voice, not the toolkit. Stay, spend the delta on craft, keep the Swift pill spike as the gated escape valve."
+   }
+  ],
+  "judge": {
+   "recommendation": "stay-tauri",
+   "confidence": 0.86,
+   "rationale": "Two of the three advocates convict themselves. The Swift case's own killers section concedes that under the binding macOS+Windows v1 charter, 'full native Swift' is secretly TWO rewrites (SwiftUI has no Windows existence; the Swift/WinRT+WinUI lane just lost its industrial patron to the Atlassian acquisition, with swift-winui's README self-describing as an outdated snapshot) \u2014 its bottom line is literally 'killed for v1.' Its remaining strong claims also wilt under attack: the WKWebView-throttling argument targets occluded/minimized windows, but the pill is by definition visible and always-on-top, so the genuine gap is only the non-activating panel primitive \u2014 which the repo already has a documented in-shell fix for (tauri-nspanel ~40-line recipe in NATIVE-UI-DECISION.md \u00a74, plus a sanctioned objc2 NSPanel-subclass design already written in pill_window.rs:47-61, with vibrancy ALREADY shipped at pill_window.rs:112-117 \u2014 verified). The MAS/IAP argument is a non sequitur for v1: a signed+notarized DMG shipped 2026-06-08 and direct distribution is the plan. And 'views-only by construction' elides that the views ARE the cost \u2014 the advocate admits the 12.9k CSS textured-instrument contract doesn't translate, it re-paints. The Flutter case likewise concedes its own killers (a 2-4 month re-platform = functional launch cancellation; wrong diagnosis \u2014 every documented UI failure traces to TS/Python wiring seams, none to a WebView engine limitation; the dual-engine pain has a days-cheap WebView2 CI mitigation). Its 'golden tests strictly better' claim is wrong in practice \u2014 golden files are notoriously flaky across GPU/font rasterization, re-importing the cross-platform variance it promises to eliminate \u2014 and it torches the solo engineer's actual force multiplier: 1,577 green tests plus the entire web-tuned agent toolchain (vitest hooks, qa-blitz, Playwright, HTML-mock contract workflow). Flutter's transparent click-through overlay + multi-window needs sit on the community-plugin edge of its ecosystem \u2014 riskiest exactly at vibemix's signature surfaces. That leaves stay-Tauri, whose weaknesses are real but convert into work items rather than killers: an unexercised Windows/WebView2 visual lane, an unproven built-artifact pill over fullscreen Rekordbox, and 8 webview process trees on a gig laptop. Decisive context: the actual launch blockers are Sven's voice/perception quality (friend score, cold-start silence, empty deck) \u2014 no renderer change touches any of them, and every rewrite month is taken from the only gate that matters. I also reject hybrid-NOW: building the Swift pill today means two divergent pill implementations (Swift macOS + Tauri Windows) in a language the solo engineer doesn't write, to polish a surface no teardown lists as a blocker; hybrid is the correctly-gated escape valve, not the v1 plan. Judged fresh, the 2026-06-05 conclusion was right and its four \u00a75 revisit gates (shipped+paying users, funded native headcount, spike-proven felt delta, real Windows answer) remain the correct trigger \u2014 all currently unmet. The ws-bus thin-client boundary is the strategic asset: it keeps a future native end-state cheap without paying for it now.",
+   "conditions": [
+    "Ship the non-activating pill NOW: convert the pill window to a real NSPanel (tauri-nspanel v2.1 macro or the in-repo objc2 subclass path per pill_window.rs:47-61) with .nonactivatingPanel + .fullScreenAuxiliary + .canJoinAllSpaces, and acceptance-test it in the BUILT artifact over real fullscreen Rekordbox/Serato \u2014 zero focus-steal is the pass criterion; explicitly test the tauri-plugin-store geometry-save panic interaction (plugins-workspace #1546).",
+    "Stand up a Windows/WebView2 visual QA lane before launch (CI screenshots or a regularly-exercised Windows box): pixel-verify the pink-mock contract surfaces (backdrop-filter, fonts, canvas perf) on WebView2 \u2014 the charter says Windows is v1 and that lane is currently untested; pair with apply_acrylic/mica as the Windows vibrancy analog.",
+    "Measure and budget the 8-surface webview footprint on a gig-laptop profile (Rekordbox + Python sidecar + Chatterbox TTS + CLAP ONNX running concurrently): lazy-create secondary windows, destroy hidden surfaces, and pause/decimate the three.js render loop when occluded \u2014 make UI RAM/CPU a tracked number, not a vibe.",
+    "Keep the ws-bus/IPC seam deliberately UI-agnostic (no Tauri-specific protocol leakage into messages.schema.json or IpcRouterBus) \u2014 this is the documented exit hatch that keeps a post-launch native macOS surface cheap; treat any PR that couples the wire to the webview as a regression.",
+    "Keep the one-week Swift Liquid-Glass pill spike PARKED behind the NATIVE-UI-DECISION.md \u00a75 gates; trigger it only post-launch, only if the nspanel pill demonstrably fails a felt-quality bar live, and judge it by A/B feel against the crate-path pill \u2014 never by vibes.",
+    "Spend every reclaimed week on the actual launch gates: Sven friend-score (bench loop), cold-start silence, fresh-user empty deck, go-live determinism \u2014 the toolkit decision is settled precisely so this work gets the time.",
+    "If Mac App Store distribution ever becomes a goal, audit the macOSPrivateApi:true usage (tauri.conf.json5:112) then \u2014 it is not a v1 item and must not be used to justify a rewrite now."
+   ],
+   "strongest_counterargument": "The product's single most public surface \u2014 the always-on-top pill/HUD floating over fullscreen Rekordbox, judged by pro-audio users whose reference software is uniformly native \u2014 sits exactly where the web stack is structurally weakest and where Tauri itself still lacks the primitive (tauri #11488/#13034 remain open; the fix rides third-party crates with documented panic interactions and a class-swizzle landmine the repo's own comments warn about). If the crate-path pill fails the by-feel test against fullscreen DJ software in the built artifact, 'stay' didn't avoid the native work \u2014 it deferred it to the worst possible moment: post-launch, in public, with paying DJs watching. Meanwhile the 2026 platform winds (macOS Liquid Glass, Microsoft's explicit WinUI-over-web-slop campaign) make custom-drawn web facsimiles read slightly more dated with every OS release, and the ws-bus boundary that makes staying safe is the same evidence that a native rewrite is unusually cheap HERE \u2014 engine reuse is 100%, the schema ports mechanically, and the UI is already organized as surfaces. If vibemix genuinely intends to be 'the next Serato,' native is the plausible end-state, and every additional month on Tauri adds web LOC and web-tuned tests that the eventual port must re-pay with interest \u2014 so the cheapest moment for the macOS-native pivot is always now, and it only gets more expensive."
+  }
+ },
+ "audits": [
+  {
+   "findings": [
+    {
+     "file": "tauri/ui/src/session/components/drop-chip.ts",
+     "lines": "119-127, 149-154",
+     "severity": "P0",
+     "title": "Drop countdown prints bars as a fake timecode \u2014 'DROP IN 14:00' reads as a frozen 14-minute timer",
+     "why": "formatBars() renders `${bars}:00` with a hardcoded ':00' eighths placeholder. On screen (session-1, z-live-foot, narrow-880) it reads as mm:ss \u2014 a clock that never ticks its seconds = reads broken, and the ':00' is fabricated sub-bar precision (violates the no-invented-data law on the one numeric riding the master groove).",
+     "fix": "Adopt the mock's phrase-label grammar verbatim: `drop in ~14 bars` \u2014 phrase-label 9px Geist Mono 0.22em uppercase silk-40, with the count in --brand 700 (the mock's .phrase-label em). Keep the BPM pip row. Delete formatBars()'s ':00'; only ever print the integer the detector actually has.",
+     "mock_ref": ".phrase-label / .phrase-label em \u2014 'breakdown \u00b7 drop in ~28 bars' (mock lines 890-904, 1569)"
+    },
+    {
+     "file": "tauri/ui/src/session/SessionLayout.ts",
+     "lines": "1051-1093 (CSS), 1932-1943 (update), 70-78 (dark props), 38 (phase-tape import)",
+     "severity": "P1",
+     "title": "The foot groove wears the mock's PHRASE-strip costume but plots RMS level \u2014 the instrument's needle means the wrong quantity",
+     "why": "The 4px groove + lit playhead orb is the mock's phrase-line vocabulary (position-in-phrase), but .vmx-fmeter__fill width = smoothed loudness, so at a glance the deck shows a track-progress bar that randomly swells. Worse: SessionState.phase (chunks + nowPct) and events[] are projected every frame and NEVER rendered \u2014 phase-tape.ts/event-ribbon.ts are imported type-only. Plus a real bug: fill clamps at 100% (line 1941) while the peak orb clamps at METER_CEIL=86% (line 1942), so on loud passages the 'peak' orb drowns INSIDE the fill.",
+     "fix": "Make the groove the mock's phrase-line: render phase.chunks as the stepped brand-alpha segments (brand-08/-10/-22 bands, mock's .phrase-line::before) with nowPct driving the playhead orb on the --bpm-beat cadence; demote live RMS to a short dedicated level read (or the fill's opacity, not its width). Minimum viable: clamp fill to the same 86% ceiling and drop the orb's playhead styling while it means 'peak level'.",
+     "mock_ref": ".phrase-hair / .phrase-line / .phrase-playhead (mock lines 830-889, markup 1565-1570)"
+    },
+    {
+     "file": "tauri/ui/src/session/SessionLayout.ts",
+     "lines": "1533-1582 (deck composition: speak + foot only)",
+     "severity": "P1",
+     "title": "Dead lower half \u2014 the mock's NEXT UP queue zone is empty void at every width",
+     "why": "At 1440x900 (session-1/2) and 1100/880 the region between the voice hero and the foot is bare obsidian. In the contract that zone is the next-up setlist (lead row with serif name + italic reason, two single-line rows with BPM\u00b7key + energy-delta chips). This is NOT honest-empty: SuggestionService / next_suggestion.py exist and are wired-to-show elsewhere (the pill). The deck reads under-furnished, not restrained.",
+     "fix": "Mount the mock's .next-up block under .vmx-claim (max-width 920px, enter-stagger 0.85s): mono 'next up' label with 14px brand-22 lead-in hairline + 'grounded' meta; #1 lead row as the lit slab (brand-08\u2192transparent over void-8\u2192void-5, left 2px brand bar, Instrument Serif 22px name, serif italic 17px reason); #2-#3 borderless rows with nr-delta chips (gold hot/warm, void cool). Rows render ONLY when a real grounded suggestion exists \u2014 empty stays empty.",
+     "mock_ref": ".next-up / .nr.lead / .nr-delta / .nr-reason (mock lines 1138-1329, markup 1588-1628)"
+    },
+    {
+     "file": "tauri/ui/src/session/SessionLayout.ts",
+     "lines": "903-992 (receipt CSS), 1422-1455 (DOM), 1849-1864 (apply)",
+     "severity": "P1",
+     "title": "Evidence chip is a one-line 11px caption \u2014 the mock's receipt is a two-line proof OBJECT with a hover link back to the claim",
+     "why": "App chip: 10px padding, 20px wave, single '\u25c2 STEADY KICK @ 0:31' line (z-receipt.png). Mock receipt: 16/20px padding, 28px wave, 12px bold tabular time stacked over a 10px muted band line, backdrop-blur, hover corner-bracket, and \u2014 the part that sells grounding \u2014 receipt:hover ignites the hero line's cite/em (cite-linked). The app receipt has no link-back, so claim and proof never visibly connect; the anti-slop thesis loses its best gesture.",
+     "fix": "Restructure .vmx-receipt__chip to the mock's receipt-meta: stacked .receipt-time (verb-free `0:31` in 12px GeistMono 700 0.18em tabular + emboss) over .receipt-band (verb in 10px text-muted, e.g. 'steady kick'); grow the wave to 28px; add backdrop-filter blur(20px) saturate(160%) and the hover ::after corner bracket; on chip mouseenter add .cite-linked to .vmx-now's .num spans (brand underline + em glow), mirroring mock JS lines 1786-1793. No new data needed \u2014 verb + timestamp_s already ride CitationChip.",
+     "mock_ref": ".receipt / .receipt-wave / .receipt-meta + receipt\u2192cite hover JS (mock lines 926-1012, 1572-1586, 1783-1793)"
+    },
+    {
+     "file": "tauri/ui/src/session/SessionLayout.ts",
+     "lines": "289-355 (CSS), 1346-1354 (DOM)",
+     "severity": "P1",
+     "title": "Persona control reads as a static 'HYPE' label \u2014 tap-to-cycle affordance exists only in aria-label",
+     "why": "z-rail-persona.png shows a lone bordered box containing rose 'HYPE'. Nothing at rest signals it is a control or that coach/teach exist; cycling is blind (no preview of the next mood). The contract's persona switcher is a recessed 3-chip strip where all three moods are visible and the active one is physically pressed in \u2014 a hardware rocker, not a mystery label.",
+     "fix": "Replace the single button with the mock's .persona-strip: one recessed well (inset 0 2px 4px black 0.45 over void-5\u2192void-8 gradient, 3px padding) holding three 9px mono 0.18em chips; active chip gets the pressed-in radial (void-0\u2192void-12) + inset brand-22 ring + emboss; hover brand-04. Wire each chip to the existing onCycleMood\u2192set-lens path (direct-select instead of cycle). Keep optimistic data-active repaint per the CLAUDE.md settings-control rule.",
+     "mock_ref": ".persona-strip / .persona-chip[data-active] (mock lines 527-565, markup 1534-1538)"
+    },
+    {
+     "file": "tauri/ui/src/session/SessionLayout.ts",
+     "lines": "832-853, 1035-1050 (scene-line), 1556-1565 (readout DOM)",
+     "severity": "P1",
+     "title": "Scene line is missing its two gold instruments \u2014 no Camelot move chip, no heat read; gold never appears on the live deck",
+     "why": "App scene line: '\u2014 BPM 128.0 \u00b7 KEY 5A \u00b7 NOW <track>' \u2014 three key:value mono pairs, all rose/ink. The mock's scene line carries the deck's only gold: the 8A \u2192 9A cam-chip (pulsing gold arrow toward the harmonic target) and the gold heat chip with glow-breath. tokens.css reserves --gold exclusively for Camelot/heat/energy-delta (line 136-139) and harmonics.py computes Camelot \u2014 yet the shipped deck is mono-accent, flatter than its own contract. Labels 'BPM/KEY/NOW' are also spec-sheet grammar the mock drops (values self-identify: '130 bpm').",
+     "fix": "When a grounded next-key/suggestion exists, append the cam-chip (current key 13px GeistMono 700 brand + gold arrow with cam-arrow 3s pulse + gold next-key w/ gold-glow text-shadow) and the heat chip (gold 700 tabular, heat-breath 4s) to .vmx-voice__readout. Honest-empty: render neither without real data. Lowercase the value grammar ('128.0 bpm') and let the dim labels go.",
+     "mock_ref": ".scene-line / .cam-chip / .heat-chip (mock lines 685-750, markup 1551-1557)"
+    },
+    {
+     "file": "tauri/ui/src/session/SessionLayout.ts",
+     "lines": "(no grounding panel mounted; cf. panel.ts unused for evidence)",
+     "severity": "P1",
+     "title": "Grounding side-panel (evidence cards) absent \u2014 the receipt has no 'show me the proof' destination on the live surface",
+     "why": "The mock's right rail is the grounding panel: 'cited' + 'next likely cue' evidence cards (ev-time in brand mono, claim in primary, detail muted, top brand-35 shimmer seam). On the live deck the only proof surface is the one chip; clicking it leaves for the debrief window mid-set. Known remaining item from the fable pass (settings drawer + grounding feed + NEXT UP) \u2014 confirming it is still the gap at HEAD.",
+     "fix": "Mount the mock's 280px .panel on the session surface (fixed right, void-5, border-left border-subtle, inset top sheen), body = .evidence-card stack fed by the already-flowing reactions/EvidenceRegistry payloads; panel-title 'grounding' with the beat-pulsed brand dot; \u2318] toggle. Cards render only resolved citations (Invariant #2 keeps it honest).",
+     "mock_ref": ".panel / .evidence-card / .panel-section-label (mock lines 1014-1136, markup 1633-1658)"
+    },
+    {
+     "file": "tauri/ui/src/session/SessionLayout.ts",
+     "lines": "1480-1530 (armedEyebrow 1482, armedKicker 1513, armedNote 1529)",
+     "severity": "P2",
+     "title": "GO LIVE gate stacks three redundant standby captions around one button",
+     "why": "'ARMED AND WAITING' (eyebrow) + 'READY TO LISTEN' (kicker) + 'Stands by until you go live.' (note) all say the same thing within ~300px (session-0-gate, z-gate-cta). Triple-affirming idle copy is furniture; the mock never captions a control twice. The button material itself is on-contract (cohost-pill slab) \u2014 it's the copy scaffolding that cheapens it.",
+     "fix": "Keep the eyebrow, delete the kicker; repurpose the note slot for the one fact the others can't state (e.g. the active capture route: 'listening via blackhole 2ch') or drop it. One mono caption per the mock's label economy.",
+     "mock_ref": ".cohost-pill \u2014 a single self-labeled control, no kicker/note (mock lines 568-635, 1539-1542)"
+    },
+    {
+     "file": "tauri/ui/src/session/SessionLayout.ts",
+     "lines": "1208-1212, 1244-1246",
+     "severity": "P2",
+     "title": "Dead responsive rules in the \u2264780px block \u2014 narrow tuning silently no-ops",
+     "why": ".vmx-deck::before/::after offsets target pseudo-elements that no longer exist (the wash moved to .vmx-stage::before in the fable pass), and grid-template-columns:1fr 1fr is set on .vmx-armed__context which is display:flex (no-op). Verified the deck still holds at 1100/880 via live screenshots \u2014 but only by luck of the clamps; the narrow contract is drift, not design.",
+     "fix": "Delete the orphaned ::before/::after rules; either switch .vmx-armed__context to grid at the breakpoint or replace the rule with flex-basis:calc(50% - gap) so the 4 telemetry reads intentionally pair up at narrow widths.",
+     "mock_ref": "n/a \u2014 code hygiene against the mock's single-source layout"
+    },
+    {
+     "file": "tauri/ui/src/session/components/titlebar.ts",
+     "lines": "1-14 (docstring), 51-58 (wordmark), 30-44",
+     "severity": "P2",
+     "title": "Standalone session titlebar is heavier than the contract chrome, and its condensed-face spec is dead",
+     "why": "The mock's window chrome is a 28px whisper: 10px GeistMono 0.32em centered title with the brand em. The session window's 56px strip carries a 20px 800-weight wordmark + 18px clock + bordered pills \u2014 the loudest chrome in the room sits above the quietest deck. The docstring still says Saira wdth-78 / JetBrains Mono, and every font-variation-settings 'wdth' (here and on .vmx-persona/.vmx-deck__controls in SessionLayout) is a no-op on Geist (no wdth axis) \u2014 the 'condensed display' intent silently renders as plain Geist.",
+     "fix": "Step the wordmark down toward the mock's chrome-title register (10-11px mono, 0.32em, text-disabled, brand em on 'vibemix'); shrink the clock to the same mono scale; strip the dead 'wdth' axes repo-wide in session components and update the docstring to the Geist/Instrument-Serif reality.",
+     "mock_ref": ".window-chrome / .chrome-title (mock lines 185-222, 1487-1495)"
+    },
+    {
+     "file": "tauri/ui/src/session/SessionLayout.ts",
+     "lines": "809-822 (ghost CSS), 1409-1412 (DOM)",
+     "severity": "P2",
+     "title": "Ghost lines float unlabeled \u2014 the mock anchors prior speech with a mono ghost-mark",
+     "why": "The two receding lines above the hero (session-1/2) are bare dim serif; without the mock's tiny mono mark they read as layout leftovers rather than 'what I said before'. Small, but it's the difference between a memory trace and stray text.",
+     "fix": "Prefix the nearest ghost (g1) with the mock's cohost-ghost-mark: 9px GeistMono 0.22em uppercase text-disabled (e.g. 'earlier' or the line's mm:ss), baseline-aligned with 10px gap; keep g2 bare so the stack still recedes.",
+     "mock_ref": ".cohost-ghost / .cohost-ghost-mark (mock lines 906-924)"
+    }
+   ],
+   "overall_grade": "7/10 \u2014 the room, the voice hero, and the gate are genuinely on-contract after the fable pass; the deck's instruments (groove, drop count, receipt, persona) still tell small lies or undersell their proof, and the mock's lower-half/side furniture (NEXT UP, grounding panel) is missing entirely",
+   "surface": "LIVE DECK (tauri/ui/src/session/ \u2014 SessionLayout.ts + drop-chip/titlebar/citation components), audited against mocks/vibemix-bravoh-grade-pink.html at 1440x900 plus live 1100px/880px captures (deck holds structurally at narrow widths; only the \u2264780 block has dead rules)",
+   "top3": [
+    "Fix the foot's instrument semantics in one move: render phase.chunks/nowPct as the mock's segmented phrase-line + playhead (the props already flow every frame and die unrendered), demote RMS out of the width channel, and fix the fill-100%/peak-86% clamp mismatch (SessionLayout.ts 1051-1093, 1932-1943)",
+    "Kill the fake timecode: 'DROP IN 14:00' \u2192 the mock's 'drop in ~14 bars' phrase label; delete the hardcoded ':00' eighths (drop-chip.ts 149-154)",
+    "Fill the dead lower half with the mock's NEXT UP queue (lead slab + 2 rows + gold delta chips) gated on real SuggestionService output \u2014 the single biggest visible gap between the shipped deck and the contract's deck room (SessionLayout.ts deck composition 1533-1582; mock 1588-1628)"
+   ]
+  },
+  {
+   "surface": "shell \u2014 window chrome, sidebar rail, grounding panel, status footer, command palette (tauri/ui/src/shell/)",
+   "overall_grade": "7/10 \u2014 faithful obsidian bones (sidebar nav, keycaps, cohost slab, evidence-card material all ported 1:1), but the drawers and the copy still show construction tape: the status footer hides under the panel exactly at live, Learn ships an internal sprint memo as product copy, and the palette is an opaque slab where the mock is frosted glass.",
+   "findings": [
+    {
+     "file": "tauri/ui/src/shell/shell.css",
+     "lines": "1596-1612 (.shell-footer) vs 1492-1509 (.shell-panel)",
+     "severity": "P0",
+     "title": "Footer status line is occluded by the grounding panel \u2014 hidden exactly when live",
+     "why": "Verified live (elementFromPoint at the status-label center returns panel-body): .shell-footer is right-aligned to right: var(--sp-3) at z-footer:20, while .shell-panel sits at right:0, width 280px, z-panel:50. The store AUTO-OPENS the panel on activation=live (shell-store.ts:152-160), so the conn-dot + 'live' label \u2014 THE invariant-#5 honesty instrument \u2014 vanish under the drawer at the one moment they matter. Reads broken: the app appears to lose its status line when a set starts.",
+     "fix": "Make the footer respect the panel offset like .shell-main does: `right: calc(var(--panel-cur) + var(--sp-3));` with `transition: right 250ms var(--ease-brand)` so it slides in lockstep with the panel's 250ms transform (same seam-sync discipline as the margin-left/margin-right comment at shell.css:670-674).",
+     "mock_ref": "The mock keeps main content margined off the open panel (.main { margin-right: var(--panel-w) }) \u2014 nothing in the contract ever sits under the drawer."
+    },
+    {
+     "file": "tauri/ui/src/shell/app.ts",
+     "lines": "83-125 (mountLearnTease, copy at 97-120)",
+     "severity": "P0",
+     "title": "Learn surface ships an internal roadmap memo as user-facing copy",
+     "why": "Rendered plate (confirmed in shell-3-learn.png): kicker 'Premium v2', body 'Lessons stay parked for launch until practice audio, controller proof, and feedback all meet the same bar as Sven', proof rows 'Launch: parked, not hidden / Engine: preserved in git / Rule: no fake lessons', note 'Debrief and Viber stay live for launch.' \u2014 'preserved in git', 'launch', 'parked' and 'Premium v2' are sprint vocabulary, not a DJ product voice. This is the lorem-ish/AI-slop tell class: placeholder planning language shipped as UI.",
+     "fix": "Rewrite in the co-host first-person voice the surfaces.ts contract uses (e.g. title 'I'll teach when I can hear you.', sub 'Lessons open when your practice audio and controller give me real proof \u2014 the same bar my live calls meet.'). Kill 'Premium v2'/'git'/'launch'. Keep the plate material (it's good); only the words are the leak.",
+     "mock_ref": "Surface empty-state contract: one serif state line + one grounded co-host sub (surfaces.ts SurfaceEmptyState docstring: 'No marketing, no slop'), mirroring the mock's first-person cohost-line voice."
+    },
+    {
+     "file": "tauri/ui/src/shell/shell.css",
+     "lines": "1744-1754 (.palette-panel), 1729-1738 (.shell-palette)",
+     "severity": "P1",
+     "title": "Command palette is an opaque slab; the contract palette is frosted glass",
+     "why": "Shipped: background var(--surface-base) (opaque), border-default, 0 24px 72px shadow, top 9vh, width 720. Mock .palette: rgba(34,29,32,0.94) + backdrop-filter blur(28px) saturate(160%), border-strong, 0 40px 100px rgba(0,0,0,0.7) + 0 0 0 1px brand-08 ring + inset top highlight, top 18vh, width 580. The shipped panel reads as a flat modal card (generic SaaS), not a glass instrument floating over the dimmed room.",
+     "fix": "Adopt the mock recipe: `background: rgba(34,29,32,0.94); backdrop-filter: blur(28px) saturate(160%); border:1px solid var(--border-strong); box-shadow: 0 40px 100px rgba(0,0,0,0.7), 0 0 0 1px var(--brand-08), inset 0 1px 0 rgba(255,255,255,0.06);` and add the mock's rose '\u203a' input prefix (palette-prefix) so the input row has the instrument caret.",
+     "mock_ref": "mocks/vibemix-bravoh-grade-pink.html lines 1344-1385 (.palette, .palette-prefix)"
+    },
+    {
+     "file": "tauri/ui/src/shell/GroundingPanel.ts",
+     "lines": "54-56",
+     "severity": "P1",
+     "title": "Grounding panel idle state drops all furniture \u2014 one bare unstyled sentence in the drawer",
+     "why": "At idle, body.textContent = 'No deck note yet. I call it when the mix gives me something real.' renders as a raw 13px text-tertiary string floating in the empty drawer \u2014 no section label, no evidence-card slab. The live branch (lines 38-46) correctly uses panel-section + panel-label + panel-placeholder material. Honest emptiness is right; the missing material around it is the cheap part \u2014 the same drawer wears two different grades of furniture depending on state.",
+     "fix": "Wrap the idle copy in the same furniture as live: one panel-section with panel-label 'deck notes' and the sentence inside a .panel-placeholder slab (the machined gradient card with the brand glow seam, shell.css:1570-1594). Same honest words, contract material.",
+     "mock_ref": "Mock panel-body always composes panel-section-label + evidence-card (lines 1083-1136) \u2014 the panel never shows naked text."
+    },
+    {
+     "file": "tauri/ui/src/shell/GroundingPanel.ts",
+     "lines": "15-17 (head has no close button)",
+     "severity": "P1",
+     "title": "Grounding panel has no visible dismiss affordance",
+     "why": "The drawer closes only via Ctrl+] or Esc (DesktopShell.ts:354-366) \u2014 invisible controls. The mock contract puts a machined 24px '\u00d7' button in the panel head (.panel-close, title '\u2318]'). A drawer that auto-opens at live with no on-screen way to dismiss reads as a stuck panel to anyone who doesn't know the chord.",
+     "fix": "Add the mock's .panel-close: 24px grid-centered button, 1px border-subtle, radius 4px, '\u00d7' at 14px text-muted, hover \u2192 text-primary + border-strong + brand-04 fill, `0 1px 0 rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.04)` seat; title 'Close (Ctrl+])'; wired to store.setPanelOpen(false).",
+     "mock_ref": "mocks/vibemix-bravoh-grade-pink.html lines 1060-1073 (.panel-close) + 1636"
+    },
+    {
+     "file": "tauri/ui/src/shell/DebriefDock.ts",
+     "lines": "470-478, 685-701, 763-778",
+     "severity": "P1",
+     "title": "Debrief readiness rows speak Jira ('blocker', 'unlocks'), not DJ",
+     "why": "Rendered (shell-4-debrief.png): 'BLOCKER: needs a set', 'UNLOCKS: timeline, the why, drill'. 'Blocker' and 'unlocks' are ticket-tracker vocabulary leaking into a product whose voice contract is 'real DJ friend'. Same class of leak as the Learn memo, smaller blast radius.",
+     "fix": "Rename the slot labels in the payback grid to the co-host's voice: 'blocker' \u2192 'waiting on', 'unlocks' \u2192 'you get' (values already read well: 'needs a set', 'timeline, the why, drill'). One-line label swap in the template at :475/:477 and the PaybackSlot copy maps.",
+     "mock_ref": "Contract voice: mock copy is all concrete DJ language ('same key, same energy. eases the breakdown\u2026') \u2014 zero process vocabulary."
+    },
+    {
+     "file": "tauri/ui/src/shell/DesktopShell.ts",
+     "lines": "216-221 (+ shell.css 146-177)",
+     "severity": "P2",
+     "title": "shell.cmdk VERIFIED ALIVE (suspicion refuted) \u2014 but the affordance is a generic search-pill below the keycap bar",
+     "why": "Probe result: [data-wire=shell.cmdk] renders at (1142,5) 76\u00d718px, pointer-events auto, click opens the palette (is-open=true). NOT a dead control \u2014 the earlier tour failure was not reproducible against the live DOM. Remaining gaps: 18px height violates the repo's own 24px WCAG 2.5.8 floor (honored on .sb-collapse, shell.css:644), and the \u2318K kbd is bare mono text in a soft pill \u2014 'search' + pill = stock SaaS search affordance, while the sidebar renders every accelerator as a machined keycap.",
+     "fix": "Raise the button to 24px height; give .shell-cmdk__keys the .sb-kbd keycap recipe (linear-gradient(180deg, var(--void-12), var(--void-8)) face, border-subtle, `0 1px 0 rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.06), inset 0 -1px 0 rgba(0,0,0,0.25)` seat, text-shadow drop) so the chrome teaches the same physical key vocabulary as the rail.",
+     "mock_ref": "Mock .nav-kbd keycap material (lines 411-427); mock deliberately cut the topbar \u2318K, so if the shell keeps one it must at least wear the house keycap."
+    },
+    {
+     "file": "tauri/ui/src/shell/shell.css",
+     "lines": "1870-1896 (.pi-state) + DesktopShell.ts 141-142, 155-157, 167-168",
+     "severity": "P2",
+     "title": "Every palette row carries a bordered status chip \u2014 uniform chip noise",
+     "why": "All 7 rows get a pi-state chip ('current', 'surface'\u00d74, 'full', 'closed'). Five of them say nothing ('surface' restates the section header above). A bordered chip on every row is the uniform-rounded-box AI-slop tell; the mock's rows are glyph + text + kbd with one selected caret.",
+     "fix": "Emit `status` only when meaningful: keep 'current' on the active surface and the open/closed state on toggles; drop the quiet 'surface' chips entirely (statusKind 'quiet' \u2192 render nothing). Rows then read as the mock's clean cheat-sheet.",
+     "mock_ref": "mocks/vibemix-bravoh-grade-pink.html lines 1400-1431 (.palette-row: glyph/text/kbd only)"
+    },
+    {
+     "file": "tauri/ui/src/shell/DesktopShell.ts",
+     "lines": "222, 303-310",
+     "severity": "P2",
+     "title": "Wall clock in the chrome is mock-cut furniture duplicating the OS menubar",
+     "why": "The mock explicitly cut set-time from the chrome ('sessions sidebar shows live \u00b7 47m'); macOS already shows wall time 12px above this clock. A ticking HH:MM that means nothing to the set is dead ornament in the one strip the contract keeps minimal.",
+     "fix": "Replace with set-elapsed sourced from activation: hidden at idle, 'live \u00b7 47m' mono when data-state=live (same 10px mono/letter-spacing treatment). If no session timing exists yet, drop the clock node \u2014 honest absence beats a duplicate wall clock.",
+     "mock_ref": "Mock header comment 'Cut in this pass: topbar entirely (page label + set time + heat + Cmd+K)'; chrome carries only the inscription."
+    },
+    {
+     "file": "tauri/ui/src/shell/DesktopShell.ts",
+     "lines": "212-215, 318-324",
+     "severity": "P2",
+     "title": "Chrome inscription echoes the nav label instead of the session descriptor",
+     "why": "Shipped: 'vibemix \u00b7 deck' \u2014 restates the already-highlighted sidebar item. Mock contract: 'vibemix \u00b7 main floor saturday' \u2014 the inscription names the SESSION (the night), which is information the sidebar doesn't carry and gives the chrome an engraved-nameplate feel instead of a breadcrumb.",
+     "fix": "When live and a session title/recording name exists (recordings index / session bridge), inscribe it; fall back to the surface label at idle. Keep the em-lit 'vibemix' + 0.32em tracking as-is (already 1:1).",
+     "mock_ref": "mocks/vibemix-bravoh-grade-pink.html line 1493 (.chrome-title)"
+    },
+    {
+     "file": "tauri/ui/src/shell/Sidebar.ts",
+     "lines": "73-88 (+ shell.css 341-433)",
+     "severity": "P2",
+     "title": "TONIGHT section at idle is an engraved header above one dangling link and a dead rail void",
+     "why": "At idle the live item is display:none (honest, correct) but the 'tonight' section label still renders, leaving 'TONIGHT / \u2014 ALL SESSIONS \u203a' floating over ~300px of empty rail (visible in shell-1-deck.png). A section header with no section reads as scaffolding, and the lone tiny link is the only furniture between nav and foot.",
+     "fix": "Gate the .sb-section 'tonight' label with the strip (`#shell-root:not([data-state=\"live\"]) .sb-section--tonight { display:none }`), or better: seat one real last-session row from the recordings index ('warmup ritual \u00b7 2h ago \u00b7 9 tracks' style, real data only) so the strip matches the mock's two-row session rhythm without fabricating anything.",
+     "mock_ref": "mocks/vibemix-bravoh-grade-pink.html lines 1520-1531 (sessions strip with meta rows)"
+    },
+    {
+     "file": "tauri/ui/src/shell/LibraryFreshnessBadge.ts",
+     "lines": "47 (QUIET_LABEL=\"\") + VoiceReadinessBadge.ts:41",
+     "severity": "P2",
+     "title": "Footer health badges are permanently mute \u2014 warn/fault is a 6px dot color change only",
+     "why": "QUIET_LABEL='' is used for EVERY state, so .library-freshness-label / .voice-readiness-label never render text and the :empty CSS + max-width plumbing (shell.css:1627-1672) is dead weight. The footer shows two anonymous dots between hairline separators; a library-stale or voice-fault state is only a tooltip + a 6px hue shift \u2014 sub-threshold for an honesty instrument.",
+     "fix": "Keep ok/setup dot-only (quiet is right), but emit a short mono label at warn/fault ('library stale', 'voice down') so a real degradation gets words, matching how the conn label already says 'co-host offline'. The CSS already supports it \u2014 only the model's label field needs the two strings.",
+     "mock_ref": "Contract principle: status states honest words, not color-only (StatusFooter's own CONNECTION_LABEL pattern)."
+    },
+    {
+     "file": "tauri/ui/src/shell/surfaces.ts",
+     "lines": "109-119",
+     "severity": "P2",
+     "title": "Settings empty-state is unreachable dead copy that would also misreport ('Not set up yet.')",
+     "why": "wireSettingsNav (app.ts:141-187) intercepts every navigation to settings and re-routes to the drawer, so the surface empty-state never paints \u2014 and if it ever did, 'Not set up yet.' is unconditional: it would claim un-setup even on a fully configured rig (an honesty violation in waiting).",
+     "fix": "Either delete the empty block for settings (the drawer is the surface) or reword state-neutral: title 'Settings live in the drawer.', sub 'Audio routing, voice, and persona \u2014 change what I listen to and how I sound.' so the fallback can never lie.",
+     "mock_ref": "Honest-empty contract in surfaces.ts's own SurfaceEmptyState docstring (state must be true at rest)."
+    }
+   ],
+   "top3": [
+    "Footer/panel occlusion (shell.css:1596-1612): make .shell-footer right-offset by --panel-cur with a 250ms matched transition \u2014 the honesty status line must never hide under the auto-opened grounding panel at live.",
+    "Rewrite the Learn tease copy (app.ts:97-120) from sprint-memo language ('Premium v2', 'preserved in git', 'parked for launch') into the co-host's first-person voice; keep the plate material, replace every word a DJ wouldn't say.",
+    "Bring the grounding drawer and palette up to contract material: idle panel copy into the panel-label + panel-placeholder slab, add the mock's 24px '\u00d7' panel-close, and give .palette-panel the frosted-glass recipe (blur 28px saturate 160%, brand-08 ring, 0 40px 100px shadow)."
+   ]
+  },
+  {
+   "surface": "VIBER (library/set-prep chat) \u2014 tauri/ui/src/library/index.ts + library.css, mounted into the shell via library.html markup",
+   "overall_grade": "6/10 \u2014 the room is right (serif greeting, setlist starters, one-slab composer, open-void transcript), but the conversation's working parts still read dev-grade: user turns are unstyled due to a dead selector, receipts print raw DB hashes and XP debug-speak, the grounding rack renders into a hidden panel, and the progress bar is a SaaS gradient pill.",
+   "findings": [
+    {
+     "file": "/Users/ozai/projects/dj-set-ai/tauri/ui/src/library/index.ts",
+     "lines": "1773 (appendChatTurn), 2103; dead CSS at /Users/ozai/projects/dj-set-ai/tauri/ui/src/library/library.css:1435-1437, 1458-1469, 1488-1495, 1510-1516",
+     "severity": "P0",
+     "title": "User turns have NO material \u2014 data-role mismatch ('you' in TS vs 'user' in CSS) kills the whole transcript hierarchy",
+     "why": "appendChatTurn sets data-role=\"you\" but every user-turn rule styles [data-role=\"user\"]. Live-verified: user turns render with bg transparent, no box-shadow, no mono font, no '> ' prefix \u2014 visually near-identical to Viber turns minus the rose bar. The designed recessed-terminal-input subordination (mono, --void-85 inset slab, max-width 620px) is 100% dead CSS in the shipped app. The console-transcript metaphor collapses into undifferentiated grey text.",
+     "fix": "One-line fix: in appendChatTurn set turn.dataset.role = role === \"you\" ? \"user\" : \"viber\" (and update the [data-role=\"you\"] guard at index.ts:2103 to match), OR rename the CSS selectors to [data-role=\"you\"]. No test pins the attribute as a style hook (chat.test.ts only queries [data-role=\"viber\"]). After the fix the user line gets its terminal material: JetBrains-mono body, inset 0 2px 6px recess on --void-85, '> ' who-prefix.",
+     "mock_ref": "The mock's recessed-control vocabulary \u2014 persona-chip[data-active] / nav-item[data-active] inset recess (mock lines 555-565, 390-401): subordinate elements sink into the track; the lit voice (Viber) floats on the void."
+    },
+    {
+     "file": "/Users/ozai/projects/dj-set-ai/tauri/ui/src/library/index.ts",
+     "lines": "2285-2287 (seen_track_ids line), 2574 (grade.title || grade.track_id)",
+     "severity": "P0",
+     "title": "Raw track hashes printed into the conversation card \u2014 '7f9f9052 \u00b7 b8d4da96' as product copy",
+     "why": "Live-verified: the MOVES card prints 'LIT AFF +100XP 7F9F9052' (track_id fallback in the grade title) and a bare line of joined content hashes for seen_track_ids. library.css:960-962 documents purging exactly this from track rows ('the raw DB hash read as a dev placeholder') \u2014 the chat card reintroduces it into the product's primary surface. Reads broken/debug, the loudest cheap tell on the surface.",
+     "fix": "Route ids through the existing display helpers: trackDisplayDetails()/splitArtistTitle() to resolve real titles, falling back to `Track ${shortTrackId(id)}` (both already in this file, lines 645, 692). For seen_track_ids with no resolvable titles, replace the hash line with a count line in the established receipt voice: '6 tracks inspected' \u2014 never bare hashes.",
+     "mock_ref": "Evidence-card copy contract (mock lines 1642-1654): every receipt line is human-readable claim + detail ('peak 16.2 dB over baseline \u00b7 200\u20132k Hz'), never identifiers."
+    },
+    {
+     "file": "/Users/ozai/projects/dj-set-ai/tauri/ui/src/library/index.ts",
+     "lines": "2508-2530 (chatMoveGradeProgressText), 2541-2592 (appendChatMoveGradeLine); material at library.css:1982-2077",
+     "severity": "P1",
+     "title": "Move-grade line is an RPG debug HUD, not a DJ receipt \u2014 'LV2 38/250XP / X4 / LEVEL UP' token soup",
+     "why": "The grade row leads with gamification tokens in glowing gold allcaps mono ('+100XP', 'LV2 38/250XP', 'X4', 'LEVEL UP') and buries the one human phrase ('everything clicks') as a truncated grey tail. Three gold-glow treatments on one row breaks the 20/80 rule (gold is supposed to be quarantined to key/BPM/energy numerics \u2014 the CSS's own comment at library.css:1964-1966), and the XP grammar reads as leaked dev/Learn internals on the set-prep surface.",
+     "fix": "Invert the hierarchy to the mock's receipt grammar: reason leads in --silk at 12.5px ('everything clicks \u2014 tight cut on the phrase'), grade label as the single small lit accent, ONE quiet gold numeric right-aligned (+100xp). Move LV/streak/levels-gained into the existing title= tooltip (already populated at index.ts:2561). Drop the text-shadow glow from grade-progress (library.css:2049-2052).",
+     "mock_ref": "Evidence-card structure (mock lines 1121-1136): ev-time (one small lit mono accent) \u2192 ev-claim (human sentence, primary ink) \u2192 ev-detail (muted). One accent per card."
+    },
+    {
+     "file": "/Users/ozai/projects/dj-set-ai/tauri/ui/src/library/library.css",
+     "lines": "2471 (grounding-panel display:none), 1340-1342 (chat-mode nth-child(3) display:none); writers at /Users/ozai/projects/dj-set-ai/tauri/ui/src/library/index.ts:2180-2210, 2073-2095, 2111-2120",
+     "severity": "P1",
+     "title": "Tool-trace rack + deck-check receipts render into a permanently hidden panel \u2014 the grounding instrument is dark",
+     "why": "Live-verified: #vmx-lib-chat-tools and the 'Context'/scope-state readout have zero size (the aside is display:none always, AND chat-mode hides panel 3). renderChatSide still builds the diode tool rows, deck-check proof rows, and 'N iter \u00b7 stop_reason' state into that dead DOM every turn. During a run the user sees only one self-replacing status line; afterward the receipts vanish. The beautifully-specced recessed rack material (library.css:1730-1828 \u2014 inset track, rotated gem diodes, rose-lit ok states) ships as dead code, and the anti-slop visual promise (show the receipts) is unfulfilled on Viber.",
+     "fix": "Re-route the receipts where artifact cards already go: append the .vmx-lib-chat-tools rack into activeChatTurn (index.ts:2197-2206 already does this for cards), collapsed to the last 3-5 rows, using the existing rack material verbatim. Keep the deck-check row as the first diode. Then delete the dead scope-state writes or fold that string into the rack header. If keeping it dark is deliberate, delete the render path \u2014 don't ship a dark instrument.",
+     "mock_ref": "The grounding panel + receipt (mock lines 1633-1658, 926-1012): the co-host's claims always carry a visible, hover-linked receipt; receipts are the product thesis made visual."
+    },
+    {
+     "file": "/Users/ozai/projects/dj-set-ai/tauri/ui/src/library/library.css",
+     "lines": "1574-1601 (__rail + fill + scan)",
+     "severity": "P1",
+     "title": "Import progress bar is a rounded gradient SaaS pill \u2014 violates the surface's own no-gradient-bar rule",
+     "why": "The chat import progress rail is border-radius:999px with a continuous linear-gradient(90deg, brand-40 \u2192 brand \u2192 brand-40) fill plus glow \u2014 the generic loading-bar pattern the file header explicitly forbids (library.css:10-11: 'discrete cells, NOT a gradient fill bar') and the enforcement skill calls slop. Live capture also shows the track filename rendering brighter than the count (see token finding), making the pill the loudest thing in the turn.",
+     "fix": "Rebuild on the phrase-line recipe: 3-4px squared rail (border-radius 1-2px), recessed with inset 0 1px 2px rgba(0,0,0,0.55) + bottom highlight, flat --brand-22 elapsed fill with a 1.5px --brand playhead tip carrying the only glow (0 0 6px brand-50). Keep the mono head row; cells optional but the recessed-hairline+playhead reads most like the instrument.",
+     "mock_ref": "phrase-line + phrase-playhead (mock lines 838-889): progress on this surface is a machined recessed hairline with a lit playhead, not a filled pill."
+    },
+    {
+     "file": "/Users/ozai/projects/dj-set-ai/tauri/ui/src/library/library.css",
+     "lines": "1098 (--silk-90), 1112 (--silk-58), 1121 (--silk-92), 1128 (--silk-72), 1568 (--silk-55), 1608 (--silk-38) \u2014 vs /Users/ozai/projects/dj-set-ai/tauri/ui/src/tokens.css:279-283 (only silk/65/40/22/12 exist)",
+     "severity": "P1",
+     "title": "Six undefined --silk-* tokens silently collapse the ink hierarchy (progress count dimmer than the filename under it)",
+     "why": "color: var(--silk-55/-38/-90/-92/-72/-58) all compute to inherit because the tokens don't exist. Live-verified on the import progress: the current-track filename (meant to be the dimmest line, silk-38) inherits full --silk and renders BRIGHTER than the '214 / 612' count above it \u2014 inverted hierarchy. Same silent flattening hits the clarification question/hint and agent-failure title/detail copy.",
+     "fix": "Map to the real scale: silk-90/92 \u2192 var(--silk), silk-72/65 \u2192 var(--silk-65), silk-55/58 \u2192 var(--silk-40), silk-38 \u2192 var(--silk-40) at reduced size \u2014 or add the missing steps to tokens.css if the finer ramp is wanted. Either way, no var() may reference a token that doesn't resolve; consider extending the legacy-token CI gate to catch undefined custom-property references.",
+     "mock_ref": "The mock's strict 5-step ink ramp (--ink-100\u2026--ink-20, lines 43-47) \u2014 hierarchy is carried by a defined ramp, never by accident."
+    },
+    {
+     "file": "/Users/ozai/projects/dj-set-ai/tauri/ui/src/library/library.css",
+     "lines": "383-390 (.vmx-lib-qbox::before) not neutralized by the chat overrides at 1258-1265",
+     "severity": "P1",
+     "title": "Stray engraved hairline floats inside the one-slab composer \u2014 leftover recessed-glass pseudo from the boxed qbox",
+     "why": "The Fable pass made .vmx-lib-chatbox bare (border 0, shadow none) but the .vmx-lib-qbox::before inset-2px dark border-top/border-left still renders (live-verified: computed 1px borders). A disconnected dark line floats under the placeholder inside the hero composer slab \u2014 reads as a rendering bug on the single most-touched control.",
+     "fix": ":is(body, .vmx-lib-app)[data-mode=\"chat\"] .vmx-lib-chatbox::before { content: none; } next to the existing bare-slab override block.",
+     "mock_ref": "One-slab composer discipline (the pass's own comment at library.css:1254-1257): the outer panel is the only bordered material; nothing else draws edges inside it."
+    },
+    {
+     "file": "/Users/ozai/projects/dj-set-ai/tauri/ui/src/library/index.ts",
+     "lines": "2977-2979 (setChatTurnText reply), 2197-2206 (cards appended to turn) \u2014 scroll only happens in appendChatTurn:1786 and appendChatImportProgress:1700-1701",
+     "severity": "P1",
+     "title": "Reply lands below the fold \u2014 thread never re-anchors when the pending turn grows",
+     "why": "The thread scrolls when the (empty) pending turn is appended, but the actual reply text swap and the artifact/setup cards appended afterward can add hundreds of px with no re-scroll. With any prior history, a long Viber answer + MOVES card ends up cut behind the floating composer; the user must scroll to find the answer they just asked for. Dead-feeling furniture on the core loop.",
+     "fix": "After setChatTurnText(pending, reply) and after renderChatSide appends cards, re-anchor: chatThread.scrollTop = chatThread.scrollHeight \u2014 gated on the user not having scrolled up (track a 'pinned to floor' flag: scrollHeight - scrollTop - clientHeight < 48 before the swap).",
+     "mock_ref": "The mock's bottom-anchored 'newest line lands in the key-light pool' staging (library.css:1372-1391 comment) \u2014 the newest Viber line is the lit floor of the room and must be on screen."
+    },
+    {
+     "file": "/Users/ozai/projects/dj-set-ai/tauri/ui/src/library/index.ts",
+     "lines": "2994 (engine error turn text), 2595-2620 (renderChatError card goes to hidden #vmx-lib-chat-artifact)",
+     "severity": "P2",
+     "title": "Errors speak raw exception strings in Viber's voice; the styled error card renders into the hidden panel",
+     "why": "On failure the turn body becomes 'engine error: <raw Error.message>' \u2014 a stack-trace voice in the conversation \u2014 while the properly-materialized error card (cap LED + label) is appended to the dead artifact node and never seen. Honest failure is right (no masking), but the material is inverted: the cheap string is visible, the crafted receipt is dark.",
+     "fix": "Append the existing error card into the failed turn (same path as artifact cards at 2199), keep the raw message inside it as a mono .line, and give the turn body one human line ('That run failed \u2014 receipt below.'). Reuse .vmx-lib-agent-failure copy patterns (already has title/detail/receipt/next vocabulary at css 1114-1149).",
+     "mock_ref": "Receipt-carrying claims (mock receipt block 1572-1586): even failures get a machined receipt, not a console dump."
+    },
+    {
+     "file": "/Users/ozai/projects/dj-set-ai/tauri/ui/src/library/library.css",
+     "lines": "1711-1727 (:has(starters:not([hidden])) serif gate)",
+     "severity": "P2",
+     "title": "Greeting snaps from 42px serif hero to 18px body the instant the first message sends",
+     "why": "The hero serif on Viber's greeting is gated on the starters being visible, so on first send the same line visibly collapses to ordinary turn type \u2014 a one-frame material demotion of the surface's signature moment. Reads as a glitch rather than a transition.",
+     "fix": "Tag the intro turn at creation (e.g. .vmx-lib-chat-greeting in ensureChatIntro/static markup) and key the serif on that class instead of :has(starters); let history keep a reduced serif (clamp(22px, 2vw, 28px)) with a 0.3s var(--ease-brand) font-size transition so the demotion is staged, not snapped.",
+     "mock_ref": "cohost-line (mock lines 771-783): the agent's voice line is always serif \u2014 it is the identity, not an empty-state costume."
+    },
+    {
+     "file": "/Users/ozai/projects/dj-set-ai/tauri/ui/src/library/library.css",
+     "lines": "1310-1330 (#vmx-lib-chat-folder chat-mode rules)",
+     "severity": "P2",
+     "title": "Folder key is near-invisible at idle \u2014 the only library-building affordance in product chat reads as dead space",
+     "why": "The borderless engraved folder icon idles at --silk-40 on near-black (live crop: barely perceptible). Quiet-by-design is right, but below the perception floor it reads as an empty 44px gutter; with tool modes hidden in product, this and the 'Add music' starter are the only ways to index music.",
+     "fix": "Lift idle to --silk-65 and seat it as a keycap using the mock's nav-kbd recipe (linear-gradient void-12\u2192void-8, inset top highlight, 0 1px 0 black drop) at ~28px square inside the 44px cell; keep the existing rose hover-lit state as-is.",
+     "mock_ref": "nav-kbd keycap material (mock lines 411-427): small controls read as machined keys \u2014 visible geometry at idle, light on interaction."
+    }
+   ],
+   "top3": [
+    "Fix the data-role 'you'\u2192'user' mismatch (index.ts:1773) so the user-turn recessed terminal material actually renders \u2014 one line restores the entire transcript hierarchy that is currently dead CSS.",
+    "Purge dev leakage from the conversation receipts: no raw track hashes (index.ts:2285-2287, 2574) and demote the XP/LV token soup to a tooltip \u2014 receipts must read time \u00b7 claim \u00b7 detail like the mock's evidence card.",
+    "Make the grounding visible and instrument-grade: append the already-styled tool/deck-check diode rack into the active turn instead of the hidden panel (index.ts:2180-2210), and rebuild the import progress as the mock's recessed hairline + playhead instead of a rounded gradient pill (library.css:1574-1601)."
+   ]
+  },
+  {
+   "findings": [
+    {
+     "file": "tauri/ui/index.html",
+     "lines": "26",
+     "severity": "P0",
+     "title": "Dead '00:00' clock in the wizard titlebar \u2014 frozen readout through the entire first run",
+     "why": "#wizard-clock ships as static '00:00' and NO code writes it (grep: learn/components/titlebar.ts and session/SessionLayout.ts bind their own elements; nothing touches wizard-clock). A numeric display stuck at zero on a 'physical instrument' reads broken \u2014 the first fake LED a new user sees, on every step.",
+     "fix": "Wire a 1s HH:MM ticker (copy learn/components/titlebar.ts:42-70 pattern) or delete the element. The mock's window chrome carries only the wordmark + room name ('vibemix \u00b7 main floor saturday') \u2014 no numerics it can't honor.",
+     "mock_ref": ".chrome-title (mock line 211-222) \u2014 chrome speaks only what's true"
+    },
+    {
+     "file": "tauri/ui/src/wizard/router.ts",
+     "lines": "562-565",
+     "severity": "P0",
+     "title": "'done' step is a bare unstyled text node 'loading vibemix\u2026' \u2014 the handoff moment reads like a crash",
+     "why": "The last thing a first-run user sees before the wizard\u2192live webview reload is document.createElement('div') with raw textContent, default 14px Geist on the void \u2014 no panel, no motion, no brand. If the sidecar respawn takes seconds, the user parks on what looks like a dead page.",
+     "fix": "A styled handoff in the intro's own vocabulary: the wizard-intro hairline frame + low rose dawn, serif lowercase line ('opening the deck\u2026') and one pulsing rose dot (mock .cohost-dot pulse @ --bpm-beat). Reuse the registered wizard-intro CSS so it's ~20 lines.",
+     "mock_ref": ".cohost-dot pulse keyframe (mock 622-633) + intro warm-void frame"
+    },
+    {
+     "file": "tauri/ui/src/wizard/step-library-feed.ts",
+     "lines": "687-717 (assembly), tokens.css 724-750 (scroll container)",
+     "severity": "P0",
+     "title": "Final step's primary CTA 'Open vibemix' falls below the fold; privacy checkboxes clip mid-row",
+     "why": "Measured live at 1440\u00d7900: the panel boundingBox is ~892px tall starting at y=136, and the cta row is appended INSIDE the scrolling .wizard-grid \u2014 so the deck-opening control is off-screen at default window size with only a 6px scrollbar hinting more exists. The 'BUILD LOCAL PROFILE / SHARE DIAGNOSTICS' checkboxes render half-clipped. The activation step hides its own GO key.",
+     "fix": "Mount ctaRow into .wizard-content's third grid row (grid-template-rows: stepstrip / 1fr / auto already reserves it \u2014 tokens.css:728) so 'Open vibemix' pins above the status bar; collapse controller+voice+privacy into one support card so the panel fits 900px.",
+     "mock_ref": "The mock's one always-visible key: .cohost-pill pinned in sidebar-foot \u2014 primary action never scrolls away"
+    },
+    {
+     "file": "tauri/ui/src/wizard/components/primary-panel.ts",
+     "lines": "37-38, 51-52 (+ permissions-card.ts:58)",
+     "severity": "P1",
+     "title": "Step panel material is still v5 COOL BLUE-BLACK \u2014 hardcoded rgba(8,10,16)/rgba(2,3,6) + old-silk #d6cfc7 mill-lines/rivets",
+     "why": "The panel every interior step sits in fills with the retired cold void as raw literals (tokens.css:36-37 explicitly bans component hex/rgba; the v6 contract is the warm rose-shifted ladder). Inside the retextured warm room the panel reads as a leftover cold slab \u2014 this is exactly the 'old v5 cool-blue material' the intro pass eliminated on step 0 but steps 1..N still carry. rgba(214,207,199,\u2026) is the dead v5 silk tint.",
+     "fix": "Rebuild on the mock's card recipe: background linear-gradient(180deg, var(--void-10), var(--void-5)); box-shadow var(--chrome-highlight) + var(--shadow-raised) (or --bevel-raised); top accent hairline linear-gradient(90deg, transparent, var(--brand-35), transparent) like the mock's evidence-card::after; re-tint mill lines/rivets to ink alpha or drop them.",
+     "mock_ref": ".evidence-card (mock 1097-1120) + .receipt material stack (mock 926-963)"
+    },
+    {
+     "file": "tauri/ui/src/wizard/components/step-indicator.ts",
+     "lines": "76-92 (+ permissions-card.ts:121-130, status-bar.ts:58-82)",
+     "severity": "P1",
+     "title": "Green/red traffic-light LED triad across step strip, permission states, and status bar \u2014 three system hues the contract doesn't own",
+     "why": "Complete step = green dome + tick (--led-ok), GRANTED = green LED + green text, DENIED = red, status bar = green/red rows. The contract mock spends exactly two hues: rose brand + quarantined gold; 'alive/ok' there is a pulsing rose dot or plain ink. Green domes with tick marks read generic-installer (Electron setup wizard), and with rose + gold + green + red on one screen the 20/80 rule is gone.",
+     "fix": "Complete dome \u2192 rose fill with ink tick (or recessed brand ring); GRANTED \u2192 --ink-100 text + 4px rose pulse dot; status-bar ok \u2192 ink label + rose dot (mock .live-dot); keep --led-fault red ONLY for genuine failure (denied/down) as the lone functional exception.",
+     "mock_ref": ".session-meta .live-dot + .cohost-dot (mock 485-492, 622-629) \u2014 life is rose, not green"
+    },
+    {
+     "file": "tauri/ui/src/wizard/components/button.ts",
+     "lines": "109-131",
+     "severity": "P1",
+     "title": "Primary CTA continuity break \u2014 intro presses a rose-lit slab key, every later Continue is a flat ghost",
+     "why": "step0-intro.ts:166-184 gives the first button the full physical treatment (brand-22\u219206 fill, specular top line, machined inset, real drop shadow). The armed primary in button.ts is a 9%-alpha gradient with pink text and no mass \u2014 so 'Continue', 'Index this', and 'Open vibemix' (the money keys) all feel cheaper than the very first key the user touched. The instrument degrades as you walk deeper.",
+     "fix": "Port the intro CTA stack into .cmp-btn[data-variant=primary][data-state=armed]: background linear-gradient(180deg, var(--brand-22), var(--brand-10) 50%, var(--brand-06)); border-color var(--brand-35); box-shadow inset 0 1px 0 rgba(255,255,255,0.18), inset 0 -1px 0 rgba(0,0,0,0.45), inset 0 0 24px var(--brand-06), 0 6px 18px rgba(176,112,160,0.18); :active translateY(1px) + --shadow-pressed.",
+     "mock_ref": ".cohost-pill full lit-slab stack + ::before specular line (mock 568-610)"
+    },
+    {
+     "file": "tauri/ui/src/wizard/step-forewarning.ts",
+     "lines": "30-74 (+ step-driver-fetch.ts:32-53)",
+     "severity": "P1",
+     "title": "The two audio steps drop the room \u2014 no PrimaryPanel, no '0N\u00b7' lead glyph, sentence-case headings, flat glass cards",
+     "why": "Permissions has the milled panel + '01\u00b7 PERMISSIONS' engraved anatomy; library-feed has the serif hero + '03 LAUNCH' kicker. Between them, forewarning ('Two prompts you'll see') and driver-fetch ('Setting up audio') render naked on the void: plain 22px headings with no index glyph, cards as flat var(--glass-1) rectangles with a plain border. Mid-wizard the user walks out of the dressed room into an unfinished hallway \u2014 continuity the intro explicitly promises ('same room from first paint to live set').",
+     "fix": "Wrap both in PrimaryPanel + withStepLeadGlyph(heading, 2); heading anatomy matching step 1 (uppercase Geist engraved, or serif lowercase like step 3); cards \u2192 linear-gradient(180deg, var(--void-10), var(--void-5)) + var(--bevel-raised) + the mock's 2px rose left brand-bar on the card that needs the eye.",
+     "mock_ref": "receipt::before 2px brand-bar (mock 953-964) + nr.lead card material (mock 1201-1219)"
+    },
+    {
+     "file": "tauri/ui/src/wizard/step-driver-fetch.ts",
+     "lines": "45-79 (rows), 163-167+copy 'stopwatch' (raw '0 ms'), 80-103 (yellow fallback)",
+     "severity": "P1",
+     "title": "Driver-fetch reads as a generic SaaS checklist \u2014 four uniform rounded boxes with ball dots, a permanent raw '0 ms' debug readout, and a fourth hue (yellow warn card)",
+     "why": "Uniform rounded boxes each with a colored circle = the canonical AI-slop install list. The stopwatch paints '0 ms' from mount (engineering telemetry leaked into first-run UX) and tints through good/warn/fault buckets. On failure the fallback card borders full --led-warn yellow (#f4c542) \u2014 adding a 4th hue to a screen already carrying rose, green, and red. Verified live: 'Checking\u2026' red dot + 3 green dots + yellow card + pink CTA simultaneously.",
+     "fix": "Rows \u2192 ledger lines inside the panel: hairline border-bottom var(--border-subtle), no per-row box; active row gets the 2px rose left bar + Geist Mono 10px 0.15em label; done = ink text, fault = red text only on true failure. Stopwatch hidden until >10s, then 'still working \u2014 52s' in Geist Mono var(--text-muted). Fallback card \u2192 void gradient + --led-fault hairline (no yellow).",
+     "mock_ref": ".nr queue rows \u2014 borderless ledger w/ left brand-bar (mock 1176-1223); Geist Mono microcopy vocabulary"
+    },
+    {
+     "file": "tauri/ui/src/wizard/step-library-feed.ts",
+     "lines": "639 + step1-permissions.ts:62,68 (text-transform: uppercase)",
+     "severity": "P1",
+     "title": "Instrument Serif hero 'Feed your library' renders ALL-CAPS via the legacy heading class",
+     "why": "The title stacks wizard-step__heading (which carries v5 text-transform: uppercase) under wizard-feed-hero__title, so the serif paints 'FEED YOUR LIBRARY'. The mock's serif voice \u2014 cohost-line, nr.lead names \u2014 is strictly sentence/lowercase; uppercase serif reads as an engraved bank plaque, the exact opposite of the warm co-host voice the face is reserved for.",
+     "fix": "Add text-transform: none to .wizard-feed-hero__title (it already sets font-family var(--type-serif)); keep 'Feed your library' sentence case, letter-spacing -0.01em, optionally one italic rose word ('Feed your <em>library</em>') per the mock's lit-syllable logic.",
+     "mock_ref": ".cohost-line + .nr.lead .nr-name \u2014 serif is always sentence-case, em in rose (mock 771-807, 1251-1258)"
+    },
+    {
+     "file": "tauri/ui/src/wizard/components/skill-level.ts",
+     "lines": "82-85",
+     "severity": "P1",
+     "title": "Selected skill row = full-row 22% rose FILL \u2014 brand spent as a slab, violating the wash-never-fill contract",
+     "why": "[data-selected=true] paints background: var(--amber-22) across the whole row \u2014 the loudest element on the final step (verified live: a solid pink slab). tokens.css:115 states brand is 'used as a low-alpha wash via an explicit ladder, never a fill'; the mock's selected control is a RECESS, not a fill.",
+     "fix": "Selected row \u2192 the persona-chip[data-active] recipe: background radial-gradient(ellipse at top, var(--void-0), var(--void-12)); box-shadow inset 0 2px 5px rgba(0,0,0,0.55), inset 0 0 0 1px var(--brand-22), inset 0 0 14px var(--brand-04); label color var(--brand) + var(--text-emboss). Radio dot stays brand.",
+     "mock_ref": ".persona-chip[data-active=true] recessed-active treatment (mock 555-565)"
+    },
+    {
+     "file": "tauri/ui/src/wizard/step-library-feed.ts",
+     "lines": "326-332, 525-543",
+     "severity": "P1",
+     "title": "Controller card wears an always-on glowing rose LED that means nothing",
+     "why": "wizard-feed-controller__dot is a permanently lit --amber dome with glow next to copy saying 'Plug it in whenever you want' \u2014 a lamp that never changes state is a fake affordance (gratuitous-glow slop tell) and it competes with the step's real accents (selected skill, source-found chip, progress bar).",
+     "fix": "Unlit by default: var(--void-20) dome with inset shadow (the mock's pending-state vocabulary); light it rose with the pulse animation ONLY when ipc reports a connected controller. Or delete the dot \u2014 the copy carries the meaning.",
+     "mock_ref": "cohost-pill[data-live=false] .cohost-dot \u2014 dot unlit, no glow, no animation when not live (mock 611-621)"
+    },
+    {
+     "file": "tauri/ui/src/wizard/step-library-feed.ts",
+     "lines": "545-559, 645-653, 425-428, 598-620",
+     "severity": "P1",
+     "title": "706MB voice download gets a bare text line while the library progress renders THREE times on the same screen",
+     "why": "Voice ('downloading voice \u2014 230 MB of 706 MB') is the longest wait in the wizard and has no bar; meanwhile the identical '412/1342 Adriatique \u2014 X' readout appears in the hero chip, the library-card meta, AND the progress-bar label simultaneously (verified live). The biggest job gets the least instrument; the same number echoes 3\u00d7 = noise, not grounding.",
+     "fix": "Give voice the existing wizard-feed-progress bar with Geist Mono tabular numerals ('230 / 706 MB'). Collapse the duplicates: keep the bar label as the single live readout, demote the hero chip to a status word ('indexing'), drop the card-meta echo.",
+     "mock_ref": "One readout per fact \u2014 the mock's receipt carries the timestamp exactly once (receipt-meta, mock 1003-1012)"
+    },
+    {
+     "file": "tauri/ui/src/wizard/components/status-bar.ts",
+     "lines": "105-122",
+     "severity": "P2",
+     "title": "First-run chrome leaks vendor names: 'LIVEKIT \u00b7 GEMINI' printed to end users",
+     "why": "The bottom LED row labels itself with internal stack names. Product copy rules (no inlined model/provider names; honest-but-commercial public copy) and the mock's chrome never name infrastructure \u2014 a DJ doesn't care that the brain is Gemini, and the label dates the binary.",
+     "fix": "Relabel to capability words \u2014 'voice link \u00b7 brain \u00b7 controller \u00b7 screen' (states/keys unchanged, only the label strings in the items array).",
+     "mock_ref": "Mock chrome/status vocabulary is product-\u8bed ('studio \u00b7 listening'), never vendor names"
+    },
+    {
+     "file": "tauri/ui/src/wizard/step-library-feed.ts",
+     "lines": "283-320",
+     "severity": "P2",
+     "title": "Privacy toggles are default-looking 18px square checkboxes with CSS-uppercased labels",
+     "why": "The consent moment (a brand-trust beat) uses near-stock checkbox styling plus text-transform: uppercase on 13px body labels ('BUILD LOCAL PROFILE') \u2014 shouty generic form controls on the money step, inconsistent with the machined-control vocabulary everywhere else.",
+     "fix": "Drop the text-transform (source strings are already lowercase); restyle as the mock's recessed two-state control \u2014 persona-strip style inset track (inset 0 2px 4px rgba(0,0,0,0.45)) with a rose-ringed thumb when on; label stays Geist 13px var(--text-secondary).",
+     "mock_ref": ".persona-strip recessed track material (mock 527-538)"
+    },
+    {
+     "file": "tauri/ui/src/wizard/smoke-test.ts",
+     "lines": "1-165 (+ step-skill-level.ts, step-profile-consent.ts, step-telemetry-consent.ts)",
+     "severity": "P2",
+     "title": "Four legacy off-path steps remain pure v5 (smoke-test stacks three concurrent rose moments)",
+     "why": "skill-level / profile-consent / telemetry-consent / smoke-test are out of the forward path (?step= only) but still registered and styled: smoke-test shows a pink glowing 'READY TO PLAY' heading + glowing orb + glowing bars at once (verified live) \u2014 multiple competing accents. If any gets re-linked (back() from smoke-test even routes INTO them, router.ts:284-286), the old material leaks back into the product path.",
+     "fix": "Either prune them from KNOWN_STEPS/back() routing, or when touched: heading \u2192 ink with --text-emboss, keep the orb as the single rose moment, bars unlit until audio actually plays.",
+     "mock_ref": "One-light-per-surface law \u2014 mock's single pulsing dot per panel region"
+    }
+   ],
+   "overall_grade": "5.5/10 \u2014 the door is dressed, the rooms behind it are still the old building: intro lands the warm-void/serif/rose contract, but every interior step sits in a hardcoded v5 cool blue-black panel with green/red/yellow traffic LEDs, ghost CTAs, and a final step whose GO key is below the fold",
+   "surface": "First-run wizard \u2014 intro \u2192 permissions \u2192 audio (forewarning + driver-fetch) \u2192 library-feed \u2192 done, plus titlebar/step-strip/status-bar chrome (tauri/ui/src/wizard/). Note: audit-before wizard-step1..5.png were blank capture artifacts; all steps were re-captured live via window.__vibemixDev on localhost:1420 (shots in /tmp/uxshots/wizaudit/).",
+   "top3": [
+    "Re-materialize the shared panel + primary button in the intro/mock vocabulary \u2014 kill the cool blue-black + #d6cfc7 literals in primary-panel.ts:37-52 and port the intro's rose-lit slab key into button.ts armed state; two edits re-dress every step at once",
+    "Collapse the green/red/yellow LED triad to the mock's rose+ink language (fault-red only on true failure) across step-indicator, permissions-card states, driver-fetch rows, and the status bar \u2014 restores 20/80 and deletes the generic-installer read",
+    "Fix the two broken-feeling moments: pin 'Open vibemix' into .wizard-content's reserved auto grid row so the final CTA is never below the fold, and replace the bare 'loading vibemix\u2026' done-div + dead 00:00 clock with honest, styled chrome"
+   ]
+  },
+  {
+   "surface": "SETTINGS (drawer: tauri/ui/src/settings/SettingsDrawer.ts + components/, controls: session/components/{rocker,picker}.ts, shell mount: shell/surfaces.ts)",
+   "overall_grade": "7/10 \u2014 machined shell, dead organs. The Forged-Obsidian pass landed: groups are lit recessed modules, rockers/pickers/slider/hotkey all carry real inset bezels + brand-active states, and every control repaints optimistically per the CLAUDE.md convention. What remains below the bar is content honesty (a 14-voice picker for a retired engine, a permanently-unstyled staleness banner showing a literal '\u2026', a hand-stale About row) and vocabulary drift (sans labels where the contract mock speaks mono, a lone grey OFF chip, a duplicate HYPE/COACH/TEACH switch).",
+   "findings": [
+    {
+     "file": "/Users/ozai/projects/dj-set-ai/tauri/ui/src/settings/components/staleness-banner.ts",
+     "lines": "36-49 (innerHTML + className 'vmx-staleness-banner hidden'); whole file \u2014 no registerStyle import",
+     "severity": "P0",
+     "title": "Staleness banner ships completely unstyled and permanently visible with a literal '\u2026' placeholder",
+     "why": "The component header promises 'amber tint, 1px border, mono age, hidden by default' but registers ZERO CSS \u2014 grep confirms no .vmx-staleness-banner or global .hidden rule exists anywhere in src (only .vmx-library-progress.hidden is defined, library-panel.ts:226). Result, confirmed in the live capture: the LIBRARY group opens with raw browser-default text 'Library is \u2026 old. Re-index to keep me grounded.' plus three unstyled inline buttons ('Refresh library Dismiss Snooze 7 days') crowded on one line. It reads as a broken template with lorem ellipsis \u2014 the single cheapest pixel in the drawer, and it is NOT dev-gated.",
+     "mock_ref": "Group-footer / alert vocabulary: mock \u00a7.vmx-settings-group__footer pattern and mock receipt material (gradient wash over void ladder, 1px border-default, mono accent text)",
+     "fix": "Register a style block: `.vmx-staleness-banner { display:flex; justify-content:space-between; gap:var(--sp-3); padding:10px var(--sp-3); border-radius:var(--rad-sm); background: linear-gradient(180deg, var(--brand-08), transparent 60%), rgba(0,0,0,0.18); box-shadow: inset 0 1px 0 rgba(255,222,242,0.05), inset 0 -1px 0 rgba(0,0,0,0.4); }`; `.vmx-staleness-age` in var(--type-mono) var(--brand) with text-emboss; actions as the existing machined silk chip recipe (hotkey-capture __rebind treatment); and critically `.vmx-staleness-banner.hidden { display:none; }` so it actually hides until a nudge arrives."
+    },
+    {
+     "file": "/Users/ozai/projects/dj-set-ai/tauri/ui/src/settings/SettingsDrawer.ts",
+     "lines": "493-515 (VOICE_OPTIONS), 932-943 (voice picker)",
+     "severity": "P0",
+     "title": "VOICE picker offers 14 retired MOSS-TTS voices \u2014 a dead control wearing a premium picker",
+     "why": "The comment itself says 'real MOSS-TTS-Nano manifest voices', but MOSS is RETIRED (CLAUDE.md: local_tts.py no longer exists). The product voice is single-reference Chatterbox zero-shot clone (src/vibemix/agent/chatterbox_tts.py \u2014 one Kaan-locked 'pranker' ref clip); src/vibemix/voice_presets.py is now titled 'Legacy voice names' and none of Adam/Nathan/Xiaoyu/Mortis/Anon appear anywhere in the Python product path. Selecting 'Soyo' or 'Umiri' changes nothing audible. A beautifully machined dropdown that lies about 14 capabilities is the definition of a dead control.",
+     "mock_ref": "Honest-data ethos (cardinal invariant: never fabricate) + mock's single-identity cohost vocabulary (.cohost-pill 'SVEN \u00b7 LIVE')",
+     "fix": "Replace the picker with an honest voice identity readout: a machined row in the recessed-display recipe (hotkey __chip material \u2014 glass-3, inset 0 2px 6px floor, brand mono text) reading 'SVEN \u00b7 LOCAL VOICE' with the chatterbox-ready LED, plus a sub-line 'on-device \u00b7 no cloud'. If multi-ref presets ever ship, repopulate from a real manifest. Delete VOICE_OPTIONS."
+    },
+    {
+     "file": "/Users/ozai/projects/dj-set-ai/tauri/ui/src/settings/components/group.ts",
+     "lines": "72-91 (group header font), plus SettingsDrawer.ts:457-469 (__label), rocker.ts:62-66 (segments)",
+     "severity": "P1",
+     "title": "Section/label/control type voice is Geist Sans where the contract mock speaks Geist Mono",
+     "why": "Every machined label in the contract mock \u2014 .panel-section-label, .sidebar-section, .persona-chip, .nav-kbd, .scene-line, .phrase-label \u2014 is 'Geist Mono' with 0.18-0.3em tracking; that mono+tracking pairing IS the engraved-hardware voice. The drawer's group headers (PERSONA/OUTPUT/HOTKEY\u2026), sub-labels (MODE, PUSH-TO-MUTE, RETENTION) and rocker segments all use var(--type-display) = Geist Sans. The result reads softer/webbier than the mock at identical sizes \u2014 the core of the 'consistent but flat' verdict. Bonus dead code: font-variation-settings \"wdth\" 85 everywhere is a no-op (tokens.css:48-50 admits Geist has no width axis).",
+     "mock_ref": "mock \u00a7.panel-section-label (Geist Mono 9px 0.3em), \u00a7.persona-chip (Geist Mono 9px 0.18em), \u00a7.sidebar-section",
+     "fix": "Swap group headers, drawer labels, and rocker/mood segment labels to var(--type-mono); keep current sizes/tracking (9-11px, 0.18-0.26em). Strip the dead 'wdth' 85 axis from all font-variation-settings in settings/* and rocker.ts. One-line-per-rule change, instantly reads as engraved silkscreen."
+    },
+    {
+     "file": "/Users/ozai/projects/dj-set-ai/tauri/ui/src/settings/SettingsDrawer.ts",
+     "lines": "1260-1264 (MascotGroup mounted OUTSIDE the DEV gate) + mascot-group.ts:63-67, 258-297",
+     "severity": "P1",
+     "title": "MASCOT group ships in production for a parked feature and duplicates the PERSONA MODE switch verbatim",
+     "why": "The drawer shows TWO visually identical three-way switches labeled HYPE/COACH/TEACH ~300px apart \u2014 PERSONA\u00b7MODE (writes 'lens') and MASCOT\u00b7MOOD (writes 'mood'). A user cannot tell which one changes what; flipping one and watching the other not move reads as a broken control. Worse, the mascot overlay is opt-in-experimental with placeholder art (the organism replacement is parked, ORGANISM_DECK_ENABLED=false), yet ENABLE/CLICK-THROUGH/MOOD ship to paying users while genuinely-useful groups (CALIBRATION re-run) are dev-gated.",
+     "mock_ref": "mock has exactly ONE persona-strip (sidebar \u00a7.persona-strip) \u2014 a single recessed three-chip switch for the whole surface",
+     "fix": "Move `body.append(MascotGroup())` inside the `import.meta.env.DEV` block alongside PROFILE/DIAGNOSTICS/CALIBRATION/LEARN. If mood must stay user-facing, fold it into PERSONA as the one switch and have it write both fields \u2014 never two controls with identical labels."
+    },
+    {
+     "file": "/Users/ozai/projects/dj-set-ai/tauri/ui/src/settings/components/help-group.ts",
+     "lines": "53-64 (props default 'unknown'), 114-121 (neutral dot), SettingsDrawer.ts:1278 (HelpGroup() called with no props)",
+     "severity": "P1",
+     "title": "Troubleshoot-audio status LEDs are permanently dark \u2014 three questions with dead indicators",
+     "why": "'BLACKHOLE ROUTED?', 'SCREEN RECORDING?', 'DJAY PRO RUNNING?' each carry an LED dome that supports ok/warn/fault states, but the drawer never passes props, so every dot renders the neutral silk-22 dome forever. A question mark row with an unlit LED reads as a dead diagnostic \u2014 the opposite of the product's grounding-receipt promise. (This is wired-but-dark, not honest-empty: the wizard already knows these answers.)",
+     "mock_ref": "mock LED vocabulary \u2014 \u00a7.ear, \u00a7.cohost-dot, \u00a7.session-meta .live-dot: dots are alive or absent, never permanently grey",
+     "fix": "Surface a wizard-derived checklist slice (blackhole/screenRecording/djay) in SessionState and pass it at the HelpGroup() call site; the led-ok/warn/fault styles already exist (help-group.ts:122-142). Until wired, remove the dot from these rows and keep them as plain link rows \u2014 no dead LEDs."
+    },
+    {
+     "file": "/Users/ozai/projects/dj-set-ai/tauri/ui/src/settings/SettingsDrawer.ts",
+     "lines": "517-526 (GENRE_OPTIONS), 969-986 (genre picker)",
+     "severity": "P1",
+     "title": "Genre picker leaks raw wire enums ('dnb', 'edm-generic', 'tech-house') as user-facing labels",
+     "why": "The picker deliberately preserves source casing (picker.ts:149-153 critique note), which makes raw lowercase slugs render verbatim. 'edm-generic' in a paying product is dev leakage \u2014 the exact 'lorem-ish copy' tell. Every other enum in the drawer has a label map (LENS_LABELS, SKILL_LABELS, OUTPUT_PROFILE_LABELS); genre is the one that skipped it.",
+     "mock_ref": "mock label discipline \u2014 every visible string is set copy ('main floor saturday', 'TECHNO \u00b7 132'), never a wire id",
+     "fix": "Add GENRE_LABELS: {house:'House', 'tech-house':'Tech House', techno:'Techno', dnb:'Drum & Bass', trance:'Trance', psytrance:'Psytrance', 'hip-hop':'Hip-Hop', 'edm-generic':'EDM'} and map options/value exactly like the lens rocker does; ids stay verbatim on the wire."
+    },
+    {
+     "file": "/Users/ozai/projects/dj-set-ai/tauri/ui/src/settings/SettingsDrawer.ts",
+     "lines": "1019-1049 (DEVICE picker options)",
+     "severity": "P1",
+     "title": "OUTPUT DEVICE dropdown contains exactly one option for fresh users \u2014 a dropdown that opens to itself",
+     "why": "Options = ['Auto device'] + (current id if previously set). A fresh user clicks a full machined dropdown row, gets a popover containing only the value already selected, and concludes the control is dead. The inline comment ('Real device list is populated by the sidecar at boot\u2026 Phase 15 expands') confirms this is a known stub wearing interactive furniture.",
+     "mock_ref": "mock affordance honesty \u2014 interactive chrome (chevron, popover) only where choice exists",
+     "fix": "Either populate from the sidecar's enumerated device list off ipc.settings.state (the data already crosses the bridge at boot), or until then render the row as a non-popover readout chip \u2014 label 'Auto device' + AUTO pill, no chevron \u2014 so the furniture matches the capability."
+    },
+    {
+     "file": "/Users/ozai/projects/dj-set-ai/tauri/ui/src/settings/components/performance-group.ts",
+     "lines": "141-166 (single push-toggle), 57-101 (chip CSS)",
+     "severity": "P1",
+     "title": "LIGHTER BLUR boolean is a lone grey chip reading 'OFF' \u2014 inconsistent with the drawer's own rocker vocabulary",
+     "why": "Mascot ENABLE and CLICK-THROUGH render booleans as recessed OFF|ON rockers; PERFORMANCE renders the same concept as a single small button whose label IS the state. At rest it's a dim grey chip that says OFF \u2014 it scans as a disabled/dead button (the classic default-looking control), and two boolean shapes in one drawer breaks the machined-instrument consistency the mock builds on one switch vocabulary.",
+     "mock_ref": "mock \u00a7.persona-strip recessed segment switch \u2014 one shape for all mutually-exclusive states",
+     "fix": "Replace the chip with renderRocker({options:[{id:'off',label:'OFF'},{id:'on',label:'ON'}], variant:'rocker'}) exactly like mascot-group rows; keep the local-first applyBlurPerfPreference call in onChange. Deletes ~45 lines of bespoke CSS."
+    },
+    {
+     "file": "/Users/ozai/projects/dj-set-ai/tauri/ui/src/settings/components/help-group.ts",
+     "lines": "37-40 (VIBEMIX_VERSION '0.1.0-rc1', BUILD_DATE '2026-05-14')",
+     "severity": "P1",
+     "title": "ABOUT row shows a hand-bumped stale version that contradicts the shipped artifact",
+     "why": "The shipped DMG is vibemix-0.0.1 (built 2026-06-08); the drawer reports '0.1.0-rc1 \u00b7 2026-05-14'. Hand-maintained constants WILL drift (already have, twice over). Fabricated-looking metadata in the About row violates the same honest-data contract the rest of the product is built on.",
+     "mock_ref": "honest-data ethos (cardinal invariant #3 applied to chrome)",
+     "fix": "Inject at build time: `define: { __APP_VERSION__: JSON.stringify(pkg.version), __BUILD_DATE__: ... }` in vite.config (or read tauri.conf version via the existing invoke surface) and render those; delete the hand-bumped exports."
+    },
+    {
+     "file": "/Users/ozai/projects/dj-set-ai/tauri/ui/src/settings/components/recording-browser.ts",
+     "lines": "88-93 (formatUsageLine sentinels), 113-121 (__usage style)",
+     "severity": "P2",
+     "title": "Usage-line sentinels render as bare lowercase debug strings ('loading...', 'unavailable')",
+     "why": "The live capture shows a floating grey 'unavailable' right-aligned over the empty recordings strip \u2014 bare lowercase prose in a surface where every other status reads as tracked small-caps mono. The component's own spec called for 'RECORDINGS \u00b7 LOADING\u2026' / 'RECORDINGS \u00b7 UNAVAILABLE'; the prefix was dropped, leaving an orphaned word that reads like console output. (The 'No recordings yet. Start a session to capture one.' empty state itself is correct honest-empty \u2014 keep it.)",
+     "mock_ref": "mock \u00a7.next-meta / \u00a7.session-meta \u2014 status strings are mono, tracked, uppercase, anchored to a label",
+     "fix": "Restore the spec'd format in formatUsageLine: 'RECORDINGS \u00b7 LOADING\u2026' / 'RECORDINGS \u00b7 \u2014' / '3 SESSIONS \u00b7 1.2 GB', and let the existing 0.08em mono style carry it; consider the \u00a7.panel-section-label leading 10px hairline tick for anchoring."
+    },
+    {
+     "file": "/Users/ozai/projects/dj-set-ai/tauri/ui/src/settings/components/profile-panel.ts",
+     "lines": "error-render path (raw msg into --led-fault text; visible in dev capture as 'load failed: ipc invoke failed: Error: Tauri runtime unavailable')",
+     "severity": "P2",
+     "title": "Dev-only PROFILE group surfaces a raw transport stack-string in red",
+     "why": "Dev-gated (won't ship), but during every dev session the drawer shows 'load failed: ipc invoke failed: Error: Tauri runtime unavailable' as red body text \u2014 raw exception prose in the UI normalizes slop in the surface used to judge polish.",
+     "mock_ref": "honest-empty voice (surfaces.ts empty copy: short declarative product sentences)",
+     "fix": "Map transport-class errors to one product sentence ('Profile lives on the sidecar \u2014 start a session to load it.') in the drawer voice; keep the raw error in console.warn only."
+    },
+    {
+     "file": "/Users/ozai/projects/dj-set-ai/tauri/ui/src/settings/SettingsDrawer.ts",
+     "lines": "1008-1014 (PERSONA badge 'VOICE'), 925-1014 viewport composition; picker.ts:156-169 (AUTO pill)",
+     "severity": "P2",
+     "title": "First-viewport accent density crowds 20/80 \u2014 ~10 simultaneously-lit brand elements",
+     "why": "Top fold carries lit pink on: VOICE group badge, HYPE seg, INTERMEDIATE seg, AUTO pill, HEADPHONES seg, the \u2318M readout, the 30 D readout glow, lit retention track, active knob, active stop label. Each is individually justified (active state) but the aggregate means the eye has no single landing point \u2014 the exact failure the in-file P1-b comment fought at the glow tier. The non-interactive spends (group badge, AUTO pill) are the cheapest to reclaim.",
+     "mock_ref": "SKILL.md rule 2 (20/80) + mock restraint: one pulsing dot per panel title, accents only inside the active element",
+     "fix": "Demote the two non-state accents: PERSONA 'VOICE' badge \u2192 silk-engraved chip (border-subtle, text-muted, no brand fill); AUTO pill \u2192 mono text-muted 'AUTO' with no border glow. Active control states keep their current treatment untouched."
+    },
+    {
+     "file": "/Users/ozai/projects/dj-set-ai/tauri/ui/src/settings/components/learn-group.ts",
+     "lines": "76-96 (.vmx-learn-group__toast background rgba(18,20,28,\u2026) / rgba(4,5,9,\u2026))",
+     "severity": "P2",
+     "title": "Learn-reset toast uses the retired cool blue-black palette, off the warm void ladder",
+     "why": "rgba(18,20,28) is a blue-tinted black from the pre-pink direction; the entire contract surface is the warm rose-tinted void (#1A1618/#221D20 family). One cool-black popup over a warm drawer reads as a foreign OS toast. Dev-gated today, but it's a literal-color escape from the token system (the legacy-token gate won't catch rgb literals).",
+     "mock_ref": "mock \u00a7.toast \u2014 rgba(34,29,32,0.95) warm glass + brand-35 border + blur(20px) saturate(160%)",
+     "fix": "Rebuild on the mock toast recipe: background rgba(34,29,32,0.95) (or var(--void-5)-derived), border 1px var(--brand-35), backdrop-filter blur(20px) saturate(160%), box-shadow 0 12px 36px rgba(0,0,0,0.5) + 0 0 18px var(--brand-18)."
+    }
+   ],
+   "top3": [
+    "Style + actually-hide the library staleness banner (staleness-banner.ts:36-49) \u2014 it currently ships as permanently-visible unstyled text reading 'Library is \u2026 old.' with three raw buttons; register the brand-wash banner CSS and a working .hidden rule (P0, the single cheapest pixel in the drawer).",
+    "Kill the dead 14-voice MOSS picker (SettingsDrawer.ts:493-515, 932-943) \u2014 replace with an honest machined 'SVEN \u00b7 LOCAL VOICE' readout in the recessed-display recipe; the product voice is single-reference Chatterbox and none of these names do anything (P0 dead control).",
+    "Mono-label retexture pass (group.ts:72-91, SettingsDrawer.ts:457-469, rocker.ts:62-66) \u2014 swap section headers, sub-labels, and segment labels from Geist Sans to var(--type-mono) per the mock's engraved-silkscreen vocabulary, and strip the no-op 'wdth' 85 axis; this one change is what moves the whole drawer from 'consistent but flat' to machined."
+   ]
+  },
+  {
+   "surface": "LEARN (parked tease) + DEBRIEF (shell dock + standalone review window)",
+   "overall_grade": "6/10 \u2014 parked with dignity in material, but the Learn tease speaks internal-changelog instead of co-host, and the Debrief dock stacks beveled boxes into a stat dashboard the mock explicitly forbids",
+   "findings": [
+    {
+     "file": "/Users/ozai/projects/dj-set-ai/tauri/ui/src/shell/app.ts",
+     "lines": "99, 113-120",
+     "severity": "P0",
+     "title": "Learn tease copy is internal roadmap vocabulary leaked to the user",
+     "why": "Kicker 'Premium v2' is a pricing-tier marketing label for a feature that's parked (over-promise \u2014 Learn was parked for being boring, the tease must not sell it as a premium tier). Proof row 'Engine: preserved in git' is developer changelog language \u2014 the user has no git; 'parked for launch' / 'Debrief and Viber stay live for launch' is milestone-standup voice. surfaces.ts's own empty-state contract says 'written in the co-host's voice\u2026 No marketing, no slop' \u2014 this is both marketing AND dev-slop in one card, and it's the single thing a user reads on this surface.",
+     "fix": "Rewrite in Sven's first person, grounded and honest about WHY: kicker \u2192 mono 'lessons \u00b7 parked' in --text-tertiary; body \u2192 'I only teach when I can hear your hands. Lessons come back when practice decks, controller proof, and my feedback hold the same bar as my live calls.'; proof rows user-facing: 'Status \u2014 parked, on purpose' / 'Engine \u2014 built, waiting for the bar' / 'Rule \u2014 no fake lessons' (keep that one, it's the best line on the card); note \u2192 drop 'for launch', keep 'Lessons return when they can teach without pretending.'",
+     "mock_ref": "The mock's voice register: cohost-line ('that snare punch at 02:14 \u2014 you've been building toward it') and palette rows ('cut my voice. keep listening.') \u2014 first-person instrument speech, zero tier/roadmap words"
+    },
+    {
+     "file": "/Users/ozai/projects/dj-set-ai/tauri/ui/src/shell/shell.css",
+     "lines": "1029-1090 (plate 1034, ::before 1045-1054, led 1056-1065, kicker 1077-1079, title 1090)",
+     "severity": "P1",
+     "title": "Learn tease spends the rose accent five ways on a static card \u2014 20/80 broken, and a static lit LED fakes life on a parked feature",
+     "why": "Full-perimeter border var(--brand-22) + brand-08 top wash + brand-glow kicker + pink title glow (0 0 18px brand-12) + solid-pink LED. The mock's accent grammar: static cards sit on --border-default with at most one 1px top seam; brand is reserved for the 2px left brand-bar, active states, and BREATHING dots. The LED here is the worst offender \u2014 flat var(--brand) fill, no radial machining, no pulse, permanently lit on a surface whose whole message is 'this is off'. A fabricated sign of life is the visual version of an ungrounded reaction.",
+     "fix": "Perimeter \u2192 var(--border-default); keep only the ::before top seam (brand-12 gradient line, like evidence-card::after). Kicker \u2192 --text-tertiary mono with the 10px\u00d71px hairline-dash prefix (panel-section-label::before vocabulary). Title shadow \u2192 var(--text-3d) (press+depth stack), not glow. LED \u2192 unlit state: background var(--text-disabled), no box-shadow (cohost-pill[data-live=\"false\"] .cohost-dot recipe) \u2014 parked reads honestly dark.",
+     "mock_ref": "mock .evidence-card (border-default + ::after top seam, lines 1097-1120), .panel-section-label::before (1084-1095), --text-3d (77-80), cohost-pill[data-live=false] dot (611-621)"
+    },
+    {
+     "file": "/Users/ozai/projects/dj-set-ai/tauri/ui/src/shell/shell.css",
+     "lines": "1015-1027 (+ app.ts 83-125)",
+     "severity": "P1",
+     "title": "Learn tease is a marketing modal floating dead-center in a void \u2014 the mock's stage is the page",
+     "why": "640px card centered both axes inside ~85% empty stage reads like a SaaS upgrade interstitial, not a powered instrument at rest. The codebase's own empty-state law (shell.css 893-895: 'No card, no hero metric, no CTA grid \u2014 PRODUCT.md anti-references') is violated by a glass plate carrying a hero title and a 3-column grid. The mock never floats a centered card; its hero content sits ON the stage, left-anchored with editorial padding.",
+     "fix": "Drop the plate. Set the tease directly on the stage in the mock's stage vocabulary: padding ~140px/96px top-left anchor, max-width 920px; mono scene-line kicker with the 32px hairline ::before; serif title at clamp(34px, 4vw, 52px) with --text-3d; body as the cohost-ghost register (13px italic + mono mark); proof rows as .se-proof spec rows over one machined inset seam. Keeps every element, removes the box.",
+     "mock_ref": "mock .stage-scroll (padding 140px 96px, lines 662-670), .scene-line::before hairline (699), .cohost-line serif hero (771-783), .cohost-ghost (906-924)"
+    },
+    {
+     "file": "/Users/ozai/projects/dj-set-ai/tauri/ui/src/shell/DebriefDock.ts",
+     "lines": "30-65 (dock plate), 71-85 (mast plate), 188-201 (readiness plate), 292-320 (empty + row plates)",
+     "severity": "P1",
+     "title": "Debrief dock is plates-inside-plates \u2014 five nested beveled boxes where the mock mandates 'no cards, no grid'",
+     "why": "Outer .debrief-dock plate (bevel-raised + 80px drop shadow + inner ::before frame) > mast plate (bevel-raised + 38px shadow) > readiness plate (bevel-raised) > per-session row plates (bevel-raised) > empty-well box. Every layer same radius, same bevel recipe = the uniform-rounded-boxes AI-slop tell. The mock's queue section is explicit: '#1 expanded w/ reason, #2-#3 single-line\u2026 No cards, no grid' \u2014 one lead card maximum, everything else hairline list rows on the stage.",
+     "fix": "Kill the outer .debrief-dock plate and the mast plate \u2014 stage is the page; mast becomes bare stage type (serif title + --text-3d, mono kicker with hairline dash). Session rows \u2192 .nr vocabulary: border-bottom var(--border-subtle) rows, grid columns, hover background brand-04 + padding-left slide + 2px left brand-bar; data-ready=true gets the .nr.lead treatment (brand-08 wash, glowing left bar) as the ONE card. Readiness collapses into that lead row's reason line.",
+     "mock_ref": "mock .next-up/.nr/.nr.lead (lines 1171-1329) \u2014 the DJ-queue metaphor, plus the 'No cards, no grid' comment at 1138-1139"
+    },
+    {
+     "file": "/Users/ozai/projects/dj-set-ai/tauri/ui/src/shell/DebriefDock.ts",
+     "lines": "469-485 (markup), 497-501, 677-707 (cold/empty renders)",
+     "severity": "P1",
+     "title": "Cold-boot stat wall: seven dead readouts all saying 'nothing yet' around one honest empty state",
+     "why": "First paint with no recordings renders LAST SET 'no recording yet' / BLOCKER 'needs a set' / ACTION 'record from Deck' / UNLOCKS '\u2026' + LENGTH '0m' / EVENTS '0 events' / READY 'waiting' + status 'ready when you are' + a 260px recessed well repeating the same message. The emptiness is honest (by design); the seven-cell grid of synonyms for 'nothing' is the cheap furniture around it \u2014 a dashboard wearing the empty state. The mock's idle weight is one serif line + one receipt.",
+     "fix": "In the no-summary state, collapse the payback grid and metrics dl entirely: one serif line 'Record a real set.', one grounded sub ('Debrief arms after five minutes and enough evidence events.'), one receipt-style action row ('record from Deck \u2192 timeline, the why, one drill') with the 2px left brand-bar. Reveal the full payback + metrics spec-line only when renderReadiness receives a real summary \u2014 then the numbers are real data, not placeholders.",
+     "mock_ref": "mock .receipt (one compact grounded artifact, lines 926-1012) vs the readiness card's 7 'pending/checking/waiting' cells"
+    },
+    {
+     "file": "/Users/ozai/projects/dj-set-ai/tauri/ui/src/shell/DebriefDock.ts",
+     "lines": "169-187 (refresh), 387-409 (open)",
+     "severity": "P1",
+     "title": "REFRESH reads as a default outlined button \u2014 no machining, no press",
+     "why": "Flat rgba(0,0,0,0.22) fill, uniform 1px border, near-white tracked label, zero box-shadow, no :active state (confirmed in screenshot zoom: it floats as a flat outlined chip on the plate). Every control in the mock is machined: secondary controls carry '0 1px 0 rgba(0,0,0,0.4) + inset 0 1px 0 rgba(255,255,255,0.04)' and an :active scale/translate press; the primary pill gets the full gradient + specular-line + multi-inset stack. Also font-variation-settings '\"wdth\" 85' is a no-op on Geist (wght-only axis) \u2014 the condensed intent silently fails.",
+     "fix": "Refresh \u2192 mock secondary-control recipe: box-shadow '0 1px 0 rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.04)', label in --type-mono 10px/0.18em at --text-secondary, :active transform scale(0.96). 'Open review' (the primary) \u2192 cohost-pill material: brand gradient (brand-22\u219210\u219206), ::before specular top line, inset stack + press translateY(1px). Drop the dead wdth axis setting.",
+     "mock_ref": "mock .collapse-btn/.panel-close bevels (342-356, 1060-1073) and .cohost-pill (568-633)"
+    },
+    {
+     "file": "/Users/ozai/projects/dj-set-ai/tauri/ui/src/shell/DebriefDock.ts",
+     "lines": "107-110, 140-147, 207-209",
+     "severity": "P1",
+     "title": "Six static pink labels on one surface \u2014 contradicts the accent budget the shell itself codified",
+     "why": "Mast kicker, readiness kicker, and all three mast proof-row dt's render in var(--brand), plus ready-state pink. shell.css 957-962 documents the exact rule being broken here: 'Rose is the sign-of-life budget\u2026 spending it on three static proof labels sprawls the accent past its documented use' \u2014 and .se-proof dt was deliberately set to --text-tertiary for that reason. DebriefDock re-introduces the sprawl the sibling component was corrected for, so the two surfaces disagree about what pink means.",
+     "fix": "All static dt/kicker labels \u2192 --text-tertiary mono (match .se-proof dt exactly); keep var(--brand) only on live/earned states: [data-ready=\"true\"] row-state chip, the ready meter fill, and the lead row's left brand-bar. One vocabulary across se-proof, learn-tease__row, and debrief-dock__proof-row.",
+     "mock_ref": "shell.css 957-962 (the codified budget) + mock .panel-section-label (static labels at --text-disabled, brand only in the breathing dot)"
+    },
+    {
+     "file": "/Users/ozai/projects/dj-set-ai/tauri/ui/src/shell/DebriefDock.ts",
+     "lines": "71-85, 450-460",
+     "severity": "P2",
+     "title": "Mast space-between leaves a dead vertical band mid-column",
+     "why": "justify-content: space-between pins the proof rows to the bottom of the mast plate, leaving an awkward unstructured void between the sub and the proof (clearly visible in shell-4-debrief.png). The mock composes top-anchored blocks with deliberate rhythm (56/96px steps), never elastic gaps.",
+     "fix": "Top-anchor the mast stack (remove space-between, gap var(--sp-5)); let the proof rows sit directly under the sub as the spec line. If bottom-anchoring is wanted after the flatten (finding 4), use a fixed margin-top tied to the type rhythm, not flex elasticity.",
+     "mock_ref": "mock .stage-scroll content rhythm: scene-line margin-bottom 56px, next-up margin-top 96px"
+    },
+    {
+     "file": "/Users/ozai/projects/dj-set-ai/tauri/ui/src/debrief/styles/debrief.css",
+     "lines": "36-52",
+     "severity": "P2",
+     "title": "Standalone debrief window sits on a cold blue-black void \u2014 different product than the warm rose-brown contract",
+     "why": "The real review window (the peak-end emotional moment, per this file's own header) backgrounds on hardcoded cool literals \u2014 linear-gradient rgba(17,20,28) \u2192 rgba(5,7,11) \u2192 rgba(1,2,5) \u2014 a blue-black, while the contract void is warm #1A1618/#221D20. Accents alias to pink via the --amber\u2192--brand shims so the foreground matches, but the room itself is the wrong temperature; the file's header documents 'reads as different product' as the defect class it was rewritten to kill.",
+     "fix": "Swap the root background literals to the token ramp: var(--void-5) \u2192 var(--void-0) with the same stop structure (e.g. rgba over var(--void-0) base), keeping the pink radial atmosphere already present at :before. One-line temperature fix, no layout change.",
+     "mock_ref": "mock :root --void-0 #1A1618 / --void-5 #221D20 (warm rose-browns, lines 35-41)"
+    },
+    {
+     "file": "/Users/ozai/projects/dj-set-ai/tauri/ui/src/shell/surfaces.ts",
+     "lines": "86-90",
+     "severity": "P2",
+     "title": "Learn's fallback empty state still sells a live feature ('Pick a course') that is parked",
+     "why": "mountLearnTease normally covers it, but if the tease mount ever throws, surface-mounts falls back to this empty state: 'No lesson running. / Pick a course. I'm watching your hands on the controller, beat for beat.' \u2014 an invitation to a feature that doesn't exist in this build. The failure path over-promises exactly what the tease was written to be honest about.",
+     "fix": "Align the fallback with the parked truth: title 'Lessons are parked.' sub 'They come back when they can teach without pretending.' \u2014 same register as the tease note, so failure degrades to a shorter version of the same honest message.",
+     "mock_ref": "surfaces.ts's own SurfaceEmptyState contract comment (lines 24-28): 'grounded co-host line\u2026 no marketing, no slop'"
+    }
+   ],
+   "top3": [
+    "Rewrite the Learn tease copy in Sven's first person \u2014 kill 'Premium v2' and 'preserved in git' (dev-changelog leak is the single cheapest-reading thing on either surface), keep 'no fake lessons' as the spine (app.ts:99-120)",
+    "Flatten the Debrief dock to the mock's queue grammar: stage-as-page, hairline .nr list rows with left brand-bars, ONE lead card max \u2014 and collapse the cold-boot 7-cell 'pending/waiting/0m' stat wall into one serif line + one receipt-style action row (DebriefDock.ts:30-85, 469-485, 677-707)",
+    "Re-budget the rose accent across both surfaces to the codified sign-of-life rule: neutral --border-default perimeters and --text-tertiary static labels; brand only on left brand-bars, ready/live states, and breathing (never static) dots \u2014 unlit the parked Learn LED (shell.css:1029-1090, DebriefDock.ts:107-147)"
+   ]
+  },
+  {
+   "findings": [
+    {
+     "file": "tauri/ui/src/library/library.css (1098, 1112, 1121, 1128, 1140, 1568, 1608, 2529) + tauri/ui/src/pill/pill.css (1337, 2436) + tauri/ui/src/settings/components/library-panel.ts (169) + tauri/ui/src/learn/styles/learn.css (1594)",
+     "lines": "library.css:1098-1140,1568,1608,2529; pill.css:1337,2436; library-panel.ts:169; learn.css:1594",
+     "severity": "P0",
+     "title": "Undefined ink/silk tokens with no fallback \u2014 color declarations silently dropped, text hierarchy collapses to inherited color",
+     "why": "Authors invented silk alpha steps that have never existed in tokens.css (only --silk-65/40/22/12/06/025 are defined): --silk-90/-92 (agent-failure title, clarification question), --silk-72 (failure detail), --silk-55/-58 (hints, receipt chips, import-progress count), --silk-38 (progress track), --silk-35 (pill), --silk-50 (settings library panel), plus --mint-pale (learn voice-ok \u2014 a hue that isn't even in the rose+gold palette). `color: var(--undefined)` is invalid at computed-value time, so the property falls back to the INHERITED color \u2014 the deliberate 5-step text hierarchy in the Viber failure/clarification/import surfaces is luck, not design. This is dead styling shipping as material.",
+     "mock_ref": "Mock :root ink ladder + semantic text tokens (vibemix-bravoh-grade-pink.html lines 43-75): exactly five ink steps consumed only through --text-primary/secondary/tertiary/muted/disabled.",
+     "fix": "Mechanical replace with the semantic ladder: silk-90/92 \u2192 var(--text-primary); silk-72 \u2192 var(--text-secondary); silk-55/58/50 \u2192 var(--text-muted); silk-38/35 \u2192 var(--text-disabled). learn.css:1594 voice-ok \u2192 var(--led-ok) (it is a status LED) or quiet var(--text-secondary) per the titlebar's calm-silk-dome precedent \u2014 never an off-palette mint. Then add a vitest gate that fails on any var(--x) not defined in tokens.css or set via setProperty (the --mx/--my/--vmx-* runtime vars are the allowlist)."
+    },
+    {
+     "file": "tauri/ui/src/library/library.css",
+     "lines": "1614, 1618, 1622, 1625, 2509, 2514, 2526",
+     "severity": "P1",
+     "title": "No canonical --danger/--ok/--warn: error states fall back to BRAND ROSE in one block and to a foreign hex red in another",
+     "why": "Import-progress error/done/cancelled states use var(--ok, var(--brand)) / var(--warn, var(--silk-55)) / var(--danger, var(--brand)) \u2014 all three head tokens are undefined, so DONE and ERROR both render in brand rose: a destructive failure reads as the accent highlight, the exact wrong-meaning signal. Forty lines later the ingest-error card uses var(--danger, #ff6b6b) \u2014 a third red that matches neither --led-fault (#d4413a) nor anything in the palette, and raw hex in a component file violates tokens.css's own anti-pattern guard ('components MUST NOT declare hex colors', tokens.css:36-37). --warn's fallback chains to the undefined --silk-55, so cancelled is doubly dead.",
+     "mock_ref": "tokens.css status LEDs --led-ok/--led-warn/--led-fault (lines 303-306) \u2014 the quarantined functional hues; mock spends gold only on heat/Camelot and rose only on brand.",
+     "fix": "Define in tokens.css: --ok: var(--led-ok); --warn: var(--led-warn); --danger: var(--led-fault). Strip every per-component fallback (especially the #ff6b6b hexes at 2509/2514/2526 and the var(--brand) fallbacks at 1614/1622/1625). Error material then matches the crash-banner / unplugged-toast fault vocabulary already built on --led-fault."
+    },
+    {
+     "file": "tauri/ui/src/tokens.css + tauri/ui/src/session/components/*.ts + tauri/ui/src/library/library.css",
+     "lines": "tokens.css:246-247 vs 343-346; library.css:2510; session components: 27x --rad-sm",
+     "severity": "P1",
+     "title": "Two live radius systems (--r-sm 6px vs --rad-sm 2px) plus an invented third (--radius-sm, 8px) \u2014 corner language drifts per surface",
+     "why": "Shell speaks the mock's v6 geometry (--r-sm 6 / --r-md 10, 9 uses); session components use --rad-sm = 2px 27 times, library 41x --rad-*, debrief 26x, learn 21x. Same instrument, visibly sharper corners on session/settings controls than the contract's 6px chips/receipts/cards. library.css:2510 then typos a THIRD system \u2014 var(--radius-sm, 8px) \u2014 undefined, falling back to 8px which matches neither ladder. Confusable near-identical names guarantee new code keeps picking randomly.",
+     "mock_ref": "Mock radius vocabulary (lines 113-114): --r-sm: 6px, --r-md: 10px; smallest one-off corners 3-4px only on kbd/delta micro-chips.",
+     "fix": "Canonicalize --r-sm/--r-md as the only named system. Re-point aliases: --rad-md: var(--r-sm) (already 6px, free), --rad-lg: var(--r-md) (already 10px, free), and lift --rad-sm 2px \u2192 4px as the micro-chip step (matches the mock's kbd/delta 3-4px corners) \u2014 one token edit re-rounds 70+ controls toward the contract. Delete the --radius-sm typo at library.css:2510 (\u2192 var(--r-md)). Follow-up sweep renames --rad-* call sites to --r-*."
+    },
+    {
+     "file": "tauri/ui/src/wizard/components/button.ts",
+     "lines": "1-25 (header), 51-208 (CSS)",
+     "severity": "P1",
+     "title": "cmp-btn (the shared wizard CTA) is still the v5 'CDJ Whisper' glass ghost \u2014 onboarding's primary action doesn't match the deck's keycap",
+     "why": "The armed primary state is a 0.09-alpha rose bleed on --glass-2 with 2px corners \u2014 a translucent ghost button, while the deck GO LIVE and the Viber SEND are now solid machined rose keycaps. The first button a new user ever presses (wizard CTA) belongs to a different, cheaper product than the session that follows. The module header still documents 'CDJ Whisper v5', 'Saira', and 'JetBrains Mono' \u2014 the file has never been through the Fable pass.",
+     "mock_ref": "Mock .cohost-pill keycap (lines 568-633): fill linear-gradient(brand-22 \u2192 brand-10 \u2192 brand-06), border brand-35, top white streak ::before, --text-emboss label, inset bevel + outer rose drop (0 6px 18px rgba(176,112,160,0.18)), press = translateY(1px) + pressed inset.",
+     "fix": "Port the keycap recipe already shipped at library.css:1276-1306 (.vmx-lib-run, the Fable-pass Send key) into cmp-btn's primary armed/hover/pressed states: brand-22\u219210\u219206 fill over a void gradient, brand-35 border, inset 0 1px 0 rgba(255,255,255,0.16) streak, emboss text, translateY(1px) press, radius var(--r-sm). Secondary stays the quiet dark keycap (MUTE/STOP vocabulary). Rewrite the header comment to the v6 contract."
+    },
+    {
+     "file": "tauri/ui/src/session/components/titlebar.ts",
+     "lines": "50-58, 247-251",
+     "severity": "P1",
+     "title": "Live session window wordmark is uppercase single-tone 'VIBEMIX' \u2014 breaks the lowercase two-tone trademark the shell and wizard carry",
+     "why": "tokens.css:691-708 codifies the trademark: lowercase, tight tracking, 'mix' lit in --brand as 'the single decisive brand-color moment\u2026 not an uppercase variant'. The session titlebar renders text-transform: uppercase in flat silk with wdth 78/wght 800 \u2014 the live window (the surface the user stares at for an hour) literally wears a different logo than the shell sidebar and boot titlebar. Confirmed in session-2-live-settled.png: 'VIBEMIX' caps, no rose syllable.",
+     "mock_ref": "Mock chrome-title (lines 211-221): the brand syllable is always lit \u2014 `<em>vibemix</em>` in --brand; tokens.css wordmark contract lines 691-708 (.wm-mix span).",
+     "fix": "Drop text-transform: uppercase; render two spans ('vibe' ink / 'mix' --brand) exactly like the shell Sidebar wordmark; letter-spacing -0.01em, weight matched to the shell (600-700), keep the static no-pulse decision."
+    },
+    {
+     "file": "tauri/ui/src \u2014 learn/styles/learn.css, library/library.css, debrief/styles/debrief.css, pill/pill.css + inline TS in session/, wizard/, settings/",
+     "lines": "counts: learn.css 144, library.css 132, debrief.css 50, pill.css 45, shell.css 1 (line 1038); TS inline: session 202, wizard 196, settings 145, shell 0",
+     "severity": "P1",
+     "title": "Coherence map: only shell.css speaks canonical v6 \u2014 every other surface still authors in dead v5 vocabulary (--silk/--amber/--glass-*), which is what keeps minting broken tokens",
+     "why": "The migration aliases retone old names, so nothing looks amber \u2014 but authors writing new code in learn/library/debrief/pill/session/wizard/settings copy the surrounding v5 dialect, and when the v5 ladder lacks a step they INVENT one (the --silk-90/-58/-38 P0 and --radius-sm are direct symptoms). 914 legacy references vs shell's 1 means five of six surfaces drift further from the contract with every edit. The existing gate can't help: LEGACY_TOKEN_PATTERN (tests/tokens.legacy-detect.test.ts:28-30) covers Phase-11 tokens only, and its `ink(-dim\u2026)?` arm greedily matches the CANONICAL --ink-100 ladder \u2014 actively discouraging the v6 ink tokens in gated surfaces (plausibly why session TS still writes --silk).",
+     "mock_ref": "Mock :root (lines 34-115) \u2014 the complete authoring vocabulary is void/ink/brand/gold/border/text + r-sm/r-md; no silk, no amber, no glass.",
+     "fix": "One mechanical sweep: --silk\u2192--ink-100, --silk-65\u2192--text-secondary-ish alpha or rgba ink, --amber*\u2192--brand* (same values via alias today, so zero visual diff), --glass-edge\u2192--border-default, --glass-1/2/3\u2192--scrim-*/--surface-*. Then (a) fix the gate regex to `ink(-dim|-deep|-engraved)\\b` so canonical --ink-N passes, (b) extend it with silk|amber|glass-[123]|rad- and un-skip the per-surface specs, (c) delete the aliases from tokens.css one release later."
+    },
+    {
+     "file": "tauri/ui/src/tokens.css + tauri/ui/src/learn/styles/learn.css + tauri/ui/src/debrief/styles/debrief.css",
+     "lines": "tokens.css:602-607; learn.css (4x --amber outline, 2x outline:none); debrief.css (3x outline:none + glow-only)",
+     "severity": "P2",
+     "title": "Global focus rule clobbers keycap material (box-shadow: var(--glow-soft) replaces the bevel stack) and per-surface recipes diverge from the contract",
+     "why": "tokens.css's `*:focus-visible` sets box-shadow: var(--glow-soft), which REPLACES a focused control's entire layered box-shadow \u2014 keyboard-focus a keycap (GO LIVE, Send, cmp-btn) and its machined bevel/inset stack vanishes, leaving a flat slab with a rose halo at exactly the moment of attention. Meanwhile learn.css writes its rings in --amber (alias drift), and debrief.css uses outline: none with glow-only \u2014 invisible focus for forced-colors/high-contrast users and a third visual dialect.",
+     "mock_ref": "Mock focus contract (lines 155-164): outline 2px var(--brand-50), offset 2px, NO box-shadow \u2014 the ring sits outside the material instead of replacing it.",
+     "fix": "Global rule \u2192 outline: 2px solid var(--brand-50); outline-offset: 2px; delete the box-shadow line so component bevels survive focus. Remove the outline:none overrides in debrief.css and learn.css; retone learn's --amber rings to the same global (they then need no local rule at all)."
+    },
+    {
+     "file": "tauri/ui/src/settings/SettingsDrawer.ts + tauri/ui/src/library/library.css + tauri/ui/src/tokens.css (wizard-grid) + learn/debrief (unstyled)",
+     "lines": "SettingsDrawer.ts:339-345; library.css (.vmx-lib-panel-bd 8px/--silk-12); tokens.css:752-764 (--silk-22/40); learn.css/debrief.css: none",
+     "severity": "P2",
+     "title": "Four scrollbar dialects \u2014 including an accent-rose hover thumb in Settings \u2014 where the contract has one quiet recipe",
+     "why": "Settings: 6px thumb over a solid black track with hover \u2192 --amber-40 (brand accent spent on furniture, a 20/80 violation \u2014 the eye is pulled to a scrollbar). Library: 8px / --silk-12 / r4. Wizard: --silk-22 hover --silk-40. Learn + debrief scroll regions: completely unstyled (platform default). Five surfaces, four answers to the same shared component.",
+     "mock_ref": "Mock .stage-scroll (lines 668-672): scrollbar-width thin; 6px; thumb var(--border-default); transparent track; no hover accent.",
+     "fix": "One shared block (tokens.css or a furniture.css): 6px width, transparent track, thumb var(--border-default) \u2192 hover var(--border-strong), radius 3px. Apply to drawer body, library panels, wizard grid, learn lesson list, debrief columns; delete the amber hover."
+    },
+    {
+     "file": "tauri/ui/src/learn/styles/learn.css + tauri/ui/src/settings/components/recording-browser.ts + tauri/ui/src/runtime/permission-lost-handler.ts",
+     "lines": "learn.css:1603-1621",
+     "severity": "P2",
+     "title": "No shared toast primitive \u2014 three ad-hoc recipes, none matching the mock's toast material",
+     "why": "learn-unplugged-toast hand-rolls fault-tinted glass at 11px/0.16em with its own keyframes; settings' delete-failed feedback and the runtime permission-lost surface each roll their own. The mock specifies one toast material (warm void glass at 0.95, brand-35 hairline, blur(20px) saturate(160%), brand-18 outer glow, 10px/0.22em mono uppercase). Same product, three transient-message materials.",
+     "mock_ref": "Mock .toast (lines 1456-1479).",
+     "fix": "Extract .vmx-toast into shared CSS using the mock recipe verbatim, with data-tone=\"brand|fault\" swapping the hairline (--brand-35 vs --led-fault) and glow. Re-base unplugged-toast and the settings/runtime messages on it; keep learn's auto-dismiss logic."
+    },
+    {
+     "file": "tauri/ui/src/tokens.css",
+     "lines": "337-341 (--type-step-*), 396-408 (mood polychrome), 296-301 (--rave-*)",
+     "severity": "P2",
+     "title": "Dead token strata mislead authors: --type-step scale matches nothing on screen, mood polychrome has zero consumers",
+     "why": "--type-step-0..4 (11/13/15/18/22) has 4 consumers in 13k lines of CSS \u2014 every surface sizes type in raw px against the mock's real scale (9/10px mono labels, 12-13px body, 15px spec, 17/22px serif), so the token ladder actively suggests WRONG sizes (an 11px floor when the contract's label floor is 9px). --mood-hype/teach/coach (magenta/green/blue \u2014 three off-palette hues) and --rave-* have zero var() consumers but sit in the source-of-truth file inviting a 20/80 violation the day someone discovers them.",
+     "mock_ref": "Mock's de-facto type scale: 9px/10px Geist Mono letterspaced labels, 13px Geist body, 15px track names, 17px serif reason, clamp(44-72px) hero (lines 360-368, 686-698, 771-783, 1241-1258).",
+     "fix": "Re-point --type-step-* at the lived scale (9/10/13/15/17) or delete it; move the mood/rave blocks out of tokens.css into a quarantined legacy file with a 'banned for new work' comment, and let the no-legacy gate cover them."
+    }
+   ],
+   "overall_grade": "6/10 \u2014 the shell-facing skin is near-contract after the Fable pass, but the shared layer underneath is two-tongued: one surface speaks v6, five speak dead v5, and the seams are now shipping as literally-broken color declarations",
+   "surface": "cross-cutting: shared components + design tokens (tokens.css, cmp-btn, focus/scrollbar/toast furniture, all-surface coherence)",
+   "top3": [
+    "Kill the undefined-token class: replace the invented --silk-90/-72/-58/-38/-35/-50, --mint-pale, --radius-sm with the semantic ink ladder, and add canonical --danger/--ok/--warn aliased to the LED tokens (error must stop rendering as brand rose / foreign #ff6b6b) \u2014 library.css 1098-1625/2509-2529, learn.css:1594, pill.css:1337/2436, library-panel.ts:169",
+    "Collapse the radius systems to the mock's --r-sm/--r-md: re-point --rad-md/--rad-lg (already equal values), lift --rad-sm 2px\u21924px \u2014 one tokens.css edit re-rounds 70+ session/library/settings controls to the contract's corner language",
+    "Make the shared button speak keycap: port library.css's .vmx-lib-run rose-keycap recipe into wizard cmp-btn primary, then run the v5\u2192v6 rename sweep (silk/amber/glass \u2192 ink/brand/border, 914 refs) and fix+extend the legacy gate so the dialect can't regrow (its current ink-regex greedily bans the CANONICAL --ink-* ladder)"
+   ]
+  },
+  {
+   "findings": [
+    {
+     "file": "tauri/ui/src/session/SessionLayout.ts",
+     "lines": "611-619, 426-427, 1107, 1135; plus session/components/phase-tape.ts:101,131 and status-bar.ts:129,200",
+     "severity": "P0",
+     "title": "Text rendered below the mock's legibility floor \u2014 silk-22 (1.93:1) and silk-40 (3.50:1) used as glyph color across the session surface",
+     "why": "Live-measured: .vmx-armed__note 'Stands by until you go live.' = 1.93:1 at 11px (invisible in z-gate-cta.png); .vmx-armed__kicker 'READY TO LISTEN' = 3.50:1 at 10px; .vmx-statusrow__right = 3.50:1 at 11px; .vmx-live__s--silent and phase-tape/status-bar labels also at silk-22. The mock NEVER paints text below --text-disabled = --ink-20 #8A858A (4.95:1) \u2014 its entire dim-mono vocabulary sits at that floor. Sub-floor tints read as rendering bugs / dead ink, not restraint.",
+     "fix": "Clamp the text-color floor to --ink-20 (mock's --text-disabled). Map: silk-22-as-text \u2192 --ink-20 with reduced letter-spacing if it shouts; silk-40-as-text \u2192 --text-muted (--ink-40 #ADA8AB, 7.6:1) like the mock's .phrase-label/.session-meta. Reserve --silk-22/--silk-40 for hairlines and rules only (the mock uses border-subtle/default for those).",
+     "mock_ref": "Mock token ramp lines 43-75: dimmest text token is --text-disabled: var(--ink-20) #8A858A; .phrase-label/.sessions-all/.panel-section-label all bottom out there"
+    },
+    {
+     "file": "tauri/ui/src/session/SessionLayout.ts",
+     "lines": "358-374",
+     "severity": "P0",
+     "title": "MUTE/STOP \u2014 the only mid-set safety controls \u2014 read as dead/disabled at rest (~1.9:1 effective)",
+     "why": ".vmx-deck__controls rests at opacity 0.58 AND its buttons use color: var(--silk-40) on rgba(2,3,6,0.58) slabs \u2192 effective text contrast \u2248 1.9:1 (z-rail-controls.png confirms: two dark slabs with ghost text). A control that looks disabled until you hover is a dead-control read; a DJ scanning mid-set in a dark booth cannot find mute. The mock never dims a resting control below --text-muted and always gives it a visible machined rim.",
+     "fix": "Drop the 0.58 row dimmer (or floor it at ~0.85) and rest the buttons at color: var(--text-muted) with border: 1px solid var(--border-default) + the mock's nav-kbd bevel stack (inset 0 1px 0 rgba(255,255,255,0.06), inset 0 -1px 0 rgba(0,0,0,0.25), 0 1px 0 rgba(0,0,0,0.45)). Keep the hover/focus-within bloom to full ink.",
+     "mock_ref": "Mock .nav-kbd (lines 411-427) and .collapse-btn/.panel-close (342-356, 1060-1073): resting tertiary controls = --text-muted ink + --border-subtle rim + raised-key bevel, never sub-3:1"
+    },
+    {
+     "file": "tauri/ui/src/session/components/mode-picker.ts",
+     "lines": "91-95; also rocker.ts:82-92, titlebar.ts:163-170, status-bar.ts:99-103+268-278, picker.ts:77-88+266-272, citation-strip.ts:108",
+     "severity": "P1",
+     "title": "Keyboard focus nearly invisible on every session/settings segmented control \u2014 global ring suppressed, replaced with --glow-faint",
+     "why": "Each component suppresses the tokens.css global ring (:focus-visible { outline: none }) and substitutes color-shift + box-shadow: var(--glow-faint) = 0 0 5px rgba(brand,0.22) \u2014 a 5px 22%-alpha blur that is effectively imperceptible on dark glass. The whole settings drawer (mode HYPE/COACH/TEACH, BEG/INT/PRO rocker, voice/genre/device pickers) and session chrome lose visible keyboard focus. Mock contract is an unmissable 2px solid brand-50 outline at 2px offset on ALL interactive elements.",
+     "fix": "Rule: a component may replace the global ring only with something \u2265 ring strength. Cheapest: delete the `:focus-visible { outline: none }` overrides and let tokens.css:603 paint the 2px var(--brand) ring (matches mock 1:1). If the duplicate-glow aesthetic matters, replace with `outline: 1px solid var(--brand-35); outline-offset: 1px; box-shadow: inset 0 0 0 1px var(--brand-40), var(--glow-soft)`.",
+     "mock_ref": "Mock lines 155-164: button/input/.nav-item/.session-item/.receipt/.persona-chip:focus-visible { outline: 2px solid var(--brand-50); outline-offset: 2px }"
+    },
+    {
+     "file": "tauri/ui/src/tokens.css",
+     "lines": "429-438; offenders: session/components/titlebar.ts:110, timecode.ts:110, muted-banner.ts:70, phase-tape.ts:162, settings/components/hotkey-capture.ts:109, confirm-dialog.ts, recording-browser.ts, wizard/components/controller-probe.ts, status-bar.ts, button.ts:202",
+     "severity": "P1",
+     "title": "prefers-reduced-motion is per-component and leaks \u2014 infinite blink/pulse animations keep running under reduce",
+     "why": "tokens.css's reduce block only lowers blur and stops the border sweep. SessionLayout gates its own keyframes carefully (736, 742, 969, 1192), but sibling components ship ungated infinite loops: rec-dot blink (1400ms), timecode colon blink, MUTED banner blink, phase-tape arrow nudge, hotkey-capture pulse. For a user who asked for no motion, the most attention-grabbing animations (blinking) are exactly the ones that survive. The mock kills everything globally.",
+     "fix": "Add the mock's global kill to tokens.css alongside the blur fallback: `@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; } }` \u2014 then re-opt-in the few state-carrying animations (loading spinner in wizard button.ts) with explicit overrides, mirroring the existing 'pin the cite visible' pattern at SessionLayout.ts:1195-1197.",
+     "mock_ref": "Mock lines 134-140: global reduced-motion block zeroing all animation/transition durations"
+    },
+    {
+     "file": "tauri/ui/src/session/components/picker.ts",
+     "lines": "349; settings/components/retention-slider.ts:300-330",
+     "severity": "P1",
+     "title": "axe-core SERIOUS violations: unnamed listboxes (VOICE/GENRE/DEVICE pickers) + retention slider is a nested-interactive with no accessible name",
+     "why": "Live axe run on both ?dev=shell and ?dev=session-mock: [serious] aria-input-field-name on all three .vmx-picker__list[role=listbox] (no aria-label) and on .vmx-retention; [serious] nested-interactive on .vmx-retention (tabIndex=0 root with focusable knob descendants). Screen-reader users get an anonymous listbox for every settings picker and a slider that traps double focus.",
+     "fix": "picker.ts:349 \u2014 `list.setAttribute(\"aria-label\", props.label)` (the row already carries it at :307, the popup list does not). retention-slider.ts \u2014 give the root `role=\"slider\"` semantics an `aria-label=\"recording retention\"` + aria-valuemin/max/valuetext, and make the per-stop knobs `tabindex=\"-1\" aria-hidden=\"true\"` so arrow-keys on the root are the single interaction (the keydown handler at :314 already does the work).",
+     "mock_ref": "Contract-implied: the mock's keyboard-first ethos (every control focusable + named); WCAG 4.1.2 baseline"
+    },
+    {
+     "file": "tauri/ui/src/shell/StatusFooter.ts",
+     "lines": "26-40, with initial state at shell/shell-store.ts:88",
+     "severity": "P1",
+     "title": "Idle reads as fault: fresh-boot footer says 'co-host offline' while the deck gate says 'READY TO LISTEN / GO LIVE'",
+     "why": "Store initializes connection:\"disconnected\" and footerLabel prefers CONNECTION_LABEL over activation, so at calm idle (before the sidecar/ws handshake) the shell shows 'co-host offline' (visible bottom-right in shell-1-deck.png) at the same moment the armed gate advertises 'ready to listen'. Two surfaces contradict each other and 'offline' is fault vocabulary \u2014 exactly the invariant-#5 pattern (idle \u2260 fault) the file's own header comment promises to avoid.",
+     "fix": "Gate the fault wording on intent: at activation===\"idle\" + disconnected render the activation label ('idle' / 'standing by') with the dim steady dot; reserve 'co-host offline' for disconnected while activation is listening/live (a real mid-session loss). Keep 'co-host reconnecting' as-is.",
+     "mock_ref": "Cardinal invariant #5 (CLAUDE.md) + the mock's status vocabulary: studio dot pulses calmly at idle, no fault copy on an idle frame"
+    },
+    {
+     "file": "tauri/ui/src/library/library.css",
+     "lines": "starter-row labels (measured live: 3.50:1 @9px \u2014 'ADD MUSIC / BUILD A SET / WHAT MIXES NEXT / REDISCOVER'); same token misuse at wizard/components/status-bar.ts:47",
+     "severity": "P1",
+     "title": "Viber starter-row labels and wizard footer LEDs sit at 3.5:1 @9px \u2014 the guidance layer of both first-touch surfaces is sub-AA",
+     "why": "Measured on the running app: all four Viber starter category labels render silk-40 at 9px (3.50:1) \u2014 these are the labels that teach a new user what Viber can do (shell-2-viber.png shows them nearly vanishing). The wizard's LIVEKIT/GEMINI/CONTROLLER/SCREEN readiness LEDs idle at the same silk-40 (wizard-step*.png: the rail reads as dead pixels). 9-10px uppercase mono needs MORE contrast than body text, not less.",
+     "fix": "Move both to the mock's label floor: color: var(--ink-20) minimum (4.95:1), --text-muted preferred for 9px. For the wizard LEDs, pair the dim-idle state with a visible socket (the mock's .ear ring: 1px var(--brand-35) circle around an unlit dot) so 'off' reads as an unlit lamp, not missing text.",
+     "mock_ref": "Mock .panel-section-label / .phrase-label / .sessions-all (lines 890-904, 1084-1095): 9px mono labels bottom out at --text-disabled #8A858A; .ear (305-329) for the lit/unlit lamp pattern"
+    },
+    {
+     "file": "tauri/ui/src/shell/DesktopShell.ts",
+     "lines": "shell-main region + session SessionLayout.ts:1330-1345 (deck <main>); axe: landmark-main-is-top-level, landmark-no-duplicate-main, region (5 nodes incl. .sb-foot, .shell-footer)",
+     "severity": "P2",
+     "title": "Landmark structure broken: two <main> landmarks (shell + deck), main-inside-landmark, and sidebar foot/footer content outside any landmark",
+     "why": "axe moderate \u00d74 on ?dev=shell: the session surface mounts its own main inside .shell-main, so AT users get two competing 'main' targets; the cohost pill, tonight strip and status footer float outside all landmarks and are unreachable by landmark navigation.",
+     "fix": "SessionLayout's root becomes role=\"region\" aria-label=\"deck\" when mounted inside the shell (keep <main> only for the standalone session window); wrap .sb-foot in the existing nav or a labeled complementary, and give .shell-footer role=\"contentinfo\".",
+     "mock_ref": "Structural parity with the mock's single .main stage per window (mock lines 641-651)"
+    },
+    {
+     "file": "tauri/ui/src/shell/Sidebar.ts",
+     "lines": "79-86",
+     "severity": "P2",
+     "title": "'live session \u00b7 on air' tonight item is a passive div where the mock specifies an interactive session item",
+     "why": "The mock's .session-item is a hoverable, focus-visible control (brand left-bar slides in on hover, focus ring listed at mock line 159). The app renders a non-focusable div: pointer users get no affordance, keyboard users tab straight past the one item that represents the live set. It reads as a dead control next to the fully-wired 'all sessions \u203a' button.",
+     "fix": "Make it a <button> routing to the deck surface (store.setActiveSurface(\"deck\")) with the mock's .session-item hover/active material: hover background var(--brand-04) + padding-left slide + ::before brand bar, focus via the global ring.",
+     "mock_ref": "Mock .session-item (lines 432-492): cursor pointer, hover slide, [data-active] brand bar + focus-visible registration at line 158"
+    },
+    {
+     "file": "tauri/ui/src/tokens.css",
+     "lines": "618",
+     "severity": "P2",
+     "title": "Disabled state has no material \u2014 only cursor: not-allowed; most session/settings buttons show zero visual change when disabled",
+     "why": "Global baseline is cursor-only (tokens.css:618). Outside library (.vmx-lib-run:disabled opacity .5) and debrief, disabled buttons (e.g. SessionLayout.ts:1736/2195 setting el.disabled) keep full resting paint \u2014 indistinguishable from enabled, while ironically the ENABLED mute/stop look disabled (finding 2). The state vocabulary is inverted.",
+     "fix": "Add a global recipe next to the focus ring: `button:disabled { color: var(--text-disabled); border-color: var(--border-subtle); box-shadow: var(--shadow-inset); text-shadow: none; filter: saturate(0.6); }` \u2014 the mock's cohost-pill[data-live=\"false\"] de-energized slab is the exact reference material.",
+     "mock_ref": "Mock .cohost-pill[data-live=\"false\"] (lines 611-621): drained gradient, border-default, muted ink, glow stripped"
+    }
+   ],
+   "overall_grade": "6.5/10 \u2014 the accessibility bones are unusually good (global rose focus ring, combobox palette with inert+focus-restore, honest-idle copy discipline, aria-labels on collapse-proof nav), but the two dimmest text stops cross into illegible on the flagship surface, keyboard focus is invisible exactly where the controls live, and reduced-motion leaks every blinking element",
+   "surface": "cross-cutting: interaction states + accessibility (all surfaces)",
+   "top3": [
+    "Clamp the text floor to the mock's ramp: no glyph below --ink-20 (4.95:1). Sweep silk-22/silk-40-as-text in SessionLayout.ts (armed note/kicker, live-status labels, status row), phase-tape/status-bar, viber starter labels, wizard LEDs \u2014 silk-22/40 become hairline-only tokens.",
+    "Restore ring-strength keyboard focus on session/settings segmented controls: delete the six ':focus-visible { outline: none }' overrides (mode-picker, rocker, titlebar, status-bar, picker, citation-strip) or upgrade their replacement to the mock's 2px brand-50 outline equivalent.",
+    "Re-materialize MUTE/STOP at rest (SessionLayout.ts:358-374): kill the 0.58 row dimmer, rest at --text-muted on a --border-default machined rim so the live-set safety controls read as powered keys, not disabled slabs."
+   ]
+  },
+  {
+   "surface": "MOTION (cross-cutting: shell deck/viber/learn/settings, session gate+live, wizard, library, pill)",
+   "overall_grade": "6/10 \u2014 strong individual pieces (documented one-breath discipline, session receipt draw\u2192ignite orchestration, genuinely BPM-locked drop-chip), but composition breaks the house law on the flagship screen, the mock's BPM-locked-motion thesis is 90% unwired, and easing is a five-family zoo",
+   "findings": [
+    {
+     "file": "tauri/ui/src/shell/shell.css + tauri/ui/src/session/SessionLayout.ts",
+     "lines": "shell.css:296-298 (ear breath); SessionLayout.ts:516 (vmxArmedField 8600ms infinite), 733 (vmx-perimeter 22s infinite)",
+     "severity": "P1",
+     "title": "Deck idle / session gate runs 3 concurrent ambient motions \u2014 the one-breath law breaks at the composition seam",
+     "why": "Runtime-verified via playwright getAnimations(): shell deck at idle has sb-ear-amp (1.4s) + vmxArmedField (8.6s) + vmx-perimeter sweep (22s) all running at once. shell.css:294-304 explicitly documents 'never two breathing marks' and makes the ear yield to reconnecting \u2014 but the embedded SessionLayout armed gate brings its own field breath + perimeter sweep into the same screen, and SessionLayout.ts:500-505 claims the field is 'the screen's single sign-of-life'. tokens.css:499 itself records the critique: '3+ concurrent sweeps read as anxiety'. The shell layer and session layer each obey the law alone and break it together.",
+     "fix": "Extend the existing yield pattern (shell.css:303): `#shell-root:has(.vmx-session[data-runstate=\"armed\"]) .sb-mark .sb-ear::after { animation: none; }` so the ear sleeps while the gate owns the stage. Then pick ONE gate ambient: keep vmxArmedField (closest to the mock's single 24s ambient-drift, mock lines 233-238) and still the perimeter to its static lit seam (it already has that form at reduced-motion, SessionLayout.ts:737-738).",
+     "mock_ref": "Mock has exactly one ambient layer per zone: ambient-drift 24s (line 233) + state dots that yield by state; header comment 'studio status dot (single pulse)'"
+    },
+    {
+     "file": "tauri/ui/src/session/SessionLayout.ts + tauri/ui/src/tokens.css",
+     "lines": "tokens.css:251-252 (--bpm-beat/--bpm-bar, ZERO consumers); SessionLayout.ts:956 (vmx-wave 1.8s ease-in-out), 1073-1080 (fmeter peak: transition opacity only \u2014 left snaps)",
+     "severity": "P1",
+     "title": "The mock's signature 'BPM-locked motion' is unwired everywhere except the drop-chip \u2014 tokens dead, playhead teleports, wave ignores the room's tempo",
+     "why": "tokens.css declares the canonical motion contract '--ease-brand + BPM-locked beats' (line 249) but --bpm-beat/--bpm-bar have zero consumers (grep-verified). The mock's playhead glides one beat at a time (`transition: left 0.46s linear`, mock line 874) while the app's fmeter peak orb has no left transition and snaps per tick. The receipt wave runs a fixed generic 1.8s ease-in-out while live \u2014 the one element claiming to BE an audio moment is the one ignoring the music. Meanwhile drop-chip.ts:50 proves the wiring exists (--bpm-period-ms is JS-fed; runtime showed pips at 1875ms = 128 BPM). Music-locked breath is the product's whole motion thesis; right now only one tiny chip earns it.",
+     "fix": "Reuse the drop-chip pattern: set `transition: left calc(var(--bpm-period-ms, 461ms)) linear` on .vmx-fmeter__peak, and `animation-duration: calc(var(--bpm-period-ms, 461ms) * 4)` on .vmx-receipt__wave span (mock wave 1.8s \u2248 one bar at 130). Re-point --bpm-beat at the live-fed var or delete the dead tokens.",
+     "mock_ref": "Mock :root --bpm-beat 461ms (line 104); pulse keyframe consumed at var(--bpm-beat) (lines 490, 628, 1058); phrase-playhead transition left 0.46s linear (line 874)"
+    },
+    {
+     "file": "tauri/ui/src/pill/pill.css, src/library/library.css, src/settings/SettingsDrawer.ts, src/learn/styles/learn.css, src/session/SessionLayout.ts",
+     "lines": "pill.css: 99 hardcoded cubic-bezier(0.16,1,0.3,1) literals; library.css:1427,1528 + SessionLayout.ts:946 (0.22,1,0.36,1 family); SettingsDrawer.ts:109 vs 145 (two families inside one open gesture); learn.css:418 (0.18,0.9,0.18,1)",
+     "severity": "P1",
+     "title": "Easing is fractured into 5 bezier families + raw ease-out/ease-in-out; the mock mandates ONE brand ease globally",
+     "why": "Mock line 131 sets `* { transition-timing-function: var(--ease-brand) }` \u2014 one hand moves everything. The app has --ease-brand defined but 108 hardcoded copies of its value (un-token'd, drift-prone), a second family cubic-bezier(0.22,1,0.36,1) \u00d79 used for draws, two one-off beziers in learn, and generic ease-out/ease-in-out across settings controls (SettingsDrawer.ts:288-292), session readouts (SessionLayout.ts:1043/1048: `color 700ms ease-out` on the most-watched live numbers), library hovers, and every breathe keyframe. The settings drawer literally opens with two easing families at once: scrim 0.22-family (line 109), panel --ease-brand (line 145). Uniform default eases are the template tell.",
+     "fix": "Mechanical pass: replace the 108 literals with var(--ease-brand); if the 0.22,1,0.36,1 draw curve is intentional (it matches the session/library receipt draws), name it `--ease-draw` in tokens.css and use it only for line-draw reveals; retone ease-out/ease-in-out stragglers (settings, session readouts, breathes) to the tokens.",
+     "mock_ref": "Mock line 103 (--ease-brand) + 131 (global timing-function); every mock keyframe/transition rides it"
+    },
+    {
+     "file": "tauri/ui/src/wizard/router.ts",
+     "lines": "233-241 (advanceTo exit), 302-310 (renderInto enter)",
+     "severity": "P1",
+     "title": "Wizard step transition is a generic ease-in-out X-slide with a setTimeout hard swap \u2014 off-vocabulary, and it ignores reduced-motion",
+     "why": "The whole room enters on a Y-rise with --ease-brand (vmx-intro-rise, surface-enter, vmxArmedIn, vmx-rise \u2014 all rise). The wizard router alone slides translateX(\u00b116px) with inline `ease-in-out` and swaps the DOM on a raw setTimeout(250) \u2014 if the rAF/transition stalls you get a hard cut mid-fade. Because it's inline JS style (not CSS), the prefers-reduced-motion media queries the wizard steps carefully apply (step0-intro.ts:209, step1-permissions.ts:110) never gate it: reduced-motion users still get the slide. First-run is the first motion impression the product makes, and it's the one screen moving like a generic SPA.",
+     "fix": "Drop the exit animation entirely (mock surfaces never exit-animate; entrance only \u2014 see shell.css:1740-1743 comment). In renderInto, gate on `matchMedia('(prefers-reduced-motion: reduce)')`, switch to opacity + translateY(8px)\u21920 over var(--motion-step) var(--ease-brand) \u2014 i.e. exactly vmx-intro-rise, which already exists in the same flow.",
+     "mock_ref": "Mock @keyframes enter (lines 680-683): opacity + translateY(8px) rise, ease-brand \u2014 the house entrance"
+    },
+    {
+     "file": "tauri/ui/src/library/library.css + tauri/ui/src/settings/components/hotkey-capture.ts",
+     "lines": "library.css:1534 (pending dot, vmx-lib-breathe 1s infinite), 1600 (chat-progress-scan 1.2s infinite), 2545-2550 (reduce block covers only 4 rules); hotkey-capture.ts:109 (capture pulse 1200ms infinite, no reduce gate)",
+     "severity": "P1",
+     "title": "Infinite animations keep running under prefers-reduced-motion: viber pending dot, import progress scan, hotkey capture pulse",
+     "why": "The mock kills all motion globally under reduced-motion (lines 134-140). The app does it piecemeal per-file, and the library reduce block whitelists only 4 selectors \u2014 the chat pending breathe (1s infinite), the progress scan sweep (1.2s infinite), and the settings hotkey-capture pulse (1200ms infinite) all continue for reduced-motion users. These are exactly the long-running attention pulses the preference exists to stop; one-shot enters are debatable, infinite loops are not.",
+     "fix": "Add to library.css's existing reduce block: `.vmx-lib-chat-turn[data-pending=\"true\"] .body::after, .vmx-lib-chat-progress-scan { animation: none; opacity: 0.8; }` (keep the static lit state so 'working' stays legible). In hotkey-capture.ts, wrap the pulse in `@media (prefers-reduced-motion: no-preference)` like group.ts:174 already does.",
+     "mock_ref": "Mock lines 134-140: global reduced-motion kill (animation-duration 0.01ms, iteration-count 1)"
+    },
+    {
+     "file": "tauri/ui/src/shell/shell.css",
+     "lines": "704 (surface-enter 220ms single block), 1550-1551 (panel-section stagger \u2014 the pattern already exists)",
+     "severity": "P2",
+     "title": "Surface switches enter as one flat 220ms block; the mock's room arrives in composed staggered layers",
+     "why": "Mock entrance is the most expensive-feeling moment it has: five zones (scene-line \u2192 cohost slab \u2192 phrase hair \u2192 ghost \u2192 receipt) enter over ~850ms at 0.7-0.8s each with 50-550ms delays (mock lines 674-683) \u2014 the room assembles. The app's surface switch is a single 220ms fade-rise on the whole section: functional, but it reads as a tab switching, not a stage lighting up. The codebase already owns the right pattern (panel-section--enter with an 80ms nth-child delay, shell.css:1550) \u2014 it just never reached the deck stage children.",
+     "fix": "On .surface--deck.is-active, stagger the stage children (eyebrow/hero/context/gate-CTA) with surface-enter at 60-90ms steps and stretch the hero's duration to ~400-500ms var(--ease-brand) \u2014 the panel-section--enter recipe, scaled up. Keep total under ~600ms so repeated switches never feel slow.",
+     "mock_ref": "Mock lines 674-683: .scene-line 0.05s \u2192 .receipt 0.55s stagger, enter 0.7-0.8s ease-brand"
+    },
+    {
+     "file": "tauri/ui/src/session/SessionLayout.ts + tauri/ui/src/session/components/drop-chip.ts",
+     "lines": "SessionLayout.ts:741 (foot hidden at armed) vs runtime: vmx-idlebreath + 4\u00d7 vmx-drop-pip running at gate (playwright-verified 6 running animations)",
+     "severity": "P2",
+     "title": "Hidden elements keep animating at the gate: idlebreath meter + 4 drop pips run behind visibility:hidden",
+     "why": "At armed the deck foot is `opacity: 0; visibility: hidden` but getAnimations() shows vmx-idlebreath (3.2s infinite) and four vmx-drop-pip loops (1875ms infinite) still ticking \u2014 compositor work for pixels that don't exist, on a screen that's supposed to be a calm powered-down deck. Also a small honesty smell: the pips pulse at the 500ms fallback period when no real BPM exists yet (trust-the-audio says nothing should fake a tempo, even invisibly).",
+     "fix": "Scope the animations to the visible state: `.vmx-session[data-runstate=\"live\"] .vmx-drop-chip__pip { animation: ... }` and gate vmx-idlebreath the same way (or `animation-play-state: paused` while [data-runstate=\"armed\"]).",
+     "mock_ref": "Mock animates nothing it doesn't show; status dots stop via `animation: none` on state flips (line 621)"
+    },
+    {
+     "file": "tauri/ui/src/shell/shell.css, src/library/library.css, src/learn/styles/learn.css",
+     "lines": "shell.css:2020-2023 (shell-breathe 2.4s), library.css:111-113 (vmx-lib-breathe used at 3.4s/1.35s/1s), learn.css:116-119 (learnBreathe @ --motion-led-pulse 1400ms)",
+     "severity": "P2",
+     "title": "The same opacity-breath keyframe is re-declared in 3 files at 5 different cadences \u2014 the design names ONE cadence and only learn uses it",
+     "why": "shell-breathe, vmx-lib-breathe, and learnBreathe are near-identical opacity 0.55\u21941 breaths, but they run at 1s, 1.35s, 2.4s, 3.4s, and 1400ms \u2014 all on generic ease-in-out. tokens.css names the house cadence (--motion-led-pulse: 1400ms) and shell.css:798 calls it 'the one cadence the design names', yet only the tail cursor and learn honor it. Five desynced breath tempos across surfaces is the quiet version of competing pulses: nothing shares a heartbeat.",
+     "fix": "One shared keyframe (tokens.css, next to borderSweep) + duration var(--motion-led-pulse) var(--ease-brand) everywhere a status dot breathes; delete the two duplicate declarations. Anything that genuinely needs a different tempo should be BPM-fed (finding #2), not a new magic number.",
+     "mock_ref": "Mock has one pulse keyframe (line 630) consumed at one token cadence var(--bpm-beat) by all three dots (lines 490, 628, 1058)"
+    },
+    {
+     "file": "tauri/ui/src/library/library.css",
+     "lines": "111 (.vmx-lib-brand .dot \u2014 class absent from all TS, grep-verified)",
+     "severity": "P2",
+     "title": "Orphaned motion CSS: .vmx-lib-brand/.vmx-lib-titlebar breathe survives from the pre-one-chat library window",
+     "why": "grep finds no 'vmx-lib-brand' or 'vmx-lib-titlebar' constructor in any .ts \u2014 the one-chat redesign removed the standalone titlebar but left its breathing-dot CSS (and a stale element in the dev DOM). Dead motion rules are how the next session re-introduces a second breath by accident.",
+     "fix": "Delete the .vmx-lib-titlebar/.vmx-lib-brand blocks (library.css ~95-125) and the dot's reduce-gate line at 2548, or fold the dot into the shared breath utility if the titlebar is coming back.",
+     "mock_ref": "n/a \u2014 hygiene; the contract has no library titlebar"
+    },
+    {
+     "file": "tauri/ui/src/learn/styles/learn.css",
+     "lines": "116, 1111 (learnBreathe \u00d72), 1905 (learnVoicePulse 960ms infinite), 2006 (learnCueGlowPulse 600ms infinite)",
+     "severity": "P2",
+     "title": "Learn lesson screen (currently parked) stacks 4 concurrent infinite pulses \u2014 fix before un-parking",
+     "why": "When a lesson is active: titlebar controller underline breathes + exemplar chip LED breathes + tutor voice dot pulses at 960ms + cue glow pulses at 600ms \u2014 four desynced infinite loops on one screen, the exact 'anxiety' pattern tokens.css:499 records. Learn is parked for being boring/non-interactive; its redesign milestone is the moment this gets locked down, not after.",
+     "fix": "Adopt the shell's yield hierarchy (shell.css:294-304) inside learn: the active teaching focus (cue glow during a cue task, voice pulse while the tutor speaks) owns the breath; LEDs and underlines go static-lit while anything else pulses. Put the rule in the learn redesign brief.",
+     "mock_ref": "House discipline (shell.css:294-304 comment chain): exactly one breathing mark per reachable state"
+    }
+   ],
+   "top3": [
+    "Restore the one-breath law on the flagship deck/gate: make the sidebar ear yield while the armed gate is on stage (the data-conn='reconnecting' yield pattern already exists at shell.css:303), and pick ONE gate ambient \u2014 keep vmxArmedField, still the 22s perimeter sweep to its static seam. Runtime currently shows 3 visible concurrent ambient motions on the first screen every user sees.",
+    "Wire BPM into the live motion: reuse drop-chip.ts's --bpm-period-ms feed to give .vmx-fmeter__peak a `transition: left <beat> linear` glide (mock line 874) and the receipt wave a bar-length duration \u2014 the mock's whole motion thesis is 'one ease + BPM-locked beats' and today only the drop chip earns it while --bpm-beat/--bpm-bar sit dead in tokens.css.",
+    "Collapse easing to the brand curve: replace the 108 hardcoded cubic-bezier(0.16,1,0.3,1) literals with var(--ease-brand), name the draw curve --ease-draw if kept, and kill the generic ease-in-out/ease-out stragglers \u2014 starting with the wizard router's inline X-slide (also the only transition that ignores prefers-reduced-motion)."
+   ]
+  }
+ ],
+ "critic": {
+  "missing": [
+   "FLOATING PILL \u2014 the default primary in-set surface (src-tauri/src/config.rs:125 decodes missing primary_surface to 'pill') was never audited as a surface: /Users/ozai/projects/dj-set-ai/tauri/ui/src/pill/ (index.ts, deck-chips.ts, waveform.ts, move-grade-vocabulary.ts, next-suggestion.ts, ~2500-line pill.css) + pill.html window. Only incidental token/motion references landed. Unexercised: peek card, move-grade card, suggestion card, feedback affordance (known dead \u2014 no send()), hover/care states (tests/pill/browser-care-hover.pw.ts exists), always-on-top chrome.",
+   "MASCOT OVERLAY window \u2014 /Users/ozai/projects/dj-set-ai/tauri/ui/src/mascot/ (~40 modules + chrome.css), mascot.html (CI-gated via mascot-audit), src-tauri/src/mascot_window.rs. Zero findings. It is also under active in-flight edit right now (particle-organism.ts, focus-layer.test.ts modified; untracked src/shell/organism-stage.ts) \u2014 a surface being rebuilt mid-audit.",
+   "Click-through OVERLAY surface \u2014 overlay.html + /Users/ozai/projects/dj-set-ai/tauri/ui/src/overlay/ (overlay-highlight.ts, overlay-runtime.ts), the learn focus-highlight layer. Unaudited.",
+   "Fault/banner surfaces: src/crash-banner.ts (sidecar-crashed banner with Restart + reason routing 'port-in-use'/'audio-device-missing'), src/session/components/muted-banner.ts, src/debrief/components/error-banner.ts, src/wizard/components/blackhole-banner.ts, src/learn/components/unplugged-toast.ts \u2014 none graded for material or copy.",
+   "Live deck failure/edge states: the 'ai service unreachable' hero (SessionLayout.ts:1820 \u2014 the Invariant #5 recurring blank-hero state), reconnecting state UX, MUTE-engaged state, sidecar restarting, and the fresh-user EMPTY DECK (a known open bug from the pilot scorecard) \u2014 the deck was graded idle+live happy-path only.",
+   "Go-live transition states: warming / ARMED / capture-failed have no UI representation per the go-live root-cause packet (.planning/packets/2026-06-07/CODEX_READY-GO-LIVE-DETERMINISTIC.md) \u2014 the audit graded the gate and the live room but not the 90s in-between where users actually loop and relaunch.",
+   "Debrief with REAL data: only the cold-boot dock and a P2 on the standalone window were graded. drills-panel.ts ships the same dev-memo voice flagged on Learn ('Practice routing is parked for launch.', drills-panel.ts:144/152) and the fleet missed it; populated stat states, error-banner, and the :8766 second-window chrome/resize untested.",
+   "OS-level surfaces: system tray mood menu (src/session/tray-mood.ts + src-tauri tray.rs), quit-guard dialog (src/session/quit-guard.ts), window min-size/resize/fullscreen behavior, drag regions/traffic-light insets, multi-window focus, DPI scaling. Only titlebar visuals were graded.",
+   "Wizard failure paths: permission DENIED/revoked states, driver-fetch failure+retry flow, BlackHole-missing path (blackhole-banner.ts) \u2014 the wizard audit walked the happy path; the v5-LED finding covers colors, not the denied-state journeys.",
+   "Viber/library stress states: mid-import per-file ingest errors, import cancel, very long transcript (hundreds of turns \u2014 scroll perf + memory), and the settings library-panel's refresh-in-flight state on the staleness banner.",
+   "Holistic copy/voice dimension: each surface got local copy findings, but no single Sven-voice consistency pass across deck/viber/wizard/settings/debrief (persona, capitalization grammar, en-only check), and no loading-skeleton/first-paint dimension (FOUC, Instrument Serif/Geist font-load flash on the wizard intro and shell boot).",
+   "Small live-deck furniture never graded: hype-mode-indicator.ts, session icons/, voice-line rendering (new untracked voice-line.test.ts suggests it is in flux)."
+  ],
+  "risks": [
+   "Legacy-token gate inversion (the #1 fix-pass landmine): tests/tokens.legacy-detect.test.ts LEGACY_TOKEN_PATTERN bans --ink(-dim|-deep|-engraved)?\\b \u2014 with the \\b, EVERY proposed --ink-20/--ink-* semantic-ladder reference trips it; meanwhile its 'clean v5' fixtures bless --silk/--amber, the exact tokens the rename sweep deletes. The header says it must stay byte-for-byte in sync with scripts/check_v5_migration.sh. The gate (vitest + bash) must be rewritten in the SAME commit as the sweep or CI flips red either way.",
+   "Test pins on exact copy/markup the fixes rewrite: tests/session/components.spec.ts:165 pins the 'DROP IN' label (the drop-chip fix breaks it); tests/session/start-gate.spec.ts pins gate captions (the 'three redundant standby captions' fix); src/debrief/__tests__/drills-panel-shape.spec.ts:89 pins 'Practice routing is parked for launch.' (Learn/debrief copy rewrite); tests/settings/{drawer,staleness-banner,library-panel}.spec.ts, tests/shell/{grounding-panel,command-palette,debrief-dock,window-chrome,deck-status-fold}.spec.ts, and tests/visual/__snapshots__ (radius/blur/glow changes shift snapshots). Each pinned spec must move with its fix, atomically.",
+   "Concurrent uncommitted WIP collision: the tree is dirty on exactly the fix targets \u2014 src/library/index.ts itself, src/library/chat.test.ts, tests/session/components.spec.ts + start-gate.spec.ts, mascot files, plus vitest.config.ts/tsconfig.json/package.json. Per CLAUDE.md, parallel sessions' `git commit` absorbs everything staged. Capture a baseline `npm run build && npm test` BEFORE fixing, verify every red committed-vs-in-flight, and stage hunk-filtered patches.",
+   "The data-role 'you'\u2192'user' fix is NOT one line: index.ts has three coupled sites (render ~1773, dedup guard querySelector '[data-role=\"you\"]' at 2103, history role:'you' at 2953) plus the chat.test.ts:2084 pin, and persisted chat history (--history jsonl) carries role 'you'. Renaming the role VALUE breaks history replay/dedup; the safe fix maps role\u2192data-role at render time only.",
+   "Shared-component blast radius: rocker.ts/picker.ts live in src/session/components but are mounted by BOTH the live deck and the settings drawer \u2014 the mono-label/focus-ring retexture changes two surfaces and two test suites at once. tokens.css edits (--rad-sm 2px\u21924px, glass recipes) are consumed by pill.css, mascot chrome.css, debrief, and learn \u2014 i.e., the fix silently re-skins three windows nobody audited.",
+   "Cardinal Invariant #5: edits near SessionLayout's status/grounding copy ('co-host offline' footer, 'ai service unreachable', status fold) must keep the grounding-failure timer gated on ACTIVE \u2014 guarded by tests/session/grounding-failure.spec.ts. 'Fixing' the idle-reads-as-fault finding by tightening grounded checks recreates the blank-hero bug the invariant exists for.",
+   "Invariant #4 (one socket): new NEXT UP queue / grounding-panel wiring must ride the existing Rust-shell IPC bridge \u2014 the webview is forbidden from opening its own WebSocket to 127.0.0.1:8765 (prohibition documented in src/crash-banner.ts header). Any new ipc.* fields also require `npm run codegen:ipc`; the ajv validator is pre-compiled and silently rejects unknown fields when stale.",
+   "NEXT UP gated on a dark producer: prior audits found suggestion_service wired to None in __main__.py \u2014 shipping the mock's NEXT UP slab without proving SuggestionService fires on the live bus (drive-vibemix, not unit tests) yields a permanently-empty lead card, which reads worse than the current void.",
+   "Optimistic-repaint convention (CLAUDE.md hard rule): every rebuilt settings control (lighter-blur chip\u2192rocker, voice readout, staleness-banner buttons) must flip data-active locally in the click handler; waiting on the ipc.settings.state echo recreates the 'no buttons work' bug.",
+   "Removing the 14-voice MOSS picker can break the settings save path: ConfigStore/ipc settings payload likely still carries the voice field \u2014 delete the control without sweeping the schema/backend (plus codegen) and the drawer round-trip starts erroring; tests/settings/drawer.spec.ts likely pins the picker too.",
+   "Global motion consolidation risks: a blanket prefers-reduced-motion rule or keyframe rename (the breath keyframe is re-declared in 3 files) can freeze the BPM-locked drop-chip and the receipt draw\u2192ignite orchestration that session specs pin, and break tests/mascot/smoke-30s.spec.ts plus the playwright pill/mascot probes that are NOT in the default vitest run \u2014 silent breakage until CI/manual run.",
+   "Frosted-glass palette recipe (blur 28px saturate 160%) fights the existing perf discipline: the LIGHTER BLUR setting and tests/visual/blur-perf-ladder.spec.ts exist precisely to cap backdrop-filter cost \u2014 any new glass must honor the lighter-blur flag or low-end GPUs regress.",
+   "Activating dead CSS is not free: fixing the \u2264780 dead-rule block applies never-rendered styles (re-capture at 1100/880/780 after), and re-materializing wizard primary-panel.ts re-dresses the 4 legacy off-path steps (smoke-test) that already stack three rose moments \u2014 verify those routes too.",
+   "Footer offset by --panel-cur: the variable must exist and animate on every surface where the footer renders (0 when the panel is closed) or the footer permanently indents; the transition must match the panel's 250ms or the seam shears \u2014 and deck-status-fold.spec.ts/grounding-panel.spec.ts pin the current geometry."
+  ]
+ }
+}
