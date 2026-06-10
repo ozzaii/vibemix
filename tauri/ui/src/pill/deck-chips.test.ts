@@ -207,41 +207,45 @@ describe("renderDeckChips — deck_state → chip strip (PILL-03)", () => {
   });
 });
 
-describe("deck-chips CSS — frontend-enforcement (token-only, 20/80 amber)", () => {
+describe("deck-chips CSS — frontend-enforcement (token-only, gold lane)", () => {
   test("zero hex literals (token-only)", () => {
     expect(_CSS_FOR_TEST).not.toMatch(/#[0-9a-fA-F]{3,6}\b/);
   });
 
-  test("zero non-black rgba literals (amber/silk must come from tokens)", () => {
+  test("zero non-black rgba literals (gold/silk must come from tokens)", () => {
     const nonBlackRgba =
       _CSS_FOR_TEST.match(/rgba\((?!0,\s*0,\s*0,)[^)]+\)/g) ?? [];
     expect(nonBlackRgba).toEqual([]);
   });
 
-  test("the resolved-key glyph rule references the amber token", () => {
+  test("gold lane — a resolved Camelot key carries --gold, never the rose alias", () => {
     const resolvedRule = _CSS_FOR_TEST.match(
       /\.vmx-deck-chip__key--resolved\s*\{[^}]*\}/,
     );
     expect(resolvedRule).not.toBeNull();
-    expect(resolvedRule![0]).toMatch(/var\(--amber\)/);
+    expect(resolvedRule![0]).toMatch(/var\(--gold\)/);
+    expect(resolvedRule![0]).toMatch(/var\(--gold-glow\)/);
+    // The legacy --amber alias silently resolves to brand rose (tokens.css);
+    // a Camelot numeric must never reach for it.
+    expect(_CSS_FOR_TEST).not.toMatch(/var\(--amber/);
   });
 
-  test("20/80 — the base key glyph (unresolved) is dim silk, not amber", () => {
+  test("gold lane — the base key glyph (unresolved) is dim silk, not gold", () => {
     const keyRule = _CSS_FOR_TEST.match(/\.vmx-deck-chip__key\s*\{[^}]*\}/);
     expect(keyRule).not.toBeNull();
-    // The resting key glyph is --silk-40; amber lives only on --resolved.
+    // The resting key glyph is --silk-40; gold lives only on --resolved.
     expect(keyRule![0]).toMatch(/var\(--silk-40\)/);
-    expect(keyRule![0]).not.toMatch(/var\(--amber/);
+    expect(keyRule![0]).not.toMatch(/var\(--gold/);
   });
 
-  test("WR-04 — the low-confidence (--unsure) rule dims to silk, not amber", () => {
+  test("WR-04 — the low-confidence (--unsure) rule dims to silk, not gold", () => {
     const unsureRule = _CSS_FOR_TEST.match(
       /\.vmx-deck-chip__key--unsure\s*\{[^}]*\}/,
     );
     expect(unsureRule).not.toBeNull();
-    // A barely-sure key reads as dim silk — amber authority is reserved for a
+    // A barely-sure key reads as dim silk — gold authority is reserved for a
     // high-confidence registry hit.
     expect(unsureRule![0]).toMatch(/var\(--silk-40\)/);
-    expect(unsureRule![0]).not.toMatch(/var\(--amber/);
+    expect(unsureRule![0]).not.toMatch(/var\(--gold/);
   });
 });

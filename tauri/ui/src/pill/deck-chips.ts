@@ -9,11 +9,11 @@
  * chip shows. The chip key is passed THROUGH verbatim — the pill never computes
  * or invents a key (the bus already normalized camelot via harmonics.to_camelot).
  *
- * 20/80 amber discipline (frontend-enforcement hard rule 2): the deck-key glyph
- * is amber ONLY when a real key resolved (`vmx-deck-chip__key--resolved`);
- * otherwise it is `--silk-40`. The deck-resolved key glyph is one of the four
- * reserved amber accents on the pill (state dot / waveform / citation chips /
- * resolved key glyph) — amber appears NOWHERE else.
+ * Gold-lane discipline (pink-mock contract): a RESOLVED Camelot key is a
+ * heat/Camelot numeric, so it carries `--gold` (the quarantined numeric
+ * accent) — never the rose brand, and never the legacy `--amber` alias
+ * (which silently resolves to rose). Unresolved/unsure keys stay dim
+ * `--silk-40`. Gold appears nowhere else on the chip strip.
  *
  * Cloned from the citation-strip.ts chip-strip skeleton: the same `registerStyle`
  * once-per-scope CSS injection, the mono tabular-nums chip language (JetBrains
@@ -88,16 +88,17 @@ const CSS = `
     flex-shrink: 0;
   }
   /* The deck-key glyph. Resting = dim --silk-40 (the honest 'unknown' read);
-   * amber ONLY on the --resolved variant (20/80 — amber reserved for a real,
-   * registry-observed key). */
+   * gold ONLY on the --resolved variant — a real registry-observed Camelot is
+   * a heat/Camelot numeric, the one lane gold is reserved for. */
   .vmx-deck-chip__key {
     color: var(--silk-40);
   }
   .vmx-deck-chip__key--resolved {
-    color: var(--amber);
+    color: var(--gold);
+    text-shadow: 0 0 6px var(--gold-glow);
   }
   /* A LOW-confidence resolved key (< the deck cite-floor): the key text still
-   * shows (we did resolve it) but amber authority is DROPPED — a barely-sure
+   * shows (we did resolve it) but gold authority is DROPPED — a barely-sure
    * camelot must not read with the same authority as a registry hit (WR-04,
    * anti-slop). Dim to --silk-40, same ink as the honest 'unknown'. This rule
    * wins over --resolved because --unsure is applied INSTEAD of --resolved when

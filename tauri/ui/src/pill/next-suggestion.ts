@@ -8,9 +8,9 @@
  * fabricated "next track". Only ids the engine resolved in BOTH the vector store
  * AND the live library ever reach this renderer (Cardinal Invariant #2).
  *
- * 20/80 accent discipline: the ONLY amber on this card is the `↑` next-glyph,
- * the single actionable signal "this is your next move". Earned move-grade
- * data uses rose for the grade and gold only for the XP heat number.
+ * 20/80 accent discipline: the ONLY brand-rose accent on this card is the `↑`
+ * next-glyph, the single actionable signal "this is your next move". Gold is
+ * quarantined to Camelot/heat numerics and never appears on this card.
  *
  * Cloned from deck-chips.ts: the same `registerStyle` once-per-scope injection,
  * the JetBrains-Mono tabular-nums data vocabulary via `var(--type-mono)` (never
@@ -117,8 +117,8 @@ const CSS = `
     pointer-events: none;
   }
   /* The micro-label row: "next ↑" — uppercase mono, dim. The ↑ glyph is the
-   * single amber accent on the card (20/80 — the actionable "do this next"
-   * signal, the one place the eye is guided). */
+   * single brand-rose accent on the card (20/80 — the actionable "do this
+   * next" signal, the one place the eye is guided). */
   .vmx-next-card__label {
     position: relative;
     display: inline-flex;
@@ -132,7 +132,7 @@ const CSS = `
     color: var(--silk-40);
   }
   .vmx-next-card__glyph {
-    color: var(--amber);
+    color: var(--brand);
     font-variant-numeric: tabular-nums;
   }
   .vmx-next-card__peek-action {
@@ -237,12 +237,14 @@ const CSS = `
     background: var(--glass-2);
     overflow: hidden;
   }
+  /* Cue progress stays in the brand lane (press -> rose). Gold is reserved
+   * for Camelot/heat numerics; a progress fill is neither. */
   .vmx-next-card__cue-rail::after {
     content: "";
     position: absolute;
     inset: 0;
     border-radius: inherit;
-    background: linear-gradient(90deg, var(--brand), var(--gold));
+    background: linear-gradient(90deg, var(--brand-press), var(--brand));
     opacity: 0.72;
     transform: scaleX(var(--cue-rail-scale, 0));
     transform-origin: left center;

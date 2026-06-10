@@ -287,7 +287,11 @@
   --silk-06: rgba(242, 239, 241, 0.06);
   --silk-025: rgba(242, 239, 241, 0.025);
 
-  /* Amber accent alias -> rose brand. The v5 deck-light is now rose. */
+  /* Amber accent alias -> rose brand. The v5 deck-light is now rose.
+   * QUARANTINE NOTE: reaching for --amber gets you BRAND ROSE, never gold.
+   * For Camelot / heat / energy-delta numerics use --gold (the one warm
+   * numeric lane). New code spells intent with --brand or --gold directly;
+   * these aliases exist only until the v5->v6 rename sweep retires them. */
   --amber:      var(--brand);
   --amber-deep: var(--brand-press);
   --amber-pale: var(--brand-glow);

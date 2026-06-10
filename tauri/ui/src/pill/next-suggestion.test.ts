@@ -714,15 +714,27 @@ describe("next-suggestion CSS — frontend-enforcement (token-only, 20/80 amber)
     for (const d of decls) expect(d).toMatch(/var\(--type-mono\)/);
   });
 
-  test("20/80 — amber stays on the next glyph; the title leans on silk tone", () => {
+  test("20/80 — brand rose stays on the next glyph; the title leans on silk tone", () => {
     const glyphRule = _CSS_FOR_TEST.match(/\.vmx-next-card__glyph\s*\{[^}]*\}/);
     expect(glyphRule).not.toBeNull();
-    expect(glyphRule![0]).toMatch(/var\(--amber\)/);
+    expect(glyphRule![0]).toMatch(/var\(--brand\)/);
+    // The legacy --amber alias silently resolves to rose — intent must be
+    // spelled with the real token.
+    expect(_CSS_FOR_TEST).not.toMatch(/var\(--amber/);
 
     const titleRule = _CSS_FOR_TEST.match(/\.vmx-next-card__title\s*\{[^}]*\}/);
     expect(titleRule).not.toBeNull();
-    expect(titleRule![0]).not.toMatch(/var\(--amber/); // hierarchy via silk tone
+    expect(titleRule![0]).not.toMatch(/var\(--brand\)/); // hierarchy via silk tone
     expect(titleRule![0]).toMatch(/var\(--silk\)/);
+  });
+
+  test("gold lane — the cue rail rides the brand ladder, gold stays Camelot/heat-only", () => {
+    const railRule = _CSS_FOR_TEST.match(
+      /\.vmx-next-card__cue-rail::after\s*\{[^}]*\}/,
+    );
+    expect(railRule).not.toBeNull();
+    expect(railRule![0]).toMatch(/var\(--brand\)/);
+    expect(_CSS_FOR_TEST).not.toMatch(/var\(--gold/);
   });
 
   test("action line keeps deck and cue case visible and can wrap timing", () => {

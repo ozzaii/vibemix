@@ -642,13 +642,13 @@
   opacity: 0.46;
 }
 
-/* P1-a uplift 3 — the verdict line. ONE amber focal point on the whole
- * debrief: the session's standout stat, in JetBrains Mono amber, sitting
- * above the TL;DR player and below the silk section title. This is the
- * single warm note the DJ's eye lands on — 20/80
- * holds because it's the ONLY amber text on the surface (regions glow,
- * playhead, and this line all share the one accent; nothing else does).
- * Tabular nums so the stat reads as an instrument readout, not prose. */
+/* P1-a uplift 3 — the verdict line. ONE warm focal point on the whole
+ * debrief: the session's standout stat, in JetBrains Mono, sitting
+ * above the TL;DR player and below the silk section title. Tabular nums
+ * so the stat reads as an instrument readout, not prose. Track count and
+ * runtime are STRUCTURAL stats, not heat/Camelot numerics, so the line
+ * rides the brand ladder; gold stays quarantined for a real heat stat
+ * (e.g. peak energy delta) if the verdict ever carries one. */
 .vmx-debrief-verdict {
   margin: 0 0 var(--sp-3);
   font-family: var(--type-mono);
@@ -656,12 +656,9 @@
   font-weight: 600;
   letter-spacing: 0.02em;
   line-height: 1.12;
-  /* The single standout stat of the set — a heat/energy readout, so it carries
-   * --gold (the quarantined numeric accent), tabular so it reads as an
-   * instrument output, not prose. */
-  color: var(--gold);
+  color: var(--brand-glow);
   font-variant-numeric: tabular-nums;
-  text-shadow: 0 0 8px var(--gold-glow), 0 1px 0 rgba(0, 0, 0, 0.45);
+  text-shadow: 0 0 8px var(--brand-22), 0 1px 0 rgba(0, 0, 0, 0.45);
 }
 
 .vmx-debrief-tldr-audio {
