@@ -301,12 +301,12 @@ fn main() {
             });
 
             // Phase 18 Plan 18-04 — Tauri updater boot-time fire-and-forget.
-            // Gated by `update_check_on_launch` (default true); when true the
-            // plugin's `dialog: true` config drives the prompt UX. Failures
-            // are logged but never bail setup — the user keeps the version
-            // they have if the manifest server is unreachable. This is the
-            // lowest-priority boot task on purpose (runs AFTER sidecar +
-            // ws_client + tray are already up).
+            // Gated by `update_check_on_launch` (default true); updater.rs
+            // asks via a native dialog before any download (the v2 plugin
+            // has no built-in prompt). Failures are logged but never bail
+            // setup — the user keeps the version they have if the manifest
+            // server is unreachable. This is the lowest-priority boot task
+            // on purpose (runs AFTER sidecar + ws_client + tray are up).
             let updater_app = app_handle.clone();
             tauri::async_runtime::spawn(async move {
                 updater::run_update_check_if_enabled(updater_app).await;

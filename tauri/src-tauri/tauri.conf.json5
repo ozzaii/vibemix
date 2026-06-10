@@ -151,9 +151,9 @@
     "updater": {
       // Phase 18 Plan 18-04 — live updater config (replaces the Phase 11 STUB).
       //
-      // `active: true` enables the plugin's plugin:updater|check command
-      // (capability already granted via `updater:default` in
-      // capabilities/default.json line 16).
+      // No `active` key: that was Tauri v1 — in v2 the plugin is enabled by
+      // being registered in main.rs (the check command capability is granted
+      // via `updater:default` in capabilities/default.json).
       //
       // `endpoints` URL template — `{{target}}` becomes `darwin`/`windows`,
       // `{{arch}}` becomes `aarch64`/`x86_64`, `{{current_version}}` becomes
@@ -170,11 +170,12 @@
       // Plan 18-05's release.yml gates on the literal placeholder sentinel
       // string in the pubkey VALUE — this comment no longer trips it.
       //
-      // `dialog: true` — built-in update prompt (standard Tauri UX: notify
-      // user, show changelog from `notes`, ask "Update now?", show progress
-      // bar, restart). Update prompts are gated by `update_check_on_launch`
-      // (default true) stored in tauri-plugin-store; opt-out flips it to
-      // false. See tauri/src-tauri/src/updater.rs for the boot-time gate.
+      // No `dialog` key: that was Tauri v1 — the v2 plugin has no built-in
+      // prompt (its Config deserializer silently ignores unknown fields, so
+      // the old `dialog: true` here changed nothing). Consent is asked in
+      // src/updater.rs via tauri-plugin-dialog before any download; the
+      // whole check is gated by `update_check_on_launch` (default true) in
+      // tauri-plugin-store.
       //
       // Plan 40-05 — production key rotation
       // The pubkey above is the 2026-05-13 dev key (Phase 18-04). Production
@@ -185,12 +186,10 @@
       // pushes ONLY (the dev key passes the gate today since it lacks the
       // TAURI_UPDATER_PLACEHOLDER sentinel — tests/tauri/test_updater_key_rotated.py
       // adds the dev-key-still-present gate that flips dual-mode on rotation).
-      "active": true,
       "endpoints": [
         "https://api.altidus.world/vibemix/updates/{{target}}/{{arch}}/{{current_version}}"
       ],
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDk0QThGNkNFNDJFNjQ4N0QKUldSOVNPWkN6dmFvbEx4YjFuTmc3MUJ1MU9tdDVFRFRoUURYQW1qeWRkTC95a3FvSWV6QjBLNjEK",
-      "dialog": true
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDk0QThGNkNFNDJFNjQ4N0QKUldSOVNPWkN6dmFvbEx4YjFuTmc3MUJ1MU9tdDVFRFRoUURYQW1qeWRkTC95a3FvSWV6QjBLNjEK"
     },
     "fs": {
       "requireLiteralLeadingDot": false

@@ -3,21 +3,24 @@
 //!
 //! The Tauri updater plugin (`tauri-plugin-updater` 2.10) is configured live
 //! in `tauri.conf.json5` (Plan 18-04 Task 1):
-//!   - `active: true`
 //!   - `endpoints: ["https://api.altidus.world/vibemix/updates/{{target}}/{{arch}}/{{current_version}}"]`
 //!   - `pubkey: "<base64 minisign>"` (placeholder until Kaan generates the
 //!     keypair pre-v0.1.0 — see `tauri/src-tauri/keys/README.md`)
-//!   - `dialog: true`
+//!
+//! NOTE: tauri-plugin-updater 2.x has NO built-in prompt — the v1-era
+//! `dialog` config option does not exist (unknown fields are silently
+//! ignored by its Config deserializer). The consent prompt lives HERE,
+//! via tauri-plugin-dialog, before any download starts.
 //!
 //! This module is the **boot-time dispatcher**: it reads a single bool
 //! (`update_check_on_launch`, default `true`) from `tauri-plugin-store`'s
 //! `config.json` (the SAME file the Python sidecar's `ConfigStore` reads —
 //! both sides preserve unknown top-level keys on round-trip per
 //! `src/vibemix/runtime/config_store.py` lines 14-22). When the flag is
-//! `true` (default), we call `app.updater()?.check().await` and let the
-//! plugin's `dialog: true` config drive the prompt UX (notify → show
-//! release notes → install + restart on user confirm). When `false`, we
-//! log and exit — the user keeps the version they have.
+//! `true` (default), we call `app.updater()?.check().await`, ask the user
+//! over a native dialog when an update exists, and install only on
+//! confirm. When `false`, we log and exit — the user keeps the version
+//! they have.
 //!
 //! ## Why a separate module
 //!
@@ -56,6 +59,7 @@
 //! Only an explicit `false` boolean disables the check.
 
 use tauri::AppHandle;
+use tauri_plugin_dialog::{DialogExt, MessageDialogButtons};
 use tauri_plugin_store::StoreExt;
 use tauri_plugin_updater::UpdaterExt;
 
@@ -108,12 +112,16 @@ pub fn check_on_launch_enabled(app: &AppHandle) -> bool {
 /// Boot-time fire-and-forget update check.
 ///
 /// Called from `main.rs .setup` via `tauri::async_runtime::spawn`. Honours
-/// the `update_check_on_launch` opt-out (default ON). When enabled,
-/// invokes the Tauri updater plugin's `.check().await` — if an update is
-/// available, the plugin's `dialog: true` config drives the standard
-/// "Update available: vX.Y.Z. Install now?" prompt. On user confirm:
-/// download → minisign-verify against the pubkey baked into the running
-/// app → install → restart.
+/// the `update_check_on_launch` opt-out (default ON). When enabled, invokes
+/// the Tauri updater plugin's `.check().await` — if an update is available,
+/// WE ask first via tauri-plugin-dialog ("Install now / Later") and only
+/// then download → minisign-verify against the pubkey baked into the
+/// running app → install (applies on the next launch).
+///
+/// Consent is OURS to ask: the v1-era `updater.dialog` config option does
+/// not exist in tauri-plugin-updater 2.x (its Config deserializer silently
+/// ignores unknown fields), so without this prompt a boot-time check would
+/// download and replace the app with zero user interaction.
 ///
 /// All errors are logged but never propagated. The updater MUST NEVER
 /// bail boot — manifest server unreachable, signature mismatch, network
@@ -135,18 +143,35 @@ pub async fn run_update_check_if_enabled(app: AppHandle) {
     match updater.check().await {
         Ok(Some(update)) => {
             tracing::info!(
-                "updater: update available (version {}); dispatching download_and_install",
+                "updater: update available (version {}); asking the user",
                 update.version
             );
-            // The `dialog: true` plugin config means Tauri shows the standard
-            // prompt + progress bar; the callbacks below are no-ops because
-            // the plugin owns the UX. If we ever flip to `dialog: false` for
-            // a custom drawer, these closures become the progress hooks.
+            let (tx, rx) = tokio::sync::oneshot::channel::<bool>();
+            app.dialog()
+                .message(format!(
+                    "vibemix {} is ready.\nInstall now? It applies the next time the app opens.",
+                    update.version
+                ))
+                .title("Update available")
+                .buttons(MessageDialogButtons::OkCancelCustom(
+                    "Install now".to_string(),
+                    "Later".to_string(),
+                ))
+                .show(move |confirmed| {
+                    let _ = tx.send(confirmed);
+                });
+            let confirmed = rx.await.unwrap_or(false);
+            if !confirmed {
+                tracing::info!("updater: user chose Later; keeping the running version");
+                return;
+            }
             if let Err(e) = update
                 .download_and_install(|_chunk_len, _total_len| {}, || {})
                 .await
             {
                 tracing::warn!("updater: download_and_install failed: {e}");
+            } else {
+                tracing::info!("updater: installed; applies on next launch");
             }
         }
         Ok(None) => {
