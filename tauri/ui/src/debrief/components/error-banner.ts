@@ -8,6 +8,7 @@ export type DebriefErrorReason =
   | "sidecar_crashed"
   | "tldr_generation_failed"
   | "drills_generation_failed"
+  | "llm_unavailable"
   | "port_in_use"
   | "unknown_kind";
 
@@ -23,6 +24,8 @@ const REASON_COPY: Record<DebriefErrorReason, string> = {
     "Couldn't generate the voiced summary. Try refreshing.",
   drills_generation_failed:
     "Couldn't generate drills with valid citations. Try refreshing.",
+  llm_unavailable:
+    "The coaching brain is unreachable, so drills and the voiced recap are skipped this time. Chapters and the replay below are still from your set.",
   port_in_use:
     "Port 8766 is already taken by another process. Close the other debrief window and reopen.",
   unknown_kind:

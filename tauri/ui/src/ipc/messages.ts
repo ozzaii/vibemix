@@ -699,6 +699,7 @@ export interface DebriefError {
       | "sidecar_crashed"
       | "tldr_generation_failed"
       | "drills_generation_failed"
+      | "llm_unavailable"
       | "port_in_use"
       | "unknown_kind";
     message: string;

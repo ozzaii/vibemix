@@ -303,6 +303,7 @@ def test_debrief_citation_tooltip_not_found_path():
         "sidecar_crashed",
         "tldr_generation_failed",
         "drills_generation_failed",
+        "llm_unavailable",
         "port_in_use",
         "unknown_kind",
     ],

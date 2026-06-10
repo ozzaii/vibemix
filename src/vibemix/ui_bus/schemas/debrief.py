@@ -246,7 +246,8 @@ class DebriefErrorPayload:
             to map to user-facing copy (see Plan 29-05 ``error-banner``).
             Allowed values: ``events_missing | session_too_short |
             invalid_session_dir | sidecar_crashed | tldr_generation_failed
-            | drills_generation_failed | port_in_use | unknown_kind``.
+            | drills_generation_failed | llm_unavailable | port_in_use |
+            unknown_kind``.
         message: free-form developer-readable detail (logged, not
             user-rendered verbatim).
     """

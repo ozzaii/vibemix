@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -574,6 +575,68 @@ def _chapter_summaries(chapters: list[ChapterRegion]) -> list[str]:
     return [f"{c.label} ({c.start:.0f}–{c.end:.0f}s) [{c.citation_event_id}]" for c in chapters]
 
 
+def _build_debrief_client() -> Any | None:
+    """Resolve a genai client the way the live brain does (direct-first).
+
+    The debrief sidecar is its own process: ``open -a`` strips env and the
+    Tauri shell only relays keys it has itself (sidecar.rs
+    FORWARDED_ENV_KEYS), so a packaged proxy-mode user reaches here with no
+    GEMINI_API_KEY anywhere. Mirror ``__main__``'s mode dispatch:
+
+      1. GEMINI_API_KEY set (BYO dev relay) → direct client with the live
+         path's 120s request bound (same precedent as
+         ``__main__._library_genai_client``).
+      2. mode != direct → self-provision proxy auth exactly like the live
+         session: install-uuid + cached/refreshed JWT against the proxy
+         (no env needed — keyring/file-backed, bounded keyring calls).
+      3. ``None`` when neither resolves → caller degrades to the local
+         frames (chapters / near-miss / waveform) instead of crashing.
+    """
+    api_key = (os.environ.get("GEMINI_API_KEY") or "").strip()
+    if api_key:
+        from google import genai
+        from google.genai import types
+
+        return genai.Client(
+            api_key=api_key,
+            http_options=types.HttpOptions(timeout=120_000),  # ms — match live
+        )
+
+    mode = (os.environ.get("VIBEMIX_LLM_MODE") or "").strip().lower()
+    if not mode:
+        try:
+            from vibemix.runtime.config_store import load_config
+
+            mode = (load_config().llm_mode or "proxy").strip().lower()
+        except Exception:
+            mode = "proxy"
+    if mode == "direct":
+        # Explicit direct mode without a key: nothing to build.
+        return None
+
+    proxy_base_url = os.environ.get(
+        "VIBEMIX_PROXY_BASE_URL", "https://api.altidus.world"
+    )
+    try:
+        jwt = (os.environ.get("VIBEMIX_PROXY_JWT") or "").strip()
+        if not jwt:
+            from vibemix import __version__
+            from vibemix.agent.install_uuid import get_or_create_install_uuid
+            from vibemix.agent.jwt_cache import get_or_refresh_jwt
+
+            install_id = get_or_create_install_uuid()
+            client_version = os.environ.get("VIBEMIX_CLIENT_VERSION", __version__)
+            jwt = asyncio.run(
+                get_or_refresh_jwt(install_id, proxy_base_url, client_version)
+            )
+        from vibemix.agent.proxy_client import build_proxy_genai_client
+
+        return build_proxy_genai_client(jwt, proxy_base_url)
+    except Exception as e:
+        logger.warning("[debrief] proxy client unavailable: %s", e)
+        return None
+
+
 # ---------------------------------------------------------------------------
 # Orchestrator
 # ---------------------------------------------------------------------------
@@ -680,19 +743,34 @@ def run(
     cited_critique = _build_cited_critique(events, chapters)
 
     if client is None:
-        try:
-            from google import genai
+        client = _build_debrief_client()
 
-            client = genai.Client()
-        except Exception as e:
-            if serve:
-                _emit_error_and_exit(
-                    port,
-                    "tldr_generation_failed",
-                    f"Gemini client init failed: {e}",
-                )
-                return {}
-            raise
+    if client is None:
+        # No brain reachable (no key, no proxy auth). Chapters, near-miss,
+        # friend line, and the waveform are all local — serve those and
+        # flag the LLM gap honestly instead of failing the whole window.
+        # The cache is NOT written, so a later open retries generation.
+        state = {
+            "session_dir": validated_session_dir,
+            "chapters": chapters,
+            "drills": None,
+            "debrief": None,
+            "evidence_snapshot": evidence_snapshot,
+            "voice_meta": voice_meta,
+            "duration_s": duration_s,
+            "near_miss_payload": near_miss_payload,
+            "tldr_mp3_path": validated_session_dir / TLDR_MP3_FILENAME,
+            "cache_hit": False,
+            "llm_unavailable": True,
+        }
+        _write_back_profile_best_effort(events, evidence_snapshot)
+        if not serve:
+            raise DebriefGenerationError(
+                reason="llm_unavailable",
+                message="no GEMINI_API_KEY and no proxy auth available",
+            )
+        asyncio.run(_serve_loop(state, port))
+        return state
 
     # Drills
     try:
@@ -815,6 +893,15 @@ async def _serve_loop(state: dict, port: int) -> None:
     from vibemix.debrief.ws_server import DebriefWsServer
 
     server = DebriefWsServer(port=port, state=state)
-    # Pre-fill the emit queue with the progressive frames.
-    server.enqueue_initial_frames()
+    _enqueue_frames_for_state(server, state)
     await server.serve_forever()
+
+
+def _enqueue_frames_for_state(server: Any, state: dict) -> None:
+    """Pre-fill the emit queue: progressive frames + honest LLM-gap notice."""
+    server.enqueue_initial_frames()
+    if state.get("llm_unavailable"):
+        server.emit_error(
+            "llm_unavailable",
+            "no direct Gemini key and no proxy auth — drills + voiced TLDR skipped",
+        )
