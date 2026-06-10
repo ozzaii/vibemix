@@ -758,6 +758,11 @@
 .vmx-debrief-root[data-mock] .vmx-morning-mirror__rail {
   min-height: 56px;
 }
+.vmx-debrief-root[data-mock] .vmx-morning-mirror__play {
+  /* No audio exists in the demo — a Play button that silently no-ops is a
+   * dead control; the preview shows the composition, not a fake player. */
+  display: none;
+}
 
 .vmx-debrief-timeline-placeholder {
   position: relative;
