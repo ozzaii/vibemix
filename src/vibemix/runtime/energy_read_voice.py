@@ -39,6 +39,64 @@ _VOICE_EVENT_TYPES = frozenset(
 )
 _TEXT_ESCAPE = str.maketrans({"[": "(", "]": ")", "\n": " ", "\r": " ", "|": "/"})
 
+# Deltas are RELATIVE (|cur-prev|/prev), so a 0.02→0.05 mid move renders
+# "rose 25% (clear)" while the mids are still inaudible — the judge refuted
+# every such line ("new mids" voiced at mid=0.05: the 0-for-3 cold-start
+# class, 2026-06-10 cadence lever). A ROSE band delta is voiceable only when
+# its band's post level clears this floor. FELL reads are exempt by design:
+# a low post level IS the read ("leave low-end space"). Keeper calibration
+# from the measured runs: killers at band 0.01-0.05, survivors at 0.10-0.16.
+BAND_AUDIBILITY_FLOOR = 0.10
+
+# Delta-string keyword → the state.bands key whose post level must be audible
+# for a ROSE claim. "brightness" keys on the HIGH band: the brightness share
+# sums mid+high, so a mid-driven rise must not voice top-end vocabulary
+# (the measured "added brightness" fabrication).
+_ROSE_BAND_KEYWORDS = (
+    ("sub energy", "sub"),
+    ("low energy", "low"),
+    ("mid energy", "mid"),
+    ("high energy", "high"),
+    ("brightness", "high"),
+)
+
+
+def _rose_band_level(text: str, state: MusicState) -> float | None:
+    """Post level of the band a ROSE delta names; None for fell/non-band deltas."""
+    if "rose" not in text:
+        return None
+    bands = getattr(state, "bands", {}) or {}
+    if not isinstance(bands, dict):
+        return None
+    for keyword, key in _ROSE_BAND_KEYWORDS:
+        if keyword in text:
+            try:
+                return float(bands.get(key, 0.0) or 0.0)
+            except (TypeError, ValueError):
+                return 0.0
+    return None
+
+
+def _voiced_deltas(deltas: Sequence[str], state: MusicState) -> list[str]:
+    """The deltas the receipt offers the brain as voiceable material.
+
+    The full window still feeds the receipt digest; this clause is what the
+    prompt presents as sayable. Two measured cuts (2026-06-10): slight blips
+    drop whenever a non-slight delta co-rides (the brain voiced co-riding
+    blips as audible claims), and inaudible-rose band deltas drop always
+    (the "high energy rose 100% (strong)" at high=0.02 class)."""
+    has_non_slight = any("(slight)" not in str(d).casefold() for d in deltas)
+    out: list[str] = []
+    for raw in deltas:
+        text = str(raw).casefold()
+        if has_non_slight and "(slight)" in text:
+            continue
+        level = _rose_band_level(text, state)
+        if level is not None and level < BAND_AUDIBILITY_FLOOR:
+            continue
+        out.append(raw)
+    return out
+
 
 def build_energy_read_voice_line(
     suggestion: Mapping[str, Any] | None,
@@ -118,7 +176,8 @@ def build_energy_read_voice_line(
         risks_clause = _list_clause("Risk flags", transition["transition"].get("risk_flags"))
         scope_clause = f"{scope_clause}, and library fit"
 
-    delta_clause = f"Live deltas: {'; '.join(deltas)}. " if deltas else ""
+    voiced = _voiced_deltas(deltas, state)
+    delta_clause = f"Live deltas: {'; '.join(voiced)}. " if voiced else ""
     arc_text = f"{arc_clause}. " if arc_clause is not None else ""
     phrase_text = f"{phrase_clause}. " if phrase_clause is not None else ""
 
@@ -283,18 +342,28 @@ def _forward_body(
         # ("That brightness share just ticked up…") the judge's ears refuted.
         if "(slight)" in text:
             continue
+        # Rose claims must be audible NOW (BAND_AUDIBILITY_FLOOR): a relative
+        # rise from near-silence is a blip, not a read — the measured
+        # cold-start "new mids at mid=0.05" class. Fell claims pass: a low
+        # post level is the read itself.
+        level = _rose_band_level(text, state)
+        if level is not None and level < BAND_AUDIBILITY_FLOOR:
+            continue
         if ("sub energy" in text or "low energy" in text or "rms" in text) and "fell" in text:
             return "leaving low-end space before the next push"
         if ("sub energy" in text or "low energy" in text or "rms" in text) and "rose" in text:
             return "controlling the added weight in the next phrase"
         # Mid is split from brightness (iter7): a clear mid rise rendered as
         # "the added brightness" was judged fabricated against low actual
-        # highs — each band speaks its own vocabulary.
+        # highs — each band speaks its own vocabulary. Same split on the fall
+        # side (the rise-bug's twin): a mid fall is a mid read, not top-end.
         if "mid energy" in text and "rose" in text:
             return "letting the new mids sit before adding anything on top"
         if ("high energy" in text or "brightness" in text) and "rose" in text:
             return "using the added brightness as the forward cue"
-        if ("mid energy" in text or "high energy" in text or "brightness" in text) and "fell" in text:
+        if "mid energy" in text and "fell" in text:
+            return "leaving the mids open before the next layer"
+        if ("high energy" in text or "brightness" in text) and "fell" in text:
             return "keeping the top-end space intentional"
     if "lifting" in arc or "building" in arc:
         return "lifting the next phrase without rushing it"

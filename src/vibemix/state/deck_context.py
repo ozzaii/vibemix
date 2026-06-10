@@ -2086,13 +2086,17 @@ def render_audio_delta_items(
         phr = render_delta(label, cur, prev.get(key), floor=DELTA_FLOOR)
         if phr is not None:
             out.append(phr)
-        if len(out) >= cap:
-            break
-    if len(out) < cap:
-        brightness_delta = _render_brightness_delta(bands, prev)
-        if brightness_delta is not None:
-            out.append(brightness_delta)
-    return out
+    brightness_delta = _render_brightness_delta(bands, prev)
+    if brightness_delta is not None:
+        out.append(brightness_delta)
+    # Non-slight deltas outrank slight inside the cap window: with the old
+    # break-at-cap walk, four slight blips early in the fixed band order could
+    # fill the window and a real change read further down never reached the
+    # receipt producer at all. Stable partition — order within each class and
+    # the cap are unchanged.
+    non_slight = [item for item in out if "(slight)" not in item]
+    slight = [item for item in out if "(slight)" in item]
+    return (non_slight + slight)[:cap]
 
 
 def _band_env_tokens(state: MusicState) -> list[str]:

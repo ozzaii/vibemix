@@ -2080,6 +2080,31 @@ def test_audio_delta_items_include_brightness_share_receipt() -> None:
     assert "audio_delta=brightness_share_rose_44pct_strong" in mix_keys
 
 
+def test_audio_delta_items_rank_non_slight_ahead_of_slight() -> None:
+    """Cadence lever U3 (2026-06-10): the fixed collect order broke at cap=4,
+    so four slight blips early in the band list could fill the window and
+    starve a real change read further down (a strong high move never reached
+    the receipt producer at all). Non-slight deltas now outrank slight within
+    the cap — a stable, count-preserving partition."""
+    state = MusicState(audible=True, rms=0.12, onset_density=3.0, master_lufs=-12.5)
+    state.bands = {"sub": 0.23, "low": 0.23, "mid": 0.345, "high": 0.20}
+    state.prev_perceive = {
+        "rms": 0.12,
+        "master_lufs": -14.0,
+        "sub": 0.20,
+        "low": 0.20,
+        "mid": 0.30,
+        "high": 0.10,
+        "onset_density": 3.0,
+    }
+
+    items = render_audio_delta_items(state)
+
+    assert len(items) == 4
+    assert items[0] == "high energy rose 100% (strong)"
+    assert all("(slight)" not in item for item in items[:2])
+
+
 def test_audio_delta_items_strip_flat_master_lufs_receipt() -> None:
     state = MusicState(audible=True, rms=0.12, onset_density=3.0, master_lufs=-13.8)
     state.prev_perceive = {"master_lufs": -14.0}

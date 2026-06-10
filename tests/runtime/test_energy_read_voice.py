@@ -25,6 +25,7 @@ def _state(
     curve: list[float] | None = None,
     phase: str = "groove",
     buildup: float = 0.0,
+    bands: dict[str, float] | None = None,
 ) -> MusicState:
     state = MusicState()
     state.audible = True
@@ -32,6 +33,8 @@ def _state(
     state.buildup_score = buildup
     if curve is not None:
         state.energy_curve = curve
+    if bands is not None:
+        state.bands = dict(bands)
     return state
 
 
@@ -133,7 +136,10 @@ def test_lifting_arc_with_sub_rose_delta_prefers_delta_body() -> None:
         None,
         event_type="PHASE",
         evidence_registry=EvidenceRegistry(),
-        state=_state(curve=[0.30, 0.30, 0.45, 0.50]),  # lifting arc
+        state=_state(
+            curve=[0.30, 0.30, 0.45, 0.50],  # lifting arc
+            bands={"sub": 0.24, "low": 0.20, "mid": 0.10, "high": 0.05},
+        ),
         audio_delta_items=["sub energy rose 0.10 -> 0.24"],
     )
     assert isinstance(line, str)
@@ -164,7 +170,7 @@ def test_slight_delta_skipped_in_favor_of_clear_delta() -> None:
         None,
         event_type="PHASE",
         evidence_registry=EvidenceRegistry(),
-        state=_state(phase=""),
+        state=_state(phase="", bands={"sub": 0.20, "low": 0.18, "mid": 0.22, "high": 0.31}),
         audio_delta_items=[
             "sub energy fell 4% (slight)",
             "brightness share rose 31% (clear)",
@@ -184,12 +190,98 @@ def test_mid_rise_speaks_mid_language_not_brightness() -> None:
         None,
         event_type="PHASE",
         evidence_registry=EvidenceRegistry(),
-        state=_state(phase=""),
+        state=_state(phase="", bands={"sub": 0.18, "low": 0.20, "mid": 0.16, "high": 0.04}),
         audio_delta_items=["mid energy rose 25% (clear)"],
     )
     assert isinstance(line, str)
     assert "letting the new mids sit before adding anything on top" in line
     assert "brightness" not in line.split("Live deltas:")[0]
+
+
+def test_inaudible_mid_rise_yields_no_receipt() -> None:
+    """Cadence lever U1 (2026-06-10): deltas are RELATIVE, so a 0.02→0.05 mid
+    move renders "rose 25% (clear)" while the mids are still inaudible — the
+    measured 0-for-3 cold-start class ("new mids" voiced at mid=0.05, judged
+    perceptual-overclaim every run). A ROSE band delta selects a body only
+    when its band's post level clears BAND_AUDIBILITY_FLOOR; with nothing else
+    to say the read falls to a no-info body and stays silent. Fell reads are
+    exempt — a low post level IS the read."""
+    line = build_energy_read_voice_line(
+        None,
+        event_type="PHASE",
+        evidence_registry=EvidenceRegistry(),
+        state=_state(phase="", bands={"sub": 0.30, "low": 0.25, "mid": 0.05, "high": 0.02}),
+        audio_delta_items=["mid energy rose 25% (clear)", "onset density rose 100% (strong)"],
+    )
+    assert line is None
+
+
+def test_inaudible_rose_delta_dropped_from_voiced_clause() -> None:
+    """The +151 class (midi-r2/r3, 2026-06-10): the receipt minted on an
+    audible delta, but the brain voiced the CO-RIDING "high energy rose 100%
+    (strong)" at high=0.02 from the evidence clause. Inaudible-rose deltas no
+    longer enter the voiceable clause at all (they stay in the digest)."""
+    line = build_energy_read_voice_line(
+        None,
+        event_type="PHASE",
+        evidence_registry=EvidenceRegistry(),
+        state=_state(phase="", bands={"sub": 0.28, "low": 0.24, "mid": 0.08, "high": 0.02}),
+        audio_delta_items=[
+            "sub energy fell 40% (clear)",
+            "high energy rose 100% (strong)",
+        ],
+    )
+    assert isinstance(line, str)
+    assert "leaving low-end space before the next push" in line
+    assert "high energy rose" not in line
+
+
+def test_slight_deltas_dropped_from_voiced_clause_when_non_slight_rides() -> None:
+    """Slight blips stay out of the brain's voiceable material whenever a real
+    delta co-rides — the measured generation-variance path voiced them
+    downstream of body selection ("That brightness share just ticked up")."""
+    line = build_energy_read_voice_line(
+        None,
+        event_type="PHASE",
+        evidence_registry=EvidenceRegistry(),
+        state=_state(phase="", bands={"sub": 0.28, "low": 0.24, "mid": 0.12, "high": 0.06}),
+        audio_delta_items=[
+            "sub energy fell 40% (clear)",
+            "brightness share rose 17% (slight)",
+        ],
+    )
+    assert isinstance(line, str)
+    assert "(slight)" not in line
+
+
+def test_mid_fell_speaks_mid_language_not_top_end() -> None:
+    """The rise-bug's twin (auditor residual, 2026-06-10): "mid energy fell"
+    rendered "keeping the top-end space intentional" — top-end vocabulary for
+    a mid move. Each band speaks its own vocabulary on the fall side too."""
+    line = build_energy_read_voice_line(
+        None,
+        event_type="PHASE",
+        evidence_registry=EvidenceRegistry(),
+        state=_state(phase=""),
+        audio_delta_items=["mid energy fell 30% (clear)"],
+    )
+    assert isinstance(line, str)
+    assert "leaving the mids open before the next layer" in line
+    assert "top-end" not in line.split("Live deltas:")[0]
+
+
+def test_high_fell_keeps_top_end_vocabulary() -> None:
+    """A genuine high/brightness fall keeps the top-end body — the vocabulary
+    split is per-band, not a ban."""
+    line = build_energy_read_voice_line(
+        None,
+        event_type="PHASE",
+        evidence_registry=EvidenceRegistry(),
+        state=_state(phase=""),
+        audio_delta_items=["high energy fell 35% (clear)"],
+    )
+    assert isinstance(line, str)
+    assert "keeping the top-end space intentional" in line
 
 
 def test_unmatched_deltas_fall_to_no_info_body_and_stay_silent() -> None:
