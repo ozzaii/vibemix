@@ -5,7 +5,10 @@
  *     STILL LIVE copy and the expected button labels.
  *   - Clicking STAY resolves the promise with false (don't quit).
  *   - Clicking QUIT ANYWAY resolves with true (close).
- *   - isLiveSessionActive() reads the SessionState.status.livekit flag.
+ *   - isLiveSessionActive() reads SessionState.runState (the activation
+ *     state) and ignores status.livekit — the 1Hz status tick emits
+ *     livekit="ok" from boot, idle included, so keying off it armed the
+ *     guard forever (the idle "STILL LIVE" false alarm).
  *   - The dialog uses the danger variant (red-tinted destructive button).
  *
  * The beforeunload listener itself is harder to assert directly — vitest's
@@ -37,27 +40,29 @@ afterEach(() => {
 });
 
 describe("isLiveSessionActive", () => {
-  it("returns false when livekit is null", () => {
+  it("returns false at the boot default (armed deck, no Start yet)", () => {
     expect(isLiveSessionActive()).toBe(false);
   });
 
-  it("returns true when livekit === 'ok'", () => {
-    setSessionState({
-      status: {
-        livekit: "ok",
-        gemini: "ok",
-        midi: 1,
-        screen: "ok",
-      },
-    });
+  it("returns true while runState === 'running'", () => {
+    setSessionState({ runState: "running" });
     expect(isLiveSessionActive()).toBe(true);
     expect(isRecording()).toBe(true);
   });
 
-  it("returns false when livekit === 'down'", () => {
+  it("returns false when the deck parks back to 'armed'", () => {
+    setSessionState({ runState: "running" });
+    setSessionState({ runState: "armed" });
+    expect(isLiveSessionActive()).toBe(false);
+  });
+
+  it("IGNORES the never-faulting status tick — livekit='ok' at idle must not arm the guard", () => {
+    // ws_bus.py emits livekit="ok" at 1Hz from boot, idle included
+    // (never-faults by construction). The guard keying off it produced
+    // the idle "STILL LIVE" false alarm — pin that it stays dead.
     setSessionState({
       status: {
-        livekit: "down",
+        livekit: "ok",
         gemini: "ok",
         midi: 1,
         screen: "ok",
@@ -115,14 +120,7 @@ describe("confirmQuitDuringRecording", () => {
 
 describe("installQuitGuard beforeunload listener", () => {
   it("sets returnValue when live session is active so the browser shows native confirm", () => {
-    setSessionState({
-      status: {
-        livekit: "ok",
-        gemini: "ok",
-        midi: 1,
-        screen: "ok",
-      },
-    });
+    setSessionState({ runState: "running" });
     const unregister = installQuitGuard();
     const event = new Event("beforeunload", { cancelable: true });
     // jsdom doesn't populate `returnValue` on plain Events; we tag it
@@ -139,7 +137,7 @@ describe("installQuitGuard beforeunload listener", () => {
   });
 
   it("is a no-op when isRecording=false", () => {
-    // Default state: livekit=null → isLiveSessionActive=false
+    // Default state: runState="armed" → isLiveSessionActive=false
     const unregister = installQuitGuard();
     const event = new Event("beforeunload", { cancelable: true });
     Object.defineProperty(event, "returnValue", {
@@ -152,14 +150,7 @@ describe("installQuitGuard beforeunload listener", () => {
   });
 
   it("unregister fn removes the listener", () => {
-    setSessionState({
-      status: {
-        livekit: "ok",
-        gemini: "ok",
-        midi: 1,
-        screen: "ok",
-      },
-    });
+    setSessionState({ runState: "running" });
     const unregister = installQuitGuard();
     unregister();
     // After unregister, dispatching again should not set returnValue.

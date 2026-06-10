@@ -23,10 +23,15 @@
  * wiring the Rust tray-side handshake. Cmd+Q on a live recording no
  * longer drops the take.
  *
- * The active-live-session check uses `status.livekit === "ok"`. That is
- * intentionally not called "recording" here: the current UI does not carry
- * a dedicated recording-consent/recorder-active bit, so the guard protects
- * the running session without claiming more than the state can prove. */
+ * The active-live-session check uses `runState === "running"` — the deck's
+ * activation state (boots "armed", flips on Start, reconciled by the
+ * backend's run_state snapshot). It deliberately does NOT read
+ * `status.livekit`: the 1Hz status tick emits livekit="ok" from boot,
+ * idle included (ws_bus.py STATUS_EVERY_N contract, never-faults by
+ * construction), so keying off it armed the guard forever — quitting an
+ * IDLE app threw the "STILL LIVE" dialog. It is intentionally not called
+ * "recording" here: the UI carries no recorder-active bit, so the guard
+ * protects the running session without claiming more than it can prove. */
 
 import { renderConfirmDialog } from "../settings/components/confirm-dialog.js";
 import { emitTauri, listenTauri, type UnlistenFn } from "../tauri-runtime.js";
@@ -35,7 +40,7 @@ import { getSessionState } from "./state.js";
 /** Returns true when the cohost has an active live session. Exported for tests. */
 export function isLiveSessionActive(): boolean {
   try {
-    return getSessionState().status.livekit === "ok";
+    return getSessionState().runState === "running";
   } catch {
     return false;
   }
