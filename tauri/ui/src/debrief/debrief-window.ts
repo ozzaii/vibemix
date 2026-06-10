@@ -71,6 +71,10 @@ if (isMockMode) {
   let chapters: TimelineChapter[] = [];
   let totalDurationS = 0;
   let morningPayload: MorningMirrorPayload | null = null;
+  // The evidence frame returns async; the click that requested it stashes
+  // its viewport position here so the tooltip opens at the chip, not at
+  // the document tail.
+  let pendingTooltipAnchor: { x: number; y: number } | null = null;
 
   client.addEventListener("session-loaded", (e: Event) => {
     const detail = (e as CustomEvent).detail as {
@@ -164,7 +168,10 @@ if (isMockMode) {
 
   client.addEventListener("citation-tooltip", (e: Event) => {
     const detail = (e as CustomEvent).detail as CitationTooltipPayload;
-    if (tooltip) showCitationTooltip(tooltip, detail);
+    if (tooltip) {
+      showCitationTooltip(tooltip, detail, pendingTooltipAnchor ?? undefined);
+    }
+    pendingTooltipAnchor = null;
   });
 
   client.addEventListener("error", (e: Event) => {
@@ -229,7 +236,15 @@ if (isMockMode) {
   // Wire citation chip clicks → request tooltip via WS.
   if (drillsEl) {
     drillsEl.addEventListener("citation-click", (e: Event) => {
-      const detail = (e as CustomEvent).detail as { citation: string };
+      const detail = (e as CustomEvent).detail as {
+        citation: string;
+        anchorX?: number;
+        anchorY?: number;
+      };
+      pendingTooltipAnchor =
+        typeof detail.anchorX === "number" && typeof detail.anchorY === "number"
+          ? { x: detail.anchorX, y: detail.anchorY }
+          : null;
       client.sendCitationTooltipRequest(detail.citation);
     });
     drillsEl.addEventListener("moment-feedback-click", (e: Event) => {
@@ -246,7 +261,13 @@ if (isMockMode) {
     waveformEl.addEventListener("region-clicked", (e: Event) => {
       const detail = (e as CustomEvent).detail as {
         citation_event_id: string;
+        anchorX?: number;
+        anchorY?: number;
       };
+      pendingTooltipAnchor =
+        typeof detail.anchorX === "number" && typeof detail.anchorY === "number"
+          ? { x: detail.anchorX, y: detail.anchorY }
+          : null;
       client.sendCitationTooltipRequest(detail.citation_event_id);
     });
   }

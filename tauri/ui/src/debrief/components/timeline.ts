@@ -148,11 +148,17 @@ export function mountTimelinePlaceholder(
     region.addEventListener("click", (e) => {
       e.stopPropagation();
       inspect();
+      // Evidence arrives async over the ws bus — the click position rides
+      // along so the tooltip can open at the region, not the page tail.
+      const rect = region.getBoundingClientRect();
+      const fromKeyboard = e.detail === 0;
       container.dispatchEvent(
         new CustomEvent("region-clicked", {
           detail: {
             time: c.start,
             citation_event_id: c.citation_event_id,
+            anchorX: fromKeyboard ? rect.left : e.clientX,
+            anchorY: fromKeyboard ? rect.bottom : e.clientY,
           },
           bubbles: true,
         }),

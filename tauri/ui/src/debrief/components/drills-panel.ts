@@ -22,7 +22,7 @@ export interface LearnReferralPayload {
 }
 
 export interface CitationClickEvent extends CustomEvent {
-  detail: { citation: string };
+  detail: { citation: string; anchorX: number; anchorY: number };
 }
 
 export interface LearnReferralClickEvent extends CustomEvent {
@@ -82,9 +82,19 @@ export function mountDrillsPanel(
     chip.title = "Click to see evidence";
     chip.addEventListener("click", (e) => {
       e.stopPropagation();
+      // The evidence tooltip arrives later over the ws bus, so the click
+      // position rides the event for the window to stash. Keyboard
+      // activation has no pointer coords (detail === 0) — anchor on the
+      // chip itself.
+      const rect = chip.getBoundingClientRect();
+      const fromKeyboard = e.detail === 0;
       container.dispatchEvent(
         new CustomEvent("citation-click", {
-          detail: { citation: d.citation },
+          detail: {
+            citation: d.citation,
+            anchorX: fromKeyboard ? rect.left : e.clientX,
+            anchorY: fromKeyboard ? rect.bottom : e.clientY,
+          },
           bubbles: true,
         }),
       );

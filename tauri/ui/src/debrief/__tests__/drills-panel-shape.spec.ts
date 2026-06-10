@@ -66,7 +66,13 @@ describe("drills-panel", () => {
     });
     mountDrillsPanel(div, [drill, drill, drill]);
     (div.querySelector("button.vmx-drill-citation") as HTMLButtonElement).click();
-    expect(onClick).toHaveBeenCalledWith({ citation: "[ev:M@1]" });
+    expect(onClick).toHaveBeenCalledWith(
+      expect.objectContaining({
+        citation: "[ev:M@1]",
+        anchorX: expect.any(Number),
+        anchorY: expect.any(Number),
+      }),
+    );
   });
 
   it("learn referral renders a parked coming-soon row with lesson metadata", () => {

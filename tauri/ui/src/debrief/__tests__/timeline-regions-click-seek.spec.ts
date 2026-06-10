@@ -62,10 +62,14 @@ describe("timeline placeholder", () => {
     });
     mountTimelinePlaceholder(div, chapters, 900);
     (div.querySelectorAll<HTMLElement>(".vmx-debrief-region")[1] as HTMLButtonElement).click();
-    expect(onClick).toHaveBeenCalledWith({
-      time: 300,
-      citation_event_id: "ev:TRACK_CHANGE@300",
-    });
+    expect(onClick).toHaveBeenCalledWith(
+      expect.objectContaining({
+        time: 300,
+        citation_event_id: "ev:TRACK_CHANGE@300",
+        anchorX: expect.any(Number),
+        anchorY: expect.any(Number),
+      }),
+    );
   });
 
   it("empty chapters renders fallback text", () => {

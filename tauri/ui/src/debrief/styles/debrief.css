@@ -1420,7 +1420,9 @@
 }
 
 .vmx-debrief-tooltip {
-  position: absolute;
+  /* Fixed: the anchor is the click's viewport position (clientX/Y), and
+   * the evidence receipt must not scroll away from the chip it cites. */
+  position: fixed;
   z-index: 200;
   background: var(--glass-3);
   backdrop-filter: var(--blur-glass-display);

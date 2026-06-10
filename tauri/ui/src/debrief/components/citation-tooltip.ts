@@ -39,8 +39,17 @@ export function showCitationTooltip(
   }
 
   if (anchor) {
+    // Place just under the click, then clamp into the viewport — the
+    // receipt must open AT the chip, never below the fold. Position
+    // first so the measured size reflects the final content.
     container.style.left = `${anchor.x}px`;
-    container.style.top = `${anchor.y}px`;
+    container.style.top = `${anchor.y + 8}px`;
+    const rect = container.getBoundingClientRect();
+    const margin = 12;
+    const maxLeft = window.innerWidth - rect.width - margin;
+    const maxTop = window.innerHeight - rect.height - margin;
+    container.style.left = `${Math.max(margin, Math.min(anchor.x, maxLeft))}px`;
+    container.style.top = `${Math.max(margin, Math.min(anchor.y + 8, maxTop))}px`;
   }
 
   // Auto-dismiss handlers — outside click + Escape.
