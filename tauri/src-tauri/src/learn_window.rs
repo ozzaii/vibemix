@@ -31,6 +31,7 @@
 //!     capability allowlist (Plan 91-01 `capabilities/default.json`)
 //!     gates webview invocation.
 
+use tauri::window::Color;
 use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
 
 /// Tauri window label for the Learn surface. Lowercase + no whitespace
@@ -92,11 +93,13 @@ async fn open_learn_route(app: AppHandle, lesson_id: Option<String>) -> Result<(
         LEARN_WINDOW_LABEL,
         learn_webview_url(lesson_id.as_deref()),
     )
-    .title("Learn — vibemix")
+    .title("Learn · vibemix")
     .inner_size(DEFAULT_WIDTH, DEFAULT_HEIGHT)
     .min_inner_size(MIN_WIDTH, MIN_HEIGHT)
     .resizable(true)
     .decorations(true)
+    // Warm void (--void-0) from the first frame — no platform-white flash.
+    .background_color(Color(0x1A, 0x16, 0x18, 0xFF))
     .build()
     .map_err(|e| format!("window build: {e}"))?;
 

@@ -57,6 +57,7 @@ use std::{
     process::Command,
     time::{SystemTime, UNIX_EPOCH},
 };
+use tauri::window::Color;
 use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
 use tauri_plugin_shell::process::CommandEvent;
 use tauri_plugin_shell::ShellExt;
@@ -1388,6 +1389,8 @@ pub async fn open_library_window(app: AppHandle) -> Result<(), String> {
     .min_inner_size(LIBRARY_MIN_WIDTH, LIBRARY_MIN_HEIGHT)
     .resizable(true)
     .decorations(true)
+    // Warm void (--void-0) from the first frame — no platform-white flash.
+    .background_color(Color(0x1A, 0x16, 0x18, 0xFF))
     .build()
     .map_err(|e| format!("library window build: {e}"))?;
 

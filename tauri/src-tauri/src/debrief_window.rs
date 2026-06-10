@@ -25,6 +25,7 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
 use serde::{Deserialize, Serialize};
+use tauri::window::Color;
 use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindowBuilder, WindowEvent};
 use tauri_plugin_shell::process::{CommandChild, CommandEvent};
 use tauri_plugin_shell::ShellExt;
@@ -199,11 +200,15 @@ pub async fn open_debrief_window(
         None => format!("debrief.html?session={url_encoded}"),
     };
     let window = WebviewWindowBuilder::new(&app, DEBRIEF_WINDOW_LABEL, WebviewUrl::App(url.into()))
-        .title(format!("Debrief — {session_label}"))
+        .title(format!("Debrief · {session_label}"))
         .inner_size(DEFAULT_WIDTH, DEFAULT_HEIGHT)
         .min_inner_size(MIN_WIDTH, MIN_HEIGHT)
         .resizable(true)
         .decorations(true)
+        // Paint the warm void (--void-0) from the first frame — without it the
+        // webview opens platform-white before the stylesheet lands (a white
+        // flash on a dark app).
+        .background_color(Color(0x1A, 0x16, 0x18, 0xFF))
         .build()
         .map_err(|e| format!("window build: {e}"))?;
 
