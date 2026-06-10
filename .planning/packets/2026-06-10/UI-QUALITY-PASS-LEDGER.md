@@ -112,7 +112,12 @@ NEXT QUEUE v3 #1 (pill rose budget) + the pill P2 tail + v3 #3 tray lane + v3 #5
 
 Gates: full vitest 1646 passed + 1 todo (178 files), npm run build green, tsc green, cargo test tray 9/9, bare cargo check green. Captures: pill-rose-budget/{before,after}/*.png.
 
-### NEXT QUEUE v4 (carried forward)
-1. **Warming ≠ live-listening** (python wire, the big one): go-live-deterministic packet owns it — capture opens BEFORE Chatterbox warmup, "started" gated on first capture callback, ipc.error on capture-fail, ARMED status. Same lane: "audio input dropped" fault dead-wired; armed-gate "checking" states ride never-faulting values.
-2. **Critic gaps left**: updater unaudited; settings interior failure states; Windows wizard parity.
-3. **Carryovers**: v5→v6 rename sweep (+legacy-gate rewrite SAME commit); NEXT UP (blocked on live suggestion_service proof); viber index.ts P0s (other session's WIP); screen-noun P2; debrief mock-mode citation chips dead + morning panel mock overflow (mock-only, low).
+### NEXT QUEUE v4 — items 1+2(updater) CLOSED same session (2 more commits 99e90fdf, acdbca64)
+
+- [x] **Warming ≠ live (v4 #1)**: RE-PINNED against HEAD — the python keystone ALREADY LANDED in the gobble wave (capture spawns BEFORE Chatterbox warmup `__main__.py:2501` vs `:2502+` "warming Chatterbox while capture arms"; "started" gated on stream bind; capture_bound/capture_failed events + ipc.error original_type=audio.capture; activation-time device re-resolve). The packet's ARMED wire status remains unbuilt but is now marginal (bind-gated started + deck notices cover it). What was STILL stale = the TS half, closed in **99e90fdf**: faultInput's dead livekit→"audio" arm + unreachable "screen" cause deleted (brain = the one honest fault); the never-lightable status-row "audio" chip DELETED with its wiring; armedCaptureText's dead "connecting"/"dropped" arms dropped (checking=pre-tick, armed=tick-seen, master in=real RMS). NO state invented from absence of signal (first attempt keyed a chip to missing captureDevice — 2 specs correctly rejected it as inverted invariant-#5; reverted to deletion).
+- [x] **Updater audit (v4 #2 part)**: REAL consent bug found+fixed (**acdbca64**) — `dialog: true` is Tauri v1; the v2 plugin Config silently ignores unknown fields (verified in vendored 2.10.1 source), so the shipped path was boot → silent download_and_install, zero interaction, while comments promised a prompt. Now: native ask via tauri-plugin-dialog ("Install now / Later") before any download; dead `dialog`/`active` fields deleted from tauri.conf.json5; lore comments fixed in 3 files. cargo check green; test_updater_key_rotated.py 7 passed.
+
+### NEXT QUEUE v5 (carried forward)
+1. **Critic gaps left**: settings interior failure states; Windows wizard parity.
+2. **Carryovers**: v5→v6 rename sweep (+legacy-gate rewrite SAME commit — own session); NEXT UP (blocked on live suggestion_service proof); viber index.ts P0s (other session's WIP); screen-noun P2; debrief mock-mode citation chips dead + morning panel mock overflow (mock-only, low).
+3. **Live-verify lane**: the updater prompt + tray gemini-down error icon + deck fault flow want a packaged-app eyeball (browser can't reach native dialog/tray).
