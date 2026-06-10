@@ -129,7 +129,7 @@ const CSS = `
     letter-spacing: 0.12em;
     line-height: 1;
     text-transform: uppercase;
-    color: var(--silk-40);
+    color: var(--silk-65);
   }
   .vmx-next-card__glyph {
     color: var(--brand);
@@ -209,7 +209,7 @@ const CSS = `
     flex-wrap: wrap;
     gap: 3px;
     overflow: hidden;
-    color: var(--silk-40);
+    color: var(--silk-65);
     font-family: var(--type-mono);
     font-size: 9px;
     letter-spacing: 0.04em;
@@ -406,8 +406,12 @@ export function nextSuggestionPrimaryActionAriaLabel(
   s: NextSuggestionWire,
   options: Pick<NextSuggestionRenderOptions, "density"> = {},
 ): string {
+  // "pin this next", not "load suggestion" — vibemix cannot load a track
+  // into the DJ software; activating records an accept (the pick is pinned
+  // and feeds the consent-gated taste loop). The name promises only what
+  // the system actually does.
   const base = nextSuggestionAriaLabel(s, options);
-  return `${base}. activate to load suggestion`;
+  return `${base}. activate to pin this next`;
 }
 
 function timingPostureText(t: NextSuggestionTransitionWire | null | undefined): string {

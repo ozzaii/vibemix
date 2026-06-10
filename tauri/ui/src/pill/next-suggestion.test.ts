@@ -501,7 +501,7 @@ describe("renderNextSuggestion — honest silence + verbatim render", () => {
     expect(peek.dataset.interactive).toBe("true");
     expect(peek.getAttribute("role")).toBe("button");
     expect(peek.getAttribute("aria-label")).toBe(
-      "next: Strobe. activate to load suggestion",
+      "next: Strobe. activate to pin this next",
     );
     expect(peek.getAttribute("aria-keyshortcuts")).toBe("Enter Space");
     expect(peek.tabIndex).toBe(0);

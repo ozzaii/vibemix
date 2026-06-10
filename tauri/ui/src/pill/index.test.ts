@@ -1403,7 +1403,7 @@ describe("pillRootAriaLabel — focused pill action summary", () => {
     ).toBe(
       [
         "vibemix cohost pill",
-        "next: Velvet Pressure. action: load B · in 8 bars. activate to load suggestion",
+        "next: Velvet Pressure. action: load B · in 8 bars. activate to pin this next",
       ].join(". "),
     );
   });

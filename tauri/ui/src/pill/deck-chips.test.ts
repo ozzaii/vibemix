@@ -7,8 +7,8 @@
  * `deck_state` wire field renders one `<deck> · <key> · <bpm>` chip
  * ("a · 8a · 128"); an unresolved key/bpm renders `unknown` (NEVER a fabricated
  * key); when NO deck resolves a single `decks · unknown` chip shows. The deck-
- * key glyph is amber ONLY when a real key resolved (--silk-40 otherwise) — the
- * 20/80 amber discipline (frontend-enforcement hard rule 2).
+ * key glyph is GOLD only when a real key resolved (dim silk-65 otherwise) —
+ * the gold-lane discipline (Camelot/heat numerics own the warm accent).
  *
  * Mirrors citation-strip.test.ts / waveform.test.ts: jsdom env (renderDeckChips
  * calls registerStyle → touches document.head), the `_CSS_FOR_TEST` no-hex /
@@ -137,7 +137,7 @@ describe("renderDeckChips — deck_state → chip strip (PILL-03)", () => {
     expect(glyph!.classList.contains("vmx-deck-chip__key--unsure")).toBe(false);
   });
 
-  test("unknown-key glyph does NOT carry the amber class (dim --silk-40)", () => {
+  test("unknown-key glyph does NOT carry the amber class (dim silk)", () => {
     const deckState: DeckStateWire = {
       A: { title: "Track A", camelot: null, key: null, bpm: 128, confidence: 0.4 },
     };
@@ -233,8 +233,8 @@ describe("deck-chips CSS — frontend-enforcement (token-only, gold lane)", () =
   test("gold lane — the base key glyph (unresolved) is dim silk, not gold", () => {
     const keyRule = _CSS_FOR_TEST.match(/\.vmx-deck-chip__key\s*\{[^}]*\}/);
     expect(keyRule).not.toBeNull();
-    // The resting key glyph is --silk-40; gold lives only on --resolved.
-    expect(keyRule![0]).toMatch(/var\(--silk-40\)/);
+    // The resting key glyph is silk-65 (the text floor); gold lives only on --resolved.
+    expect(keyRule![0]).toMatch(/var\(--silk-65\)/);
     expect(keyRule![0]).not.toMatch(/var\(--gold/);
   });
 
@@ -245,7 +245,7 @@ describe("deck-chips CSS — frontend-enforcement (token-only, gold lane)", () =
     expect(unsureRule).not.toBeNull();
     // A barely-sure key reads as dim silk — gold authority is reserved for a
     // high-confidence registry hit.
-    expect(unsureRule![0]).toMatch(/var\(--silk-40\)/);
+    expect(unsureRule![0]).toMatch(/var\(--silk-65\)/);
     expect(unsureRule![0]).not.toMatch(/var\(--gold/);
   });
 });

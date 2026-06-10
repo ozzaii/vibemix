@@ -985,7 +985,13 @@ export function pillPeekHandlePrimaryActionClick(
   if (!peek || !hasSuggestion || ev.button !== 0) return false;
   const target = ev.target instanceof Element ? ev.target : null;
   if (!target || !root.contains(target)) return false;
+  // The collapsed waveform is aria-hidden decoration riding INSIDE the
+  // actionable row — its bars carry [data-no-drag] (belt-and-braces against
+  // window drags), which used to swallow clicks here and turn ~half the
+  // pointer-cursor face into a dead zone. Decoration clicks act as row clicks.
+  const isWaveDecoration = target.closest(".vmx-pill-wave") !== null;
   if (
+    !isWaveDecoration &&
     target.closest(
       [
         ".pill__drag",
@@ -2057,11 +2063,19 @@ function boot(): void {
     // glance until a fresh suggestion arrives.
     const suggestion = effectiveNextSuggestion(view);
     // Close the explicit feedback loop: the peek primary action means "activate
-    // to load suggestion" (its aria label) — an accept. Emit it over the bus so
+    // to pin this next" (its aria label) — an accept. Emit it over the bus so
     // SuggestionService.record_feedback pins the pick + feeds the (consent-gated)
     // taste loop. Real grounded picks only — never the demo card.
     if (suggestion && suggestion !== DEMO_NEXT_SUGGESTION) {
       bus?.send({ action: "next_suggestion.feedback", feedback: "accept" });
+      // One-breath acknowledgment on the collapsed face — without it the
+      // card vanishing read as a dismissal, indistinguishable from rejecting.
+      view.reactionEcho = {
+        label: "PINNED",
+        tone: "clean",
+        key: `pin:${nextSuggestionRenderKey(suggestion) ?? "next"}`,
+        until: performance.now() + 1800,
+      };
     }
     const completionKey = pillNextCompletionKey(suggestion);
     const renderKey = nextSuggestionRenderKey(suggestion);

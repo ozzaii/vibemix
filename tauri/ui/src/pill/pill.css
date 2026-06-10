@@ -999,7 +999,10 @@
 .pill__notch {
   position: absolute;
   left: 50%;
-  top: 43px; /* bottom edge of the 44px collapsed pill */
+  /* INSIDE the 44px collapsed face: at the old top:43px the 3px notch fell
+   * across the overflow:hidden bottom edge (and the 44px native window), so
+   * the "more below" signal + its 4 ready/glint keyframes never painted. */
+  top: 40px;
   width: 24px;
   height: 3px;
   border-radius: 2px;
@@ -1806,8 +1809,10 @@
   background:
     linear-gradient(180deg, var(--lg-spec-lo), transparent 48%),
     transparent;
-  color: var(--silk-40);
-  opacity: 0.72;
+  /* Text floor: the honest "decks · unknown" read is load-bearing info, not
+   * decoration — silk-65 with no extra dimming keeps it above the ink-20
+   * contrast floor (it shipped at silk-40 x 0.72 = barely-there). */
+  color: var(--silk-65);
   box-shadow:
     inset 0 1px 0 var(--lg-spec-lo),
     inset 0 -1px 0 var(--lg-rim-void);

@@ -13,7 +13,7 @@
  * heat/Camelot numeric, so it carries `--gold` (the quarantined numeric
  * accent) — never the rose brand, and never the legacy `--amber` alias
  * (which silently resolves to rose). Unresolved/unsure keys stay dim
- * `--silk-40`. Gold appears nowhere else on the chip strip.
+ * silk-65. Gold appears nowhere else on the chip strip.
  *
  * Cloned from the citation-strip.ts chip-strip skeleton: the same `registerStyle`
  * once-per-scope CSS injection, the mono tabular-nums chip language (JetBrains
@@ -87,11 +87,11 @@ const CSS = `
      * meta, not interactive targets, so there is no hover-lift either. */
     flex-shrink: 0;
   }
-  /* The deck-key glyph. Resting = dim --silk-40 (the honest 'unknown' read);
+  /* The deck-key glyph. Resting = dim silk (the honest unknown read, silk-65 = the ink-20 text floor);
    * gold ONLY on the --resolved variant — a real registry-observed Camelot is
    * a heat/Camelot numeric, the one lane gold is reserved for. */
   .vmx-deck-chip__key {
-    color: var(--silk-40);
+    color: var(--silk-65);
   }
   .vmx-deck-chip__key--resolved {
     color: var(--gold);
@@ -100,11 +100,11 @@ const CSS = `
   /* A LOW-confidence resolved key (< the deck cite-floor): the key text still
    * shows (we did resolve it) but gold authority is DROPPED — a barely-sure
    * camelot must not read with the same authority as a registry hit (WR-04,
-   * anti-slop). Dim to --silk-40, same ink as the honest 'unknown'. This rule
+   * anti-slop). Dim to the same silk-65 ink as the honest unknown. This rule
    * wins over --resolved because --unsure is applied INSTEAD of --resolved when
    * confidence is below the floor. */
   .vmx-deck-chip__key--unsure {
-    color: var(--silk-40);
+    color: var(--silk-65);
   }
 `;
 
