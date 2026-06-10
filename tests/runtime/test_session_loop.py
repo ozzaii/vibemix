@@ -1211,3 +1211,156 @@ def test_kick_pending_import_clap_failure_emits_ipc_error(
     assert ran == []
     errors = fake_bus.emitted_by_type("ipc.error")
     assert errors and "CLAP" in errors[0]["payload"]["reason"]
+
+
+# ---------------------------------------------------------------------------
+# Staleness action handler — restored Package 5J wiring (was one-ended at
+# a153915c: the renderer's staleness-banner emitted
+# ipc.library.staleness_action but the 364c55ba restructure dropped the
+# Python handler; receipts in the 2026-06-10 stale-test alignment report).
+# ---------------------------------------------------------------------------
+
+
+def test_staleness_action_handler_registered(fake_bus: FakeBus) -> None:
+    loop = SessionLoop(fake_bus)
+    loop.register_handlers()
+    assert "ipc.library.staleness_action" in fake_bus.handlers
+
+
+def test_staleness_action_snooze_persists_and_clears_retained(
+    fake_bus: FakeBus, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """snooze_7d routes to apply_snooze_action and drops the retained nudge."""
+    import vibemix.library as library_mod
+
+    applied: list[str] = []
+    cleared: list[str] = []
+    monkeypatch.setattr(
+        library_mod, "apply_snooze_action", lambda action: applied.append(action)
+    )
+    fake_bus.clear_retained = lambda mtype: cleared.append(mtype)  # type: ignore[attr-defined]
+
+    loop = SessionLoop(fake_bus)
+    loop.register_handlers()
+    _drive(
+        fake_bus,
+        {
+            "type": "ipc.library.staleness_action",
+            "ts": "2026-06-10T00:00:00Z",
+            "payload": {"action": "snooze_7d", "schema_version": "1"},
+        },
+    )
+    assert applied == ["snooze_7d"]
+    assert cleared == ["ipc.library.staleness_nudge"]
+
+
+def test_staleness_reindex_uses_recorded_source_not_renderer_path(
+    fake_bus: FakeBus, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Package 5J consent boundary: reindex_folder re-imports ONLY the
+    recorded source folder — a renderer-supplied path is never trusted."""
+    import vibemix.library.staleness as staleness_mod
+
+    recorded = tmp_path / "recorded-crate"
+    recorded.mkdir()
+    monkeypatch.setattr(
+        staleness_mod, "library_freshness_status", lambda *a, **k: object()
+    )
+    monkeypatch.setattr(
+        staleness_mod, "refreshable_source", lambda status: (str(recorded), "folder")
+    )
+    ran: list[Path] = []
+
+    async def fake_run(self, source_path: Path) -> None:
+        ran.append(source_path)
+
+    monkeypatch.setattr(SessionLoop, "_run_library_import", fake_run)
+
+    loop = SessionLoop(fake_bus)
+    loop.register_handlers()
+
+    async def _run() -> None:
+        await fake_bus.handlers["ipc.library.staleness_action"](
+            {
+                "type": "ipc.library.staleness_action",
+                "ts": "2026-06-10T00:00:00Z",
+                "payload": {
+                    "action": "reindex_folder",
+                    "schema_version": "1",
+                },
+            }
+        )
+        task = loop._library_import_task
+        assert task is not None
+        await task
+
+    asyncio.run(_run())
+    assert ran == [recorded]
+
+
+def test_staleness_reindex_rejected_when_source_not_folder(
+    fake_bus: FakeBus, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An XML/unknown recorded source never triggers a folder reindex."""
+    import vibemix.library.staleness as staleness_mod
+
+    monkeypatch.setattr(
+        staleness_mod, "library_freshness_status", lambda *a, **k: object()
+    )
+    monkeypatch.setattr(
+        staleness_mod, "refreshable_source", lambda status: (None, None)
+    )
+    ran: list[Path] = []
+
+    async def fake_run(self, source_path: Path) -> None:
+        ran.append(source_path)
+
+    monkeypatch.setattr(SessionLoop, "_run_library_import", fake_run)
+
+    loop = SessionLoop(fake_bus)
+    loop.register_handlers()
+    _drive(
+        fake_bus,
+        {
+            "type": "ipc.library.staleness_action",
+            "ts": "2026-06-10T00:00:00Z",
+            "payload": {"action": "reindex_folder", "schema_version": "1"},
+        },
+    )
+    assert ran == []
+
+
+def test_boot_staleness_nudge_emitted_when_stale(
+    fake_bus: FakeBus, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """run_boot_sweeps emits the staleness nudge so the banner can show."""
+    import vibemix.library.staleness as staleness_mod
+
+    monkeypatch.setattr(
+        staleness_mod,
+        "freshness_nudge_payload",
+        lambda *a, **k: {
+            "age_days": 42,
+            "snoozed_until_ts": None,
+            "source_path": "/Users/x/Music/crates",
+            "source_kind": "folder",
+        },
+    )
+    loop = SessionLoop(fake_bus)
+    asyncio.run(loop.run_boot_sweeps())
+    nudges = fake_bus.emitted_by_type("ipc.library.staleness_nudge")
+    assert len(nudges) == 1
+    assert nudges[0]["payload"]["age_days"] == 42
+
+
+def test_boot_staleness_nudge_silent_when_fresh(
+    fake_bus: FakeBus, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import vibemix.library.staleness as staleness_mod
+
+    monkeypatch.setattr(
+        staleness_mod, "freshness_nudge_payload", lambda *a, **k: None
+    )
+    loop = SessionLoop(fake_bus)
+    asyncio.run(loop.run_boot_sweeps())
+    assert fake_bus.emitted_by_type("ipc.library.staleness_nudge") == []

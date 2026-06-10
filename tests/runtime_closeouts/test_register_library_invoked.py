@@ -207,28 +207,19 @@ def test_library_import_generic_catalog_path_uses_ingest_source() -> None:
     assert "await self._emit_library_import_progress(" in helper
 
 
-# reason: the stale-folder reindex wiring this test pins was REMOVED from the
-# committed tree (not moved) — see the xfail reason below for the receipts.
-@pytest.mark.xfail(
-    reason=(
-        "Package 5J folder re-index was DROPPED in the 364c55ba restructure: "
-        "the ipc.library.staleness_action handler, the refreshable_source() "
-        "reindex wiring and the label='folder reindex' ingest call no longer "
-        "exist anywhere under src/vibemix. The renderer still emits "
-        "ipc.library.staleness_action with action='reindex_folder' "
-        "(tauri/ui/src/settings/components/staleness-banner.ts), so the "
-        "action is ONE-ENDED at HEAD. Re-pin this test against the new "
-        "wiring when the reindex path is restored; flagged in the 2026-06-10 "
-        "stale-test alignment report."
-    ),
-    strict=False,
-)
 def test_stale_folder_reindex_uses_recorded_source_not_renderer_path() -> None:
-    """Folder re-index keeps the Package 5J consent boundary."""
-    source = (PROJECT_ROOT / "src/vibemix/__main__.py").read_text()
+    """Folder re-index keeps the Package 5J consent boundary.
 
-    assert "async def _start_folder_import(" in source
+    Re-pinned 2026-06-10: the 364c55ba restructure DROPPED the staleness
+    wiring (handler + reindex + boot nudge were one-ended for a while); it
+    was restored into SessionLoop, so the pins now read session_loop.py —
+    the recorded source is the only reindex target, never a renderer path.
+    """
+    source = (PROJECT_ROOT / "src/vibemix/runtime/session_loop.py").read_text()
+
+    assert '"ipc.library.staleness_action", self._on_library_staleness_action' in source
+    assert "async def _start_folder_reindex(" in source
     assert "source_path, source_kind = refreshable_source(status)" in source
-    assert "await _start_folder_import(\n                    folder," in source
-    assert 'label="folder reindex"' in source
-    assert "clear_staleness=True" in source
+    assert 'source_kind != "folder" or not source_path' in source
+    # Behavior-level consent boundary + boot nudge are pinned in
+    # tests/runtime/test_session_loop.py (staleness suite).

@@ -338,6 +338,13 @@ class SessionLoop:
         # legacy/fresh-user ipc path alive for folder/XML imports.
         self.bus.register_handler("ipc.library.import", self._on_library_import)
         self.bus.register_handler("ipc.library.import_cancel", self._on_library_import_cancel)
+        # Package 5J staleness actions (dismiss / snooze_7d / reindex_folder).
+        # Restored 2026-06-10: the 364c55ba restructure moved library import
+        # here but dropped this handler, leaving the renderer's staleness
+        # banner one-ended (its emits died at "no handler" on the live bus).
+        self.bus.register_handler(
+            "ipc.library.staleness_action", self._on_library_staleness_action
+        )
         # Phase 32 / PROFILE-07 — Settings → Profile panel.
         # Three request-reply pairs:
         #   view       → view_result   (snapshot + bytes + consent)
@@ -781,6 +788,48 @@ class SessionLoop:
             current_track_name="",
             cache_hits=0,
             cancelled=True,
+        )
+
+    async def _on_library_staleness_action(self, msg: dict) -> None:
+        """Package 5J: dismiss / snooze_7d persist via the staleness store;
+        reindex_folder re-imports the RECORDED source only (consent boundary —
+        a renderer-supplied path is never trusted for the reindex)."""
+        payload = msg.get("payload") or {}
+        action = str(payload.get("action", "")).strip()
+        try:
+            if action == "reindex_folder":
+                await self._start_folder_reindex()
+                return
+            from vibemix.library import apply_snooze_action
+
+            apply_snooze_action(action)
+            clear = getattr(self.bus, "clear_retained", None)
+            if callable(clear):
+                clear("ipc.library.staleness_nudge")
+        except ValueError as exc:
+            log.warning("staleness action rejected: %s", exc)
+
+    async def _start_folder_reindex(self) -> None:
+        if self._library_import_task is not None and not self._library_import_task.done():
+            return
+        from vibemix.library.staleness import (
+            library_freshness_status,
+            refreshable_source,
+        )
+
+        status = library_freshness_status()
+        source_path, source_kind = refreshable_source(status)
+        if source_kind != "folder" or not source_path:
+            log.warning("staleness reindex rejected: recorded source is not a folder")
+            return
+        folder = Path(source_path).expanduser()
+        if not folder.is_dir():
+            log.warning("staleness reindex rejected: recorded folder is missing")
+            return
+        self._library_import_cancel_requested = False
+        self._library_import_task = asyncio.create_task(
+            self._run_library_import(folder),
+            name="library-reindex",
         )
 
     async def _run_library_import(self, source_path: Path) -> None:
@@ -1265,12 +1314,42 @@ class SessionLoop:
         sweep must never block startup).
         """
         await self._fire_one_retention_sweep("boot")
+        await self._emit_boot_staleness_nudge()
         if not self.memory_ingest_enabled:
             log.info("memory ingest (boot) skipped: disabled for this session loop")
             return
         # Fire-and-forget: the boot ingest must NOT block boot/IPC readiness.
         # Keep a ref so the task is not GC'd mid-flight.
         self._boot_ingest_task = asyncio.create_task(self._fire_ingest("boot"))
+
+    async def _emit_boot_staleness_nudge(self) -> None:
+        """LIBRARY-06: one boot-time staleness nudge so the banner can show.
+
+        Restored with the staleness_action handler (2026-06-10) — the
+        364c55ba restructure dropped both ends, leaving the renderer banner
+        permanently dark. The bus retains this type for replay-to-new-client,
+        so emitting before the renderer connects is safe. Best-effort.
+        """
+        try:
+            from vibemix.library.staleness import freshness_nudge_payload
+            from vibemix.ui_bus import LibraryStalenessNudge
+
+            payload = freshness_nudge_payload()
+            if payload is None:
+                return
+            nudge = LibraryStalenessNudge.make(
+                age_days=int(payload.get("age_days", 0)),
+                snoozed_until_ts=payload.get("snoozed_until_ts"),
+                source_path=payload.get("source_path")
+                if isinstance(payload.get("source_path"), str)
+                else None,
+                source_kind=payload.get("source_kind")
+                if isinstance(payload.get("source_kind"), str)
+                else None,
+            )
+            await self.bus.emit(json.loads(nudge.to_json()))
+        except Exception as e:
+            log.warning("boot staleness nudge failed: %s", e)
 
     async def on_session_close(self) -> None:
         """Phase 15 Plan 03 — session-close trigger.
