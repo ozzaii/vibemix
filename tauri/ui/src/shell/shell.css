@@ -313,6 +313,10 @@ html[data-runtime="tauri"] .shell-main {
  * every reachable state (live -> tail cursor, reconnecting -> conn-dot, else
  * -> brand ear). */
 #shell-root[data-conn="reconnecting"] .sb-mark .sb-ear::after { animation: none; }
+/* The armed GO LIVE gate owns the stage's one ambient (vmxArmedField) — the
+ * ear sleeps there too, so the first screen a user sees never runs three
+ * concurrent motions (runtime-verified: ear + armed field + perimeter). */
+#shell-root:has(.vmx-session[data-runstate="armed"]) .sb-mark .sb-ear::after { animation: none; }
 @keyframes sb-ear-amp {
   0%, 100% { transform: scale(0.6); opacity: 0.5; }
   35%      { transform: scale(1.15); opacity: 1; }

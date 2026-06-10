@@ -106,7 +106,13 @@ const CSS = `
       inset 0 0 18px var(--amber-22),
       0 0 0 1px rgba(255, 165, 223, 0.18);
     text-shadow: 0 0 7px var(--amber-65), 0 0 16px var(--amber-40);
-    animation: vmx-hotkey-capture-pulse 1200ms ease-in-out infinite;
+  }
+  /* Capture pulse is gated on motion preference — the lit chip above already
+   * says "listening" without the loop. */
+  @media (prefers-reduced-motion: no-preference) {
+    .vmx-hotkey-capture[data-capture="true"] .vmx-hotkey-capture__chip {
+      animation: vmx-hotkey-capture-pulse 1200ms ease-in-out infinite;
+    }
   }
   .vmx-hotkey-capture[data-error="true"] .vmx-hotkey-capture__chip {
     color: var(--led-fault);

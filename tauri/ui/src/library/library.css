@@ -2547,6 +2547,13 @@ body {
   .vmx-lib-row.settled { transition: none; }
   .vmx-lib-brand .dot { animation: none; }
   .vmx-lib-chat-grade { transition: none; }
+  /* Infinite loops the old allowlist missed: the pending-turn breathe and the
+   * import scan sweep hold a static lit state so "working" stays legible. */
+  .vmx-lib-chat-turn[data-pending="true"] .body::after {
+    animation: none;
+    opacity: 0.8;
+  }
+  .vmx-lib-chat-progress-scan { animation: none; }
 }
 
 @media (max-width: 1120px) {

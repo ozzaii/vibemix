@@ -732,11 +732,9 @@ const LAYOUT_CSS = `
       linear-gradient(rgba(0, 0, 0, 1) 0 0) content-box,
       linear-gradient(rgba(0, 0, 0, 1) 0 0);
             mask-composite: exclude;
-    animation: vmx-perimeter var(--motion-border-sweep) linear infinite;
-  }
-  @keyframes vmx-perimeter { to { --vmx-sweep: 360deg; } }
-  @media (prefers-reduced-motion: reduce) {
-    .vmx-armed__frame::before { animation: none; opacity: 0.5; }
+    /* Stilled (one-breath law): vmxArmedField is the gate's ONE ambient —
+     * the perimeter holds as a static lit seam instead of a second motion. */
+    opacity: 0.5;
   }
   /* The idle deck has no live signal — the master meter is runtime telemetry.
    * Showing its empty groove at armed read as a stray progress bar. */
@@ -1106,9 +1104,15 @@ const LAYOUT_CSS = `
   .vmx-fmeter__peak {
     position: absolute; top: -5px; bottom: -5px; left: 0; width: 1.5px;
     background: var(--brand);
-    transition: opacity 700ms ease-out;
+    /* The playhead glides one beat at a time — the mock's BPM-locked motion
+     * thesis. Falls back to the house beat (461ms ≈ 130bpm) until live tempo
+     * writes --bpm-period-ms on the groove. */
+    transition: opacity 700ms ease-out, left calc(var(--bpm-period-ms, 461ms)) linear;
     box-shadow: 0 0 6px var(--brand-50);
     z-index: 4;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .vmx-fmeter__peak { transition: opacity 700ms ease-out; }
   }
   .vmx-fmeter__peak::before {
     content: "";
@@ -1218,6 +1222,10 @@ const LAYOUT_CSS = `
     background: var(--silk-22); animation: vmx-idlebreath 3200ms ease-in-out infinite;
   }
   .vmx-session[data-mode="fault"] .vmx-fmeter__fill { background: var(--silk-12); animation: none; }
+  /* The armed gate hides the foot — its meter breath and drop pips must not
+   * keep burning compositor time behind visibility:hidden. */
+  .vmx-session[data-runstate="armed"] .vmx-fmeter__fill,
+  .vmx-session[data-runstate="armed"] .vmx-drop-chip__pip { animation: none; }
   .vmx-session[data-mode="silent"] .vmx-fmeter__peak,
   .vmx-session[data-mode="fault"] .vmx-fmeter__peak { opacity: 0; }
   @keyframes vmx-idlebreath { 0%, 100% { opacity: 0.4; } 50% { opacity: 0.85; } }
@@ -1974,6 +1982,12 @@ function applyState(mounted: Mounted, next: SessionState, isMount: boolean): voi
     );
   }
   if (mode === "") {
+    // Live tempo drives the playhead's beat-length glide (CSS transition on
+    // --bpm-period-ms); the drop chip sets the same var on its own root.
+    const groove = mounted.meterChunks.parentElement;
+    if (groove && next.drop.bpmPeriodMs && next.drop.bpmPeriodMs > 0) {
+      groove.style.setProperty("--bpm-period-ms", `${next.drop.bpmPeriodMs}ms`);
+    }
     if (next.phase.chunks.length > 0) {
       const pct = Math.min(Math.max(next.phase.nowPct, 0), 100);
       const lvl = Math.min(meterLevelPct(next.meters.music.rms), 100);
