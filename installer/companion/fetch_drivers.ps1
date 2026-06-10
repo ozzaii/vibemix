@@ -85,6 +85,7 @@ if ($DryRun) {
 
 # ─── Download ──────────────────────────────────────────────────────────────
 Log-Event -Stage "fetch" -State "downloading" -Extra @{ url = $Url }
+Emit-State -State "downloading"
 try {
   Invoke-WebRequest -Uri $Url -OutFile $TmpZip -UseBasicParsing -ErrorAction Stop
 } catch {
@@ -95,6 +96,7 @@ try {
 Log-Event -Stage "fetch" -State "downloaded"
 
 # ─── Verify SHA-256 ────────────────────────────────────────────────────────
+Emit-State -State "verifying"
 $ActualSha = (Get-FileHash -Path $TmpZip -Algorithm SHA256).Hash.ToLower()
 $ExpectedShaLc = $ExpectedSha.ToLower()
 if ($ExpectedSha.StartsWith("PLACEHOLDER_")) {
@@ -124,6 +126,7 @@ if (-not $SetupExe) {
 }
 
 Log-Event -Stage "install" -State "starting"
+Emit-State -State "installing"
 $proc = Start-Process -FilePath $SetupExe.FullName -ArgumentList $SilentFlag -Wait -PassThru -Verb RunAs
 if ($proc.ExitCode -eq 0) {
   Log-Event -Stage "install" -State "ok"

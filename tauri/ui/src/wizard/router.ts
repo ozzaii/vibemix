@@ -758,11 +758,16 @@ function startStep1PermissionPoll(): void {
  *  chain when the driver is genuinely absent. Probe failure routes INTO the
  *  chain (fail-closed): with the driver present the companion script's own
  *  probe exits "already_installed" in under a second, so the worst case of
- *  a bus hiccup is one extra Continue — never a dead deck. Windows rigs
- *  (VB-CABLE, never BlackHole) always take the chain; fetch_drivers.ps1
- *  performs the equivalent already-installed probe. */
+ *  a bus hiccup is one extra Continue — never a dead deck.
+ *
+ *  Windows takes NO driver chain at all: the shipped capture backend is
+ *  WASAPI loopback on the default playback device — "no virtual cable
+ *  required (BlackHole-equivalent install is the macOS-only tax)"
+ *  (_audio_windows.py, docs/windows-setup.md). The old routing walked every
+ *  fresh Windows user through a UAC-elevated VB-CABLE kernel-driver install
+ *  that nothing in the product consumes. */
 async function advancePastPermissions(): Promise<void> {
-  if (wizardState.platform === "linux") {
+  if (wizardState.platform !== "darwin") {
     advanceTo("library-feed");
     return;
   }

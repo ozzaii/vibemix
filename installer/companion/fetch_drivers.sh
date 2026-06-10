@@ -122,6 +122,7 @@ fi
 
 # ─── Download ─────────────────────────────────────────────────────────────
 log_event "fetch" "downloading" "url" "$URL"
+emit_state "downloading"
 if ! curl -fsSL -o "$TMP_PKG" "$URL"; then
   log_event "fetch" "fail" "reason" "curl_failed"
   emit_state "fail" "stage" "fetch"
@@ -130,6 +131,7 @@ fi
 log_event "fetch" "downloaded"
 
 # ─── Verify SHA-256 ───────────────────────────────────────────────────────
+emit_state "verifying"
 ACTUAL_SHA="$(shasum -a 256 "$TMP_PKG" | awk '{print $1}')"
 if [[ "$EXPECTED_SHA" == PLACEHOLDER_* ]]; then
   log_event "verify" "warning_placeholder" "actual" "$ACTUAL_SHA"
@@ -146,6 +148,7 @@ fi
 
 # ─── Install ──────────────────────────────────────────────────────────────
 log_event "install" "starting"
+emit_state "installing"
 # osascript with admin privilege prompt (vendor-signed pkg; macOS shows the
 # standard "Installer is requesting your password" dialog).
 if osascript -e "do shell script \"installer -pkg '$TMP_PKG' -target /\" with administrator privileges" \

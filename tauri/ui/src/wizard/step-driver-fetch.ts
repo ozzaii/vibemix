@@ -270,9 +270,18 @@ export function createStepDriverFetch(
 
   // Invoke companion fetch via Tauri command (Plan 49-04 provides the
   // wizard_cmds.rs `run_companion_fetch` handler).
+  // The real installed version rides the 'installed' progress payload; an
+  // already_installed resolve carries none (the script doesn't know what
+  // version is on disk) — the row then says just "Installed" instead of
+  // stamping BlackHole's manifest literal on whatever is actually there.
+  let installedVersion: string | undefined;
+  const doneLabel = (): string =>
+    installedVersion && installedVersion.trim()
+      ? interpolate(copy.steps.driver_fetch.row_done, { version: installedVersion })
+      : "Installed";
   invoke<string>("run_companion_fetch", { dryRun: false })
     .then(() => {
-      setRowState("driver", "done", interpolate(copy.steps.driver_fetch.row_done, { version: "0.6.0" }));
+      setRowState("driver", "done", doneLabel());
       checkAllDone();
     })
     .catch(() => {
@@ -281,7 +290,7 @@ export function createStepDriverFetch(
 
   // Subscribe to companion stdout progress events.
   listen("companion.fetch.progress", (event) => {
-    const payload = event.payload as { state?: string };
+    const payload = event.payload as { state?: string; version?: string };
     if (payload?.state === "downloading" || payload?.state === "fetching") {
       setRowState("driver", "fetching", interpolate(copy.steps.driver_fetch.row_fetching, { vendor_host: "vendor" }));
     } else if (payload?.state === "verifying") {
@@ -289,7 +298,8 @@ export function createStepDriverFetch(
     } else if (payload?.state === "installing") {
       setRowState("driver", "installing", copy.steps.driver_fetch.row_installing);
     } else if (payload?.state === "installed" || payload?.state === "already_installed") {
-      setRowState("driver", "done", interpolate(copy.steps.driver_fetch.row_done, { version: "0.6.0" }));
+      if (typeof payload.version === "string") installedVersion = payload.version;
+      setRowState("driver", "done", doneLabel());
       checkAllDone();
     }
   });
