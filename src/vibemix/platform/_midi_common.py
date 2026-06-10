@@ -31,7 +31,7 @@ import sys
 import threading
 import time
 import warnings
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any
 
 from vibemix.midi.profile import ControllerProfile
@@ -269,65 +269,76 @@ def handle_port_change(holder: ListenerHolder, event: tuple) -> None:
             holder.bound_port = None
 
 
-def handle_port_change_single_state(holder: ListenerHolder, event: tuple) -> None:
+def handle_port_change_single_state(holder: ListenerHolder, event: tuple) -> bool:
     """Single-state on_change callback (option B from 53-RESEARCH §Q2) — the
     LIVE-SESSION default.
 
     Unlike :func:`handle_port_change`, this NEVER rebuilds
     ``holder.controller_state`` on connect. It mutates the EXISTING
-    ControllerState in place (``mark_connected`` / ``mark_disconnected``). This
-    is the load-bearing difference for the live wiring: ``__main__`` passes
-    ``midi_macos.controller_state`` ONCE to ``ws_broadcast`` +
-    ``state_refresh_loop``; those loops read ``.deck_snapshot()`` /
-    ``.moves_since()`` off that captured object. If a hot-plug rebuilt the state
-    (as :func:`handle_port_change` does), the consumers would keep reading the
-    OLD, now-stale object and never see the reconnected controller — the
-    capture-once-then-rebuild divergence. Mutating in place keeps the single
-    state object live across unplug/replug, so no consumer signature changes.
+    ControllerState in place. This is the load-bearing difference for the
+    live wiring: ``__main__`` passes ``midi_macos.controller_state`` ONCE to
+    ``ws_broadcast`` + ``state_refresh_loop``; those loops read
+    ``.deck_snapshot()`` / ``.moves_since()`` off that captured object. If a
+    hot-plug rebuilt the state (as :func:`handle_port_change` does), the
+    consumers would keep reading the OLD, now-stale object and never see the
+    reconnected controller. Mutating in place keeps the single state object
+    live across unplug/replug, so no consumer signature changes.
 
-    Carveout (BRINGUP-03, single-FLX4 target): the ControllerState was built
-    from the FLX4 profile at ``MidiMacOS.__init__`` and is NOT re-profiled on
-    connect. For the single-FLX4 target the profile is stable across replug, so
-    ``mark_connected`` (not rebuild) is correct. If a DIFFERENT controller is
-    plugged, single-state keeps the original FLX4 binding — acceptable + documented
-    for BRINGUP-03; the rebuild path (:func:`handle_port_change`) remains for the
-    future multi-controller path.
+    2026-06-10 audit (E-midi) upgrades over the BRINGUP-03 carveout:
+
+    * The existing ControllerState is RE-PROFILED in place via
+      ``ControllerState.rebind_profile(profile)`` — a DDJ-400/Hercules/XDJ
+      plug now decodes with its own bindings instead of the boot-time FLX4
+      lookup. Same-id rebinds are a no-op inside ``rebind_profile``, so the
+      FLX4 replug path is byte-identical to the previous behavior.
+    * The spawned listener is pinned to the EXACT port the watcher resolved
+      (``port_name_hints=(port,)``): the generic fallback profile carries no
+      hints at all (it could never bind), and curated hints match this same
+      port anyway.
+    * A generic (unmapped) port never steals a live binding — IAC buses and
+      virtual ports appearing mid-set must not tear down a real controller.
+    * Returns True when the event actually changed the binding (listener
+      spawned or torn down), False for no-ops. Composition hooks — the
+      MidiMirror envelope path built by :func:`make_single_state_on_change`
+      — key off this so UI envelopes only fire for real transitions.
 
     Args:
         holder: ListenerHolder owning the (single, never-rebuilt) ControllerState.
         event: ``('connected', port, profile)`` or ``('disconnected', port)``.
-
-    On ``('connected', port, profile)``:
-        - If ``port == holder.bound_port`` → no-op.
-        - Else: stop the existing listener (set listener_stop + join 1.0s);
-          ``holder.controller_state.mark_connected(port)`` (NO rebuild); spawn a
-          fresh listener feeding the SAME ControllerState; set ``bound_port``.
-    On ``('disconnected', port)``:
-        - Identical to :func:`handle_port_change` — if bound: stop listener +
-          ``mark_disconnected()`` (clears the rings via Plan 01) + clear
-          ``bound_port``.
     """
+    # Lazy import — mirrors handle_port_change's pattern (avoid forcing the
+    # vibemix.midi modules at platform-package import time).
+    from vibemix.midi.generic import GENERIC_MIDI_ID
+
     kind = event[0]
     if kind == "connected":
         _, port, profile = event
         if holder.bound_port == port:
-            return  # already bound
+            return False  # already bound
+        if holder.bound_port is not None and profile.id == GENERIC_MIDI_ID:
+            # A controller is live; an unmapped port appearing (IAC bus,
+            # virtual port) must not steal its binding.
+            return False
         # Stop existing listener if any.
         if holder.listener_stop is not None:
             holder.listener_stop.set()
         if holder.listener_thread is not None:
             holder.listener_thread.join(timeout=1.0)
-        # Single-state: mark the EXISTING ControllerState connected — do NOT
-        # rebuild it. The live loops keep their reference live.
+        # Single-state: re-profile + mark the EXISTING ControllerState — do
+        # NOT rebuild it. The live loops keep their reference live.
+        holder.controller_state.rebind_profile(profile)
         holder.controller_state.mark_connected(port)
-        # Spawn a fresh listener feeding the SAME ControllerState. The event's
-        # resolved profile drives the listener's port-hint matching; the state
-        # object is unchanged.
+        # Spawn a fresh listener feeding the SAME ControllerState, pinned to
+        # the exact resolved port (see docstring).
         holder.listener_stop = threading.Event()
         holder.listener_thread = spawn_listener(
-            holder.controller_state, holder.listener_stop, profile, holder.mido_module
+            holder.controller_state,
+            holder.listener_stop,
+            replace(profile, port_name_hints=(port,)),
+            holder.mido_module,
         )
         holder.bound_port = port
+        return True
     elif kind == "disconnected":
         _, port = event
         if holder.bound_port == port:
@@ -335,3 +346,21 @@ def handle_port_change_single_state(holder: ListenerHolder, event: tuple) -> Non
                 holder.listener_stop.set()
             holder.controller_state.mark_disconnected()
             holder.bound_port = None
+            return True
+    return False
+
+
+def make_single_state_on_change(holder: ListenerHolder, *, on_applied=None):
+    """Compose the production watcher callback: run the single-state listener
+    manager, then — ONLY when the event actually changed the binding —
+    invoke ``on_applied(event)`` (``__main__`` passes the MidiMirror
+    UI-envelope hook here). Gating on the applied flag means an unrelated
+    port's disconnect, a repeat connect, or a blocked generic steal never
+    pings the UI.
+    """
+
+    def _on_change(event: tuple) -> None:
+        if handle_port_change_single_state(holder, event) and on_applied is not None:
+            on_applied(event)
+
+    return _on_change
