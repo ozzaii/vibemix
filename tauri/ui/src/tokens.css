@@ -316,6 +316,10 @@
   --ok:     var(--led-ok);
   --warn:   var(--led-warn);
   --danger: var(--led-fault);
+  /* Fault washes — --danger is opaque; surfaces that tint with it (error
+   * banner fill/border) read these instead of re-deriving the channels. */
+  --danger-10: rgba(212, 65, 58, 0.10);
+  --danger-58: rgba(212, 65, 58, 0.58);
 
   /* Glass blurs */
   --blur-glass:         blur(32px) saturate(140%);

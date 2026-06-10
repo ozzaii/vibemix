@@ -44,8 +44,8 @@
   overflow-x: hidden;
   overflow-y: auto;
   background:
-    linear-gradient(180deg, rgba(17, 20, 28, 0.94) 0%, rgba(5, 7, 11, 0.98) 46%, rgba(1, 2, 5, 1) 100%),
-    repeating-linear-gradient(90deg, rgba(214, 207, 199, 0.022) 0 1px, transparent 1px 82px),
+    linear-gradient(180deg, var(--glass-3) 0%, var(--void-85) 46%, rgba(0, 0, 0, 0.97) 100%),
+    repeating-linear-gradient(90deg, var(--silk-025) 0 1px, transparent 1px 82px),
     var(--void-1);
 }
 
@@ -60,9 +60,9 @@
 
 .vmx-debrief-root::before {
   background:
-    radial-gradient(circle at 72% 18%, rgba(255, 165, 223, 0.06), transparent 28%),
-    linear-gradient(90deg, transparent 0%, rgba(255, 165, 223, 0.035) 50%, transparent 100%),
-    repeating-linear-gradient(0deg, transparent 0 10px, rgba(214, 207, 199, 0.018) 10px 11px);
+    radial-gradient(circle at 72% 18%, var(--brand-06), transparent 28%),
+    linear-gradient(90deg, transparent 0%, var(--brand-04) 50%, transparent 100%),
+    repeating-linear-gradient(0deg, transparent 0 10px, var(--silk-025) 10px 11px);
   opacity: 0.68;
   mask-image: linear-gradient(180deg, transparent 0%, black 16%, black 88%, transparent 100%);
 }
@@ -70,8 +70,8 @@
 .vmx-debrief-root::after {
   inset: auto 24px 24px;
   height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(255, 165, 223, 0.24), transparent);
-  box-shadow: 0 0 18px rgba(255, 165, 223, 0.1);
+  background: linear-gradient(90deg, transparent, var(--brand-22), transparent);
+  box-shadow: 0 0 18px var(--brand-10);
 }
 
 .vmx-debrief-titlebar {
@@ -85,7 +85,7 @@
   padding: 0 var(--sp-5);
   height: var(--titlebar-h);
   background:
-    linear-gradient(180deg, rgba(18, 20, 28, 0.88), rgba(4, 5, 9, 0.82)),
+    linear-gradient(180deg, var(--glass-3), rgba(0, 0, 0, 0.82)),
     rgba(0, 0, 0, 0.55);
   backdrop-filter: var(--blur-glass-light);
   -webkit-backdrop-filter: var(--blur-glass-light);
@@ -240,11 +240,11 @@
   inset: var(--sp-5);
   z-index: -1;
   pointer-events: none;
-  border: 1px solid rgba(214, 207, 199, 0.035);
+  border: 1px solid var(--silk-025);
   border-radius: var(--rad-md);
   background:
-    radial-gradient(circle at 73% 36%, rgba(255, 165, 223, 0.055), transparent 18%),
-    linear-gradient(90deg, transparent 0 22%, rgba(255, 165, 223, 0.035) 22.1%, transparent 22.3% 100%);
+    radial-gradient(circle at 73% 36%, var(--brand-06), transparent 18%),
+    linear-gradient(90deg, transparent 0 22%, var(--brand-04) 22.1%, transparent 22.3% 100%);
   opacity: 0.82;
 }
 
@@ -449,8 +449,8 @@
   inset: 0;
   pointer-events: none;
   background:
-    radial-gradient(circle at 10px 10px, rgba(255, 222, 242, 0.22) 0 1.5px, transparent 2.4px),
-    radial-gradient(circle at calc(100% - 10px) 10px, rgba(255, 222, 242, 0.12) 0 1.5px, transparent 2.4px),
+    radial-gradient(circle at 10px 10px, var(--border-strong) 0 1.5px, transparent 2.4px),
+    radial-gradient(circle at calc(100% - 10px) 10px, var(--border-subtle) 0 1.5px, transparent 2.4px),
     linear-gradient(90deg, transparent, var(--brand-05), transparent);
   opacity: 0.78;
   mask-image: linear-gradient(180deg, black 0%, black 82%, transparent 100%);
@@ -698,8 +698,8 @@
   inset: 0;
   pointer-events: none;
   background:
-    linear-gradient(90deg, transparent, rgba(255, 165, 223, 0.052), transparent),
-    repeating-linear-gradient(90deg, transparent 0 18px, rgba(214, 207, 199, 0.026) 18px 19px);
+    linear-gradient(90deg, transparent, var(--brand-05), transparent),
+    repeating-linear-gradient(90deg, transparent 0 18px, var(--silk-025) 18px 19px);
   opacity: 0.7;
 }
 
@@ -862,7 +862,10 @@
   min-height: 8px;
   border-radius: 1.25px 1.25px 0 0;
   /* Lit rose spectrum bars rising off the screen floor — the live waveform of
-   * the set, bright at the tip, fading into the LED comb at the base. */
+   * the set, bright at the tip, fading into the LED comb at the base.
+   * Sanctioned literal: the alpha is set per bar at runtime from the real
+   * signal level, so no fixed ladder step can express it; the channels stay
+   * pinned to the brand rose. */
   background:
     linear-gradient(180deg, rgba(255, 165, 223, var(--vmx-bar-alpha)) 0%, var(--brand-08) 70%, transparent 100%),
     rgba(0, 0, 0, 0.18);
@@ -978,8 +981,8 @@
   height: 74px;
   transform: translateY(-50%);
   background:
-    linear-gradient(90deg, transparent, rgba(255, 165, 223, 0.16), transparent),
-    repeating-linear-gradient(90deg, rgba(255, 165, 223, 0.16) 0 2px, transparent 2px 13px);
+    linear-gradient(90deg, transparent, var(--brand-16), transparent),
+    repeating-linear-gradient(90deg, var(--brand-16) 0 2px, transparent 2px 13px);
   opacity: 0.24;
   mask-image: radial-gradient(ellipse at center, black 0%, black 64%, transparent 100%);
 }
@@ -991,8 +994,8 @@
   right: 8%;
   top: 50%;
   height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(255, 165, 223, 0.34), transparent);
-  box-shadow: 0 0 18px rgba(255, 165, 223, 0.12);
+  background: linear-gradient(90deg, transparent, var(--brand-35), transparent);
+  box-shadow: 0 0 18px var(--brand-12);
 }
 
 .vmx-debrief-region {
@@ -1003,9 +1006,9 @@
   align-items: center;
   justify-content: center;
   background:
-    linear-gradient(180deg, rgba(255, 165, 223, 0.2), rgba(255, 165, 223, 0.095)),
+    linear-gradient(180deg, var(--brand-22), var(--brand-10)),
     rgba(0, 0, 0, 0.18);
-  border: 1px solid rgba(255, 165, 223, 0.34);
+  border: 1px solid var(--brand-35);
   border-radius: var(--rad-sm);
   cursor: pointer;
   color: var(--silk);
@@ -1029,7 +1032,7 @@
 .vmx-debrief-region:hover,
 .vmx-debrief-region:focus-visible {
   background:
-    linear-gradient(180deg, rgba(255, 165, 223, 0.34), rgba(255, 165, 223, 0.14)),
+    linear-gradient(180deg, var(--brand-35), var(--brand-16)),
     rgba(0, 0, 0, 0.2);
   border-color: var(--amber);
   box-shadow: var(--glow-soft);
@@ -1040,7 +1043,7 @@
   color: var(--amber-pale);
   border-color: var(--amber);
   background:
-    linear-gradient(180deg, rgba(255, 165, 223, 0.42), rgba(255, 165, 223, 0.18)),
+    linear-gradient(180deg, var(--brand-40), var(--brand-18)),
     rgba(0, 0, 0, 0.24);
   box-shadow: var(--glow-soft);
   z-index: 3;
@@ -1314,7 +1317,7 @@
   color: var(--amber);
   border-color: var(--amber-40);
   background:
-    linear-gradient(180deg, rgba(255, 197, 107, 0.1), transparent 70%),
+    linear-gradient(180deg, var(--brand-10), transparent 70%),
     rgba(0, 0, 0, 0.3);
   outline: none;
 }
@@ -1393,11 +1396,11 @@
   top: calc(var(--titlebar-h) + var(--sp-3));
   right: var(--sp-5);
   background:
-    linear-gradient(180deg, rgba(212, 65, 58, 0.1), rgba(0, 0, 0, 0.22)),
+    linear-gradient(180deg, var(--danger-10), rgba(0, 0, 0, 0.22)),
     var(--glass-2);
   backdrop-filter: var(--blur-glass-light);
   -webkit-backdrop-filter: var(--blur-glass-light);
-  border: 1px solid rgba(212, 65, 58, 0.58);
+  border: 1px solid var(--danger-58);
   border-radius: var(--rad-md);
   padding: var(--sp-3) var(--sp-4);
   display: flex;
@@ -1501,8 +1504,8 @@
   .vmx-debrief-layout::before {
     inset: var(--sp-4);
     background:
-      radial-gradient(circle at 50% 24%, rgba(255, 165, 223, 0.052), transparent 22%),
-      linear-gradient(180deg, transparent 0 18%, rgba(255, 165, 223, 0.035) 18.1%, transparent 18.3% 100%);
+      radial-gradient(circle at 50% 24%, var(--brand-05), transparent 22%),
+      linear-gradient(180deg, transparent 0 18%, var(--brand-04) 18.1%, transparent 18.3% 100%);
   }
 
   .vmx-debrief-main {
@@ -1641,8 +1644,8 @@
     width: 6px;
     height: 6px;
     border-radius: 50%;
-    background: rgba(255, 165, 223, 0.74);
-    box-shadow: 0 0 10px rgba(255, 165, 223, 0.32);
+    background: var(--brand-78);
+    box-shadow: 0 0 10px var(--brand-30);
   }
 
   .vmx-debrief-verdict {
