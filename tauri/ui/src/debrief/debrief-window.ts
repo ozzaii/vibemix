@@ -213,25 +213,9 @@ if (isMockMode) {
     }
   });
 
-  // Wire the chapter rail → timeline deep-link. The rail's buttons were a
-  // dead control: they dispatched chapter-selected and nobody listened —
-  // ~320px of fully-styled affordance that did nothing. Route through the
-  // existing vmx-debrief-deeplink path (same scroll+pulse the live
-  // chip-click uses); covers both the live and mock mounts.
-  if (chaptersEl) {
-    chaptersEl.addEventListener("chapter-selected", (e: Event) => {
-      const detail = (e as CustomEvent).detail as {
-        id: string;
-        start: number;
-        citation_event_id: string;
-      };
-      window.dispatchEvent(
-        new CustomEvent("vmx-debrief-deeplink", {
-          detail: { eventId: detail.citation_event_id, timestampS: detail.start },
-        }),
-      );
-    });
-  }
+  // Wire the chapter rail → timeline deep-link (shared with the mock mount —
+  // the bridge is a pure local CustomEvent hop, no WS dependency).
+  if (chaptersEl) wireChapterRailDeepLink(chaptersEl);
 
   // Wire citation chip clicks → request tooltip via WS.
   if (drillsEl) {
@@ -331,8 +315,31 @@ if (isMockMode) {
   client.connect();
 }
 
+/** Chapter rail → timeline deep-link. The rail's buttons were a dead
+ *  control: they dispatched chapter-selected and nobody listened — ~320px of
+ *  fully-styled affordance that did nothing. Route through the existing
+ *  vmx-debrief-deeplink path (same scroll+pulse the live chip-click uses).
+ *  Called from BOTH the real and mock mounts. */
+function wireChapterRailDeepLink(rail: HTMLElement): void {
+  rail.addEventListener("chapter-selected", (e: Event) => {
+    const detail = (e as CustomEvent).detail as {
+      id: string;
+      start: number;
+      citation_event_id: string;
+    };
+    window.dispatchEvent(
+      new CustomEvent("vmx-debrief-deeplink", {
+        detail: { eventId: detail.citation_event_id, timestampS: detail.start },
+      }),
+    );
+  });
+}
+
 function mountMockDebrief(): void {
   if (errorBanner) errorBanner.hidden = true;
+  // Scope hook for mock-only CSS (the morning mirror's demo diet) — the
+  // real path never carries this attribute.
+  document.getElementById("debrief-root")?.setAttribute("data-mock", "true");
 
   const totalDurationS = 47 * 60;
   const waveformPeaks = mockWaveformPeaks(192);
@@ -379,7 +386,10 @@ function mountMockDebrief(): void {
     },
   ];
 
-  if (chaptersEl) mountChapterList(chaptersEl, chapters);
+  if (chaptersEl) {
+    mountChapterList(chaptersEl, chapters);
+    wireChapterRailDeepLink(chaptersEl);
+  }
   if (waveformEl) {
     mountTimelinePlaceholder(
       waveformEl,
@@ -450,6 +460,52 @@ function mountMockDebrief(): void {
         citation: "mock:36:02",
       },
     ]);
+  }
+
+  // Evidence chips + timeline regions resolve LOCALLY in mock — the real
+  // path round-trips the citation over WS, but a preview whose receipts do
+  // nothing lies about the product's grounding interaction. Same tooltip,
+  // same anchor behavior, canned receipts.
+  const mockReceipts = new Map<string, CitationTooltipPayload>([
+    ["mock:00:00", { event_id: "mock:00:00", evidence_text: "Set opens at 124 BPM; low end held back for the first phrase.", timestamp: 0, found: true }],
+    ["mock:07:40", { event_id: "mock:07:40", evidence_text: "Bass handoff: outgoing low cut as the incoming groove takes the floor.", timestamp: 460, found: true }],
+    ["mock:18:12", { event_id: "mock:18:12", evidence_text: "Two vocals overlap for a bar; the hook loses front position.", timestamp: 1092, found: true }],
+    ["mock:27:55", { event_id: "mock:27:55", evidence_text: "Peak blend lands on the downbeat; room energy carries through.", timestamp: 1675, found: true }],
+    ["mock:38:30", { event_id: "mock:38:30", evidence_text: "Reset window: breakdown clears bandwidth ahead of the final run.", timestamp: 2310, found: true }],
+    ["mock:12:44", { event_id: "mock:12:44", evidence_text: "Bass swap lands three beats early; old groove still holds the floor.", timestamp: 764, found: true }],
+    ["mock:24:18", { event_id: "mock:24:18", evidence_text: "Lead vocal phrases stack for a full bar across the blend.", timestamp: 1458, found: true }],
+    ["mock:36:02", { event_id: "mock:36:02", evidence_text: "Echo tail runs long; hats return after the downbeat.", timestamp: 2162, found: true }],
+  ]);
+  const showMockReceipt = (citation: string, anchorX?: number, anchorY?: number): void => {
+    if (!tooltip) return;
+    const payload =
+      mockReceipts.get(citation) ??
+      ({ event_id: citation, evidence_text: "", timestamp: 0, found: false } satisfies CitationTooltipPayload);
+    const anchor =
+      typeof anchorX === "number" && typeof anchorY === "number"
+        ? { x: anchorX, y: anchorY }
+        : undefined;
+    showCitationTooltip(tooltip, payload, anchor);
+  };
+  if (drillsEl) {
+    drillsEl.addEventListener("citation-click", (e: Event) => {
+      const detail = (e as CustomEvent).detail as {
+        citation: string;
+        anchorX?: number;
+        anchorY?: number;
+      };
+      showMockReceipt(detail.citation, detail.anchorX, detail.anchorY);
+    });
+  }
+  if (waveformEl) {
+    waveformEl.addEventListener("region-clicked", (e: Event) => {
+      const detail = (e as CustomEvent).detail as {
+        citation_event_id: string;
+        anchorX?: number;
+        anchorY?: number;
+      };
+      showMockReceipt(detail.citation_event_id, detail.anchorX, detail.anchorY);
+    });
   }
 }
 

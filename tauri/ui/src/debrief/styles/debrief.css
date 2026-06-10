@@ -745,6 +745,18 @@
   }
 }
 
+/* Mock-only morning diet ([data-mock] is set ONLY by mountMockDebrief; the
+ * real path never carries it). The demo replay's <audio> points at a file
+ * that doesn't exist in the preview — a dead native player that also pushes
+ * the Play-window controls below the panel's overflow:hidden edge at 900px
+ * viewports. Hide the dead element and let the rail breathe shorter. */
+.vmx-debrief-root[data-mock] .vmx-morning-mirror__audio {
+  display: none;
+}
+.vmx-debrief-root[data-mock] .vmx-morning-mirror__rail {
+  min-height: 56px;
+}
+
 .vmx-debrief-timeline-placeholder {
   position: relative;
   min-height: 100%;
