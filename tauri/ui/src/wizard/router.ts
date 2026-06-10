@@ -22,8 +22,10 @@ import { emitIpc, sendIpcRequest, subscribeIpc } from "../ipc/client.js";
 import {
   libraryImportFromAction,
   libraryImportOutcome,
+  libraryModels,
   libraryStats,
   onLibraryImportProgress,
+  onModelProgress,
   type LibrarySetupCandidate,
 } from "../library/api.js";
 import { registerShortcuts } from "../session/shortcuts.js";
@@ -48,7 +50,9 @@ import {
 } from "./step-skill-level.js";
 import {
   renderStepLibraryFeed,
+  voiceModelReadoutText,
   type LibraryFeedState,
+  type VoiceModelState,
 } from "./step-library-feed.js";
 import { createStepDriverFetch } from "./step-driver-fetch.js";
 import { createStepForewarning } from "./step-forewarning.js";
@@ -75,6 +79,7 @@ export interface WizardState {
   step1: Step1State;
   skillLevel: SkillLevelState;
   libraryFeed: LibraryFeedState;
+  voiceModel: VoiceModelState;
   profileConsent: ProfileConsentState;
   telemetryConsent: TelemetryConsentState;
   smokeTest: SmokeTestState;
@@ -103,6 +108,7 @@ const DEFAULT_STATE: WizardState = {
     candidates: [],
     indexed: 0,
   },
+  voiceModel: { status: "idle", downloaded: 0, size: 0 },
   profileConsent: {
     // PROFILE-05 default-OFF — non-negotiable. The toggle MUST start
     // unchecked; the user opts in explicitly.
@@ -411,8 +417,13 @@ export function renderCurrentStep(): void {
         libraryFeedBootStarted = true;
         void refreshLibraryFeedCandidates();
       }
+      if (!voiceModelPrefetchStarted) {
+        voiceModelPrefetchStarted = true;
+        void startVoiceModelPrefetch();
+      }
       primary = renderStepLibraryFeed(wizardState.libraryFeed, {
         skill: wizardState.skillLevel.skill,
+        voiceModel: wizardState.voiceModel,
         profileConsent: wizardState.profileConsent.consent,
         telemetryConsent: wizardState.telemetryConsent.consent,
         onSelectSkill: (next) =>
@@ -567,6 +578,7 @@ let step1PollTimer: number | null = null;
 let hasTriedScreenRestart = false;
 let screenRestartFocusHandler: (() => void) | null = null;
 let libraryFeedBootStarted = false;
+let voiceModelPrefetchStarted = false;
 let smokeTestStarted = false;
 let driverFetchEl: HTMLElement | null = null;
 
@@ -785,6 +797,59 @@ async function startLibraryFeedImport(
         error: message,
       },
     });
+  }
+}
+
+/** Lane A (2026-06-10) — the ~706MB Chatterbox voice + the CLAP embedder used
+ *  to download INSIDE ipc.wizard.done, freezing the app on "loading vibemix…"
+ *  for the whole transfer. Kick the existing one-shot installer instead
+ *  (Tauri `library_models` command → `vibemix library models --install
+ *  required --progress`): the child process belongs to the Tauri PARENT, so
+ *  it survives the wizard→live sidecar handoff and resumes via the HF cache
+ *  on retry. Progress arrives on the already-built `library://model-progress`
+ *  channel. Failure is visible, not fatal — the deck opens with the voice
+ *  badge muted and the Viber models card as recovery. */
+async function startVoiceModelPrefetch(): Promise<void> {
+  paintVoiceModel({ ...wizardState.voiceModel, status: "downloading" });
+  let unlisten: () => void = () => {};
+  try {
+    unlisten = await onModelProgress((p) => {
+      if (p.id !== "chatterbox") return; // voice dominates the payload
+      paintVoiceModel({
+        status: p.status === "error" ? "error" : "downloading",
+        downloaded: p.downloaded,
+        size: p.size,
+        detail: p.error,
+      });
+    });
+    const result = await libraryModels("required");
+    const ok = result.install ? result.install.ok : result.required_ready;
+    paintVoiceModel({
+      ...wizardState.voiceModel,
+      status: ok ? "ready" : "error",
+    });
+  } catch (err) {
+    paintVoiceModel({
+      ...wizardState.voiceModel,
+      status: "error",
+      detail: err instanceof Error ? err.message : String(err),
+    });
+  } finally {
+    unlisten();
+  }
+}
+
+/** Update the voiceModel slice WITHOUT re-rendering the whole step — a full
+ *  setState() rerender restarts the step entrance animation on every 8MB
+ *  progress chunk (same hazard the status-bar subscriber documents). The
+ *  readout element repaints in place; the next natural render reads state. */
+function paintVoiceModel(next: VoiceModelState): void {
+  wizardState = { ...wizardState, voiceModel: next };
+  notify();
+  const el = document.getElementById("voice-model-readout");
+  if (el) {
+    el.textContent = voiceModelReadoutText(next);
+    el.dataset.status = next.status;
   }
 }
 

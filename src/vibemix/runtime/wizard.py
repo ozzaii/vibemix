@@ -434,7 +434,13 @@ class WizardLoop:
 
     async def _on_wizard_done(self, msg: dict) -> None:
         """Sidecar logs the choices + exits cleanly. Rust shell persists
-        config.json + respawns ``vibemix`` without ``--wizard``."""
+        config.json + respawns ``vibemix`` without ``--wizard``.
+
+        Lane A (2026-06-10): the exit is IMMEDIATE — no model download on
+        this path. The ~706MB Chatterbox prefetch used to run here and froze
+        the wizard→live handoff for the whole transfer with zero UI; the
+        wizard webview now kicks the Tauri ``library_models`` one-shot
+        installer instead (survives this process, visible progress)."""
         payload = msg.get("payload", {})
         # Privacy-respecting log — controller_profile + device_id are not PII;
         # target_window_id is just an opaque OS handle.
@@ -444,7 +450,6 @@ class WizardLoop:
             payload.get("controller_profile"),
             payload.get("target_window_id"),
         )
-        await self._prefetch_chatterbox_model()
         self._stop.set()
 
     async def _on_wizard_start(self, _msg: dict) -> None:
@@ -577,45 +582,6 @@ class WizardLoop:
         )
         await self.bus.emit(json.loads(ack.to_json()))
 
-    async def _prefetch_chatterbox_model(self) -> None:
-        """Download Chatterbox weights before the first live session starts.
-
-        Failure keeps the wizard non-fatal: the next launch shows a muted local
-        voice status and the runtime refuses to download during a set.
-        """
-        try:
-            from vibemix.library.model_assets import install_chatterbox_model
-
-            def _progress(frame: dict[str, object]) -> None:
-                log.info(
-                    "[chatterbox-model] %s",
-                    json.dumps(frame, separators=(",", ":"), sort_keys=True),
-                )
-
-            result = await asyncio.to_thread(
-                install_chatterbox_model,
-                progress=_progress,
-            )
-        except Exception as e:  # pragma: no cover - fail-soft at wizard boundary
-            self._voice_muted = True
-            log.warning("chatterbox model prefetch failed: %s", e)
-            await self._emit_voice_status("muted")
-            return
-
-        errors = [str(err) for err in result.get("errors", [])]
-        if errors or not bool(result.get("installed")):
-            self._voice_muted = True
-            log.warning(
-                "chatterbox model unavailable; co-host starts voiceless: %s",
-                "; ".join(errors),
-            )
-            await self._emit_voice_status("muted")
-            return
-
-        self._voice_muted = False
-        log.info("chatterbox model ready: %s", result.get("path", ""))
-        await self._emit_voice_status("ok")
-
     # ------------------------------------------------------------------
     # Background loops
     # ------------------------------------------------------------------
@@ -662,16 +628,6 @@ class WizardLoop:
             )
         except Exception:
             return "denied"
-
-    async def _emit_voice_status(self, voice: str) -> None:
-        tick = StatusTick.make(
-            livekit="connecting",
-            gemini="down",
-            midi=self._probe_midi_count(),
-            screen=self._probe_screen_status(),
-            voice="muted" if voice == "muted" else "ok",
-        )
-        await self.bus.emit(json.loads(tick.to_json()))
 
     # ------------------------------------------------------------------
     # Helpers

@@ -19,19 +19,16 @@ from vibemix.ui_bus.messages import WizardDone
 
 
 def test_wizard_done_sets_stop_event(fake_bus: FakeBus, monkeypatch) -> None:
-    """ipc.wizard.done → stop event set, sidecar will exit cleanly."""
+    """ipc.wizard.done → stop set IMMEDIATELY; no model download on the exit
+    path (lane A: the ~706MB Chatterbox fetch froze the wizard→live handoff;
+    the wizard UI kicks the Tauri one-shot installer instead)."""
     import vibemix.library.model_assets as model_assets
 
+    download_calls: list[object] = []
     monkeypatch.setattr(
         model_assets,
         "install_chatterbox_model",
-        lambda progress=None: {
-            "id": "chatterbox",
-            "installed": True,
-            "path": "/tmp/vibemix-test/chatterbox",
-            "files": [],
-            "errors": [],
-        },
+        lambda *a, **k: download_calls.append(1) or {},
     )
     loop = WizardLoop(fake_bus)
     loop.register_handlers()
@@ -45,7 +42,7 @@ def test_wizard_done_sets_stop_event(fake_bus: FakeBus, monkeypatch) -> None:
     assert not loop._stop.is_set()
     asyncio.run(fake_bus.handlers["ipc.wizard.done"](msg))
     assert loop._stop.is_set()
-    assert fake_bus.emitted_by_type("ipc.status.tick")[-1]["payload"]["voice"] == "ok"
+    assert download_calls == []  # exit path must never download
 
 
 def test_wizard_done_payload_schema_valid() -> None:

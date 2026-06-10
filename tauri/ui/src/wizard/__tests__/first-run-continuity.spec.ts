@@ -56,6 +56,12 @@ vi.mock("../../library/api.js", () => ({
   })),
   libraryImportFromAction: vi.fn(async () => true),
   onLibraryImportProgress: vi.fn(async () => () => {}),
+  libraryModels: vi.fn(async () => ({
+    models: [],
+    required_ready: true,
+    all_ready: true,
+  })),
+  onModelProgress: vi.fn(async () => () => {}),
 }));
 
 import {

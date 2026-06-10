@@ -36,10 +36,32 @@ export interface LibraryFeedState {
   error?: string;
 }
 
+export interface VoiceModelState {
+  status: "idle" | "downloading" | "ready" | "error";
+  downloaded: number;
+  size: number;
+  detail?: string;
+}
+
+export function voiceModelReadoutText(vm: VoiceModelState): string {
+  const mb = (n: number): string => `${Math.round(n / (1024 * 1024))} MB`;
+  if (vm.status === "downloading") {
+    return vm.size > 0
+      ? `downloading voice — ${mb(vm.downloaded)} of ${mb(vm.size)}`
+      : "downloading voice";
+  }
+  if (vm.status === "ready") return "voice installed";
+  if (vm.status === "error") {
+    return "voice download failed — vibemix opens with voice muted";
+  }
+  return "preparing voice";
+}
+
 export interface LibraryFeedCallbacks {
   skill: SkillLevel;
   profileConsent: boolean;
   telemetryConsent: boolean;
+  voiceModel?: VoiceModelState;
   onSelectSkill: (next: SkillLevel) => void;
   onToggleProfile: (next: boolean) => void;
   onToggleTelemetry: (next: boolean) => void;
@@ -520,6 +542,22 @@ function renderControllerCard(): HTMLElement {
   return card;
 }
 
+function renderVoiceModelCard(vm: VoiceModelState): HTMLElement {
+  const card = document.createElement("section");
+  card.className = "wizard-feed-card";
+  card.dataset.role = "voice-model";
+  const title = document.createElement("h2");
+  title.className = "wizard-feed-card__title";
+  title.textContent = "voice";
+  const copy = document.createElement("p");
+  copy.className = "wizard-feed-card__body";
+  copy.id = "voice-model-readout";
+  copy.dataset.status = vm.status;
+  copy.textContent = voiceModelReadoutText(vm);
+  card.append(title, copy);
+  return card;
+}
+
 function renderPrivacyCard(
   state: LibraryFeedState,
   cb: LibraryFeedCallbacks,
@@ -633,7 +671,14 @@ export function renderStepLibraryFeed(
 
   const support = document.createElement("div");
   support.className = "wizard-feed-support";
-  support.append(skillCard, renderControllerCard(), renderPrivacyCard(state, cb));
+  support.append(
+    skillCard,
+    renderControllerCard(),
+    renderVoiceModelCard(
+      cb.voiceModel ?? { status: "idle", downloaded: 0, size: 0 },
+    ),
+    renderPrivacyCard(state, cb),
+  );
 
   grid.append(renderLibraryCard(state, cb), support);
 
