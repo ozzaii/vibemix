@@ -222,6 +222,57 @@ class ControllerState:
                 fields.clear()
             self._touched_master_fields.clear()
 
+    def rebind_profile(self, profile: ControllerProfile) -> None:
+        """Swap the bound profile IN PLACE — the hot-plug re-profile path.
+
+        ``handle_port_change_single_state`` calls this when the watcher
+        resolves a profile for a newly-connected port. Mutating the existing
+        object (instead of rebuilding, as ``handle_port_change`` does)
+        preserves the single-state invariant: every consumer that captured
+        this ControllerState at boot (ws_broadcast, state_refresh_loop,
+        MidiMirror) keeps reading the SAME object and sees the new
+        controller's decode immediately.
+
+        Same-id rebinds are a no-op, so the FLX4 unplug→replug cycle keeps
+        its existing semantics byte-for-byte (``mark_disconnected`` already
+        cleared the rings; deck values survive a same-controller rebind).
+
+        On a real profile change: rebuild the deck dict / lookup tables /
+        touched-field sets for the new profile shape and clear both rings —
+        moves from controller A must never ground a reaction after
+        controller B takes over (same anti-hallucination contract as
+        ``mark_disconnected``). Monotonic counters (``_messages_seen_total``,
+        ``_next_event_id``, ``_moves_seen_total``) are NOT reset — the
+        ``activity_snapshot`` contract says "monotonic for this
+        ControllerState run". ``on_move`` (the tracer hook) is untouched.
+        """
+        with self._lock:
+            if profile.id == self._profile.id:
+                return
+            self._profile = profile
+            self.deck = {
+                d: {
+                    "vol": 0,
+                    "eq_low": 64,
+                    "eq_mid": 64,
+                    "eq_hi": 64,
+                    "filter": 64,
+                    "tempo": 64,
+                    "jog": 0,
+                    "play": False,
+                    "cue": False,
+                    "jog_touched": False,
+                }
+                for d in profile.decks
+            }
+            self.xfader = 64
+            self._touched_fields = {d: set() for d in profile.decks}
+            self._touched_master_fields = set()
+            self._moves.clear()
+            self._events.clear()
+            self._cc_lookup = {(b.channel, b.cc): b for b in profile.controls.values()}
+            self._note_lookup = {(b.channel, b.note): b for b in profile.buttons.values()}
+
     def is_connected(self) -> bool:
         with self._lock:
             return self._connected
