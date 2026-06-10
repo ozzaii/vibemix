@@ -3,7 +3,11 @@
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import { reasonToCopy, showErrorBanner } from "../components/error-banner.js";
+import {
+  reasonToCopy,
+  showErrorBanner,
+  showWorkingBanner,
+} from "../components/error-banner.js";
 
 afterEach(() => {
   document.body.replaceChildren();
@@ -72,5 +76,14 @@ describe("showErrorBanner mounts dom", () => {
     document.body.append(div);
     showErrorBanner(div, "bogus", "fallback msg");
     expect(div.textContent).toContain("fallback msg");
+  });
+
+  it("renders the honest working line without a dismiss control", () => {
+    const host = document.createElement("div");
+    showWorkingBanner(host);
+    expect(host.hidden).toBe(false);
+    expect(host.dataset.reason).toBe("still_working");
+    expect(host.textContent).toContain("still putting your debrief together");
+    expect(host.querySelector("button")).toBeNull();
   });
 });

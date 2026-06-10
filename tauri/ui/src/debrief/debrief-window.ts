@@ -26,7 +26,7 @@ import {
   showCitationTooltip,
   type CitationTooltipPayload,
 } from "./components/citation-tooltip.js";
-import { showErrorBanner } from "./components/error-banner.js";
+import { showErrorBanner, showWorkingBanner } from "./components/error-banner.js";
 import { DebriefWsClient } from "./ws-client.js";
 import { parseDebriefBootUrl } from "./url-state.js";
 
@@ -171,6 +171,29 @@ if (isMockMode) {
         detail?.reason ?? "sidecar_crashed",
         detail?.message ?? "",
       );
+    }
+  });
+
+  // Honest in-between state: the sidecar binds 8766 only after boot (and,
+  // first time, after generation starts emitting). Past a 10s grace, say
+  // so — never over a real error banner.
+  client.addEventListener("connecting", (e: Event) => {
+    const detail = (e as CustomEvent).detail as { elapsedMs?: number };
+    if (!errorBanner) return;
+    if ((detail?.elapsedMs ?? 0) < 10_000) return;
+    if (!errorBanner.hidden && errorBanner.dataset.reason !== "still_working")
+      return;
+    showWorkingBanner(errorBanner);
+  });
+
+  client.addEventListener("open", () => {
+    if (!errorBanner) return;
+    // A late-binding sidecar is healthy — clear the waiting line and any
+    // premature crash verdict.
+    const reason = errorBanner.dataset.reason;
+    if (reason === "still_working" || reason === "sidecar_crashed") {
+      errorBanner.hidden = true;
+      errorBanner.textContent = "";
     }
   });
 

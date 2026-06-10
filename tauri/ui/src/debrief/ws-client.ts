@@ -3,9 +3,9 @@
 //
 // Connects to ws://127.0.0.1:8766 (Plan 29-02 sidecar), validates each
 // inbound frame against the source-of-truth schema via the ajv-generated
-// validator, and dispatches typed CustomEvents on an EventTarget. Retries
-// the connection up to 3 times with exponential backoff (sidecar is
-// one-shot per window · long disconnects mean it crashed).
+// validator, and dispatches typed CustomEvents on an EventTarget. Retries the
+// connection with capped backoff for up to 120s (sidecar boot +
+// first-time generation bind 8766 late); only then declares a crash.
 
 import { vmxLog } from "../debug-log.js";
 import { stripDrillFields } from "./stripper-roundtrip.js";
@@ -45,12 +45,18 @@ const KIND_MAP: Record<string, DebriefFrameKind> = {
   "ipc.debrief.error": "error",
 };
 
-const RECONNECT_MAX = 3;
+// Reconnect policy: the sidecar is one-shot per window, but PyInstaller
+// boot and first-time generation happen BEFORE 127.0.0.1:8766 accepts
+// connections. Give it a real budget instead of ~1.4s: retry with capped
+// backoff for up to RECONNECT_BUDGET_MS, then declare the sidecar crashed.
+const RECONNECT_BUDGET_MS = 120_000;
+const RECONNECT_DELAY_CAP_MS = 2_000;
 
 export class DebriefWsClient extends EventTarget {
   private url: string;
   private ws: WebSocket | null = null;
   private retries = 0;
+  private firstAttemptAt: number | null = null;
 
   constructor(port = 8766) {
     super();
@@ -66,6 +72,7 @@ export class DebriefWsClient extends EventTarget {
     }
     this.ws.onopen = () => {
       this.retries = 0;
+      this.firstAttemptAt = null;
       vmxLog("[vmx:ws]", "debrief: connection connected", { url: this.url });
       this.dispatchEvent(new CustomEvent("open"));
     };
@@ -116,7 +123,9 @@ export class DebriefWsClient extends EventTarget {
   // ---------- private ----------
 
   private _scheduleReconnect(): void {
-    if (this.retries >= RECONNECT_MAX) {
+    const now = Date.now();
+    if (this.firstAttemptAt === null) this.firstAttemptAt = now;
+    if (now - this.firstAttemptAt >= RECONNECT_BUDGET_MS) {
       this.dispatchEvent(
         new CustomEvent("error", {
           detail: { reason: "sidecar_crashed" },
@@ -124,8 +133,13 @@ export class DebriefWsClient extends EventTarget {
       );
       return;
     }
-    const delay = Math.min(2000, 200 * 2 ** this.retries);
+    const delay = Math.min(RECONNECT_DELAY_CAP_MS, 200 * 2 ** this.retries);
     this.retries += 1;
+    this.dispatchEvent(
+      new CustomEvent("connecting", {
+        detail: { attempt: this.retries, elapsedMs: now - this.firstAttemptAt },
+      }),
+    );
     setTimeout(() => this.connect(), delay);
   }
 

@@ -62,3 +62,19 @@ export function showErrorBanner(
 export function reasonToCopy(reason: string): string {
   return (REASON_COPY as Record<string, string>)[reason] ?? "";
 }
+
+/** Honest waiting line while the sidecar boots/generates — NOT an error.
+ *  No dismiss control; the window clears it on the first successful
+ *  connection (see debrief-window.ts `open` listener). */
+export function showWorkingBanner(container: HTMLElement): void {
+  container.textContent = "";
+  container.hidden = false;
+  container.dataset.reason = "still_working";
+
+  const text = document.createElement("p");
+  text.className = "vmx-debrief-error-text";
+  text.textContent =
+    "Sven is still putting your debrief together — the first pass can take a minute.";
+
+  container.append(text);
+}

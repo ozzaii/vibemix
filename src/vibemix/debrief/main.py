@@ -790,9 +790,9 @@ def _write_back_profile_best_effort(
 def _emit_error_and_exit(port: int, reason: str, message: str) -> None:
     """Best-effort: spawn a short-lived WS server emitting one error frame.
 
-    The renderer connects within ~100ms of window load; this keeps the
-    server up for 2 seconds so the error reaches the renderer before
-    the process exits.
+    The renderer retries with capped backoff (ws-client.ts); this keeps
+    the server up for 10 seconds so the error reaches the renderer
+    before the process exits.
     """
     logger.info("[debrief] emit_error_and_exit: reason=%r", reason)
     try:
@@ -801,7 +801,10 @@ def _emit_error_and_exit(port: int, reason: str, message: str) -> None:
         async def _one_shot():
             server = DebriefWsServer(port=port)
             server.emit_error(reason, message)
-            await server.serve_for_seconds(2.0)
+            # The renderer retries with up to 2s backoff for up to 120s
+            # (ws-client.ts RECONNECT_BUDGET_MS) — hold the error frame
+            # long enough that a mid-backoff client cannot miss it.
+            await server.serve_for_seconds(10.0)
 
         asyncio.run(_one_shot())
     except Exception as e:
