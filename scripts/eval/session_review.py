@@ -248,6 +248,63 @@ def render_digest_text(session_name: str, digest: dict[str, Any]) -> str:
     return head + "\nTIMELINE:\n" + body
 
 
+def salvage_json(content: str) -> dict[str, Any] | None:
+    """Recover a JSON object from model output with trailing garbage.
+
+    Observed failure shape: a fully valid object whose closing brace is
+    preceded by junk lines (``."`` / ``"``) the model appended. Strategy:
+    plain parse, then raw_decode (ignores trailing junk AFTER a complete
+    object), then drop trailing lines one at a time and re-close whatever
+    brackets remain open. Deterministic, never invents content.
+    """
+    start = content.find("{")
+    if start < 0:
+        return None
+    body = content[start:]
+    try:
+        doc = json.loads(body)
+        return doc if isinstance(doc, dict) else None
+    except json.JSONDecodeError:
+        pass
+    try:
+        doc = json.JSONDecoder().raw_decode(body)[0]
+        return doc if isinstance(doc, dict) else None
+    except json.JSONDecodeError:
+        pass
+    lines = body.splitlines()
+    for cut in range(len(lines) - 1, max(len(lines) - 40, 0), -1):
+        prefix = "\n".join(lines[:cut]).rstrip().rstrip(",")
+        stack: list[str] = []
+        in_str = False
+        esc = False
+        for ch in prefix:
+            if esc:
+                esc = False
+                continue
+            if ch == "\\":
+                esc = in_str
+                continue
+            if ch == '"':
+                in_str = not in_str
+                continue
+            if in_str:
+                continue
+            if ch in "{[":
+                stack.append(ch)
+            elif ch in "}]" and stack:
+                stack.pop()
+        if in_str:
+            prefix += '"'
+        candidate = prefix + "".join("}" if b == "{" else "]" for b in reversed(stack))
+        try:
+            doc = json.loads(candidate)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(doc, dict):
+            return doc
+    return None
+
+
 def review_once(client: Any, model: str, system: str, digest_text: str) -> dict[str, Any]:
     """One persona review call; parks (error dict) rather than fabricating."""
     last_err = ""
@@ -273,14 +330,10 @@ def review_once(client: Any, model: str, system: str, digest_text: str) -> dict[
             if not content:
                 last_err = "blocked: no text candidate"
                 break
-            try:
-                return json.loads(content)
-            except json.JSONDecodeError:
-                start, end = content.find("{"), content.rfind("}")
-                if start >= 0 and end > start:
-                    return json.loads(content[start : end + 1])
-                last_err = "unparseable response"
-                break
+            doc = salvage_json(content)
+            if doc is not None:
+                return doc
+            return {"error": "unparseable response", "raw_head": content[:400]}
         except Exception as e:  # noqa: BLE001
             last_err = repr(e)[:160]
             transient = any(t in last_err for t in ("429", "502", "503", "UNAVAILABLE", "TimeoutError"))

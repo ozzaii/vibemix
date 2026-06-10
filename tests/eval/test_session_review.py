@@ -6,7 +6,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from scripts.eval.session_review import assemble_digest, render_digest_text
+from scripts.eval.session_review import assemble_digest, render_digest_text, salvage_json
 
 
 def _write_session(tmp_path: Path, rows: list[dict], meta: dict | None = None) -> Path:
@@ -91,3 +91,24 @@ def test_assemble_digest_empty_session(tmp_path: Path) -> None:
     assert digest["stats"]["musical_events"] == 0
     assert digest["stats"]["probe_capture"] == "unknown"
     assert "silence" in render_digest_text("s", digest)
+
+
+def test_salvage_json_recovers_trailing_garbage() -> None:
+    # The exact observed failure: a valid object whose closing brace is
+    # preceded by junk lines the model appended after the last value.
+    content = (
+        '{\n  "overall_feeling": "fine",\n  "would_use_again_0_10": 5,\n'
+        '  "top_annoyances": [\n    {"category": "silence", "what": "ghosted", "evidence_t": 125}\n  ],\n'
+        '  "change_one_thing": "speak sooner"\n'
+        '."\n."\n"\n}'
+    )
+    doc = salvage_json(content)
+    assert doc is not None
+    assert doc["would_use_again_0_10"] == 5
+    assert doc["top_annoyances"][0]["category"] == "silence"
+
+
+def test_salvage_json_plain_and_hopeless() -> None:
+    assert salvage_json('{"a": 1}') == {"a": 1}
+    assert salvage_json('prose before {"a": 1} prose after') == {"a": 1}
+    assert salvage_json("no json here at all") is None
