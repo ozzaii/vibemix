@@ -69,6 +69,33 @@ describe("SessionLayout grounding-failure → fault state (H9)", () => {
     expect(fault?.textContent).toContain("ai service");
   });
 
+  it("the restart button is unfocusable and hidden from AT outside fault mode", () => {
+    // The fault label is a real <button> wired to restart_sidecar. CSS hides
+    // it with opacity:0 + pointer-events:none outside fault mode, but neither
+    // blocks keyboard — Tab used to land on an invisible, unnamed control
+    // whose Enter restarted the co-host mid-set.
+    const root = host();
+    const mounted = mountSessionLayout(root, defaultState()); // silent mode
+    const fault = root.querySelector<HTMLButtonElement>(".vmx-live__s--fault")!;
+    expect(fault.disabled).toBe(true);
+    expect(fault.tabIndex).toBe(-1);
+    expect(fault.getAttribute("aria-hidden")).toBe("true");
+
+    // Flip to fault: the control becomes real — focusable, named, enabled.
+    vi.useFakeTimers();
+    const t0 = 1_000_000_000;
+    vi.setSystemTime(t0);
+    const active = defaultState();
+    active.cohost = { ...active.cohost, status: "LISTENING", grounded: false };
+    renderSessionFrame(mounted, active);
+    vi.setSystemTime(t0 + GROUNDING_FAILURE_MS + 500);
+    renderSessionFrame(mounted, active);
+    expect(fault.disabled).toBe(false);
+    expect(fault.tabIndex).toBe(0);
+    expect(fault.getAttribute("aria-hidden")).toBeNull();
+    expect(fault.getAttribute("aria-label")).toBe("restart co-host");
+  });
+
   it("an IDLE co-host never faults on grounded=false (empty-screen regression guard)", () => {
     // The recurring "empty screen / AI SERVICE OFFLINE / always broken" bug:
     // a quiet idle session (no music) is ungrounded forever, and the old timer

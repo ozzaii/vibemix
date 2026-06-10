@@ -1905,6 +1905,23 @@ function applyState(mounted: Mounted, next: SessionState, isMount: boolean): voi
       : "";
   if (mounted.root.dataset.mode !== mode) mounted.root.dataset.mode = mode;
 
+  // The fault label is a real <button> that restarts the co-host. Outside
+  // fault mode it is invisible (opacity 0) but CSS only gated pointer-events,
+  // which does not block keyboard — Tab landed on a zero-width unnamed
+  // control whose Enter restarted the co-host mid-set. Hard-gate focus and
+  // assistive tech to fault mode only.
+  const liveFaultBtn = mounted.liveFault as HTMLButtonElement;
+  if (mode === "fault") {
+    liveFaultBtn.disabled = false;
+    liveFaultBtn.tabIndex = 0;
+    liveFaultBtn.removeAttribute("aria-hidden");
+    liveFaultBtn.setAttribute("aria-label", "restart co-host");
+  } else if (!liveFaultBtn.disabled) {
+    liveFaultBtn.disabled = true;
+    liveFaultBtn.tabIndex = -1;
+    liveFaultBtn.setAttribute("aria-hidden", "true");
+  }
+
   // --- SHIP-WIRE START-gate run-state ---
   // Orthogonal to data-mode: armed = the idle Start gate (no reactions);
   // running = the live deck. Authoritative from the projected state; the
