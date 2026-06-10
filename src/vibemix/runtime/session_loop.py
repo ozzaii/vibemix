@@ -819,12 +819,35 @@ class SessionLoop:
 
         status = library_freshness_status()
         source_path, source_kind = refreshable_source(status)
+        # Rejections must reach the drawer: the staleness banner has already
+        # hidden itself by the time these fire, so a silent return leaves the
+        # user staring at a panel that never reacts to their Re-index click.
+        # (No import is running on these paths, so a terminal failure frame
+        # cannot stomp a live progress stream.)
         if source_kind != "folder" or not source_path:
             log.warning("staleness reindex rejected: recorded source is not a folder")
+            await self._emit_library_import_progress(
+                total=0,
+                done=0,
+                current_track_name="",
+                cache_hits=0,
+                cancelled=False,
+                failed=1,
+                failure_reason="that library source can't be re-indexed as a folder",
+            )
             return
         folder = Path(source_path).expanduser()
         if not folder.is_dir():
             log.warning("staleness reindex rejected: recorded folder is missing")
+            await self._emit_library_import_progress(
+                total=0,
+                done=0,
+                current_track_name="",
+                cache_hits=0,
+                cancelled=False,
+                failed=1,
+                failure_reason="the recorded folder is gone; check it still exists",
+            )
             return
         self._library_import_cancel_requested = False
         self._library_import_task = asyncio.create_task(
@@ -849,6 +872,19 @@ class SessionLoop:
             await self._emit_ipc_error(
                 f"library.import failed: {type(exc).__name__}: {exc}",
                 "ipc.library.import",
+            )
+            # Terminal progress frame so the drawer's progress UI settles —
+            # the ipc.error above lands on the session deck notice, which the
+            # open settings drawer covers; without this frame the panel sits
+            # on "Preparing folder…" with a live Cancel button forever.
+            await self._emit_library_import_progress(
+                total=0,
+                done=0,
+                current_track_name="",
+                cache_hits=0,
+                cancelled=False,
+                failed=1,
+                failure_reason=f"{type(exc).__name__}: {exc}",
             )
 
     async def _start_folder_import(self, folder: Path) -> None:

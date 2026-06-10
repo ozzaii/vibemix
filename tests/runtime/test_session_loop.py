@@ -322,6 +322,34 @@ def test_library_import_routes_catalog_before_xml(
     assert calls == {"catalog_source": "TraktorSource"}
 
 
+def test_library_import_failure_emits_terminal_progress_frame(
+    fake_bus: FakeBus, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An import exception must settle the drawer's progress UI: the
+    ipc.error lands on the deck notice (covered by the open drawer), so the
+    failure ALSO rides a terminal import_progress frame with failure_reason —
+    without it the panel sits on "Preparing folder…" + Cancel forever."""
+    loop = SessionLoop(fake_bus)
+    folder = tmp_path / "music"
+    folder.mkdir()
+
+    async def boom(path: Path) -> None:
+        raise RuntimeError("CLAP model missing")
+
+    monkeypatch.setattr(loop, "_start_folder_import", boom)
+
+    asyncio.run(loop._run_library_import(folder))
+
+    errors = fake_bus.emitted_by_type("ipc.error")
+    assert errors and "CLAP model missing" in errors[-1]["payload"]["reason"]
+    progress = fake_bus.emitted_by_type("ipc.library.import_progress")
+    assert progress, "failure must emit a terminal progress frame"
+    payload = progress[-1]["payload"]
+    assert payload["failed"] == 1
+    assert "CLAP model missing" in payload["failure_reason"]
+    assert payload["cancelled"] is False
+
+
 # ---------------------------------------------------------------------------
 # Boot — emits ipc.boot + initial ipc.settings.state
 # ---------------------------------------------------------------------------

@@ -385,6 +385,10 @@ export async function renderLibraryPanel(
   }
   function sourceProgressDone(p: LibraryImportProgress): boolean {
     if (p.cancelled) return true;
+    // failure_reason rides ONLY the terminal frame (api.ts contract) — it
+    // covers the sidecar's exception/rejection frames, which arrive with
+    // total=0 and would otherwise never settle the progress UI.
+    if ((p.failure_reason ?? "").trim() !== "") return true;
     if (p.total <= 0) return false;
     return p.done >= p.total || p.current_track_name.trim() === "";
   }
@@ -405,6 +409,11 @@ export async function renderLibraryPanel(
     // to prevent.
     const failed = p.failed ?? 0;
     const reason = (p.failure_reason ?? "").trim();
+    // total=0 failure frame = the run died before counting files (exception
+    // or rejected re-index) — name the reason, never "Import finished".
+    if (failed > 0 && processed === 0) {
+      return reason ? `Import failed (${reason})` : "Import failed";
+    }
     if (failed > 0 && failed >= processed && processed > 0) {
       return reason
         ? `Couldn't index any of the ${processed} files (${reason})`

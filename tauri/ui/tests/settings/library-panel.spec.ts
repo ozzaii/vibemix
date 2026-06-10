@@ -378,6 +378,32 @@ describe("library-panel — completion hides progress", () => {
     expect(status?.textContent).not.toContain("indexed");
   });
 
+  it("a total=0 failure frame settles the progress UI and names the reason", async () => {
+    const handle = await renderLibraryPanel();
+    document.body.append(handle.element);
+
+    dispatchDrop(50, ["/Music/PSYMIND"]);
+    await _flush();
+    // The sidecar's exception/rejected-reindex shape: the run died before
+    // counting files — without the failure_reason terminal rule this frame
+    // would leave "Preparing folder…" + Cancel on screen forever.
+    emitProgress({
+      total: 0,
+      done: 0,
+      current_track_name: "",
+      cache_hits: 0,
+      cancelled: false,
+      failed: 1,
+      failure_reason: "the recorded folder is gone; check it still exists",
+    });
+
+    const progress = handle.element.querySelector(".vmx-library-progress");
+    expect(progress?.classList.contains("hidden")).toBe(true);
+    const status = handle.element.querySelector(".vmx-library-status");
+    expect(status?.textContent).toContain("Import failed");
+    expect(status?.textContent).toContain("the recorded folder is gone");
+  });
+
   it("a partial-failure terminal frame names the skipped count and reason", async () => {
     const handle = await renderLibraryPanel();
     document.body.append(handle.element);
