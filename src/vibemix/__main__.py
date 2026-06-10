@@ -1499,6 +1499,44 @@ def _apply_deck_audio_config_to_env(config: Any) -> dict[str, str]:
     return {"VIBEMIX_DECK_AUDIO_CHANNELS": value}
 
 
+def _make_midi_mirror_hotplug_hook(midi_mirror: Any, controller_state: Any):
+    """Build the port-watcher hook that mirrors hot-plug events to the Learn
+    surface (MidiMirror ``controller_detected`` envelopes + profile binding)
+    and keeps the shared ControllerState's connected flag honest on unplug.
+
+    Module-level (not a closure inside ``_activate_session``) so tests can
+    drive the REAL production callback. The 2026-06-10 audit found the old
+    closure called the keyword-only ``queue_controller_detected``
+    positionally — every connect/disconnect died with a TypeError inside the
+    watcher's ``_safe_invoke`` (stderr-only), the UI never saw an envelope,
+    and an unplug never reached ``mark_disconnected`` (up to 12s of stale
+    moves kept grounding reactions on a controller that was gone).
+    """
+
+    def _on_midi_port_change(event: tuple) -> None:
+        kind = event[0]
+        if kind == "connected":
+            _, port_name, profile = event
+            midi_mirror.bind_profile(profile)
+            midi_mirror.queue_controller_detected(
+                connected=True, profile=profile, port_name=port_name
+            )
+        elif kind == "disconnected":
+            _, port_name = event
+            last_profile = midi_mirror.current_profile()
+            if last_profile is not None:
+                midi_mirror.queue_controller_detected(
+                    connected=False, profile=last_profile, port_name=port_name
+                )
+            try:
+                controller_state.mark_disconnected()
+            except Exception as exc:
+                print(f"[midi disconnect err] {exc}", file=sys.stderr)
+            midi_mirror.unbind()
+
+    return _on_midi_port_change
+
+
 async def main() -> None:
     """Verbatim port of cohost_v4.py:1925-2080 with package-aware imports.
 
@@ -2708,22 +2746,9 @@ async def main() -> None:
             midi_macos.start_listener_thread(midi_stop)
             midi_watcher_stop = asyncio.Event()
 
-            def _on_midi_port_change(event: tuple) -> None:
-                kind = event[0]
-                if kind == "connected":
-                    _, port_name, profile = event
-                    midi_mirror.bind_profile(profile)
-                    midi_mirror.queue_controller_detected(True, profile, port_name)
-                elif kind == "disconnected":
-                    _, port_name = event
-                    last_profile = midi_mirror.current_profile()
-                    if last_profile is not None:
-                        midi_mirror.queue_controller_detected(False, last_profile, port_name)
-                    try:
-                        midi_macos.controller_state.mark_disconnected()
-                    except Exception as exc:
-                        print(f"[midi disconnect err] {exc}", file=sys.stderr)
-                    midi_mirror.unbind()
+            _on_midi_port_change = _make_midi_mirror_hotplug_hook(
+                midi_mirror, midi_macos.controller_state
+            )
 
             midi_watcher_task = None
             if not os.environ.get("PYTEST_CURRENT_TEST"):

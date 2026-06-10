@@ -86,3 +86,14 @@ def test_main_module_parses():
     import ast
 
     ast.parse(_source())
+
+
+def test_queue_controller_detected_called_with_keywords():
+    """queue_controller_detected is keyword-only (midi_mirror.py) — a
+    positional call dies with TypeError inside the watcher's _safe_invoke,
+    killing both the UI envelope and the disconnect ring-clear."""
+    src = _source()
+    assert not re.search(r"queue_controller_detected\(\s*(?:True|False)\b", src), (
+        "queue_controller_detected must be called with keyword arguments "
+        "(connected=/profile=/port_name=) — it is keyword-only"
+    )
