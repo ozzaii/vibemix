@@ -353,7 +353,7 @@ describe("Phase 12 — session + drawer integration", () => {
     expect(getSessionState().settings.voice).toBe("Bella");
   });
 
-  it("deck persona button writes lens, not the overridden mood field", async () => {
+  it("deck persona strip writes lens, not the overridden mood field", async () => {
     const host = document.createElement("div");
     document.body.append(host);
     const mounted = mountSessionLayout(host);
@@ -376,9 +376,15 @@ describe("Phase 12 — session + drawer integration", () => {
     );
     invokeMock.mockClear();
 
-    document.querySelector<HTMLButtonElement>(".vmx-persona")?.click();
+    // Direct-select: with lens=hype active, picking the COACH chip writes
+    // critique. The chip also repaints optimistically before the ipc ack.
+    const coachChip = document.querySelector<HTMLButtonElement>(
+      '.vmx-persona__chip[data-mood="COACH"]',
+    );
+    coachChip?.click();
     await Promise.resolve();
     await Promise.resolve();
+    expect(coachChip?.dataset.active).toBe("true");
 
     const settingsSetCall = invokeMock.mock.calls.find((c) => {
       const args = c[1] as { message?: { type?: string; payload?: unknown } };

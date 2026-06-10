@@ -114,20 +114,19 @@ function openModeSurface(mode: "cohost" | "learn" | "build" | "debrief"): Promis
   return Promise.resolve();
 }
 
-/** Deck persona cycle. Advances the Sven mode HYPE -> COACH -> TEACH -> HYPE
- *  through the `lens` field the live brain reads. Reads live state at click
- *  time (not a captured value), so repeated taps walk the cycle correctly.
- *  Fire-and-forget; the readout reflects the echoed ipc.settings.state on
- *  the next frame, matching the settings drawer's optimistic pattern. */
-const LENS_CYCLE = ["hype", "critique", "tutor"] as const;
-function cohostLensCycleHandler(): void {
-  const cur = getSessionState().settings.lens;
-  const idx = LENS_CYCLE.indexOf(cur as (typeof LENS_CYCLE)[number]);
-  const next = LENS_CYCLE[(idx + 1) % LENS_CYCLE.length];
+/** Deck persona select. The strip's chips pick a Sven mode directly through
+ *  the `lens` field the live brain reads (hype/critique/tutor). Same-mood
+ *  taps no-op. Fire-and-forget; the readout reflects the echoed
+ *  ipc.settings.state on the next frame, matching the settings drawer's
+ *  optimistic pattern. */
+const MOOD_TO_LENS = { HYPE: "hype", COACH: "critique", TEACH: "tutor" } as const;
+function cohostLensSelectHandler(mood: "HYPE" | "COACH" | "TEACH"): void {
+  const next = MOOD_TO_LENS[mood];
+  if (getSessionState().settings.lens === next) return;
   void emitIpc("ipc.settings.set", { field: "lens", value: next }).catch(
     (err: unknown) => {
       // eslint-disable-next-line no-console
-      console.warn("[render-loop] lens cycle emitIpc failed:", err);
+      console.warn("[render-loop] lens select emitIpc failed:", err);
     },
   );
 }
@@ -404,7 +403,7 @@ function projectToLayoutState(s: BridgeSessionState): LayoutSessionState {
       mood: lensFromSettings(s.settings.lens),
       voice: s.settings.voice,
       genre: s.settings.genre,
-      onCycleMood: cohostLensCycleHandler,
+      onSelectMood: cohostLensSelectHandler,
     },
     output: {
       device: s.settings.output_device_id ?? "AUTO",

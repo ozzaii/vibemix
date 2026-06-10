@@ -129,9 +129,9 @@ export interface SessionState {
     mood: "HYPE" | "TEACH" | "COACH";
     voice: string;
     genre: string;
-    /** Tap-to-cycle persona mode. Render-loop wires it to ipc.settings.set lens.
-     *  Omitted (dev mock) means tap is a no-op. */
-    onCycleMood?: () => void;
+    /** Direct persona select (the strip's three chips). Render-loop wires it
+     *  to ipc.settings.set lens. Omitted (dev mock) means taps are no-ops. */
+    onSelectMood?: (mood: "HYPE" | "TEACH" | "COACH") => void;
   };
   output: {
     device: string;
@@ -165,9 +165,9 @@ export interface SessionState {
 export interface Mounted {
   root: HTMLElement;
   titlebar: HTMLElement;
-  /** Rail persona button (tap-to-cycle mood). */
+  /** Rail persona strip (direct-select mood chips). */
   persona: HTMLElement;
-  personaValue: HTMLElement;
+  personaChips: Record<"HYPE" | "COACH" | "TEACH", HTMLButtonElement>;
   muteButton: HTMLElement;
   /** Cross-fade liveness labels (always mounted; opacity toggled by mode). */
   liveFault: HTMLElement;
@@ -184,6 +184,8 @@ export interface Mounted {
   /** Deck notice line (THE ipc.error surface). */
   notice: HTMLElement;
   cite: HTMLElement;
+  citeTime: HTMLElement;
+  citeBand: HTMLElement;
   bpm: HTMLElement;
   key: HTMLElement;
   track: HTMLElement;
@@ -287,72 +289,60 @@ const LAYOUT_CSS = `
     padding: 2px 2px 0;
     min-width: 0;
   }
+  /* The mock's .persona-strip — a recessed hardware well holding all three
+   * moods, the active one physically pressed in. The old single rose "HYPE"
+   * label hid coach/teach behind a blind tap-to-cycle; here the choices are
+   * visible and direct-select. Optimistic repaint per the settings-control
+   * rule: the chip flips data-active locally, the echoed ipc.settings.state
+   * stays authoritative. */
   .vmx-persona {
-    appearance: none; -webkit-appearance: none;
-    position: relative; overflow: hidden;
-    display: flex; align-items: center; gap: var(--sp-3);
+    display: inline-flex;
+    align-items: stretch;
+    gap: 2px;
+    margin: 0;
+    padding: 3px;
     border: 1px solid var(--glass-edge);
     border-radius: var(--rad-sm);
-    background:
-      linear-gradient(180deg, rgba(255, 251, 244, 0.020), rgba(0, 0, 0, 0.18)),
-      rgba(0, 0, 0, 0.18);
+    background: linear-gradient(180deg, var(--void-5) 0%, var(--void-8) 100%);
+    box-shadow:
+      inset 0 2px 4px rgba(0, 0, 0, 0.45),
+      inset 0 -1px 0 rgba(255, 255, 255, 0.03),
+      0 1px 0 rgba(255, 255, 255, 0.03);
+  }
+  .vmx-persona__chip {
+    appearance: none; -webkit-appearance: none;
+    display: grid;
+    place-items: center;
     margin: 0;
-    padding: 8px 10px;
-    min-width: 128px;
+    padding: 7px 10px;
+    border: 0;
+    border-radius: var(--r-xs);
+    background: transparent;
+    font-family: var(--type-mono);
+    font-weight: 600;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    line-height: 1;
+    color: var(--text-muted);
     cursor: pointer;
+    transition: color 200ms var(--ease-brand), background 200ms var(--ease-brand),
+                box-shadow 250ms var(--ease-brand);
+  }
+  .vmx-persona__chip:hover {
+    color: var(--text-primary);
+    background: var(--brand-04);
+  }
+  .vmx-persona__chip:active { transform: scale(0.96); }
+  .vmx-persona__chip[data-active="true"] {
+    color: var(--brand);
+    background: radial-gradient(ellipse at top, var(--void-0) 0%, var(--void-12) 100%);
+    text-shadow: var(--text-emboss);
     box-shadow:
-      inset 0 1px 0 rgba(255, 251, 244, 0.028),
-      inset 0 -2px 0 rgba(0, 0, 0, 0.64);
-    transition: border-color 180ms var(--ease-brand), box-shadow 180ms var(--ease-brand);
-  }
-  /* DELIGHT (impeccable, 2026-06-03): the persona is the co-host's character
-   * dial — the control a DJ taps mid-set to swing hype → coach → teach. When you
-   * reach for it, a rose key-light pools up from the lower-left (mirroring the
-   * voice slab's own pool) and the mood word brightens: the co-host leaning
-   * toward your hand. One-Rose (a hover state, not a second ambient breath),
-   * eased, rose-only, frozen by the rail's reduced-motion handling. */
-  .vmx-persona::before {
-    content: "";
-    position: absolute;
-    inset: 0;
-    pointer-events: none;
-    background: radial-gradient(120% 120% at 16% 118%, var(--amber-22), transparent 58%);
-    opacity: 0;
-    transition: opacity 180ms var(--ease-brand);
-  }
-  .vmx-persona:hover::before,
-  .vmx-persona:focus-visible::before { opacity: 1; }
-  .vmx-persona:hover {
-    border-color: var(--amber-40);
-  }
-  .vmx-persona:hover .vmx-persona__v,
-  .vmx-persona:focus-visible .vmx-persona__v {
-    color: var(--amber);
-    text-shadow: 0 0 9px var(--amber-40);
-  }
-  .vmx-persona:active {
-    transform: translateY(1px);
-    box-shadow:
-      inset 0 2px 5px rgba(0, 0, 0, 0.62),
-      inset 0 1px 0 rgba(255, 251, 244, 0.016);
-  }
-  .vmx-persona:focus-visible { outline: 2px solid var(--amber); outline-offset: 3px; border-radius: var(--rad-sm); }
-  /* The "PERSONA" key micro-label was redundant chrome — the lit mood word plus
-   * the button's full aria-label ("co-host persona: hype. tap to cycle...") already
-   * name the control. Cut so the rose mood word reads in one beat, no key/value
-   * spec-sheet tic (impeccable layout pass, 2026-06-03). */
-  .vmx-persona__v {
-    font-family: var(--type-display);
-    font-variation-settings: 'wdth' 85, 'wght' 700;
-    font-size: 14px; letter-spacing: 0.12em; text-transform: uppercase;
-    color: var(--silk-65);
-    transition: color var(--motion-transition) ease-out, text-shadow var(--motion-transition) ease-out;
-  }
-  .vmx-persona[data-mood="HYPE"] .vmx-persona__v,
-  .vmx-persona[data-mood="TEACH"] .vmx-persona__v,
-  .vmx-persona[data-mood="COACH"] .vmx-persona__v {
-    color: var(--amber-pale);
-    text-shadow: 0 0 7px var(--amber-22);
+      inset 0 2px 5px rgba(0, 0, 0, 0.55),
+      inset 0 -1px 0 rgba(255, 255, 255, 0.04),
+      inset 0 0 0 1px var(--brand-22),
+      inset 0 0 14px var(--brand-04);
   }
   /* persistent low-ink at rest (reachable mid-set), full on hover/focus.
    * Real mute also bound to the push-to-mute hotkey (session-shortcuts.ts). */
@@ -425,8 +415,8 @@ const LAYOUT_CSS = `
      * the fault label in fault mode (it's the only clickable one — restart). */
     pointer-events: none;
   }
-  .vmx-live__s--live { color: var(--silk-40); }
-  .vmx-live__s--silent { color: var(--silk-22); }
+  .vmx-live__s--live { color: var(--text-muted); }
+  .vmx-live__s--silent { color: var(--text-disabled); }
   .vmx-live__s--fault { color: var(--amber-pale); }
   .vmx-session:not([data-mode]) .vmx-live__s--live,
   .vmx-session[data-mode=""] .vmx-live__s--live { opacity: 1; }
@@ -610,14 +600,17 @@ const LAYOUT_CSS = `
     align-self: center;
     justify-self: center;
   }
+  /* Text floor: nothing the DJ is meant to READ sits below the contract's
+   * dimmest legal step (= --text-disabled). The old silk-40/22 values were
+   * decoration-grade on load-bearing words. */
   .vmx-armed__kicker {
-    color: var(--silk-40);
+    color: var(--text-muted);
   }
   .vmx-armed__note {
     font-family: var(--type-mono);
     font-size: 11px;
     letter-spacing: 0.04em;
-    color: var(--silk-22);
+    color: var(--text-disabled);
   }
   /* Start: the one rose-lit physical control on the idle deck — the mock's
    * cohost-pill material: brand gradient slab, machined specular top line,
@@ -921,34 +914,59 @@ const LAYOUT_CSS = `
     transition: opacity 700ms ease-out;
   }
   /* The evidence chip: ONE machined glass slab holding the waveform emblem and
-   * the cite — the mock's receipt, with its left brand-bar. The rule terminates
-   * here; the chip is the claim's physical proof object. */
+   * the stacked time/band proof — the mock's receipt, with its left brand-bar.
+   * The rule terminates here; the chip is the claim's physical proof object,
+   * and hovering it lights the claim's own numerics (cite-linked) so proof and
+   * claim visibly connect. */
   .vmx-receipt__chip {
     position: relative;
     display: inline-flex;
     align-items: center;
-    gap: 14px;
-    padding: 10px 16px 10px 18px;
+    gap: 16px;
+    padding: 14px 18px 14px 20px;
     border: 1px solid var(--border-default);
     border-radius: var(--r-sm);
     background:
       linear-gradient(180deg, var(--brand-08) 0%, var(--brand-04) 40%, transparent 100%),
       linear-gradient(180deg, var(--void-8) 0%, var(--void-5) 100%);
+    backdrop-filter: var(--blur-glass-light);
+    -webkit-backdrop-filter: var(--blur-glass-light);
     box-shadow:
       inset 0 1px 0 rgba(255, 255, 255, 0.06),
       inset 0 -1px 0 rgba(0, 0, 0, 0.4),
       0 1px 0 rgba(255, 255, 255, 0.02),
-      0 4px 14px rgba(0, 0, 0, 0.35);
+      0 4px 14px rgba(0, 0, 0, 0.35),
+      0 12px 32px rgba(0, 0, 0, 0.18);
+    transition: border-color 300ms var(--ease-brand),
+                box-shadow 300ms var(--ease-brand),
+                transform 200ms var(--ease-brand);
+  }
+  .vmx-receipt__chip:hover {
+    border-color: var(--brand-35);
+    transform: translateY(-1px);
   }
   .vmx-receipt__chip::before {
     content: "";
     position: absolute;
-    left: 0; top: 9px; bottom: 9px;
+    left: 0; top: 12px; bottom: 12px;
     width: 2px;
     background: var(--brand);
     box-shadow: 0 0 6px var(--brand-50);
     border-radius: 0 1px 1px 0;
   }
+  /* Corner bracket — the hover affordance that says "this is an object you
+   * can pick up" (mock receipt::after). */
+  .vmx-receipt__chip::after {
+    content: "";
+    position: absolute;
+    width: 7px; height: 7px;
+    bottom: -1px; right: -1px;
+    border-bottom: 1px solid var(--brand);
+    border-right: 1px solid var(--brand);
+    opacity: 0;
+    transition: opacity 300ms var(--ease-brand);
+  }
+  .vmx-receipt__chip:hover::after { opacity: 0.85; }
   .vmx-receipt[hidden] { display: none; }
   .vmx-receipt__rule {
     flex: 1; height: 1px;
@@ -961,7 +979,7 @@ const LAYOUT_CSS = `
    * material emblem that this cite IS an audio moment, breathing at phrase
    * tempo beside the timestamp. */
   .vmx-receipt__wave {
-    display: flex; align-items: center; gap: 2px; height: 20px; flex: none;
+    display: flex; align-items: center; gap: 2px; height: 28px; flex: none;
   }
   .vmx-receipt__wave span {
     width: 2.5px; border-radius: 1.25px;
@@ -982,26 +1000,48 @@ const LAYOUT_CSS = `
   @media (prefers-reduced-motion: reduce) {
     .vmx-receipt__wave span { animation: none; transform: scaleY(0.7); }
   }
-  /* The cite lives INSIDE the chip slab now — bare lit mono text, no second
-   * border-in-border. Ignite plays on the text alone; the slab stays steady. */
+  /* The cite lives INSIDE the chip slab as a two-line proof object (mock
+   * receipt-meta): bold tabular time stacked over the muted band line. Ignite
+   * plays on the time line; the slab stays steady. */
   .vmx-cite {
-    flex: none; display: inline-flex; align-items: center; gap: 6px;
-    font-family: var(--type-mono); font-size: 11px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase;
-    color: var(--text-secondary); border: 0; border-radius: var(--rad-sm);
+    flex: none; display: flex; flex-direction: column; gap: 2px; align-items: flex-start;
+    font-family: var(--type-mono); text-transform: uppercase;
+    line-height: 1;
+    border: 0; border-radius: var(--rad-sm);
     padding: 0;
     background: transparent;
     cursor: pointer;
+  }
+  .vmx-cite__time {
+    color: var(--text-primary);
+    font-weight: 700;
+    font-size: 12px;
+    letter-spacing: 0.18em;
     font-variant-numeric: tabular-nums;
     text-shadow: var(--text-emboss);
   }
-  .vmx-receipt[data-arrived="true"] .vmx-cite { animation: vmx-ignite 380ms var(--ease-brand) 900ms both; }
-  .vmx-cite:hover { color: var(--brand-glow); text-shadow: 0 0 8px var(--brand-22); }
+  .vmx-cite__band {
+    color: var(--text-muted);
+    font-size: 10px;
+    letter-spacing: 0.15em;
+  }
+  .vmx-receipt[data-arrived="true"] .vmx-cite__time { animation: vmx-ignite 380ms var(--ease-brand) 900ms both; }
+  .vmx-cite:hover .vmx-cite__time { color: var(--brand-glow); text-shadow: 0 0 8px var(--brand-22); }
   .vmx-cite:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+  /* Claim↔proof link: hovering the receipt lights the spoken line's own
+   * numerics — the grounding gesture made visible. */
+  .vmx-now.cite-linked .num {
+    color: var(--brand);
+    text-shadow: 0 0 10px var(--brand-40);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    text-decoration-color: var(--brand-40);
+  }
   @keyframes vmx-draw { to { transform: scaleX(1); } }
   @keyframes vmx-ignite {
     0% { opacity: 0; color: var(--silk-40); text-shadow: none; }
     55% { opacity: 1; color: var(--amber); text-shadow: 0 0 8px var(--amber-65); }
-    100% { opacity: 1; color: var(--text-secondary); text-shadow: var(--text-emboss); }
+    100% { opacity: 1; color: var(--text-primary); text-shadow: var(--text-emboss); }
   }
 
   /* --- FOOT: one steady master readout (BPM · key · live level) --- */
@@ -1141,7 +1181,7 @@ const LAYOUT_CSS = `
   .vmx-statusrow[hidden] { display: none; }
   .vmx-statusrow__inputs {
     display: flex; align-items: center;
-    font-family: var(--type-mono); font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--silk-22);
+    font-family: var(--type-mono); font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--text-disabled);
   }
   .vmx-statusrow__i {
     appearance: none; -webkit-appearance: none;
@@ -1169,11 +1209,11 @@ const LAYOUT_CSS = `
     justify-content: flex-end;
     min-width: 0;
   }
-  .vmx-statusrow__right { font-family: var(--type-mono); font-size: 11px; color: var(--silk-40); letter-spacing: 0.08em; }
+  .vmx-statusrow__right { font-family: var(--type-mono); font-size: 11px; color: var(--text-muted); letter-spacing: 0.08em; }
 
   /* === SILENT + FAULT — the surface settles into listening / holds on a drop = */
   .vmx-session[data-mode="silent"] .vmx-now { color: var(--text-muted); }
-  .vmx-session[data-mode="fault"] .vmx-now { color: var(--silk-40); }
+  .vmx-session[data-mode="fault"] .vmx-now { color: var(--text-disabled); }
   /* Idle/fault hold a single grounded line (no live receipt), so center it in
    * the faceplate instead of pinning to the live receipt-floor — kills the vast
    * empty box above one line at rest (2026-05-30 level-up). Live keeps flex-end
@@ -1217,7 +1257,7 @@ const LAYOUT_CSS = `
   .vmx-session[data-mode="silent"] .vmx-read__num,
   .vmx-session[data-mode="silent"] .vmx-read__key,
   .vmx-session[data-mode="fault"] .vmx-read__num,
-  .vmx-session[data-mode="fault"] .vmx-read__key { color: var(--silk-40); }
+  .vmx-session[data-mode="fault"] .vmx-read__key { color: var(--text-disabled); }
   .vmx-session[data-mode="silent"] .vmx-fmeter__fill {
     background: var(--silk-22); animation: vmx-idlebreath 3200ms ease-in-out infinite;
   }
@@ -1233,9 +1273,9 @@ const LAYOUT_CSS = `
   @media (prefers-reduced-motion: reduce) {
     .vmx-now[data-arrived="true"] { animation: none; }
     .vmx-receipt[data-arrived="true"] .vmx-receipt__rule { animation: none; transform: scaleX(1); }
-    /* Without the ignite animation the chip would stay at its keyframe start
-       (opacity 0) and vanish for reduced-motion users; pin it visible. */
-    .vmx-receipt[data-arrived="true"] .vmx-cite { animation: none; opacity: 1; }
+    /* Without the ignite animation the time line would stay at its keyframe
+       start (opacity 0) and vanish for reduced-motion users; pin it visible. */
+    .vmx-receipt[data-arrived="true"] .vmx-cite__time { animation: none; opacity: 1; }
     .vmx-session[data-mode="silent"] .vmx-fmeter__fill { animation: none; }
   }
   @media (max-width: 780px) {
@@ -1375,15 +1415,34 @@ export function mountSessionLayout(
   const rail = document.createElement("div");
   rail.className = "vmx-deck__rail";
 
-  const persona = document.createElement("button");
-  persona.type = "button";
+  const persona = document.createElement("div");
   persona.className = "vmx-persona";
-  // Mood value only — the "persona" key label was redundant with the aria-label
-  // ("co-host persona: ... tap to cycle ...") set on every persona change below.
-  const personaValue = document.createElement("span");
-  personaValue.className = "vmx-persona__v";
-  persona.append(personaValue);
-  persona.addEventListener("click", () => mountedHandle?.current.persona.onCycleMood?.());
+  persona.setAttribute("role", "radiogroup");
+  persona.setAttribute("aria-label", "co-host persona");
+  const personaChips: Record<"HYPE" | "COACH" | "TEACH", HTMLButtonElement> = {
+    HYPE: document.createElement("button"),
+    COACH: document.createElement("button"),
+    TEACH: document.createElement("button"),
+  };
+  for (const mood of ["HYPE", "COACH", "TEACH"] as const) {
+    const chip = personaChips[mood];
+    chip.type = "button";
+    chip.className = "vmx-persona__chip";
+    chip.dataset.mood = mood;
+    chip.setAttribute("role", "radio");
+    chip.setAttribute("aria-checked", "false");
+    chip.textContent = mood.toLowerCase();
+    chip.addEventListener("click", () => {
+      // Optimistic repaint — flip the pressed chip NOW; the echoed
+      // ipc.settings.state re-syncs on the next frame and self-corrects.
+      for (const m of ["HYPE", "COACH", "TEACH"] as const) {
+        personaChips[m].dataset.active = String(m === mood);
+        personaChips[m].setAttribute("aria-checked", String(m === mood));
+      }
+      mountedHandle?.current.persona.onSelectMood?.(mood);
+    });
+    persona.append(chip);
+  }
 
   const controls = document.createElement("div");
   controls.className = "vmx-deck__controls";
@@ -1479,11 +1538,21 @@ export function mountSessionLayout(
   cite.type = "button";
   cite.className = "vmx-cite";
   cite.dataset.wire = "session.citation";
+  // Two-line proof object (mock receipt-meta): bold tabular time over the
+  // muted band line.
+  const citeTime = document.createElement("span");
+  citeTime.className = "vmx-cite__time";
+  const citeBand = document.createElement("span");
+  citeBand.className = "vmx-cite__band";
+  cite.append(citeTime, citeBand);
   // One glass slab holds the wave emblem + cite — the proof object the
   // signature rule terminates at.
   const receiptChip = document.createElement("span");
   receiptChip.className = "vmx-receipt__chip";
   receiptChip.append(wave, cite);
+  // Claim↔proof link: hovering the proof object lights the claim's numerics.
+  receiptChip.addEventListener("mouseenter", () => now.classList.add("cite-linked"));
+  receiptChip.addEventListener("mouseleave", () => now.classList.remove("cite-linked"));
   receipt.append(rule, receiptChip);
   const dropSlot = document.createElement("div");
   dropSlot.className = "vmx-drop-slot";
@@ -1645,7 +1714,7 @@ export function mountSessionLayout(
     root,
     titlebar,
     persona,
-    personaValue,
+    personaChips,
     muteButton: muteBtn,
     liveFault,
     armedContext: {
@@ -1660,6 +1729,8 @@ export function mountSessionLayout(
     dropSlot,
     notice,
     cite,
+    citeTime,
+    citeBand,
     bpm,
     key,
     track,
@@ -1801,14 +1872,13 @@ function applyState(mounted: Mounted, next: SessionState, isMount: boolean): voi
   if (isMount || prev.titlebar.rec !== next.titlebar.rec) setTitlebarPill(mounted.titlebar, "rec", next.titlebar.rec);
   if (isMount || prev.titlebar.sys !== next.titlebar.sys) setTitlebarPill(mounted.titlebar, "sys", next.titlebar.sys);
 
-  // --- persona (tap-to-cycle mood headline) ---
+  // --- persona (direct-select mood strip) ---
   if (isMount || prev.persona.mood !== next.persona.mood) {
-    mounted.personaValue.textContent = next.persona.mood.toLowerCase();
     mounted.persona.dataset.mood = next.persona.mood;
-    mounted.persona.setAttribute(
-      "aria-label",
-      `co-host persona: ${next.persona.mood.toLowerCase()}. tap to cycle hype, coach, teach.`,
-    );
+    for (const m of ["HYPE", "COACH", "TEACH"] as const) {
+      mounted.personaChips[m].dataset.active = String(m === next.persona.mood);
+      mounted.personaChips[m].setAttribute("aria-checked", String(m === next.persona.mood));
+    }
   }
 
   // --- grounding-failure timer ---
@@ -1886,11 +1956,14 @@ function applyState(mounted: Mounted, next: SessionState, isMount: boolean): voi
   const chip = chips && chips.length ? chips[0]! : null;
   if (chip) {
     mounted.receipt.hidden = false;
-    const citeText = `◂ ${chip.verb} @ ${formatTs(chip.timestamp_s)}`;
-    if (mounted.cite.textContent !== citeText) mounted.cite.textContent = citeText;
+    const timeText = formatTs(chip.timestamp_s);
+    const bandText = chip.verb.toLowerCase();
+    if (mounted.citeTime.textContent !== timeText) mounted.citeTime.textContent = timeText;
+    if (mounted.citeBand.textContent !== bandText) mounted.citeBand.textContent = bandText;
     // Re-bind the click only when the chip identity changes.
     if (mounted.citeChip?.event_id !== chip.event_id) {
       mounted.citeChip = chip;
+      mounted.cite.setAttribute("aria-label", `evidence: ${bandText} at ${timeText}`);
       mounted.cite.onclick = next.cohost.onChipClick ? () => next.cohost.onChipClick!(chip) : null;
     }
   } else {
