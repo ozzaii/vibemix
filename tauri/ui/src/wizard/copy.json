@@ -23,6 +23,7 @@
       "row_verifying": "Verifying SHA-256…",
       "row_installing": "Running vendor installer…",
       "row_done": "Installed · {version}",
+      "row_failed": "Auto-install didn't finish",
       "stopwatch": "{ms} ms",
       "fallback_heading": "BlackHole couldn't auto-install",
       "fallback_body": "Auto-install didn't finish. Download the free installer from existential.audio/blackhole, run it, then continue.",

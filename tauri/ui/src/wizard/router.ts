@@ -32,6 +32,7 @@ import {
   type LibrarySetupCandidate,
 } from "../library/api.js";
 import { registerShortcuts } from "../session/shortcuts.js";
+import { renderConfirmDialog } from "../settings/components/confirm-dialog.js";
 import { listenTauri } from "../tauri-runtime.js";
 import { registerStyle } from "./components/_style-registry.js";
 import { StatusBar } from "./components/status-bar.js";
@@ -816,12 +817,14 @@ async function refreshLibraryFeedCandidates(force = false): Promise<void> {
       },
     });
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
+    // Raw exception text (module paths, tracebacks) stays in the console;
+    // the feed chip speaks the consequence + the recovery.
+    console.warn("[wizard] library stats failed:", err);
     setState({
       libraryFeed: {
         ...wizardState.libraryFeed,
         status: "error",
-        error: message,
+        error: "couldn't read your library status. try again.",
       },
     });
   }
@@ -965,12 +968,12 @@ async function pickLaunchFolder(): Promise<void> {
     });
     sourcePath = firstDialogPath(selection);
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
+    console.warn("[wizard] folder picker failed:", err);
     setState({
       libraryFeed: {
         ...wizardState.libraryFeed,
         status: "error",
-        error: `file picker unavailable: ${message}`,
+        error: "couldn't open the folder picker. try again.",
       },
     });
     return;
@@ -1129,14 +1132,29 @@ async function completeWizard(): Promise<void> {
   } catch (err) {
     // Without surfacing this, the wizard advances to "done" but the
     // first_run_completed flag isn't persisted → wizard silently
-    // re-opens on next launch. Show an inline retry instead of
-    // looping forever.
+    // re-opens on next launch. Surface an in-room retry — the styled
+    // confirm dialog, not a platform window.confirm (an OS alert breaking
+    // the warm void mid-onboarding). The raw error stays in the console;
+    // the user copy names only the consequence + the choice.
     console.warn("[wizard] completion write failed:", err);
-    const detail = err instanceof Error ? err.message : String(err);
-    const retry = window.confirm(
-      `Setup couldn't be saved (${detail}).\n\nRetry now? Cancel to continue ` +
-      `without saving. vibemix will re-open the wizard on next launch.`,
-    );
+    const retry = await new Promise<boolean>((resolve) => {
+      const dialog = renderConfirmDialog({
+        heading: "SETUP DIDN'T SAVE",
+        body: "your setup couldn't be written to disk. retry now, or continue and vibemix will run setup again on next launch.",
+        confirmLabel: "RETRY",
+        cancelLabel: "CONTINUE ANYWAY",
+        variant: "danger",
+        onCancel: () => {
+          dialog.remove();
+          resolve(false);
+        },
+        onConfirm: () => {
+          dialog.remove();
+          resolve(true);
+        },
+      });
+      document.body.append(dialog);
+    });
     if (retry) {
       await completeWizard();
       return;

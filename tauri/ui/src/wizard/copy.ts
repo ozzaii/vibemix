@@ -49,6 +49,7 @@ export interface DriverFetchStep {
   row_verifying: string;
   row_installing: string;
   row_done: string;
+  row_failed: string;
   stopwatch: string;
   fallback_heading: string;
   fallback_body: string;

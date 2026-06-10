@@ -254,7 +254,9 @@ export function createStepDriverFetch(
 
   function showFallback(): void {
     fallback.style.display = "block";
-    setRowState("driver", "fail");
+    // Name the failure on the row itself — without the label the red LED sat
+    // next to the stale "Checking…" text forever (a fault wearing idle copy).
+    setRowState("driver", "fail", copy.steps.driver_fetch.row_failed);
     // No dead-end (product bar): auto-install failed, but the wizard must
     // stay walkable. The fallback card names the manual installer path;
     // Continue arms so the user can keep going — the deck's armed gate
