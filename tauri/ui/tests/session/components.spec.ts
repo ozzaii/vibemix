@@ -161,7 +161,10 @@ describe("renderDropChip", () => {
     const chip = renderDropChip({ bars: 8, bpmPeriodMs: 500 });
     expect(chip).toBeTruthy();
     expect(chip!.dataset.bars).toBe("8");
-    expect(chip!.querySelector(".vmx-drop-chip__count")?.textContent).toBe("08:00");
+    expect(chip!.querySelector(".vmx-drop-chip__count")?.textContent).toBe("~8");
+    // The unit word makes the grammar honest: "drop in ~8 bars", never a
+    // ":00" fake timecode (fable pass 2026-06-10).
+    expect(chip!.querySelector(".vmx-drop-chip__unit")?.textContent).toBe("bars");
     expect(chip!.querySelector(".vmx-drop-chip__lbl")?.textContent).toBe("DROP IN");
   });
 
@@ -609,7 +612,7 @@ describe("SessionLayout", () => {
     expect(root.querySelectorAll(".vmx-session__col")).toHaveLength(0);
   });
 
-  it("gives BPM and key stable readout slots in the footer", () => {
+  it("gives BPM and key stable readout slots crowning the voice", () => {
     const root = host();
     const state = defaultState();
     state.timecode.bpm = 128.4;
@@ -622,9 +625,9 @@ describe("SessionLayout", () => {
     expect(keyWrap?.querySelector(".vmx-read__key")?.textContent).toBe("12A");
     expect(document.head.textContent).toContain('.vmx-read[data-readout="bpm"]');
     expect(document.head.textContent).toContain('.vmx-read[data-readout="key"]');
-    expect(document.head.textContent).toContain(
-      "grid-template-columns: minmax(12ch, max-content) minmax(9ch, max-content)",
-    );
+    // BOLD REDESIGN: BPM · KEY moved out of the foot's 3-column grid up into the
+    // readout frame crowning the spoken line; the foot is now the level meter alone.
+    expect(document.head.textContent).toContain(".vmx-voice__readout");
     expect(document.head.textContent).toContain("font-variant-numeric: tabular-nums");
   });
 
@@ -961,7 +964,7 @@ describe("SessionLayout", () => {
     const chip = root.querySelector<HTMLElement>(".vmx-drop-chip");
     expect(chip).toBeTruthy();
     expect(chip?.dataset.bars).toBe("8");
-    expect(chip?.querySelector(".vmx-drop-chip__count")?.textContent).toBe("08:00");
+    expect(chip?.querySelector(".vmx-drop-chip__count")?.textContent).toBe("~8");
     expect(chip?.style.getPropertyValue("--bpm-period-ms")).toBe("500ms");
 
     renderSessionFrame(mounted, {

@@ -85,6 +85,18 @@ const CSS = `
     line-height: 1;
     text-shadow: 0 1px 0 rgba(0, 0, 0, 0.7);
   }
+  /* The unit word after the count ("~14 bars") — same quiet register as the
+   * label, so the lit count stays the one bright element. */
+  .vmx-drop-chip__unit {
+    font-family: var(--type-mono);
+    font-weight: 500;
+    font-size: 9px;
+    letter-spacing: 0.25em;
+    color: var(--silk-40);
+    text-transform: uppercase;
+    line-height: 1;
+    text-shadow: 0 1px 0 rgba(0, 0, 0, 0.7);
+  }
   .vmx-drop-chip[data-bars="0"] {
     animation: vmx-drop-rec-flash 220ms ease-out 1;
   }
@@ -115,8 +127,9 @@ export function renderDropChip(props: DropChipProps): HTMLElement | null {
     root.style.setProperty("--bpm-period-ms", `${props.bpmPeriodMs}ms`);
   }
 
-  // Label leads, count follows — reads as the mock's phrase line
-  // ("drop in · 08:00"), not a gadget readout.
+  // The mock's phrase-label grammar: "drop in ~14 bars". The old "{bars}:00"
+  // printed a fake timecode — "DROP IN 14:00" read as a frozen 14-minute
+  // timer. Only ever print the integer the detector actually has.
   const lbl = document.createElement("span");
   lbl.className = "vmx-drop-chip__lbl";
   lbl.textContent = "DROP IN";
@@ -126,6 +139,11 @@ export function renderDropChip(props: DropChipProps): HTMLElement | null {
   count.className = "vmx-drop-chip__count";
   count.textContent = formatBars(props.bars);
   root.append(count);
+
+  const unit = document.createElement("span");
+  unit.className = "vmx-drop-chip__unit";
+  unit.textContent = props.bars === 1 ? "bar" : "bars";
+  root.append(unit);
 
   // 4-beat pip row — visualizes the sync period as a Pioneer-style
   // pulse train. Suppressed in REC-flash state (bars === 0) since the
@@ -147,8 +165,8 @@ export function renderDropChip(props: DropChipProps): HTMLElement | null {
 }
 
 function formatBars(bars: number): string {
-  // Bars formatted as "{bars}:00" — eighths placeholder per UI-SPEC §7.
-  // Phase 12-04 may extend to true sub-bar tracking; for now the count is bar-aligned.
+  // The integer the detector actually has, with the mock's approximation
+  // tilde — never a ":00" eighths placeholder pretending to be a timecode.
   const safe = Math.max(0, Math.floor(bars));
-  return `${String(safe).padStart(2, "0")}:00`;
+  return `~${safe}`;
 }

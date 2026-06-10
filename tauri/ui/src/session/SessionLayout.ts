@@ -189,6 +189,7 @@ export interface Mounted {
   track: HTMLElement;
   meterFill: HTMLElement;
   meterPeak: HTMLElement;
+  meterChunks: HTMLElement;
   statusInputs: {
     audio: HTMLButtonElement;
     ai: HTMLButtonElement;
@@ -355,14 +356,15 @@ const LAYOUT_CSS = `
   }
   /* persistent low-ink at rest (reachable mid-set), full on hover/focus.
    * Real mute also bound to the push-to-mute hotkey (session-shortcuts.ts). */
-  .vmx-deck__controls { display: flex; gap: var(--sp-2); opacity: 0.58; transition: opacity 180ms ease-out; margin-left: auto; }
-  .vmx-deck:hover .vmx-deck__controls, .vmx-deck:focus-within .vmx-deck__controls { opacity: 1; }
+  /* MUTE/STOP are live-set SAFETY controls — they rest powered (ink on a
+   * machined rim), never behind a 0.58 row dimmer that read as disabled. */
+  .vmx-deck__controls { display: flex; gap: var(--sp-2); margin-left: auto; }
   .vmx-deck__controls button {
     font-family: var(--type-display);
     font-variation-settings: 'wdth' 85, 'wght' 600;
     font-size: 9px; letter-spacing: 0.2em; text-transform: uppercase;
-    color: var(--silk-40);
-    border: 1px solid var(--glass-edge); border-radius: var(--rad-sm);
+    color: var(--text-muted);
+    border: 1px solid var(--border-default); border-radius: var(--rad-sm);
     padding: 6px 13px;
     background:
       linear-gradient(180deg, rgba(255, 251, 244, 0.024), rgba(0, 0, 0, 0.20)),
@@ -820,6 +822,19 @@ const LAYOUT_CSS = `
   }
   .vmx-ghost--g2 { color: var(--text-disabled); opacity: 0.7; }
   .vmx-ghost--g1 { color: var(--text-muted); }
+  /* The nearest ghost wears the mock's ghost-mark — a mono "earlier" anchor
+   * so prior speech reads as a labeled receipt, not an unexplained echo.
+   * g2 stays bare so the stack still recedes. */
+  .vmx-ghost--g1:not(:empty)::before {
+    content: "earlier";
+    font-family: var(--type-mono);
+    font-size: 9px;
+    font-weight: 500;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--text-disabled);
+    margin-right: 10px;
+  }
   .vmx-claim { display: flex; flex-direction: column; align-items: flex-start; gap: var(--sp-3); margin-top: var(--sp-2); }
   /* BOLD REDESIGN: the instrument readout crowning the voice — BPM · KEY laid
    * horizontally just above the spoken line (the bravoh-grade-pink mock's
@@ -1063,6 +1078,24 @@ const LAYOUT_CSS = `
     overflow: visible;
     margin: 5px 0 7px;
   }
+  /* The phrase tape inside the groove: phase chunks render as stepped
+   * brand-alpha bands (silent stays void, groove a low wash, build brighter,
+   * drop-ghost an outlined promise) so the strip plots SONG STRUCTURE and the
+   * playhead rides the real now position. Live RMS demotes to the fill's
+   * breathing opacity — the needle stops lying about what it measures. */
+  .vmx-fmeter__chunks {
+    position: absolute; inset: 0; display: flex; border-radius: 2px;
+    overflow: hidden; z-index: 0;
+  }
+  .vmx-fmeter__chunks span { height: 100%; flex-basis: 0; }
+  .vmx-fmeter__chunks span + span { border-left: 1px solid rgba(0, 0, 0, 0.4); }
+  .vmx-fmeter__chunks span[data-kind="silent"] { background: transparent; }
+  .vmx-fmeter__chunks span[data-kind="groove"] { background: var(--brand-08); }
+  .vmx-fmeter__chunks span[data-kind="build"] { background: var(--brand-22); }
+  .vmx-fmeter__chunks span[data-kind="drop-ghost"] {
+    background: transparent;
+    box-shadow: inset 0 0 0 1px var(--brand-35);
+  }
   .vmx-fmeter__fill {
     position: absolute; inset: 0; width: 0%; border-radius: 2px;
     background: linear-gradient(90deg, var(--brand-10), var(--brand-22) 70%, var(--brand-35));
@@ -1205,11 +1238,6 @@ const LAYOUT_CSS = `
     .vmx-deck {
       padding: 0 var(--sp-4);
     }
-    .vmx-deck::before,
-    .vmx-deck::after {
-      left: var(--sp-4);
-      right: var(--sp-4);
-    }
     .vmx-deck__rail {
       gap: var(--sp-3);
       margin: var(--sp-4) 0 0;
@@ -1226,7 +1254,6 @@ const LAYOUT_CSS = `
     }
     .vmx-deck__controls {
       margin-left: auto;
-      opacity: 0.9;
     }
     .vmx-deck__controls button {
       padding: 6px 10px;
@@ -1240,9 +1267,6 @@ const LAYOUT_CSS = `
     .vmx-armed__title {
       font-size: 44px;
       max-width: 10ch;
-    }
-    .vmx-armed__context {
-      grid-template-columns: 1fr 1fr;
     }
     .vmx-armed__module {
       width: 100%;
@@ -1568,11 +1592,14 @@ export function mountSessionLayout(
   fmeter.className = "vmx-fmeter";
   fmeter.dataset.wire = "session.meter";
   fmeter.setAttribute("aria-label", "master level");
+  const meterChunks = document.createElement("div");
+  meterChunks.className = "vmx-fmeter__chunks";
+  meterChunks.setAttribute("aria-hidden", "true");
   const meterFill = document.createElement("div");
   meterFill.className = "vmx-fmeter__fill";
   const meterPeak = document.createElement("div");
   meterPeak.className = "vmx-fmeter__peak";
-  fmeter.append(meterFill, meterPeak);
+  fmeter.append(meterChunks, meterFill, meterPeak);
   // The drop countdown rides the groove as its phrase label (the mock's
   // "drop in ~N bars" position) — empty slot collapses via :empty.
   foot.append(fmeter, dropSlot);
@@ -1630,6 +1657,7 @@ export function mountSessionLayout(
     track,
     meterFill,
     meterPeak,
+    meterChunks,
     statusInputs: {
       audio: inAudio,
       ai: inAi,
@@ -1929,17 +1957,41 @@ function applyState(mounted: Mounted, next: SessionState, isMount: boolean): voi
     mounted.key.removeAttribute("aria-label");
   }
 
-  // --- master meter (smoothed; live only — held/recolored by CSS in silent/fault) ---
+  // --- master groove (live only — held/recolored by CSS in silent/fault) ---
+  // The phrase tape renders when the structure read exists: chunks band the
+  // groove, fill + playhead ride the real now position, and live RMS breathes
+  // the wash's opacity instead of impersonating progress. With no chunks yet
+  // the groove falls back to the smoothed RMS level — fill and needle clamped
+  // to the SAME ceiling so the orb never trails the fill's end.
+  if (isMount || prev.phase.chunks !== next.phase.chunks) {
+    mounted.meterChunks.replaceChildren(
+      ...next.phase.chunks.map((chunk) => {
+        const seg = document.createElement("span");
+        seg.dataset.kind = chunk.kind;
+        seg.style.flexGrow = String(Math.max(chunk.weight, 0.0001));
+        return seg;
+      }),
+    );
+  }
   if (mode === "") {
-    const target = meterLevelPct(next.meters.music.rms);
-    mounted.meterCur += (target - mounted.meterCur) * METER_ATTACK;
-    const peakTarget = meterLevelPct(next.meters.music.peak ?? next.meters.music.rms);
-    const lead = Math.max(mounted.meterCur + 4, peakTarget);
-    if (lead > mounted.meterPk) mounted.meterPk = lead;
-    else mounted.meterPk += (lead - mounted.meterPk) * METER_PEAK_DECAY;
-    const w = Math.min(mounted.meterCur, 100);
-    mounted.meterFill.style.width = `${w.toFixed(1)}%`;
-    mounted.meterPeak.style.left = `${Math.min(mounted.meterPk, METER_CEIL).toFixed(1)}%`;
+    if (next.phase.chunks.length > 0) {
+      const pct = Math.min(Math.max(next.phase.nowPct, 0), 100);
+      const lvl = Math.min(meterLevelPct(next.meters.music.rms), 100);
+      mounted.meterFill.style.width = `${pct.toFixed(1)}%`;
+      mounted.meterFill.style.opacity = (0.45 + (0.55 * lvl) / 100).toFixed(2);
+      mounted.meterPeak.style.left = `${pct.toFixed(1)}%`;
+    } else {
+      mounted.meterFill.style.opacity = "";
+      const target = meterLevelPct(next.meters.music.rms);
+      mounted.meterCur += (target - mounted.meterCur) * METER_ATTACK;
+      const peakTarget = meterLevelPct(next.meters.music.peak ?? next.meters.music.rms);
+      const lead = Math.max(mounted.meterCur + 4, peakTarget);
+      if (lead > mounted.meterPk) mounted.meterPk = lead;
+      else mounted.meterPk += (lead - mounted.meterPk) * METER_PEAK_DECAY;
+      const w = Math.min(mounted.meterCur, METER_CEIL);
+      mounted.meterFill.style.width = `${w.toFixed(1)}%`;
+      mounted.meterPeak.style.left = `${Math.min(mounted.meterPk, METER_CEIL).toFixed(1)}%`;
+    }
   }
 
   // --- mute control reflects state ---
