@@ -2013,6 +2013,22 @@ class DJCoHostAgent(Agent):
             ttft_ms=ttft_ms,
         )
 
+    def brain_runtime_down_reason(self) -> str | None:
+        """Live brain-health read for the 1Hz status badge (ws_bus ``gemini``).
+
+        Reuses the two existing outage one-shots — the proxy classifier flag
+        (``_proxy_unavailable``) and the loud connection-error streak guard
+        (``_connection_error_emitted``) — so the badge flips "down" within one
+        status tick of a runtime LLM failure and recovers on exactly the
+        transitions that already clear those flags: the next successful
+        stream or the 60s /health canary. None == healthy.
+        """
+        if self._proxy_unavailable:
+            return "proxy_unavailable"
+        if self._connection_error_emitted:
+            return "connection_error"
+        return None
+
     def _maybe_emit_proxy_unavailable(self, reason: str) -> None:
         """Arm the proxy-unavailable flag + log a one-shot diagnostic.
 

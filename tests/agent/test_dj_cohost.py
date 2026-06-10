@@ -2508,3 +2508,28 @@ def test_resolve_prompt_cell_corrupt_lens_falls_back_no_crash(tmp_path, monkeypa
     assert IM_LISTENING_FRAGMENT not in out
     for tag in TTS_TAGS:
         assert tag not in out
+
+
+def test_brain_runtime_down_reason_tracks_outage_oneshots(
+    mocker, tmp_path, monkeypatch
+) -> None:
+    """The gemini status badge reads the existing outage one-shots through ONE
+    accessor: the proxy classifier flag and the connection-error streak flip
+    it down; their existing recovery transitions clear it."""
+    monkeypatch.setenv("VIBEMIX_LLM_MODE", "proxy")
+    agent, _client, _recorder, _state = _build_agent(mocker, tmp_path)
+    assert agent.brain_runtime_down_reason() is None
+
+    agent._maybe_emit_proxy_unavailable("status=503")
+    assert agent.brain_runtime_down_reason() == "proxy_unavailable"
+
+    agent._maybe_emit_proxy_recovery()
+    assert agent.brain_runtime_down_reason() is None
+
+    agent._emit_connection_error(RuntimeError("401 unauthorized"))
+    assert agent.brain_runtime_down_reason() == "connection_error"
+
+    # llm_node's success path clears the streak flag directly (dj_cohost
+    # :3848); the accessor must read healthy again.
+    agent._connection_error_emitted = False
+    assert agent.brain_runtime_down_reason() is None

@@ -2090,6 +2090,11 @@ async def main() -> None:
     learn_voice_stream: Any | None = None
     learn_voice_lock = threading.RLock()
     learn_voice_tts_cache: dict[str, Any | None] = {"tts": None}
+    # Runtime brain-health holder — _activate_session parks the live agent
+    # here so the 1Hz status tick (_is_brain_configured → gemini badge) can
+    # read its outage one-shots. Cleared on teardown so idle never reads as a
+    # brain fault (Invariant #5: idle ≠ fault).
+    live_brain_agent: dict[str, Any] = {"agent": None}
     _background_tasks: set[asyncio.Task] = set()
 
     async def _boot_housekeeping() -> None:
@@ -2210,6 +2215,17 @@ async def main() -> None:
         )
 
     def _is_brain_configured() -> bool:
+        # Runtime outage first: while a live agent is parked in the holder its
+        # proxy/connection one-shots are the freshest brain truth (they clear
+        # on the next successful stream / 60s health canary, so recovery flips
+        # the badge back to ok without a restart).
+        agent = live_brain_agent["agent"]
+        if agent is not None:
+            try:
+                if agent.brain_runtime_down_reason() is not None:
+                    return False
+            except Exception:
+                pass
         return brain_unavailable_reason is None
 
     def _learn_voice_tts_provider() -> Any | None:
@@ -2327,8 +2343,12 @@ async def main() -> None:
                     )
                     print(f"-> mode: proxy (install_uuid={install_id[:8]}..., jwt cached)")
                 except RuntimeError as exc:
+                    _log_brain_unavailable(f"proxy setup failed: {exc}")
                     raise RuntimeError(f"proxy setup failed: {exc}") from exc
                 except httpx.HTTPError as exc:
+                    _log_brain_unavailable(
+                        f"proxy network error: {exc.__class__.__name__}"
+                    )
                     raise RuntimeError(
                         f"proxy network error: {exc.__class__.__name__}: {exc}"
                     ) from exc
@@ -2692,6 +2712,7 @@ async def main() -> None:
                 learn_progress=_learn_progress,
             )
             agent.bind_ipc_bus(ipc_router)
+            live_brain_agent["agent"] = agent
 
             session = AgentSession(
                 llm=llm_inst,
@@ -2874,6 +2895,7 @@ async def main() -> None:
             live_session_active = False
             live_voice_muted = learn_voice_stream is None
             suggestion_service = None
+            live_brain_agent["agent"] = None
             if midi_stop is not None:
                 midi_stop.set()
             if midi_watcher_stop is not None:
