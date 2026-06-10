@@ -398,8 +398,21 @@ export async function renderLibraryPanel(
   function sourceDoneNote(p: LibraryImportProgress): string {
     if (p.cancelled) return "Import cancelled";
     const processed = p.total > 0 ? p.total : p.done;
+    // The sidecar deliberately carries failed/failure_reason on the terminal
+    // frame so an all-failed run can't walk the bar to 100% and read as
+    // success (the packaged-ffprobe wipeout shape). Honor it here — "N
+    // processed" with zero tracks indexed is the exact lie that guard exists
+    // to prevent.
+    const failed = p.failed ?? 0;
+    const reason = (p.failure_reason ?? "").trim();
+    if (failed > 0 && failed >= processed && processed > 0) {
+      return reason
+        ? `Couldn't index any of the ${processed} files (${reason})`
+        : `Couldn't index any of the ${processed} files`;
+    }
     const parts: string[] = [];
-    if (processed > 0) parts.push(`${processed} processed`);
+    if (processed > 0) parts.push(`${processed - failed} indexed`);
+    if (failed > 0) parts.push(`${failed} skipped${reason ? ` (${reason})` : ""}`);
     if (p.cache_hits > 0) parts.push(`${p.cache_hits} cached`);
     return parts.length > 0 ? parts.join(", ") : "Import finished";
   }

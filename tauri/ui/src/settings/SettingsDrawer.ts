@@ -989,7 +989,17 @@ function renderDrawerBody(body: HTMLElement, modalSlot: HTMLElement): void {
   voiceName.textContent = "SVEN · LOCAL VOICE";
   const voiceSub = document.createElement("span");
   voiceSub.className = "vmx-settings-drawer__readout-sub";
-  voiceSub.textContent = "on-device, no cloud";
+  // Honest readout: the status tick carries voice ok|muted|null. "muted"
+  // means the local voice engine is not loaded (the documented voice-muted,
+  // no-fallback state) — the one place a user checks the voice must not
+  // assert a working one. null (no tick yet) keeps the calm default
+  // (invariant #5: absence of signal is not a fault).
+  if (getSessionState().status.voice === "muted") {
+    voiceReadout.dataset.quiet = "true";
+    voiceSub.textContent = "voice asleep · model not loaded";
+  } else {
+    voiceSub.textContent = "on-device, no cloud";
+  }
   voiceReadout.append(voiceName, voiceSub);
   voiceWrap.append(voiceLabel, voiceReadout);
   personaBody.append(withWire(voiceWrap, "settings.persona.voice"));

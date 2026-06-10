@@ -14,6 +14,8 @@ type ProgressFrame = {
   current_track_name: string;
   cache_hits: number;
   cancelled: boolean;
+  failed?: number;
+  failure_reason?: string;
 };
 const dialogMocks = vi.hoisted(() => ({
   open: vi.fn(),
@@ -350,8 +352,51 @@ describe("library-panel — completion hides progress", () => {
     const progress = handle.element.querySelector(".vmx-library-progress");
     expect(progress?.classList.contains("hidden")).toBe(true);
     const status = handle.element.querySelector(".vmx-library-status");
-    expect(status?.textContent).toContain("50 processed");
+    expect(status?.textContent).toContain("50 indexed");
     expect(status?.textContent).toContain("12 cached");
+  });
+
+  it("an all-failed terminal frame reads as failure, never 'N processed' success", async () => {
+    const handle = await renderLibraryPanel();
+    document.body.append(handle.element);
+
+    dispatchDrop(50, ["/Music/PSYMIND"]);
+    await _flush();
+    emitProgress({
+      total: 50,
+      done: 50,
+      current_track_name: "",
+      cache_hits: 0,
+      cancelled: false,
+      failed: 50,
+      failure_reason: "track.mp3: decoder unavailable",
+    });
+
+    const status = handle.element.querySelector(".vmx-library-status");
+    expect(status?.textContent).toContain("Couldn't index any of the 50 files");
+    expect(status?.textContent).toContain("decoder unavailable");
+    expect(status?.textContent).not.toContain("indexed");
+  });
+
+  it("a partial-failure terminal frame names the skipped count and reason", async () => {
+    const handle = await renderLibraryPanel();
+    document.body.append(handle.element);
+
+    dispatchDrop(50, ["/Music/PSYMIND"]);
+    await _flush();
+    emitProgress({
+      total: 50,
+      done: 50,
+      current_track_name: "",
+      cache_hits: 3,
+      cancelled: false,
+      failed: 8,
+      failure_reason: "broken.flac: corrupt header",
+    });
+
+    const status = handle.element.querySelector(".vmx-library-status");
+    expect(status?.textContent).toContain("42 indexed");
+    expect(status?.textContent).toContain("8 skipped (broken.flac: corrupt header)");
   });
 });
 

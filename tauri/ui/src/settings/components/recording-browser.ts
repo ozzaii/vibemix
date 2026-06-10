@@ -464,11 +464,11 @@ export function renderRecordingBrowser(
         activeObserver.disconnect();
         activeObserver = null;
       }
-      if (pending) {
-        clearTimeout(pending.timeoutId);
-        pending.toastEl.remove();
-        pending = null;
-      }
+      // Commit, never drop: the user already saw "deleted · undo?" and chose
+      // not to undo — a drawer rebuild/close inside the 4s window must not
+      // silently cancel the delete (the row would resurrect unexplained).
+      // Mirrors the openDeleteWithUndo stack discipline: interrupt = commit.
+      if (pending) commitPending();
       rowHandles = [];
       currentSessions = [];
     },
