@@ -517,3 +517,68 @@ def test_cue_anchored_namespaces_cache_key() -> None:
         duration_s=120.0, cues=(), filepath="",  # streaming-only marker path
     )
     assert mean_emb._track_hash(track) != cue_emb._track_hash(track)
+
+
+# ─── probe_duration_s (PyAV primary, ffprobe fallback) ──────────────────────
+
+
+def _write_wav(path: Path, seconds: float = 2.0, sr: int = 44100) -> Path:
+    """Write a real PCM wav via stdlib wave — no ffprobe/ffmpeg binary."""
+    import struct
+    import wave
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    n = int(seconds * sr)
+    with wave.open(str(path), "wb") as w:
+        w.setnchannels(1)
+        w.setsampwidth(2)
+        w.setframerate(sr)
+        w.writeframes(struct.pack(f"<{n}h", *([0] * n)))
+    return path
+
+
+def test_probe_duration_uses_pyav_without_ffprobe(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Packaged-app contract: duration probes need NO ffprobe binary."""
+    from vibemix.library import folder_ingest
+
+    wav = _write_wav(tmp_path / "two_seconds.wav", seconds=2.0)
+    # Simulate the packaged GUI: Finder PATH has no ffprobe anywhere.
+    monkeypatch.setattr(folder_ingest.shutil, "which", lambda _name: None)
+
+    assert folder_ingest.probe_duration_s(wav) == pytest.approx(2.0, abs=0.05)
+
+
+def test_probe_duration_garbage_file_returns_none(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from vibemix.library import folder_ingest
+
+    bad = tmp_path / "garbage.mp3"
+    bad.write_bytes(b"\x00" * 64 + b"not audio at all")
+    monkeypatch.setattr(folder_ingest.shutil, "which", lambda _name: None)
+
+    assert folder_ingest.probe_duration_s(bad) is None
+
+
+def test_probe_duration_falls_back_to_ffprobe(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A PyAV-unreadable file still probes on dev rigs that have ffprobe."""
+    from types import SimpleNamespace
+
+    from vibemix.library import folder_ingest
+
+    bad = tmp_path / "garbage.mp3"
+    bad.write_bytes(b"\x00" * 64 + b"not audio at all")
+    monkeypatch.setattr(
+        folder_ingest.shutil, "which", lambda _name: "/fake/ffprobe"
+    )
+    monkeypatch.setattr(
+        folder_ingest.subprocess,
+        "run",
+        lambda *a, **k: SimpleNamespace(stdout="12.5\n"),
+    )
+
+    assert folder_ingest.probe_duration_s(bad) == pytest.approx(12.5)

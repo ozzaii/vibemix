@@ -4,7 +4,7 @@
 quick-260525-gz2. Kaan's DJ library is a raw folder tree of audio files
     (mp3 / m4a / wav / flac / aac), NOT a Rekordbox ``collection.xml``. This
     module walks such a folder, derives a minimal :class:`TrackEntry` per file
-    (filename stem as title, ffprobe duration), embeds each via the active
+    (filename stem as title, probed duration), embeds each via the active
     product embedder, persists the 512-d CLAP vectors to the active
 :class:`LibraryStore`, and writes a ``library.pkl`` cache compatible with
 ``RekordboxLibrary.try_load_cache()`` so the existing ``search`` / ``similar``
@@ -13,7 +13,7 @@ CLIs can resolve filenames for folder-ingested tracks.
 Data flow::
 
     scan_folder(root)            # walk → sorted [Path, ...] of supported files
-      └─ probe_duration_s(path)  # ffprobe → float | None (None == skip honestly)
+      └─ probe_duration_s(path)  # PyAV (ffprobe fallback) → float | None (None == skip honestly)
               └─ folder_to_track_entry(path, dur) → TrackEntry (namespaced id)
                   └─ embedder.embed_track(entry) → 512-d L2-normalized vec
                   └─ store.add_batch([(id, vec)])
@@ -30,7 +30,7 @@ Design rules (honest + resilient):
       different dim than ``EMBEDDING_DIM`` (a stale 768 build), ingest
       raises before embedding anything (T-gz2-01).
 
-The ffprobe call is injectable (``probe`` arg) so the unit tests need no
+The duration probe is injectable (``probe`` arg) so the unit tests need no
 real binary and no real audio files.
 """
 
@@ -170,18 +170,39 @@ def scan_folder(root: Path) -> list[Path]:
     return out
 
 
-def probe_duration_s(path: Path) -> float | None:
-    """Return audio duration in seconds via ffprobe, or ``None`` on any failure.
+def _probe_duration_pyav(path: Path) -> float | None:
+    """Return duration in seconds via PyAV (bundled FFmpeg), or ``None``.
 
-    ffprobe ships with the already-pinned ffmpeg hard dep. A ``None`` return
-    is the honest "we can't trust this file" signal — the caller skips it
-    rather than embedding a guessed duration.
+    PyAV is the packaged-app primary: ``av`` ships inside the PyInstaller
+    sidecar while the ffprobe binary does NOT (and a Finder launch has no
+    Homebrew PATH). Container duration is in ``av.time_base`` units
+    (microseconds); raw streams without a container duration (e.g. ADTS
+    .aac) fall through to the per-stream duration when present.
     """
+    try:
+        import av
+    except ImportError:  # pragma: no cover - av is a pinned hard dep
+        return None
+    try:
+        with av.open(str(path)) as container:
+            duration = container.duration
+            if duration is not None and duration > 0:
+                return float(duration) / float(av.time_base)
+            for stream in container.streams.audio:
+                if stream.duration is not None and stream.time_base is not None:
+                    dur = float(stream.duration * stream.time_base)
+                    if dur > 0:
+                        return dur
+    except Exception as e:  # broad on purpose — a bad file is a skip, not a crash
+        logger.warning("PyAV probe failed for %s: %s", path, e)
+        return None
+    return None
+
+
+def _probe_duration_ffprobe(path: Path) -> float | None:
+    """Dev-machine fallback: shell out to ffprobe when it exists on PATH."""
     ffprobe = shutil.which("ffprobe")
     if ffprobe is None:
-        logger.warning(
-            "ffprobe not on PATH — cannot probe %s (install ffmpeg)", path
-        )
         return None
     try:
         result = subprocess.run(
@@ -212,6 +233,21 @@ def probe_duration_s(path: Path) -> float | None:
     if dur <= 0 or dur != dur:  # non-positive or NaN
         return None
     return dur
+
+
+def probe_duration_s(path: Path) -> float | None:
+    """Return audio duration in seconds, or ``None`` on any failure.
+
+    PyAV (the already-bundled FFmpeg binding) probes first so the packaged
+    app needs no external ffprobe binary; ffprobe remains a fallback for
+    files PyAV cannot read. A ``None`` return is the honest "we can't
+    trust this file" signal — the caller skips it rather than embedding a
+    guessed duration.
+    """
+    duration = _probe_duration_pyav(path)
+    if duration is not None:
+        return duration
+    return _probe_duration_ffprobe(path)
 
 
 def folder_to_track_entry(path: Path, duration_s: float) -> TrackEntry:
