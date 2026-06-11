@@ -848,14 +848,19 @@ class AICoach:
             if "energy_read_voice_line" not in receipt_keys:
                 energy_hint = ""
             elif peer:
+                # Iter2 (steerfix wave 1): "where the next bars are heading"
+                # re-opened the narration hole — 23/23 lines re-judged as sound
+                # description and the hype reviewer called them "clinical".
+                # The peer line is a felt REACTION, past tense (latency-true),
+                # shaped like the way a peer in the booth would shout it.
                 energy_hint = (
-                    " If energy_read_voice_line rides this read, its forward "
-                    "read IS your point: call it the way a peer in the booth "
-                    "would — where the next bars are heading, what's about to "
-                    "pay off — and copy the receipt's citations exactly. The "
-                    "deltas behind it are your evidence, not your line — when "
-                    "the read doesn't match what you're hearing, output a "
-                    "single space to stay silent."
+                    " If energy_read_voice_line rides this read, it IS your "
+                    "line: one terse peer reaction to what the mix just "
+                    "pulled off — past tense, felt, producer-terse — and copy "
+                    "the receipt's citations exactly. The deltas behind it "
+                    "are your evidence, not your line — when the read doesn't "
+                    "match what you're hearing, output a single space to stay "
+                    "silent."
                 )
             else:
                 energy_hint = (
@@ -923,14 +928,13 @@ class AICoach:
                 if peer:
                     return _with_grounded_receipts(
                         f"Phase shifted: {prev}→{new}. You have a grounded "
-                        "forward energy read. Voice it as the call a peer "
-                        "drops in the booth — where the next bars are heading, "
-                        "what's about to pay off — terse and hyped, and copy "
-                        "the receipt's citations exactly. The moves and level "
-                        "changes you heard are the context you build on; the "
-                        "listener was there for them, so spend your words on "
-                        "the next bars. If the read does not match what you "
-                        "are hearing, output a single space to stay silent."
+                        "forward energy read. React to the shift that just "
+                        "hit — one terse hype line, past tense, like a peer "
+                        "who felt it land — and copy the receipt's citations "
+                        "exactly. The shift is his; your line is the feeling "
+                        "it earned, sized to what the read actually shows. If "
+                        "the read does not match what you are hearing, output "
+                        "a single space to stay silent."
                     )
                 return _with_grounded_receipts(
                     f"Phase shifted: {prev}→{new}. You have a grounded forward "
@@ -1011,9 +1015,10 @@ class AICoach:
             # below rides both registers verbatim.
             move_lead = (
                 "The DJ made that move and already hears what it did — name it "
-                "in passing at most, never as the line's point. Call what the "
-                "move set up in the sound you're hearing — where it takes the "
-                "next bars — terse, peer register. "
+                "in passing at most, never as the line's point. Your line is "
+                "the reaction, not a replay: one terse peer shout for what the "
+                "move just landed, past tense, sized to what the audio deltas "
+                "actually show. "
                 if peer
                 else
                 "The DJ made the move and already hears it — name it in "
@@ -1042,8 +1047,9 @@ class AICoach:
         if t == "HEARTBEAT":
             if peer:
                 return _with_grounded_receipts(
-                    "Steady stretch. Turn what you hear into one forward call "
-                    "— where the music's heading, what's about to pay off. "
+                    "Steady stretch. One terse peer line for the strongest "
+                    "thing this stretch just did — past tense, felt, "
+                    "producer-terse. "
                     "Ground it in the audio you just heard. "
                     "If you cite, copy an exact bracket from grounding_refs; never "
                     "invent a timestamp from BPM/RMS values. "
