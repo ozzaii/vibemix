@@ -35,44 +35,36 @@ export interface Step0IntroCallbacks {
 }
 
 const CSS = `
+  /* CINEMATIC CUT (2026-06-11): the enclosing hairline card is GONE — an
+   * unfilled outlined rectangle floating in the void is still a card. The
+   * intro is now the same three-plane scene as the deck: the ROOM (full-
+   * bleed void with the rose dawn low on the horizon), the AIR (the
+   * trademark at cinema scale), and one lit CTA key. */
   .wizard-intro {
     position: relative;
     display: grid;
     justify-items: center;
     align-content: center;
     gap: var(--sp-5);
-    justify-self: center;
-    width: min(720px, calc(100vw - 64px));
+    justify-self: stretch;
+    width: 100%;
     min-height: min(540px, calc(100vh - var(--titlebar-h) - var(--statusbar-h) - 72px));
-    padding: clamp(48px, 8vh, 78px) var(--sp-5);
+    padding: clamp(48px, 8vh, 78px) var(--sp-5) clamp(56px, 9vh, 92px);
     text-align: center;
     isolation: isolate;
     overflow: hidden;
   }
-  /* FABLE PASS (2026-06-10): the cool blue-black boxed card is GONE — it was
-   * the v5 palette in a glowy frame, the first cheap thing a new install saw.
-   * The intro now sits on the same lit warm void as the deck: a single
-   * hairline frame seating the moment, a low rose dawn beneath the wordmark.
-   * Same room from first paint to live set. */
-  .wizard-intro::before {
-    content: "";
-    position: absolute;
-    inset: 14px 8px;
-    z-index: 0;
-    border: 1px solid var(--border-subtle);
-    border-radius: var(--rad-lg);
-    pointer-events: none;
-  }
   .wizard-intro::after {
     content: "";
     position: absolute;
-    inset: 15px 9px;
+    inset: auto -8% 0;
+    height: 58%;
     z-index: 0;
     pointer-events: none;
-    border-radius: var(--rad-lg);
     background:
-      radial-gradient(120% 80% at 50% 118%, var(--brand-10), var(--brand-04) 40%, transparent 66%);
-    opacity: 0.85;
+      radial-gradient(105% 88% at 50% 102%, var(--brand-16), var(--brand-06) 38%, transparent 64%),
+      radial-gradient(50% 28% at 50% 101%, rgba(255, 214, 240, 0.10), transparent 68%);
+    opacity: 0.9;
   }
   .wizard-intro__hero {
     position: relative;
@@ -88,22 +80,9 @@ const CSS = `
       0 2px 8px rgba(0, 0, 0, 0.65),
       0 0 32px rgba(255, 165, 223, 0.06);
   }
-  .wizard-intro__hero::before {
-    content: "";
-    position: absolute;
-    left: 50%;
-    top: 50%;
-    z-index: -1;
-    width: 390px;
-    height: 170px;
-    transform: translate(-50%, -50%);
-    border-radius: 50%;
-    background: radial-gradient(ellipse, rgba(0, 0, 0, 0.58) 0%, rgba(0, 0, 0, 0.18) 48%, transparent 72%);
-    filter: blur(4px);
-  }
   .wizard-intro__wordmark {
     font-variation-settings: "wdth" 82, "wght" 800;
-    font-size: 76px;
+    font-size: clamp(76px, 11vw, 124px);
     /* Lowercase, tight — the exact case of the persistent shell wordmark, set
      * with the small negative tracking a large display lockup wants. NO
      * text-transform: the syllables abut (gap 0) so "vibemix" reads as one
@@ -131,7 +110,7 @@ const CSS = `
   .wizard-intro__phrase {
     font-family: var(--type-serif);
     font-weight: 400;
-    font-size: 46px;
+    font-size: clamp(40px, 5.4vw, 58px);
     line-height: 1.05;
     letter-spacing: -0.01em;
     text-transform: lowercase;
@@ -181,22 +160,14 @@ const CSS = `
       0 6px 18px rgba(176, 112, 160, 0.18),
       0 14px 32px rgba(0, 0, 0, 0.4);
   }
-  /* Phase 43 / Plan 43-03 — VIS-02 hover-glow sweep. The intro carries a
-   * single CTA ("Let's go"); the broad interactive selector union below
-   * applies --glow-faint on :hover + :focus-visible so the first surface
-   * the user touches already speaks CDJ Whisper tactility. */
-  .wizard-intro__cta button:not([disabled]),
-  .wizard-intro__cta [role="button"]:not([aria-disabled="true"]),
-  .wizard-intro__cta [data-interactive] {
-    transition: box-shadow var(--motion-snap) ease-out;
-  }
-  .wizard-intro__cta button:not([disabled]):hover,
-  .wizard-intro__cta button:not([disabled]):focus-visible,
-  .wizard-intro__cta [role="button"]:not([aria-disabled="true"]):hover,
-  .wizard-intro__cta [role="button"]:not([aria-disabled="true"]):focus-visible,
-  .wizard-intro__cta [data-interactive]:hover,
-  .wizard-intro__cta [data-interactive]:focus-visible {
-    box-shadow: var(--glow-faint);
+  /* Hover brightens the slab's interior — it must never REPLACE the
+   * machined box-shadow stack (the old --glow-faint rule swapped the
+   * 6-layer slab for a 5px halo by specificity: the first button the
+   * user presses flipped from metal to sticker on hover). */
+  .wizard-intro__cta .cmp-btn:hover,
+  .wizard-intro__cta .cmp-btn:focus-visible {
+    filter: brightness(1.12);
+    border-color: var(--brand-50);
   }
   /* 2026-05-19 /impeccable critique fix round 2: at 80ms stagger the
    * CTA appeared almost simultaneously with the hero — the staircase
@@ -208,11 +179,11 @@ const CSS = `
   @media (prefers-reduced-motion: no-preference) {
     .wizard-intro__hero,
     .wizard-intro__cta {
-      animation: vmx-intro-rise var(--motion-step) ease-out both;
+      animation: vmx-intro-rise 640ms var(--ease-brand) both;
     }
   }
   @keyframes vmx-intro-rise {
-    from { opacity: 0; transform: translateY(8px); }
+    from { opacity: 0; transform: translateY(12px); }
     to   { opacity: 1; transform: translateY(0); }
   }
   @media (max-width: 720px) {
@@ -221,8 +192,6 @@ const CSS = `
       min-height: min(560px, calc(100vh - var(--titlebar-h) - var(--statusbar-h) - 52px));
       padding: 44px var(--sp-4) 58px;
     }
-    .wizard-intro::before { inset: 10px 0; }
-    .wizard-intro::after { inset: 11px 1px; }
     .wizard-intro__wordmark { font-size: 52px; }
     .wizard-intro__phrase { font-size: 30px; }
     .wizard-intro__slogan { font-size: 11px; }
@@ -254,9 +223,8 @@ export function renderStep0Intro(cb: Step0IntroCallbacks): HTMLElement {
 
   const wordmark = document.createElement("span");
   wordmark.className = "wizard-intro__wordmark";
-  // The SAME wordmark as the shell sidebar: lowercase, "vibe" in ink + "mix" lit
-  // in rose, here at hero scale — so the first impression and the persistent
-  // chrome are one trademark, identical in case, not two different wordmarks.
+  // The SAME wordmark as the shell sidebar: lowercase single-tone ink, here at
+  // hero scale — one trademark from first impression to persistent chrome.
   const wordmarkVibe = document.createElement("span");
   wordmarkVibe.className = "wizard-intro__wordmark-vibe";
   wordmarkVibe.textContent = "vibe";

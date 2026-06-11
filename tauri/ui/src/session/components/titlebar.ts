@@ -47,12 +47,15 @@ const CSS = `
     flex-shrink: 0;
     -webkit-app-region: no-drag;
   }
+  /* ONE trademark (2026-06-11): the session titlebar carried an UPPERCASE
+   * spaced variant while boot + sidebar carry the lowercase tight lockup —
+   * two wordmarks for one product (and uppercase at 0.04em is the banned
+   * middle ground). Same mark everywhere now. */
   .vmx-titlebar__wordmark {
     font-family: var(--type-display);
-    font-variation-settings: "wdth" 78, "wght" 800;
-    font-size: 20px;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
+    font-variation-settings: "wdth" 85, "wght" 700;
+    font-size: 18px;
+    letter-spacing: -0.01em;
     color: var(--silk);
     line-height: 1;
   }
@@ -67,16 +70,16 @@ const CSS = `
     gap: var(--sp-2);
     margin-left: var(--sp-5);
   }
+  /* Status is engraved ON the chrome (LED + tracked label) — hardware
+   * spells status flush on the faceplate; a bordered mini-chip is sticker
+   * grammar. */
   .vmx-titlebar__pill {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
-    padding: 4px 10px;
-    background: rgba(0, 0, 0, 0.4);
-    border: 1px solid var(--glass-edge);
-    border-radius: var(--rad-sm);
+    gap: 7px;
+    padding: 0;
     font-family: var(--type-display);
-    font-variation-settings: "wdth" 85, "wght" 500;
+    font-variation-settings: "wdth" 85, "wght" 600;
     font-size: 9px;
     letter-spacing: 0.22em;
     text-transform: uppercase;
@@ -100,7 +103,7 @@ const CSS = `
     background: var(--silk);
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3);
   }
-  .vmx-titlebar__pill[data-state="ok"] { color: var(--silk); border-color: var(--silk-22); }
+  .vmx-titlebar__pill[data-state="ok"] { color: var(--silk); }
   .vmx-titlebar__pill[data-key="rec"][data-state="ok"] .vmx-titlebar__pill-led {
     background: var(--rec);
     box-shadow:
@@ -109,12 +112,12 @@ const CSS = `
       inset 0 1px 0 rgba(255, 255, 255, 0.3);
     animation: vmx-rec-blink 1400ms ease-in-out infinite;
   }
-  .vmx-titlebar__pill[data-key="rec"][data-state="ok"] { color: var(--rec); border-color: rgba(212, 65, 58, 0.35); }
+  .vmx-titlebar__pill[data-key="rec"][data-state="ok"] { color: var(--rec); }
   .vmx-titlebar__pill[data-state="down"] .vmx-titlebar__pill-led {
     background: var(--rec);
     box-shadow: 0 0 3px var(--rec), 0 0 6px rgba(212, 65, 58, 0.28);
   }
-  .vmx-titlebar__pill[data-state="down"] { color: var(--rec); border-color: rgba(212, 65, 58, 0.35); }
+  .vmx-titlebar__pill[data-state="down"] { color: var(--rec); }
   @keyframes vmx-rec-blink {
     0%, 100% { opacity: 1; }
     50% { opacity: 0.35; }
@@ -126,7 +129,7 @@ const CSS = `
     font-weight: 500;
     font-size: 18px;
     color: var(--silk);
-    text-shadow: 0 0 6px rgba(255, 165, 223, 0.18);
+    text-shadow: var(--text-emboss);
     letter-spacing: -0.01em;
     line-height: 1;
     -webkit-app-region: no-drag;
@@ -163,13 +166,14 @@ const CSS = `
   .vmx-titlebar__settings:focus-visible {
     color: var(--silk);
     border-color: var(--silk-22);
-    box-shadow: var(--glow-faint);
+    background: rgba(255, 255, 255, 0.035);
   }
   /* Suppress the body-level *:focus-visible outline+glow-soft on the
    * gear; the rule above is the authoritative focus signal. */
   .vmx-titlebar__settings[data-active="true"] {
-    color: var(--amber);
-    border-color: var(--amber-40);
+    color: var(--text-primary);
+    border-color: var(--brand-35);
+    background: linear-gradient(180deg, var(--brand-16), var(--brand-06));
   }
   .vmx-titlebar__settings .sr-only {
     position: absolute;
