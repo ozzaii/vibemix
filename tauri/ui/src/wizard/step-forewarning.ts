@@ -55,7 +55,7 @@ const CSS = `
     font-size: 13px;
     color: var(--silk);
     margin: 0 0 var(--sp-2);
-    letter-spacing: 0.04em;
+    letter-spacing: 0.08em;
     text-transform: uppercase;
   }
   .step-forewarning__card-body {

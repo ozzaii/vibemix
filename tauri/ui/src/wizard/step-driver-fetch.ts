@@ -90,7 +90,7 @@ const CSS = `
     font-size: 13px;
     color: var(--led-warn);
     text-transform: uppercase;
-    letter-spacing: 0.04em;
+    letter-spacing: 0.08em;
     margin: 0 0 var(--sp-2);
   }
   .step-driver-fetch__fallback-body {

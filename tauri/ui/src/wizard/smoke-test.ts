@@ -41,7 +41,7 @@ const CSS = `
     font-family: var(--type-display);
     font-variation-settings: "wdth" 85, "wght" 700;
     font-size: 22px;
-    letter-spacing: 0.04em;
+    letter-spacing: 0.08em;
     color: var(--amber);
     text-shadow: 0 1px 0 rgba(0, 0, 0, 0.7), var(--glow-soft);
     text-transform: uppercase;

@@ -74,7 +74,7 @@ const CSS = `
     font-variant-numeric: tabular-nums;
     font-size: 10px;
     color: var(--silk-65);
-    letter-spacing: 0.04em;
+    letter-spacing: 0.08em;
     text-transform: uppercase;
     line-height: 1;
     text-shadow: 0 1px 0 rgba(0, 0, 0, 0.7);

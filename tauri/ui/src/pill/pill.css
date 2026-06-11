@@ -1341,7 +1341,7 @@
   font-family: var(--type-mono);
   font-size: 18px;
   font-weight: 700;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.08em;
   line-height: 1;
   text-transform: uppercase;
   color: var(--brand-glow);

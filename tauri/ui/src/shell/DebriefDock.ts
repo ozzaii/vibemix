@@ -109,7 +109,7 @@ const CSS = `
   }
   .debrief-dock__proof-row dt {
     margin: 0;
-    color: var(--brand);
+    color: var(--text-muted);
     font-family: var(--type-mono);
     font-size: 10px;
     letter-spacing: 0.12em;
