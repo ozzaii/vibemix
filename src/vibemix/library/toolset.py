@@ -54,6 +54,7 @@ if TYPE_CHECKING:
     from vibemix.library.smart_cues import SmartCueProposal
 from vibemix.library.rekordbox import CuePoint, RekordboxLibrary
 from vibemix.library.search import vibe_search
+from vibemix.library.similar import similar_to
 from vibemix.library.section_builder import (
     best_source_section,
     destination_sections,
@@ -138,12 +139,17 @@ class LibraryToolset:
         *,
         freshness_provider: Callable[[], Any] | None = None,
         knowledge_embedder: _EmbeddingProvider | None = None,
+        recordings_root: os.PathLike[str] | str | None = None,
     ) -> None:
         self._embedder = embedder
         self._store = store
         self._library = library
         self._freshness_provider = freshness_provider
         self._knowledge_embedder = knowledge_embedder
+        # Session-tape root for the retrospective tools. None = resolve the
+        # OS-aware default lazily (app_data_dir()/recordings) so unit tests
+        # and embedded callers can point at a fixture dir instead.
+        self._recordings_root = recordings_root
         # Lazily-loaded DJ-knowledge RAG store (retrieve_dj_knowledge). Built on
         # first use from disk; honest empty-results when no KB is present.
         self._knowledge_store: Any | None = None
@@ -1996,6 +2002,191 @@ class LibraryToolset:
             return not result.get("results")
         return False
 
+    # ── Retrospective session tools — Viber's eyes over vibemix's own tape ──
+
+    def _resolve_recordings_index(self) -> Any | None:
+        """Build a path-safe RecordingsIndex over the session-tape root.
+
+        Local import: runtime/ is a different layer and the toolset must stay
+        importable without it (mirrors the app_data_dir discipline in the
+        taste loader). Returns None when no recordings root exists yet — the
+        fresh-install honest-empty case.
+        """
+        from vibemix.runtime.recordings_index import RecordingsIndex
+
+        root = self._recordings_root
+        if root is None:
+            from vibemix.runtime.config_store import app_data_dir
+
+            root = app_data_dir() / "recordings"
+        root = pathlib.Path(root)
+        if not root.exists():
+            return None
+        return RecordingsIndex(root)
+
+    @staticmethod
+    def _tape_track_changes(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """Ordered TRACK_CHANGE rows, consecutive duplicates collapsed.
+
+        Tape titles are nowplaying strings — carry the tape's own confidence
+        through so downstream surfaces can show how sure the session itself
+        was, separately from any library join.
+        """
+        rows: list[dict[str, Any]] = []
+        for e in events:
+            if e.get("kind") != "event" or e.get("type") != "TRACK_CHANGE":
+                continue
+            title = str(e.get("track") or "").strip()
+            if not title:
+                continue
+            if rows and rows[-1]["tape_title"] == title:
+                continue
+            rows.append(
+                {
+                    "t": float(e.get("t") or 0.0),
+                    "deck": e.get("deck"),
+                    "tape_title": title,
+                    "track_conf": e.get("track_conf"),
+                }
+            )
+        return rows
+
+    def list_past_sessions(self, args: dict[str, Any]) -> dict[str, Any]:
+        """Enumerate recorded sessions worth analyzing (boot-noise filtered).
+
+        A session qualifies only with >=1 TRACK_CHANGE and >=2 minutes of
+        tape — most local recordings are short app boots that would drown
+        the real sets. Honest-empty when nothing qualifies.
+        """
+        limit = max(1, min(30, _int_arg(args.get("limit"), default=10)))
+        index = self._resolve_recordings_index()
+        if index is None:
+            return {"sessions": [], "note": "no recorded sessions yet"}
+        rows: list[dict[str, Any]] = []
+        for summary in index.list():
+            events, err = index.read_events(summary.session_dir)
+            if err is not None or not events:
+                continue
+            track_changes = len(self._tape_track_changes(events))
+            if track_changes < 1:
+                continue
+            # Legacy dirs carry duration only via voice.wav; fall back to the
+            # last event timestamp so event-only sessions still qualify.
+            last_t = max((float(e.get("t") or 0.0) for e in events), default=0.0)
+            duration_s = max(float(summary.duration_s or 0.0), last_t)
+            if duration_s < 120.0:
+                continue
+            rows.append(
+                {
+                    "session_id": summary.session_dir,
+                    "started_at": summary.started_at_iso,
+                    "duration_s": duration_s,
+                    "track_changes": track_changes,
+                    "crashed": bool(summary.crashed),
+                }
+            )
+            if len(rows) >= limit:
+                break
+        return {"sessions": rows}
+
+    def analyze_past_set(self, args: dict[str, Any]) -> dict[str, Any]:
+        """Retrospective read of one recorded session, library-grounded.
+
+        The tape supplies WHAT HAPPENED (track sequence, phase arc, mix-move
+        timing, why the gate held lines back). The LIBRARY supplies the
+        musical facts: tape titles resolve against live entries (honest-null
+        on miss) and only resolved ids — re-validated via seed_working_set —
+        enter the grounding spine. The tape carries NO key field, so every
+        bpm/camelot here is labeled a library join, never a tape fact.
+        """
+        session_id = str(args.get("session_id") or "").strip()
+        if not session_id:
+            return {"error": "analyze_past_set: provide 'session_id' from list_past_sessions"}
+        index = self._resolve_recordings_index()
+        if index is None:
+            return {"error": "no recorded sessions yet"}
+        events, err = index.read_events(session_id)
+        if err is not None:
+            return {"error": f"invalid session_id: {err}"}
+        if not events:
+            return {"error": f"no events recorded for session {session_id!r}"}
+
+        tracks = self._tape_track_changes(events)
+        # Normalized-title join against the live library, built once per call.
+        by_title: dict[str, str] = {}
+        for tid, entry in self._library.tracks.items():
+            key = str(entry.title or "").strip().casefold()
+            if key:
+                by_title.setdefault(key, tid)
+        resolved_ids = [
+            tid
+            for row in tracks
+            if (tid := by_title.get(row["tape_title"].casefold())) is not None
+        ]
+        survivors = set(self.seed_working_set(resolved_ids))
+        for row in tracks:
+            tid = by_title.get(row["tape_title"].casefold())
+            if tid in survivors:
+                entry = self._library.lookup_by_id(tid)
+                row["track_id"] = tid
+                row["library_facts"] = {
+                    "source": "library",
+                    "bpm": float(entry.bpm) if entry is not None and entry.bpm else None,
+                    "camelot": entry.camelot if entry is not None else None,
+                }
+            else:
+                row["track_id"] = None
+                row["library_facts"] = None
+
+        phases = [
+            {"t": float(e.get("t") or 0.0), "phase": e.get("phase")}
+            for e in events
+            if e.get("kind") == "event" and e.get("type") == "PHASE"
+        ]
+        mix_move_count = sum(
+            1 for e in events if e.get("kind") == "event" and e.get("type") == "MIX_MOVE"
+        )
+        gate_reasons: dict[str, int] = {}
+        for e in events:
+            reason = e.get("coach_speak_gate_reason")
+            if isinstance(reason, str) and reason:
+                gate_reasons[reason] = gate_reasons.get(reason, 0) + 1
+        return {
+            "session_id": session_id,
+            "duration_s": max((float(e.get("t") or 0.0) for e in events), default=0.0),
+            "tracks": tracks,
+            "phases": phases,
+            "mix_move_count": mix_move_count,
+            "gate_reasons": gate_reasons,
+            "tape_disclaimer": (
+                "tape titles are nowplaying strings with their own confidence; "
+                "bpm/camelot are live-library joins, not tape facts"
+            ),
+        }
+
+    def similar_tracks(self, args: dict[str, Any]) -> dict[str, Any]:
+        """Track→track similarity for a GROUNDED seed id.
+
+        Exposes the existing similar_to engine (centered cosine + harmonic/
+        tempo relation) to the agent. The seed must already be in the seen
+        set (discovery, working set, or past-set resolution); results enter
+        the spine via seed_working_set so follow-up tools can use them.
+        """
+        track_id = str(args.get("track_id") or "").strip()
+        if not track_id:
+            return {"error": "similar_tracks: provide 'track_id'"}
+        if track_id not in self.seen:
+            return {
+                "error": (
+                    f"unknown track_id {track_id!r} — it must come from "
+                    "search_vibe/discover_pool/the working set this run"
+                )
+            }
+        k = max(1, min(15, _int_arg(args.get("k"), default=8)))
+        results = similar_to(self._embedder, self._store, self._library, track_id, k=k)
+        self.seed_working_set([r.track_id for r in results])
+        return {"seed_track_id": track_id, "results": [r.to_dict() for r in results]}
+
     def _dispatch_handlers(self) -> dict[str, Callable[[dict[str, Any]], dict[str, Any]]]:
         """The single source of truth for dispatchable tools.
 
@@ -2024,6 +2215,9 @@ class LibraryToolset:
             "quote_moment": self.quote_moment,
             "request_clarification": self.request_clarification,
             "retrieve_dj_knowledge": self.retrieve_dj_knowledge,
+            "list_past_sessions": self.list_past_sessions,
+            "analyze_past_set": self.analyze_past_set,
+            "similar_tracks": self.similar_tracks,
         }
 
     def dispatch(self, name: str, args: dict[str, Any]) -> dict[str, Any]:

@@ -167,15 +167,21 @@ def test_build_server_smoke(server: Any) -> None:
     assert hasattr(server, "run"), "FastMCP server must expose a run() method"
 
 
-def test_registered_tool_count_is_eighteen(server: Any) -> None:
-    """The grounded base surface is 16; two newer surfaces bring it to 18.
+def test_registered_tool_count_is_twenty_one(server: Any) -> None:
+    """The grounded base surface is 16; newer surfaces bring it to 21.
 
     Regression-pin: if a future refactor drops a tool, this flips.
+    2026-06-11: 18 → 21 — the retrospective session tools landed
+    (list_past_sessions / analyze_past_set over the path-safe
+    RecordingsIndex reader, similar_tracks over the existing similar_to
+    engine; all results re-validated into the seen set via
+    seed_working_set, Invariant #2 intact).
     """
     tools = server._tool_manager.list_tools()
-    assert len(tools) == 18, (
-        f"Expected 18 registered tools (16 base + inspect_candidates + "
-        f"request_clarification), "
+    assert len(tools) == 21, (
+        f"Expected 21 registered tools (16 base + inspect_candidates + "
+        f"request_clarification + list_past_sessions + analyze_past_set + "
+        f"similar_tracks), "
         f"got {len(tools)}: {[t.name for t in tools]}"
     )
 
@@ -351,19 +357,21 @@ def test_request_clarification_docstring_teaches_codex(server: Any) -> None:
     )
 
 
-def test_grep_gate_eighteen_mcp_tool_decorators() -> None:
+def test_grep_gate_twenty_two_mcp_tool_decorators() -> None:
     """Subprocess grep gate — independent confirmation that the source file
-    has exactly 19 ``@mcp.tool()`` decorators.
+    has exactly 22 ``@mcp.tool()`` decorators.
 
     Belt-and-braces for the registered-tool-count check; this also catches
     "tool was added but build_server didn't re-bind it" drift since the
     decorator is what binds.
 
-    19 = the 18-tool surface this file pins PLUS ``ingest_source``
+    22 = the 21-tool surface this file pins PLUS ``ingest_source``
     (9849b384 — Serato/catalog ingest routed into Viber). ``ingest_source``
     is ``hasattr``-gated on the toolset, so the registered-tool-count test
-    above still sees 18 with the bare fake toolset — the source decorator
-    count is the gate that covers it.
+    above still sees 21 with the bare fake toolset — the source decorator
+    count is the gate that covers it. 2026-06-11: 19 → 22 — the
+    retrospective session tools (list_past_sessions / analyze_past_set /
+    similar_tracks) landed.
     """
     src = Path(__file__).resolve().parents[2] / "src" / "vibemix" / "library" / "mcp_server.py"
     assert src.exists(), f"mcp_server.py not found at {src}"
@@ -374,9 +382,9 @@ def test_grep_gate_eighteen_mcp_tool_decorators() -> None:
         check=False,
     )
     count = int(out.stdout.strip())
-    assert count == 19, (
-        f"Expected exactly 19 @mcp.tool() decorators in mcp_server.py "
-        f"(18 base + hasattr-gated ingest_source), got {count}. Either a "
+    assert count == 22, (
+        f"Expected exactly 22 @mcp.tool() decorators in mcp_server.py "
+        f"(21 base + hasattr-gated ingest_source), got {count}. Either a "
         f"grounded tool was dropped, the raw export_cues tool came back, "
         f"or a new tool landed without re-pinning this gate."
     )

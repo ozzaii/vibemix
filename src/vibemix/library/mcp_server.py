@@ -472,6 +472,28 @@ def build_server(toolset: Any) -> Any:
             {"query": query, "topic": topic, "skill_level": skill_level, "k": k}
         )
 
+    @mcp.tool()
+    def list_past_sessions(limit: int = 10) -> dict[str, Any]:
+        """Enumerate the DJ's recorded vibemix sessions worth analyzing
+        (boot-noise filtered: needs track changes + real duration). Returns
+        session_id rows for analyze_past_set. Honest-empty when none."""
+        return toolset.list_past_sessions({"limit": limit})
+
+    @mcp.tool()
+    def analyze_past_set(session_id: str) -> dict[str, Any]:
+        """Retrospective read of one recorded session: track sequence, phase
+        arc, mix-move timing, speak-gate reasons. Tape titles resolve against
+        the live library (honest-null on miss); bpm/camelot are library joins,
+        never tape facts. Resolved ids become grounded for follow-up tools."""
+        return toolset.analyze_past_set({"session_id": session_id})
+
+    @mcp.tool()
+    def similar_tracks(track_id: str, k: int = 8) -> dict[str, Any]:
+        """Find library tracks that SOUND like a grounded track_id (centered
+        cosine + harmonic/tempo relation). The seed must be grounded this run
+        (discovery, working set, or past-set resolution)."""
+        return toolset.similar_tracks({"track_id": track_id, "k": k})
+
     return mcp
 
 

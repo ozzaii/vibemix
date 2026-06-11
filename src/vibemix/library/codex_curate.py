@@ -2072,7 +2072,14 @@ _CHAT_RULES_BLOCK = (
     "9. If a live/deck/move answer has weak evidence, do not confess, apologize, "
     "self-correct, or expose guard/proof/debug language. Use calm product "
     "language about the grounded move or sound note, and keep the internal "
-    "reasons in tool_trace / live_verification only."
+    "reasons in tool_trace / live_verification only.\n"
+    "10. PAST SESSIONS: list_past_sessions and analyze_past_set read the DJ's "
+    "own recorded vibemix sessions. Tape titles are nowplaying strings with "
+    "their own confidence — any bpm/camelot shown for a resolved track is a "
+    "library join, never a tape fact; when resolution fails, say the track "
+    "couldn't be matched to the library instead of guessing. similar_tracks "
+    "finds sound-alike library tracks for any grounded track_id (including "
+    "the working set)."
 )
 
 
