@@ -249,6 +249,12 @@ def test_generation_call_surfaces_have_ai_message_coverage() -> None:
             "Generates fresh candidate lines under a persona for bench "
             "scoring only — never spoken, never shown to a user."
         ),
+        # 2026-06-10 simulated-DJ-fleet instrument (e502df34 lineage), same
+        # offline-eval class as the judges above.
+        Path("scripts/eval/session_review.py"): (
+            "Whole-session persona reviewer over recorded sessions; emits "
+            "review JSONs to .planning/eval-runs, not assistant messages."
+        ),
     }
 
     found = _generation_call_files()
