@@ -210,6 +210,17 @@ try:
 except Exception as exc:  # pragma: no cover — native extension packaging drift
     print(f"[spec] sqlite_vec extension collection skipped: {exc}", file=sys.stderr)
 
+# mlx compiles its Metal kernels into mlx/lib/mlx.metallib — a data file, so
+# collect_dynamic_libs("mlx") above ships libmlx.dylib WITHOUT it. At runtime
+# mlx resolves the metallib via dladdr next to the loaded dylib (mlx/lib/);
+# missing means every mlx.nn import dies with "Failed to load the default
+# metallib" → Chatterbox voice unrecoverable in the packaged app while dev
+# runs fine (2026-06-11 live repro).
+try:
+    datas.extend(collect_data_files("mlx", includes=["lib/*.metallib"]))
+except Exception as exc:  # pragma: no cover — local-AI packaging drift
+    print(f"[spec] mlx metallib collection skipped: {exc}", file=sys.stderr)
+
 # livekit ships a native FFI lib (livekit/rtc/resources/liblivekit_ffi.dylib)
 # plus non-.py resources under livekit/{rtc,agents}/resources. collect_submodules
 # above only grabs .py modules, so the frozen sidecar ImportErrors at
