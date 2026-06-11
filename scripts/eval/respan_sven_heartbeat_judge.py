@@ -330,6 +330,15 @@ def load_rows(session: Path, events: set[str], limit: int | None) -> list[dict]:
             # Bare-citation reply: TTS strips it to nothing, never spoken.
             silent += 1
             continue
+        if meta.get("suppression") and not meta.get("head_yielded"):
+            # The runtime recorded its own suppression decision (slop /
+            # silence / stale / non_english) — the dump keeps the original
+            # text, but the turn never reached TTS (2026-06-11 panel,
+            # instrument-honesty finding). head_yielded turns stay judged:
+            # a speculative head that already reached TTS was partially
+            # HEARD, and the instrument must never hide a heard line.
+            silent += 1
+            continue
         prompt_p = d / "prompt.txt"
         prompt_text = prompt_p.read_text(errors="ignore") if prompt_p.exists() else None
         rows.append(

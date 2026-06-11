@@ -177,6 +177,45 @@ def test_load_rows_skips_wordless_citation_only_response(tmp_path) -> None:
     ]
 
 
+def test_load_rows_skips_runtime_suppressed_turns(tmp_path) -> None:
+    """The invocation dump is written even when the runtime SUPPRESSES the
+    turn (slop / silence / stale / non_english) — response.txt keeps the
+    original text, so a naive loader grades a silenced turn as a spoken line
+    (2026-06-11 panel, instrument-honesty finding). meta['suppression'] is
+    the runtime's own record of the decision; non-null counts as
+    already-silent."""
+    inv = tmp_path / "invocations"
+
+    def _mk(name: str, event: str, line: str, suppression: str | None = None) -> None:
+        d = inv / name
+        d.mkdir(parents=True)
+        meta = {"event": event}
+        if suppression is not None:
+            meta["suppression"] = suppression
+        (d / "meta.json").write_text(json.dumps(meta))
+        (d / "response.txt").write_text(line)
+
+    _mk("0001_PHASE", "PHASE", "Hold the low end open for four bars.")
+    _mk("0002_PHASE", "PHASE", "That drop was absolutely insane, fam!", suppression="slop")
+    _mk("0003_PHASE", "PHASE", "Some stale line that never reached TTS.", suppression="stale")
+    # A suppressed turn whose speculative HEAD already reached TTS was
+    # partially heard — the instrument must never hide a heard line
+    # (slop-audit required change, 2026-06-11).
+    d = inv / "0004_PHASE"
+    d.mkdir(parents=True)
+    (d / "meta.json").write_text(
+        json.dumps({"event": "PHASE", "suppression": "slop", "head_yielded": True})
+    )
+    (d / "response.txt").write_text("First sentence was heard. Then the slop arrived.")
+
+    rows = judge.load_rows(tmp_path, set(), None)
+
+    assert [r["line"] for r in rows] == [
+        "Hold the low end open for four bars.",
+        "First sentence was heard. Then the slop arrived.",
+    ]
+
+
 def test_probe_capture_status_reads_session_json(tmp_path) -> None:
     def _status(meta: dict | None) -> str:
         d = tmp_path / ("probe" + str(meta))
