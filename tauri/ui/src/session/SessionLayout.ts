@@ -473,22 +473,26 @@ const LAYOUT_CSS = `
     background: transparent;
     box-shadow: none;
   }
+  /* THE ARMED STAGE (2026-06-11 cinematic cut) — three depth planes, not a
+   * centered card: the ROOM (deep void + the rose dawn low on the horizon),
+   * the AIR (the co-host's serif line, large, lit from below), and the
+   * CONSOLE (a full-bleed machined strip pinned to the floor, readouts left,
+   * the GO LIVE transport key right, with the dawn spilling over its top
+   * edge from behind). Depth you can feel, not borders that say "panel". */
+  .vmx-session[data-runstate="armed"] .vmx-deck { padding: 0; }
+  .vmx-session[data-runstate="armed"] .vmx-deck__speak { padding: 0; }
   .vmx-session[data-runstate="armed"] .vmx-armed {
     position: relative;
     isolation: isolate;
     display: grid;
-    grid-template-columns: minmax(0, min(640px, 100%));
-    justify-content: center;
-    justify-items: center;
-    align-content: center;
-    gap: clamp(28px, 5vw, 72px);
+    grid-template-rows: minmax(0, 1fr) auto;
     min-height: 0;
     width: 100%;
-    max-width: 1120px;
-    margin: 0 auto;
-    padding: clamp(28px, 6vh, 72px) clamp(4px, 1.8vw, 22px) clamp(34px, 7vh, 86px);
+    max-width: none;
+    margin: 0;
+    padding: 0;
     text-align: center;
-    animation: vmxArmedIn 520ms var(--ease-brand);
+    animation: vmxArmedIn 640ms var(--ease-brand);
   }
   /* The idle stage is a powered deck warming up, not dead black. A low rose
    * dawn rises from beneath the stage (toward the Start action) and breathes
@@ -498,23 +502,26 @@ const LAYOUT_CSS = `
    * and cheap-empty. */
   .vmx-armed__field {
     position: absolute;
-    inset: -10% -8% -16%;
-    z-index: -1;
+    inset: auto 0 0;
+    height: 56%;
+    z-index: 0;
     pointer-events: none;
     background:
-      radial-gradient(135% 92% at 50% 116%, var(--brand-16), var(--brand-04) 38%, transparent 66%),
-      linear-gradient(112deg, transparent 0%, var(--brand-04) 30%, transparent 56%),
-      radial-gradient(80% 60% at 82% 8%, rgba(255, 222, 242, 0.03), transparent 58%);
-    filter: blur(0.2px);
-    opacity: 0.86;
+      radial-gradient(110% 86% at 50% 102%, var(--brand-22), var(--brand-08) 34%, transparent 62%),
+      radial-gradient(54% 30% at 50% 101%, rgba(255, 214, 240, 0.12), transparent 68%);
+    opacity: 0.9;
     transform: translate3d(0, 0, 0);
     animation: vmxArmedField 8600ms var(--ease-brand) infinite alternate;
   }
   .vmx-armed__copy {
+    position: relative;
+    z-index: 1;
     display: grid;
     gap: var(--sp-4);
     justify-items: center;
+    align-self: center;
     min-width: 0;
+    padding: clamp(24px, 5vh, 56px) clamp(16px, 4vw, 48px) clamp(16px, 3vh, 36px);
   }
   .vmx-armed__eyebrow,
   .vmx-armed__kicker,
@@ -525,23 +532,22 @@ const LAYOUT_CSS = `
     text-transform: uppercase;
   }
   .vmx-armed__eyebrow {
-    color: var(--brand);
-    text-shadow: 0 0 18px var(--brand-22);
+    color: var(--text-muted);
   }
   .vmx-armed__title {
     margin: 0;
     margin-inline: auto;
-    max-width: 11ch;
+    max-width: 12ch;
     font-family: var(--type-serif);
     font-weight: 400;
-    font-size: clamp(64px, 7vw, 96px);
-    line-height: 0.96;
-    letter-spacing: 0;
+    font-size: clamp(76px, 10.5vw, 138px);
+    line-height: 0.94;
+    letter-spacing: -0.01em;
     color: var(--text-primary);
     text-wrap: balance;
     text-shadow:
-      0 1px 0 rgba(176, 112, 160, 0.20),
-      0 22px 58px rgba(0, 0, 0, 0.58);
+      0 1px 0 rgba(255, 255, 255, 0.03),
+      0 26px 70px rgba(0, 0, 0, 0.66);
   }
   .vmx-armed__title em {
     font-style: italic;
@@ -569,16 +575,19 @@ const LAYOUT_CSS = `
   .vmx-armed__context {
     display: flex;
     flex-wrap: wrap;
-    justify-content: center;
-    gap: clamp(20px, 3vw, 44px);
-    margin-top: var(--sp-4);
-    padding-top: var(--sp-4);
-    box-shadow: inset 0 1px 0 rgba(255, 222, 242, 0.07);
+    align-items: center;
+    justify-content: flex-start;
+    gap: clamp(20px, 2.8vw, 44px);
+    margin: 0;
+    padding: 0;
+    min-width: 0;
   }
   .vmx-armed__context-item {
     min-width: 0;
     display: grid;
-    gap: 6px;
+    gap: 5px;
+    text-align: left;
+    justify-items: start;
   }
   .vmx-armed__context-label {
     color: var(--text-disabled);
@@ -589,7 +598,7 @@ const LAYOUT_CSS = `
     white-space: nowrap;
     font-family: var(--type-display);
     font-variation-settings: "wdth" 90, "wght" 600;
-    font-size: 14px;
+    font-size: var(--type-step-1);
     letter-spacing: 0;
     color: var(--text-secondary);
   }
@@ -599,9 +608,11 @@ const LAYOUT_CSS = `
   .vmx-armed__module {
     position: relative;
     display: grid;
-    gap: var(--sp-4);
+    gap: 8px;
     align-self: center;
-    justify-self: center;
+    justify-items: end;
+    text-align: right;
+    flex: 0 0 auto;
   }
   /* Text floor: nothing the DJ is meant to READ sits below the contract's
    * dimmest legal step (= --text-disabled). The old silk-40/22 values were
@@ -625,21 +636,22 @@ const LAYOUT_CSS = `
     overflow: hidden;
     font-family: var(--type-mono);
     font-weight: 600;
-    font-size: 13px; letter-spacing: 0.3em; text-transform: uppercase;
+    font-size: 14px; letter-spacing: 0.3em; text-transform: uppercase;
     color: var(--text-primary);
     text-shadow: var(--text-emboss);
-    min-height: 60px;
-    padding: 18px 44px;
-    border: 1px solid var(--brand-35); border-radius: var(--rad-md);
+    min-height: 66px;
+    padding: 20px 56px;
+    border: 1px solid var(--brand-40); border-radius: var(--rad-sm);
     background:
-      linear-gradient(180deg, var(--brand-22) 0%, var(--brand-10) 50%, var(--brand-06) 100%),
+      linear-gradient(180deg, var(--brand-30) 0%, var(--brand-12) 52%, var(--brand-06) 100%),
       linear-gradient(180deg, var(--void-12), var(--void-8));
     box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.18),
+      inset 0 1px 0 rgba(255, 255, 255, 0.22),
       inset 0 -1px 0 rgba(0, 0, 0, 0.45),
-      inset 0 0 24px var(--brand-06),
+      inset 0 0 24px var(--brand-08),
       0 1px 0 rgba(255, 255, 255, 0.04),
-      0 6px 18px rgba(176, 112, 160, 0.18),
+      0 0 34px -6px var(--brand-22),
+      0 6px 18px rgba(176, 112, 160, 0.20),
       0 16px 38px rgba(0, 0, 0, 0.42);
     cursor: pointer;
     transition: color var(--motion-step) var(--ease-brand), border-color var(--motion-step) var(--ease-brand), box-shadow var(--motion-step) var(--ease-brand), filter var(--motion-step) var(--ease-brand), transform var(--motion-step) var(--ease-brand);
@@ -680,57 +692,42 @@ const LAYOUT_CSS = `
   .vmx-armed__start:focus-visible { outline: 2px solid var(--amber); outline-offset: 3px; }
   @keyframes vmxArmedIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
   @keyframes vmxArmedField {
-    from { opacity: 0.46; transform: translate3d(-8px, 5px, 0) scale(0.992); }
-    to { opacity: 0.76; transform: translate3d(8px, -5px, 0) scale(1.006); }
+    from { opacity: 0.58; transform: translate3d(0, 4px, 0); }
+    to { opacity: 0.92; transform: translate3d(0, -3px, 0); }
   }
-  /* THE SIGN OF LIFE (direction-final contract): a hairline frame seats the
-   * idle deck like the front panel of a powered instrument, and ONE slow brand
-   * light travels its perimeter — the gentle pulse of a CDJ sitting idle.
-   * Armed-only: when the deck goes live the voice + meter are the life. */
-  .vmx-armed__frame {
-    position: absolute;
-    inset: clamp(10px, 2.4vh, 26px) clamp(2px, 1.2vw, 16px);
-    border: 1px solid var(--border-subtle);
-    border-radius: var(--r-md);
-    pointer-events: none;
-    z-index: -1;
-    overflow: hidden;
+  /* THE CONSOLE — the near plane. A full-bleed machined strip pinned to the
+   * stage floor: readout cluster left, the GO LIVE transport key right. The
+   * dawn (z 0) rises BEHIND it; the console (z 1) is the silhouetted front
+   * object whose top lip catches that light — the one place the room\'s rose
+   * reflects off the metal. Depth from light across planes, not from a
+   * rounded outline saying "card". */
+  .vmx-armed__console {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: clamp(20px, 3.2vw, 48px);
+    padding: clamp(18px, 2.8vh, 28px) clamp(22px, 3.4vw, 52px) clamp(20px, 3vh, 30px);
+    background: linear-gradient(180deg, var(--void-12) 0%, var(--void-8) 46%, var(--void-5) 100%);
+    border-top: 1px solid var(--border-default);
+    box-shadow:
+      inset 0 1px 0 rgba(246, 243, 245, 0.10),
+      inset 0 -16px 34px -20px rgba(0, 0, 0, 0.62),
+      0 -34px 70px -34px rgba(0, 0, 0, 0.6);
+    text-align: left;
   }
-  /* The traveling light is the conic's FROM angle animating via @property —
-   * never transform:rotate on the masked element (rotating the element rotates
-   * its ring mask too, which streaks the light diagonally across the panel). */
-  @property --vmx-sweep {
-    syntax: "<angle>";
-    initial-value: 0deg;
-    inherits: false;
-  }
-  .vmx-armed__frame::before {
+  /* The dawn\'s reflection on the console\'s machined top edge — light from
+   * behind, caught on the lip. The console\'s only rose. */
+  .vmx-armed__console::before {
     content: "";
     position: absolute;
-    inset: 0;
-    border-radius: inherit;
-    padding: 1px;
-    background: conic-gradient(
-      from var(--vmx-sweep) at 50% 50%,
-      transparent 0%,
-      transparent 38%,
-      var(--brand-22) 47%,
-      var(--brand-50) 50%,
-      var(--brand-22) 53%,
-      transparent 62%,
-      transparent 100%
-    );
-    -webkit-mask:
-      linear-gradient(rgba(0, 0, 0, 1) 0 0) content-box,
-      linear-gradient(rgba(0, 0, 0, 1) 0 0);
-    -webkit-mask-composite: xor;
-            mask:
-      linear-gradient(rgba(0, 0, 0, 1) 0 0) content-box,
-      linear-gradient(rgba(0, 0, 0, 1) 0 0);
-            mask-composite: exclude;
-    /* Stilled (one-breath law): vmxArmedField is the gate's ONE ambient —
-     * the perimeter holds as a static lit seam instead of a second motion. */
-    opacity: 0.5;
+    top: -1px;
+    left: 0;
+    right: 0;
+    height: 1px;
+    pointer-events: none;
+    background: linear-gradient(90deg, transparent 8%, var(--brand-40) 50%, transparent 92%);
   }
   /* The idle deck has no live signal — the master meter is runtime telemetry.
    * Showing its empty groove at armed read as a stray progress bar. */
@@ -1573,12 +1570,6 @@ export function mountSessionLayout(
   const armedField = document.createElement("div");
   armedField.className = "vmx-armed__field";
   armedField.setAttribute("aria-hidden", "true");
-  // The sign of life (direction-final): a hairline frame seating the idle deck
-  // + ONE slow brand light traveling its perimeter (tokens.css .border-anim,
-  // 22s). The session deck's single allowed sweep, armed-only.
-  const armedFrame = document.createElement("div");
-  armedFrame.className = "vmx-armed__frame";
-  armedFrame.setAttribute("aria-hidden", "true");
   const armedCopy = document.createElement("div");
   armedCopy.className = "vmx-armed__copy";
   const armedEyebrow = document.createElement("span");
@@ -1609,7 +1600,7 @@ export function mountSessionLayout(
     outputContext.wrap,
     personaContext.wrap,
   );
-  armedCopy.append(armedEyebrow, armedTitle, armedLead, armedContext);
+  armedCopy.append(armedEyebrow, armedTitle, armedLead);
   const armedModule = document.createElement("div");
   armedModule.className = "vmx-armed__module";
   const armedKicker = document.createElement("span");
@@ -1632,7 +1623,11 @@ export function mountSessionLayout(
   armedNote.className = "vmx-armed__note";
   armedNote.textContent = "Stands by until you go live.";
   armedModule.append(armedKicker, startBtn, armedNote);
-  armed.append(armedFrame, armedField, armedCopy, armedModule);
+  // The console: the near plane holding telemetry + the transport key.
+  const armedConsole = document.createElement("div");
+  armedConsole.className = "vmx-armed__console";
+  armedConsole.append(armedContext, armedModule);
+  armed.append(armedField, armedCopy, armedConsole);
 
   speak.append(voice, armed);
   deck.append(speak);
