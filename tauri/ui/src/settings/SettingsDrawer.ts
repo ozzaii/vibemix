@@ -407,12 +407,11 @@ const CSS = `
       inset 0 2px 5px rgba(0, 0, 0, 0.50),
       inset 0 -1px 0 rgba(255, 222, 242, 0.04);
   }
-  /* Surface-wide VIS-02 contract — broad interactive union; comma-
-   * separated --glow-faint so deeper child components that already
-   * register their own hover treatments (mascot-group toggle rows,
-   * performance-group toggle, library-panel rows, retention slider
-   * thumb, hotkey-capture pad) inherit the uniform tactility signal
-   * without having to fork their own rules. */
+  /* Surface-wide tactility contract — broad interactive union. Hover is
+   * INTERIOR light only (the key's face catches the room): the old
+   * blanket --glow-faint outer halo on every control was neon-sticker
+   * grammar, physically wrong for keys sitting inside recessed wells
+   * (Inset-Bezel-Over-Shadow). */
   .vmx-settings-drawer button:not([disabled]),
   .vmx-settings-drawer [role="button"]:not([aria-disabled="true"]),
   .vmx-settings-drawer [data-interactive] {
@@ -424,9 +423,7 @@ const CSS = `
   .vmx-settings-drawer [role="button"]:not([aria-disabled="true"]):focus-visible,
   .vmx-settings-drawer [data-interactive]:hover,
   .vmx-settings-drawer [data-interactive]:focus-visible {
-    box-shadow:
-      inset 0 1px 0 rgba(255, 251, 244, 0.040),
-      var(--glow-faint);
+    box-shadow: inset 0 1px 0 rgba(255, 251, 244, 0.055);
   }
   /* P1-b finding #3 — DEMOTE the blanket glow, reserve a brighter signal for
    * the ACTIVE control. The faint-glow-on-everything-hovered rule above is the
@@ -467,14 +464,14 @@ const CSS = `
     line-height: 1;
     text-shadow: var(--text-emboss);
   }
-  /* Leading hairline tick — the sub-label's quiet rose anchor, one rung below
-   * the group header's solid dot (mock §panel-section-label::before). */
+  /* Leading hairline tick — engraved furniture, not a rose mark (state is
+   * rose, furniture is ink). */
   .vmx-settings-drawer__label::before {
     content: "";
     width: 10px;
     height: 1px;
     flex-shrink: 0;
-    background: var(--brand-22);
+    background: var(--silk-12);
   }
   /* Voice identity readout — a recessed display window (glass-3 floor, inset
    * bezel), not a control: it shows what the instrument IS, no chevron. */
@@ -500,8 +497,8 @@ const CSS = `
     font-size: 11px;
     font-weight: 600;
     letter-spacing: 0.18em;
-    color: var(--brand);
-    text-shadow: 0 0 6px var(--brand-22);
+    color: var(--text-primary);
+    text-shadow: var(--text-emboss);
     white-space: nowrap;
   }
   .vmx-settings-drawer__readout[data-quiet="true"] .vmx-settings-drawer__readout-name {

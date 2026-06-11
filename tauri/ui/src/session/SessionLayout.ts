@@ -334,18 +334,21 @@ const LAYOUT_CSS = `
   }
   .vmx-persona__chip:hover {
     color: var(--text-primary);
-    background: var(--brand-04);
+    background: rgba(255, 255, 255, 0.035);
   }
-  .vmx-persona__chip:active { transform: scale(0.96); }
+  .vmx-persona__chip:active { transform: translateY(1px); }
+  /* THE LIT KEY (2026-06-11 grammar): selected = the key is physically lit,
+   * GO LIVE's material at control scale — rose FILL under INK text. Never
+   * rose text in a dark socket (glowy sticker grammar). */
   .vmx-persona__chip[data-active="true"] {
-    color: var(--brand);
-    background: radial-gradient(ellipse at top, var(--void-0) 0%, var(--void-12) 100%);
+    color: var(--text-primary);
+    background:
+      linear-gradient(180deg, var(--brand-22) 0%, var(--brand-08) 62%, var(--brand-04) 100%),
+      radial-gradient(ellipse at top, var(--void-0) 0%, var(--void-12) 100%);
     text-shadow: var(--text-emboss);
     box-shadow:
-      inset 0 2px 5px rgba(0, 0, 0, 0.55),
-      inset 0 -1px 0 rgba(255, 255, 255, 0.04),
-      inset 0 0 0 1px var(--brand-22),
-      inset 0 0 14px var(--brand-04);
+      inset 0 1px 0 rgba(255, 255, 255, 0.10),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.45);
   }
   /* persistent low-ink at rest (reachable mid-set), full on hover/focus.
    * Real mute also bound to the push-to-mute hotkey (session-shortcuts.ts). */
@@ -383,30 +386,28 @@ const LAYOUT_CSS = `
       inset 0 -1px 0 rgba(0, 0, 0, 0.70);
   }
   .vmx-deck__controls button[data-on="true"] {
-    color: var(--amber-pale);
-    border-color: var(--amber-40);
+    color: var(--text-primary);
+    border-color: var(--brand-35);
     background:
-      linear-gradient(180deg, rgba(255, 165, 223, 0.11), rgba(255, 165, 223, 0.025) 58%, rgba(0, 0, 0, 0.22)),
+      linear-gradient(180deg, var(--brand-22), var(--brand-08) 58%, rgba(0, 0, 0, 0.22)),
       rgba(2, 3, 6, 0.66);
     box-shadow:
-      inset 0 1px 0 rgba(255, 251, 244, 0.040),
-      inset 0 -1px 0 var(--amber-22),
-      inset 0 0 14px rgba(255, 165, 223, 0.10);
+      inset 0 1px 0 rgba(255, 255, 255, 0.12),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.45);
   }
   .vmx-deck__controls button[data-primary="true"] {
-    color: var(--amber-pale);
-    border-color: var(--amber-22);
+    color: var(--text-secondary);
+    border-color: var(--border-strong);
     background:
-      linear-gradient(180deg, rgba(255, 165, 223, 0.075), rgba(255, 165, 223, 0.018) 58%, rgba(0, 0, 0, 0.22)),
+      linear-gradient(180deg, rgba(255, 251, 244, 0.030), rgba(0, 0, 0, 0.22)),
       rgba(2, 3, 6, 0.62);
     box-shadow:
-      inset 0 1px 0 rgba(255, 251, 244, 0.034),
-      inset 0 -1px 0 rgba(255, 165, 223, 0.16),
-      inset 0 0 12px rgba(255, 165, 223, 0.060);
+      inset 0 1px 0 rgba(255, 251, 244, 0.045),
+      inset 0 -2px 0 rgba(0, 0, 0, 0.68);
   }
   .vmx-deck__controls button[data-primary="true"]:hover {
-    color: var(--amber);
-    border-color: var(--amber-40);
+    color: var(--text-primary);
+    border-color: var(--glass-edge-up);
   }
   .vmx-live { position: relative; min-width: 168px; height: 1.2em; text-align: right; }
   .vmx-live__s {

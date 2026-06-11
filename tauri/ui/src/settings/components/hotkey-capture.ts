@@ -82,15 +82,14 @@ const CSS = `
     box-shadow:
       inset 0 2px 6px rgba(0, 0, 0, 0.85),
       inset 0 0 0 1px rgba(0, 0, 0, 0.4),
-      inset 0 0 14px rgba(255, 165, 223, 0.04),
       0 0 0 1px rgba(255, 255, 255, 0.02);
     font-family: var(--type-mono);
     font-variant-numeric: tabular-nums;
     font-size: 14px;
     letter-spacing: 0.02em;
-    color: var(--amber);
+    color: var(--text-primary);
     line-height: 1;
-    text-shadow: 0 0 6px var(--amber-40), 0 0 14px var(--amber-22);
+    text-shadow: var(--text-emboss);
     user-select: none;
     transition: color var(--motion-snap) ease-out,
                 text-shadow var(--motion-snap) ease-out,
@@ -99,13 +98,12 @@ const CSS = `
   /* Capture mode — chip becomes warmer + pulses; signals "listening for
    * keypress". The amber-deep shade reads as "armed" without being alarming. */
   .vmx-hotkey-capture[data-capture="true"] .vmx-hotkey-capture__chip {
-    color: var(--amber-deep);
+    color: var(--text-primary);
+    background: linear-gradient(180deg, var(--brand-22) 0%, var(--brand-08) 60%, var(--brand-04) 100%);
     box-shadow:
-      inset 0 2px 6px rgba(0, 0, 0, 0.85),
-      inset 0 0 0 1px var(--amber-40),
-      inset 0 0 18px var(--amber-22),
-      0 0 0 1px rgba(255, 165, 223, 0.18);
-    text-shadow: 0 0 7px var(--amber-65), 0 0 16px var(--amber-40);
+      inset 0 1px 0 rgba(255, 255, 255, 0.12),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.45);
+    text-shadow: var(--text-emboss);
   }
   /* Capture pulse is gated on motion preference — the lit chip above already
    * says "listening" without the loop. */
@@ -149,21 +147,19 @@ const CSS = `
   }
   .vmx-hotkey-capture__rebind:hover {
     color: var(--silk);
+    background: rgba(255, 255, 255, 0.035);
     box-shadow:
       inset 0 1px 0 rgba(255, 255, 255, 0.06),
-      inset 0 -1px 0 rgba(0, 0, 0, 0.45),
-      0 0 10px var(--amber-22);
+      inset 0 -1px 0 rgba(0, 0, 0, 0.45);
   }
   .vmx-hotkey-capture[data-capture="true"] .vmx-hotkey-capture__rebind {
-    color: var(--amber);
-    background: linear-gradient(180deg, rgba(255, 165, 223, 0.09) 0%, rgba(255, 165, 223, 0.025) 100%);
-    border-color: rgba(255, 165, 223, 0.14);
+    color: var(--text-primary);
+    background: linear-gradient(180deg, var(--brand-16) 0%, var(--brand-06) 100%);
+    border-color: var(--brand-35);
     box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.06),
-      inset 0 -1px 0 var(--amber-40),
-      inset 0 0 14px var(--amber-22),
-      0 0 0 1px rgba(255, 165, 223, 0.14);
-    text-shadow: 0 0 4px var(--amber-65);
+      inset 0 1px 0 rgba(255, 255, 255, 0.10),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.40);
+    text-shadow: var(--text-emboss);
   }
   .vmx-hotkey-capture__error {
     font-family: var(--type-mono);

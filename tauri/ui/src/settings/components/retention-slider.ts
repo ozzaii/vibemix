@@ -102,9 +102,8 @@ const CSS = `
     box-shadow:
       inset 0 2px 6px rgba(0, 0, 0, 0.9),
       inset 0 0 0 1px rgba(0, 0, 0, 0.4),
-      inset 0 0 14px rgba(255, 165, 223, 0.04),
       0 0 0 1px rgba(255, 255, 255, 0.02);
-    text-shadow: 0 0 6px rgba(255, 165, 223, 0.20);
+    text-shadow: var(--text-emboss);
     user-select: none;
   }
   .vmx-retention__track-wrap {
@@ -181,20 +180,18 @@ const CSS = `
                 box-shadow var(--motion-snap) ease-out;
   }
   .vmx-retention__knob:hover {
-    border-color: var(--amber-40);
+    border-color: var(--glass-edge-up);
     box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.08),
-      inset 0 -1px 0 rgba(0, 0, 0, 0.55),
-      0 0 6px var(--amber-22);
+      inset 0 1px 0 rgba(255, 255, 255, 0.10),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.55);
   }
   .vmx-retention__knob[data-active="true"] {
-    background: var(--amber);
-    border-color: var(--amber-pale);
+    background: var(--brand);
+    border-color: var(--brand-glow);
     box-shadow:
       inset 0 1px 0 rgba(255, 255, 255, 0.35),
       inset 0 -0.5px 0 rgba(0, 0, 0, 0.4),
-      0 0 4px var(--amber-65),
-      0 0 9px var(--amber-22);
+      0 0 4px var(--brand-40);
   }
   .vmx-retention__labels {
     display: flex;

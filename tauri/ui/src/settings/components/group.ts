@@ -43,25 +43,8 @@ const CSS = `
       rgba(48, 42, 46, 0.50);
     box-shadow:
       var(--bevel-raised),
-      inset 0 0 0 1px rgba(255, 255, 255, 0.014),
-      0 14px 38px rgba(0, 0, 0, 0.26),
-      0 0 52px -34px var(--brand-22);
+      inset 0 0 0 1px rgba(255, 255, 255, 0.014);
     overflow: hidden;
-  }
-  /* The leading rose seam — a vertical brand light down the left edge, the same
-   * sign-of-life the grounding panel carries (mock §grounding). Subliminal at
-   * rest; never a >1px colored stripe. */
-  .vmx-settings-group::before {
-    content: "";
-    position: absolute;
-    left: 0;
-    top: 12%;
-    bottom: 12%;
-    width: 1px;
-    pointer-events: none;
-    background: linear-gradient(180deg, transparent, var(--brand-22) 46%, transparent);
-    box-shadow: 0 0 10px var(--brand-08);
-    opacity: 0.55;
   }
   .vmx-settings-group:first-child {
     margin-top: 0;
@@ -108,7 +91,7 @@ const CSS = `
     right: var(--sp-4);
     bottom: 0;
     height: 1px;
-    background: linear-gradient(90deg, var(--brand-12) 0%, rgba(255, 222, 242, 0.045) 18%, transparent 64%);
+    background: linear-gradient(90deg, var(--silk-12) 0%, rgba(246, 243, 245, 0.045) 18%, transparent 64%);
     opacity: 0.52;
   }
   /* Engraved chip, not a lit one — the badge is a static caption, and a

@@ -69,32 +69,28 @@ const CSS = `
                 background var(--motion-snap) ease-out,
                 box-shadow var(--motion-snap) ease-out;
   }
-  /* VIS-02 (43-02) — picker row carries an additive --glow-faint on
-   * hover+focus-visible alongside its pre-existing 10px amber inset
-   * shadow. The outer halo lifts the row off the silk-22 frame the same
-   * way the rocker does, keeping the affordance vocabulary uniform. */
+  /* Hover = interior light, machined (no outer halo — Inset-Bezel-Over-
+   * Shadow; a glow around a row inside a recessed drawer is sticker
+   * grammar). */
   .vmx-picker__row:hover,
   .vmx-picker__row:focus-visible {
     color: var(--silk);
-    border-color: var(--brand-22);
+    border-color: var(--glass-edge-up);
+    background: rgba(255, 255, 255, 0.030);
     box-shadow:
       inset 0 1px 0 rgba(255, 255, 255, 0.06),
-      inset 0 -1px 0 rgba(0, 0, 0, 0.45),
-      0 0 0 1px var(--brand-08),
-      var(--glow-faint);
+      inset 0 -1px 0 rgba(0, 0, 0, 0.45);
   }
-  /* Picker row owns the outer halo above — kill the body-level
-   * 2px amber outline so we don't stack two focus rings. */
+  /* THE LIT KEY: the open picker is engaged — rose FILL under INK text,
+   * GO LIVE's material at control scale (was rose-text + rose glow). */
   .vmx-picker[data-open="true"] .vmx-picker__row {
-    color: var(--amber);
-    background: linear-gradient(180deg, rgba(255, 165, 223, 0.072) 0%, rgba(255, 165, 223, 0.022) 100%);
-    border-color: var(--brand-22);
+    color: var(--text-primary);
+    background: linear-gradient(180deg, var(--brand-22) 0%, var(--brand-08) 58%, var(--brand-04) 100%);
+    border-color: var(--brand-35);
     box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.06),
-      inset 0 -1px 0 var(--amber-40),
-      inset 0 0 10px var(--amber-22),
-      0 0 0 1px var(--brand-08);
-    text-shadow: 0 0 3px var(--amber-40);
+      inset 0 1px 0 rgba(255, 255, 255, 0.12),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.40);
+    text-shadow: var(--text-emboss);
   }
   .vmx-picker__icon {
     display: inline-flex;
@@ -102,9 +98,8 @@ const CSS = `
     justify-content: center;
     width: 18px;
     height: 18px;
-    color: var(--amber);
+    color: var(--text-secondary);
     flex-shrink: 0;
-    filter: drop-shadow(0 0 3px var(--amber-22));
   }
   /* Avatar — a flat amber-pinpoint disc on a void-2 ground (the voice "seal").
    * v5 drops the bevel-radial-gradient that the FL-Studio direction used.
@@ -179,9 +174,8 @@ const CSS = `
   }
   .vmx-picker__row:hover .vmx-picker__chev { color: var(--silk-65); }
   .vmx-picker[data-open="true"] .vmx-picker__chev {
-    color: var(--amber);
+    color: var(--text-primary);
     transform: rotate(180deg);
-    text-shadow: 0 0 4px var(--amber-22);
   }
   /* Dropdown — sealed glass-1 popover (mock .tray-popover treatment).
    *
@@ -265,26 +259,22 @@ const CSS = `
    * the deeper --glow-soft glow exclusively via the dot+tint pairing. */
   .vmx-picker__opt:hover,
   .vmx-picker__opt:focus-visible {
-    color: var(--amber);
-    background: rgba(255, 165, 223, 0.06);
-    text-shadow: 0 0 4px var(--amber-22);
-    box-shadow: var(--glow-faint);
+    color: var(--silk);
+    background: rgba(255, 255, 255, 0.035);
   }
+  /* Selected option = the lit key wash under ink; its rose dot (below) is
+   * the one rose pip in the list. */
   .vmx-picker__opt[data-selected="true"] {
-    color: var(--amber);
-    background: rgba(255, 165, 223, 0.05);
-    text-shadow: 0 0 4px var(--amber-22);
+    color: var(--text-primary);
+    background: linear-gradient(180deg, var(--brand-16) 0%, var(--brand-06) 100%);
+    text-shadow: var(--text-emboss);
   }
   .vmx-picker__opt[data-selected="true"]::before {
     content: '';
     width: 4px;
     height: 4px;
     border-radius: 50%;
-    background: var(--amber);
-    /* Active/selected row carries the DEEPER glow (the comment above + the
-     * 20/80 active-state rule: the one selected option is where the eye lands).
-     * Inactive :hover keeps --glow-faint; the selected dot gets --glow-soft. */
-    box-shadow: var(--glow-soft);
+    background: var(--brand);
     flex-shrink: 0;
     margin-right: 2px;
   }

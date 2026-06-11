@@ -78,40 +78,31 @@ const CSS = `
                 box-shadow var(--motion-snap) ease-out,
                 text-shadow var(--motion-snap) ease-out;
   }
-  /* VIS-02 hover/focus glow — colour lift + faint amber halo so the
-   * affordance survives against the silk-22 frame (closes H-01). The
-   * :focus-visible branch mirrors :hover for keyboard reachability. */
+  /* Hover = the interior of the key catches light. No outer halo: glow
+   * around a segment sitting INSIDE a recessed well is physically wrong
+   * (neon-sticker grammar) — DESIGN's Inset-Bezel-Over-Shadow rule. */
   .vmx-rocker__seg:hover,
   .vmx-rocker__seg:focus-visible {
     color: var(--silk);
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.040),
-      var(--glow-faint);
+    background: rgba(255, 255, 255, 0.035);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.050);
   }
   /* The body-level *:focus-visible already paints a 2px amber outline +
    * --glow-soft so we explicitly suppress the duplicate ring on the
    * segment (its glow comes from the rule above). */
-  /* --- rocker variant: pressed amber tile when active (used for BEG/INT/PRO etc.) --- */
-  .vmx-rocker[data-variant="rocker"] .vmx-rocker__seg[data-active="true"] {
-    color: var(--amber);
-    background: linear-gradient(180deg, rgba(255, 165, 223, 0.080) 0%, rgba(255, 165, 223, 0.024) 100%);
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.06),
-      inset 0 -1px 0 rgba(255, 165, 223, 0.30),
-      inset 0 0 8px var(--amber-22),
-      0 0 0 1px rgba(255, 165, 223, 0.13);
-    text-shadow: 0 0 2px var(--amber-40);
-  }
-  /* --- interaction variant: same hardware state, not a second palette. --- */
+  /* --- THE LIT KEY (2026-06-11 grammar): the selected segment is a
+   * physically lit key — rose FILL under INK text, machined lips intact
+   * (GO LIVE's material at control scale). The old recipe (rose text +
+   * rose inset ring + rose text-glow) was the glowy-sticker grammar that
+   * read "vibe coded"; both variants share the one hardware state. --- */
+  .vmx-rocker[data-variant="rocker"] .vmx-rocker__seg[data-active="true"],
   .vmx-rocker[data-variant="interaction"] .vmx-rocker__seg[data-active="true"] {
-    color: var(--amber);
-    background: linear-gradient(180deg, rgba(255, 165, 223, 0.074) 0%, rgba(255, 165, 223, 0.020) 100%);
+    color: var(--text-primary);
+    background: linear-gradient(180deg, var(--brand-22) 0%, var(--brand-08) 58%, var(--brand-04) 100%);
     box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.055),
-      inset 0 -1px 0 rgba(255, 165, 223, 0.28),
-      inset 0 0 7px var(--amber-22),
-      0 0 0 1px rgba(255, 165, 223, 0.12);
-    text-shadow: 0 0 2px var(--amber-40);
+      inset 0 1px 0 rgba(255, 255, 255, 0.14),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.40);
+    text-shadow: var(--text-emboss);
   }
   /* Legacy LED prefix kept rendering for backward-compat with the
    * existing renderRocker(variant="interaction") signature, but visually
