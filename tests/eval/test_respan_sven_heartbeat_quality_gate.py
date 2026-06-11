@@ -152,6 +152,31 @@ def test_load_rows_skips_guard_silenced_held_reply(tmp_path) -> None:
     assert [r["line"] for r in rows] == ["Let it ride four bars, then snap it back."]
 
 
+def test_load_rows_skips_wordless_citation_only_response(tmp_path) -> None:
+    """Measured 2026-06-10 (baseline-cadence-midi-r2): the model answered with a
+    bare citation atom plus a period. The runtime's TTS sanitizer now strips
+    that to "" (the <empty> skip-TTS branch — never spoken), so the loader must
+    count it as already-silent, exactly like the guard-substitution skip above:
+    response.txt still records the raw text, but judging it as a spoken line
+    scores a silence as friend-0 slop."""
+    inv = tmp_path / "invocations"
+
+    def _mk(name: str, event: str, line: str) -> None:
+        d = inv / name
+        d.mkdir(parents=True)
+        (d / "meta.json").write_text(json.dumps({"event": event}))
+        (d / "response.txt").write_text(line)
+
+    _mk("0001_PHASE", "PHASE", "[energy:master_read=audio_peak_110_f3108ffa].")  # wordless → skip
+    _mk("0002_PHASE", "PHASE", "Hold the low end open. [energy:master_read=audio_low_11_9b35751f]")
+
+    rows = judge.load_rows(tmp_path, set(), None)
+
+    assert [r["line"] for r in rows] == [
+        "Hold the low end open. [energy:master_read=audio_low_11_9b35751f]"
+    ]
+
+
 def test_probe_capture_status_reads_session_json(tmp_path) -> None:
     def _status(meta: dict | None) -> str:
         d = tmp_path / ("probe" + str(meta))

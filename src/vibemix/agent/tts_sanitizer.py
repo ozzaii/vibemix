@@ -15,11 +15,19 @@ from vibemix.state import EVIDENCE_CITATION_RE
 
 _HSPACE_RE = re.compile(r"[ \t\f\v]+")
 _SPACE_BEFORE_PUNCT_RE = re.compile(r" +([,.;:!?])")
+_WORD_RE = re.compile(r"\w")
 
 
 def strip_citations_for_tts(text: str, *, normalize: bool = False) -> str:
     """Remove grounding citation atoms from TTS text only."""
     raw = text or ""
+    # Text with no word characters is not speech, citations or not. Measured
+    # 2026-06-10 (baseline-cadence-midi-r2): a bare-citation reply left "."
+    # after the strip — truthy, so the runtime spoke a click and recorded the
+    # turn as a reaction. Wordless input/residue collapses to "" so the
+    # <empty> (skip TTS) branch treats it as the silence escape.
+    if not _WORD_RE.search(raw):
+        return ""
     if not EVIDENCE_CITATION_RE.search(raw):
         if normalize:
             return re.sub(r"\s+", " ", raw).strip()
@@ -28,7 +36,7 @@ def strip_citations_for_tts(text: str, *, normalize: bool = False) -> str:
     cleaned = EVIDENCE_CITATION_RE.sub(" ", raw)
     cleaned = _HSPACE_RE.sub(" ", cleaned)
     cleaned = _SPACE_BEFORE_PUNCT_RE.sub(r"\1", cleaned)
-    if not cleaned.strip():
+    if not cleaned.strip() or not _WORD_RE.search(cleaned):
         return ""
     if normalize:
         return re.sub(r"\s+", " ", cleaned).strip()

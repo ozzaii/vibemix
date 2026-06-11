@@ -50,6 +50,7 @@ from pathlib import Path
 
 import httpx  # vibemix core dep; run via `uv run python …`
 
+from vibemix.agent.tts_sanitizer import model_text_for_tts
 from vibemix.llm.model_router import resolve_model
 from vibemix.runtime.speak_gate import decide_speak_gate
 from vibemix.state import Event, MusicState
@@ -87,6 +88,19 @@ SILENCED_GUARD_SUBSTITUTIONS = frozenset(
 def is_silenced_guard_substitution(line: str) -> bool:
     """True when a recorded response is a guard-silenced held reply, not a spoken line."""
     return line.strip() in SILENCED_GUARD_SUBSTITUTIONS
+
+
+def is_wordless_after_tts_strip(line: str) -> bool:
+    """True when the runtime's TTS sanitizer reduces a recorded response to nothing.
+
+    Measured 2026-06-10 (baseline-cadence-midi-r2): the model replied with a bare
+    citation atom plus a period. The runtime strips citations before TTS and the
+    wordless residue hits the <empty> (skip TTS) branch — the user never hears
+    it — but ``response.txt`` still records the raw text, so a naive loader
+    grades a silence as a friend-0 "spoken" line. Calls the canonical sanitizer
+    (not a copy) so this can never drift from what the runtime actually speaks.
+    """
+    return not model_text_for_tts(line).strip()
 
 
 def probe_capture_status(session: Path) -> str:
@@ -310,6 +324,10 @@ def load_rows(session: Path, events: set[str], limit: int | None) -> list[dict]:
             # Guard-silenced held reply: the shipped runtime substituted this
             # deterministic safety line and did NOT speak it (emit_corrected=False).
             # Judging it as a spoken line scores a silence as friend-0 slop.
+            silent += 1
+            continue
+        if is_wordless_after_tts_strip(line):
+            # Bare-citation reply: TTS strips it to nothing, never spoken.
             silent += 1
             continue
         prompt_p = d / "prompt.txt"
