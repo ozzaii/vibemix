@@ -27,30 +27,14 @@ const CSS = `
    * a hairline under it, then the step's controls. No card fill, no drop
    * shadow. The wizard is form-bearing (device probe, window pick, MIDI listen)
    * so the controls stay; only the enclosing card is removed. */
-  /* FABLE PASS (2026-06-10): the v5 cool blue-black slab (raw rgba(8,10,16)
-   * literals + old-silk rivets) is GONE — inside the retextured warm room it
-   * read as a leftover cold tile. The panel now sits in the mock's card
-   * material: warm void gradient, machined bevel, one brand hairline catching
-   * the top lip (the evidence-card seam). */
+  /* CINEMATIC CUT (2026-06-11): the card shell dies AGAIN — the 06-10 pass
+   * re-carded this against its own docstring, and a raised slab floating in
+   * an empty room is exactly the "floating card in nowhere" composition the
+   * contract bans. The step is content ON the wizard's lit void: an engraved
+   * header, a hairline, the controls. The rows inside carry their own seams. */
   .cmp-primary-panel {
     position: relative;
-    padding: var(--sp-5);
-    border: 1px solid var(--border-subtle);
-    border-radius: var(--rad-md);
-    background: linear-gradient(180deg, var(--void-10) 0%, var(--void-5) 100%);
-    box-shadow:
-      var(--bevel-raised),
-      0 18px 46px rgba(0, 0, 0, 0.22);
-    overflow: hidden;
-  }
-  .cmp-primary-panel::before {
-    content: "";
-    position: absolute;
-    inset: 0 12px auto;
-    height: 1px;
-    pointer-events: none;
-    background: linear-gradient(90deg, transparent, var(--brand-35), transparent);
-    opacity: 0.5;
+    padding: 0;
   }
   .cmp-primary-panel__header {
     position: relative;

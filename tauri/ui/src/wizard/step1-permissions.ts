@@ -56,16 +56,21 @@ const CSS = `
    * text-shadow stays so the heading still reads as machined into the
    * deck face. Active step-indicator dot remains the sole amber signal
    * on the wizard chrome. */
+  /* The step title speaks in the co-host's serif voice at the mid register
+   * (2026-06-11): the interior steps were the one stretch of the product
+   * that dropped the serif entirely — 22px uppercase display at the banned
+   * 0.04em tracking read as a settings dialog, not the same room as the
+   * intro and the deck. textContent stays verbatim; lowercase is material. */
   .wizard-step__heading {
-    font-family: var(--type-display);
-    font-variation-settings: "wdth" 85, "wght" 700;
-    font-size: 22px;
-    letter-spacing: 0.04em;
+    font-family: var(--type-serif);
+    font-weight: 400;
+    font-size: clamp(30px, 3.6vw, 40px);
+    letter-spacing: 0;
     color: var(--silk);
-    text-shadow: 0 1px 0 rgba(0, 0, 0, 0.7);
-    line-height: 1.1;
+    text-shadow: 0 1px 0 rgba(0, 0, 0, 0.55), 0 12px 34px rgba(0, 0, 0, 0.5);
+    line-height: 1.05;
     margin: 0 0 var(--sp-2);
-    text-transform: uppercase;
+    text-transform: lowercase;
   }
   /* One amber lead glyph per interior header — the step0 hero gives the "V"
    * the single amber moment; every interior step header inherits the same
@@ -73,18 +78,18 @@ const CSS = `
    * 20/80 law: this is the ONLY amber on the silk header (the heading text
    * itself stays silk), so the eye still lands on a single accent. The "·"
    * is dimmed to amber-40 so the digits carry the glow, not the separator. */
+  /* Engraved ordinal — furniture is ink; the step's one rose object is its
+   * armed CTA. */
   .wizard-step__heading-index {
     font-family: var(--type-mono);
     font-size: 13px;
     letter-spacing: 0.08em;
-    color: var(--amber);
-    text-shadow: 0 0 6px var(--amber-40);
+    color: var(--text-disabled);
     margin-right: var(--sp-2);
-    vertical-align: 0.12em;
+    vertical-align: 0.22em;
   }
   .wizard-step__heading-index .wizard-step__heading-dot {
-    color: var(--amber-40);
-    text-shadow: none;
+    color: var(--text-disabled);
   }
   .wizard-step__subtitle {
     font-family: var(--type-body);
@@ -154,7 +159,7 @@ const CSS = `
   .wizard-step__cards [role="button"]:not([aria-disabled="true"]):focus-visible,
   .wizard-step__cards [data-interactive]:hover,
   .wizard-step__cards [data-interactive]:focus-visible {
-    box-shadow: var(--glow-faint);
+    box-shadow: inset 0 1px 0 rgba(255, 251, 244, 0.055);
   }
 `;
 

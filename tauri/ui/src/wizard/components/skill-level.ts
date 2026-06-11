@@ -69,25 +69,26 @@ const CSS = `
     align-items: flex-start;
     gap: var(--sp-3);
     padding: var(--sp-3);
-    border: 1px solid var(--silk-22);
-    border-radius: 4px;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--rad-sm);
     cursor: pointer;
     user-select: none;
     background: transparent;
-    transition: border-color 150ms ease, background 150ms ease;
+    transition: border-color 150ms ease, background 150ms ease, box-shadow 150ms ease;
   }
   .vmx-skill-level__radio-row:hover {
-    border-color: var(--silk-65);
+    border-color: var(--glass-edge-up);
+    background: rgba(255, 255, 255, 0.025);
   }
-  /* Selected = a RECESS, not a rose slab — brand is spent as a low-alpha ring
-   * + glow inside a pressed socket (tokens.css: wash-never-fill). */
+  /* THE LIT KEY: the chosen level is physically lit — rose FILL under ink,
+   * machined lips (GO LIVE's material; the old thin-pink-outline recess was
+   * sticker grammar). */
   .vmx-skill-level__radio-row[data-selected="true"] {
     border-color: var(--brand-35);
-    background: radial-gradient(ellipse at top, var(--void-8), var(--void-12));
+    background: linear-gradient(180deg, var(--brand-16) 0%, var(--brand-06) 64%, var(--brand-04) 100%);
     box-shadow:
-      inset 0 2px 5px rgba(0, 0, 0, 0.55),
-      inset 0 0 0 1px var(--brand-22),
-      inset 0 0 14px var(--brand-04);
+      inset 0 1px 0 rgba(255, 255, 255, 0.10),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.40);
   }
   .vmx-skill-level__radio {
     appearance: none;
