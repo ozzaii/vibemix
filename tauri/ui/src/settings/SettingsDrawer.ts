@@ -228,40 +228,24 @@ const CSS = `
       radial-gradient(circle at right center, rgba(214, 207, 199, 0.18) 0 2px, transparent 2.5px);
     opacity: 0;
   }
-  /* 2026-05-19 /impeccable critique round 3: dropped heading from
-   * 14px Saira 700 to 11px Saira 600 + 0.22em tracking — the drawer
-   * body label vocabulary is 9-11px throughout (every group header,
-   * every row label) and the SETTINGS title was 50% larger than its
-   * neighbors. The new size lands as a peer label, not as a
-   * separately-styled "page title." */
+  /* The drawer title speaks in the serif voice at the mid register
+   * (2026-06-11): the surface's whole hierarchy lived in a 9-13px
+   * uppercase band — the one human-voice moment the drawer was owed.
+   * Lowercase is material; textContent stays verbatim. The old rose
+   * heartbeat dot died for the rose budget (the drawer's one mark is
+   * its left edge seam). */
   .vmx-settings-drawer__title {
     position: relative;
     display: inline-flex;
     align-items: center;
-    gap: 11px;
-    padding-left: 13px;
-    font-family: var(--type-display);
-    font-variation-settings: "wdth" 85, "wght" 600;
-    font-size: 13px;
-    letter-spacing: 0.2em;
-    text-transform: uppercase;
+    font-family: var(--type-serif);
+    font-weight: 400;
+    font-size: 20px;
+    letter-spacing: 0;
+    text-transform: lowercase;
     color: var(--text-primary);
     line-height: 1;
     text-shadow: var(--text-emboss);
-  }
-  /* A lit brand tick anchoring the title — the panel's heartbeat, the single
-   * decisive sign-of-life on the header crown (mock §panel-title::before). */
-  .vmx-settings-drawer__title::before {
-    content: "";
-    position: absolute;
-    left: 0;
-    top: 50%;
-    transform: translateY(-50%);
-    width: 4px;
-    height: 4px;
-    border-radius: 50%;
-    background: var(--brand);
-    box-shadow: 0 0 6px var(--brand-50);
   }
   /* 2026-05-19 /impeccable critique fix round 2: drawer title amber
    * dot dropped entirely. When the drawer is open the user already
