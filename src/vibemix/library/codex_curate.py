@@ -4236,6 +4236,42 @@ def _dedupe_ordered(items: list[str]) -> list[str]:
     return out
 
 
+def _enrich_playlist_tracks(
+    track_ids: list[str], library: RekordboxLibrary
+) -> list[dict[str, Any]]:
+    """Resolve display facts for ALREADY-VALIDATED ids from the live store.
+
+    Receipts, not model text: every field comes from the store entry the id
+    just resolved against, so surfaces can render title/BPM/key chips without
+    a second lookup hop. The library's ``bpm == 0.0`` "no tempo" sentinel
+    surfaces as ``None`` (honest-null), and an empty title falls back to the
+    id — the same no-fabrication rule the Rust mapper applies. The rows ride
+    the ``tracks`` array library_cmds.rs is already future-proofed to prefer
+    over the flat id list.
+    """
+    rows: list[dict[str, Any]] = []
+    for tid in track_ids:
+        entry = library.lookup_by_id(tid)
+        if entry is None:
+            # Validated upstream; a store mutation mid-run degrades to an
+            # id-only row rather than dropping the track or raising.
+            rows.append(
+                {"track_id": tid, "title": tid, "artist": "", "bpm": None, "camelot": None}
+            )
+            continue
+        bpm = float(entry.bpm) if entry.bpm else None
+        rows.append(
+            {
+                "track_id": tid,
+                "title": str(entry.title or "").strip() or tid,
+                "artist": str(entry.artist or "").strip(),
+                "bpm": bpm,
+                "camelot": entry.camelot,
+            }
+        )
+    return rows
+
+
 def _normalize_chat_playlist(raw: Any, library: RekordboxLibrary) -> dict[str, Any] | None:
     """Validate a Codex-reported chat playlist artifact before surfacing it.
 
@@ -4399,6 +4435,11 @@ class CodexChatResult:
     move_grades: list[dict[str, Any]] = field(default_factory=list)
     live_verification: dict[str, Any] | None = None
     playlist: dict[str, Any] | None = None
+    # Rich display rows for the playlist's VALIDATED ids (title/artist/bpm/
+    # camelot resolved from the live store by _enrich_playlist_tracks). Kept
+    # OUTSIDE the ``playlist`` dict because that shape is exact-pinned by
+    # tests; surfaces read this sibling field. None whenever playlist is None.
+    playlist_tracks: list[dict[str, Any]] | None = None
     export_path: str | None = None
     stop_reason: str = "model_done"
     error: str | None = None
@@ -4425,6 +4466,8 @@ class CodexChatResult:
         }
         if self.live_verification is not None:
             out["live_verification"] = self.live_verification
+        if self.playlist_tracks is not None:
+            out["playlist_tracks"] = self.playlist_tracks
         if self.question is not None:
             out["question"] = self.question
         if self.choices is not None:
@@ -5015,6 +5058,9 @@ def chat_with_codex(
             move_grades=move_grades,
             live_verification=live_verification,
             playlist=playlist,
+            playlist_tracks=(
+                _enrich_playlist_tracks(playlist["track_ids"], library) if playlist else None
+            ),
             export_path=export_path,
             stop_reason=stop_reason,
         )
