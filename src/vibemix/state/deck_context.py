@@ -563,6 +563,70 @@ LIVE_TRACK_IDENTITY_HELD_REPLY = (
 LIVE_JUDGE_OVERPRAISE_HELD_REPLY = (
     "The measured Judge read was restrained there. The useful note is the evidence, not a hype grade."
 )
+LIVE_SPECTRAL_CLAIM_HELD_REPLY = (
+    "I can't hear that in the mix right now, so I'll hold that read."
+)
+
+# Spectral-claim guard (2026-06-11, the lever2 G1 class): the brain invents
+# band CONTENT the packet never offered — "added brightness" / "a lot of
+# high-end energy" / "rising top energy" voiced while the high band sits at
+# 0.01, "rising mid-textures" at mid=0.05. The citation resolves, so the
+# linter passes the turn; the claim content is what's wrong. The grammar is
+# the separator, not the vocabulary: PRESENT/PAST-POSITIVE content assertions
+# die at inaudible levels, while future/directive lines ("let the brightness
+# lift on the NEXT phrase", "slide the highs back in", "hold the top end
+# space OPEN") and bare "high energy" intensity reads are measured keepers at
+# the same levels — the judge praised "hold the top end space open" BECAUSE
+# high was 0.01. Mechanical validation over every judged corpus row
+# (baseline + lever + lever2 + iter7): 10 should_NOT killed (every spectral
+# G1 in the pool), 1 OK collateral (its own judge note: "mids are actually
+# quite low"), 91 untouched.
+_SPECTRAL_HIGH_CLAIM_RE = re.compile(
+    r"(?:(?:added|new|rising|extra)\s+brightness"
+    r"|brightness\s+in\s+check"
+    r"|(?:got|has|have)\s+(?:a\s+lot\s+of|plenty\s+of|so\s+much)\s+high"
+    r"|rising\s+top[- ]?(?:energy|end)"
+    r"|top[- ]?energy\s+(?:just\s+)?(?:rising|rose|lifted)"
+    r"|highs?\s+(?:just\s+)?(?:burst|opened|exploded))",
+    re.IGNORECASE,
+)
+_SPECTRAL_MID_CLAIM_RE = re.compile(
+    r"(?:new|rising|added)\s+mid(?:s\b|[- ]textures?)",
+    re.IGNORECASE,
+)
+# Same perceptual line as energy_read_voice.BAND_AUDIBILITY_FLOOR (kept as a
+# local constant — runtime/ imports state/, never the reverse). The guard
+# keys "brightness" on the HIGH band: the judge and the ear read brightness
+# as treble presence ("Highs are at 0.01; 'added brightness' is fabricated"),
+# unlike the producer's brightness_share delta which measures the mid+high
+# sum it actually renders.
+SPECTRAL_CLAIM_BAND_FLOOR = 0.10
+
+
+def _spectral_band_level(state: MusicState, keys: tuple[str, ...]) -> float | None:
+    bands = getattr(state, "bands", {}) or {}
+    if not isinstance(bands, dict):
+        return None
+    total = 0.0
+    for key in keys:
+        try:
+            total += float(bands.get(key, 0.0) or 0.0)
+        except (TypeError, ValueError):
+            pass
+    return total
+
+
+def _unsupported_spectral_presence_claim(text: str, state: MusicState) -> str | None:
+    """Reason string when the text asserts band content at an inaudible level."""
+    if _SPECTRAL_HIGH_CLAIM_RE.search(text):
+        level = _spectral_band_level(state, ("high",))
+        if level is not None and level < SPECTRAL_CLAIM_BAND_FLOOR:
+            return "high_presence_claim_at_inaudible_high"
+    if _SPECTRAL_MID_CLAIM_RE.search(text):
+        level = _spectral_band_level(state, ("mid",))
+        if level is not None and level < SPECTRAL_CLAIM_BAND_FLOOR:
+            return "mid_presence_claim_at_inaudible_mid"
+    return None
 
 
 def normalize_audio_window_context_text(raw: object, *, max_len: int = 900) -> str | None:
@@ -3182,6 +3246,19 @@ def apply_live_claim_guard(
             policy="mixer_contradiction",
             reason="low_kill_not_in_mixer_state",
             summary=summary + (f"; mixer_lows={mixer_summary}" if mixer_summary else ""),
+        )
+    spectral_reason = _unsupported_spectral_presence_claim(text, state)
+    if spectral_reason is not None:
+        # Hold, never strip: the fabricated band claim is usually the line's
+        # spine, and a stripped residue is the measured truncation-fragment
+        # class. See _SPECTRAL_HIGH_CLAIM_RE for the measured grammar.
+        summary = _live_guard_summary(state, moves)
+        return LiveClaimGuardResult(
+            text=LIVE_SPECTRAL_CLAIM_HELD_REPLY,
+            corrected=True,
+            policy="spectral_claim_not_audible",
+            reason=spectral_reason,
+            summary=summary,
         )
     if not moves and _has_unsupported_no_move_control_claim(text):
         summary = _live_guard_summary(state, moves)

@@ -3339,3 +3339,101 @@ def test_live_claim_guard_defers_mix_candidate_for_verdict_check() -> None:
     assert should_defer_live_claim_stream(state, ["xfader→center"]) is True
     assert result.corrected is False
     assert result.policy == "candidate_not_verdict"
+
+
+def test_live_claim_guard_holds_brightness_presence_claim_at_inaudible_high() -> None:
+    """Spectral-claim guard (2026-06-11, lever2 G1 class): the brain invents
+    band content the packet never offered — "added brightness" voiced while
+    the high band sits at 0.01. The citation resolves, so the linter passes
+    it; the CLAIM content is what's wrong. Mechanical validation over all
+    judged corpora: the presence-claim grammar at band<0.10 fires on 10
+    should_NOT lines (every spectral G1 in the pool) vs 1 OK whose own judge
+    note already doubted the grounding."""
+    from vibemix.state.deck_context import LIVE_SPECTRAL_CLAIM_HELD_REPLY
+
+    state = MusicState(audible=True)
+    state.bands = {"sub": 0.55, "low": 0.30, "mid": 0.15, "high": 0.01}
+
+    result = apply_live_claim_guard(
+        "Keep this added brightness in check over the next phrase to let that heavy kick bounce.",
+        state,
+        event_type="PHASE",
+    )
+
+    assert result.text == LIVE_SPECTRAL_CLAIM_HELD_REPLY
+    assert result.corrected is True
+    assert result.emit_corrected is False
+    assert result.policy == "spectral_claim_not_audible"
+
+
+def test_live_claim_guard_holds_high_end_energy_and_burst_claims() -> None:
+    """The other measured shapes of the same grammar: "a lot of high-end
+    energy" (lever-midi-r1, judge: 'Incorrectly claims high-end energy when
+    high is 0.01') and "highs just burst open" (iter7-midi-r3)."""
+    from vibemix.state.deck_context import LIVE_SPECTRAL_CLAIM_HELD_REPLY
+
+    state = MusicState(audible=True)
+    state.bands = {"sub": 0.60, "low": 0.25, "mid": 0.09, "high": 0.01}
+
+    for line in (
+        "This peak has a lot of high-end energy; hold here for eight bars.",
+        "Those mids and highs just burst open. Leave this low-end space alone.",
+        "Keep the low end hollow to give that rising top energy room to breathe.",
+    ):
+        result = apply_live_claim_guard(line, state, event_type="PHASE")
+        assert result.text == LIVE_SPECTRAL_CLAIM_HELD_REPLY, line
+        assert result.policy == "spectral_claim_not_audible", line
+
+
+def test_live_claim_guard_holds_mid_presence_claim_at_inaudible_mid() -> None:
+    """The MID twin (iter7-audio-r2 'rising mid-textures' at mid=0.05, F0/G1;
+    the audio_groove_14 cold-start family's brain-side escape route)."""
+    from vibemix.state.deck_context import LIVE_SPECTRAL_CLAIM_HELD_REPLY
+
+    state = MusicState(audible=True)
+    state.bands = {"sub": 0.70, "low": 0.20, "mid": 0.05, "high": 0.02}
+
+    result = apply_live_claim_guard(
+        "Let those rising mid-textures settle in the mix before you crowd any high-end layers.",
+        state,
+        event_type="PHASE",
+    )
+
+    assert result.text == LIVE_SPECTRAL_CLAIM_HELD_REPLY
+    assert result.policy == "spectral_claim_not_audible"
+
+
+def test_live_claim_guard_spares_future_directives_and_intensity_reads() -> None:
+    """The keeper grammar the guard must NEVER touch — measured OK lines at
+    the same high=0.01: future/directive top-end lines ('let the brightness
+    lift on the NEXT phrase', 'slide the highs back in', 'hold the top end
+    space open' — the judge PRAISED that one BECAUSE high is 0.01) and bare
+    'high energy' intensity reads (the judge reads intensity, not band).
+    16 measured OK spectral lines pass the pattern set untouched."""
+    state = MusicState(audible=True)
+    state.bands = {"sub": 0.55, "low": 0.30, "mid": 0.16, "high": 0.01}
+
+    for line in (
+        "Hold this steady groove a bit longer, then let the brightness lift on the next phrase.",
+        "Let this deep sub settle before you slide the highs back in.",
+        "Hold the top end space open right here so the next layers have room to breathe.",
+        "Keep that high energy under control on this next phrase; pull the volume back.",
+        "Give that punch space to breathe before you push the highs again.",
+    ):
+        result = apply_live_claim_guard(line, state, event_type="PHASE")
+        assert result.policy != "spectral_claim_not_audible", line
+
+
+def test_live_claim_guard_spares_presence_claims_at_audible_levels() -> None:
+    """The same grammar at AUDIBLE band levels is a legitimate read — 'new
+    mids' was judged OK at mid 0.12-0.13 and killed at 0.05; the gate is the
+    level, not the phrase."""
+    state = MusicState(audible=True)
+    state.bands = {"sub": 0.40, "low": 0.25, "mid": 0.13, "high": 0.15}
+
+    for line in (
+        "Let those new mids sit a few bars before you crowd the top end.",
+        "Keep this added brightness in check over the next phrase.",
+    ):
+        result = apply_live_claim_guard(line, state, event_type="PHASE")
+        assert result.policy != "spectral_claim_not_audible", line
