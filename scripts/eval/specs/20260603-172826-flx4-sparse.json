@@ -1,0 +1,17 @@
+{
+  "_comment": "Landmark-timed sparse FLX4 tape for corpus 20260603-172826 (675.9s real set: 100 gecs -> Hannah Diamond -> S3rl -> Stonebank). Gesture times sit on measured landmarks from the session's June-3 live events.jsonl (phrase boundaries 39.3/76.3, peak 308.6/364.3, track handover windows ~295/~455/~573). 6 gestures per 600s = one deliberate move per ~100s, vs the legacy tape's artifact density (6 gestures per 444s) the 2026-06-09 bench flagged.",
+  "tracks": [
+    [0.0, "100 gecs - dog food", 300.0],
+    [295.0, "Hannah Diamond - Concrete Angel", 165.0],
+    [455.0, "S3rl - All That I Need", 125.0],
+    [573.0, "Stonebank - Stronger", 103.0]
+  ],
+  "moves": [
+    { "kind": "eq_kill", "t": 78.0, "deck": "A", "band": "low", "hold": 5.0, "depth": 6 },
+    { "kind": "filter_sweep", "t": 120.0, "deck": "A", "dur": 6.0, "up_to": 104 },
+    { "kind": "transition", "t": 288.0, "dur": 16.0, "from_deck": "A", "to_deck": "B", "bass_swap": true },
+    { "kind": "eq_dip", "t": 380.0, "deck": "B", "band": "mid", "dur": 1.2, "to": 30, "restore_after": 4.0 },
+    { "kind": "transition", "t": 448.0, "dur": 14.0, "from_deck": "B", "to_deck": "A", "bass_swap": true },
+    { "kind": "transition", "t": 566.0, "dur": 12.0, "from_deck": "A", "to_deck": "B", "bass_swap": true }
+  ]
+}

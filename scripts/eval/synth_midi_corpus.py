@@ -26,6 +26,23 @@ Usage:
   python scripts/eval/synth_midi_corpus.py \
     --session "/path/to/recordings/20260603-112321" \
     --out /tmp/replay-corpus-midi
+
+With no ``--spec`` the legacy hardcoded script (timed against the rotated
+20260603-112321 audio) is emitted for back-compat. ``--spec spec.json`` builds
+the tape from a per-corpus landmark spec instead:
+
+  {"tracks": [[0.0, "Artist - Title", 312.0], ...],
+   "moves": [
+     {"kind": "transition", "t": 295.0, "dur": 18.0,
+      "from_deck": "A", "to_deck": "B", "bass_swap": true},
+     {"kind": "eq_kill",     "t": 80.0, "deck": "A", "band": "low",
+      "hold": 5.0, "depth": 6},
+     {"kind": "filter_sweep","t": 120.0, "deck": "A", "dur": 6.0, "up_to": 104},
+     {"kind": "eq_dip",      "t": 500.0, "deck": "B", "band": "mid",
+      "dur": 1.2, "to": 30, "restore_after": 4.0},
+     {"kind": "eq_lift",     "t": 360.0, "deck": "B", "band": "hi",
+      "dur": 2.0, "to": 92, "restore_after": 3.0}
+   ]}
 """
 
 from __future__ import annotations
@@ -129,9 +146,9 @@ def build_move_script() -> list[dict]:
     return rows
 
 
-def build_nowplaying_script() -> list[dict]:
+def build_nowplaying_script(tracks: list[tuple[float, str, float]] | None = None) -> list[dict]:
     rows = []
-    for ts, title, duration in _TRACKS:
+    for ts, title, duration in tracks if tracks is not None else _TRACKS:
         rows.append(
             {
                 "ts": ts,
@@ -144,7 +161,89 @@ def build_nowplaying_script() -> list[dict]:
     return rows
 
 
-def synthesize(session_dir: Path, out_root: Path, *, suffix: str = "FLX4") -> Path:
+_DECK_CH = {"A": _CH_DECK_A, "B": _CH_DECK_B}
+_EQ_CC = {"low": _CC_EQ_LOW, "mid": _CC_EQ_MID, "hi": _CC_EQ_HI}
+_FILTER_CC = {"A": _CC_FILTER_A, "B": _CC_FILTER_B}
+# Xfader rest position per live deck (matches the legacy script's endpoints).
+_XFADER_POS = {"A": 18, "B": 108}
+
+
+def build_move_script_from_spec(spec: dict) -> list[dict]:
+    """Convert a per-corpus landmark spec into CC rows (see module docstring).
+
+    The spec is gesture-level so the tape's density is an explicit, reviewable
+    choice — the legacy hardcoded script's 139 rows/444s fired MIX_MOVE at an
+    artifact density the 2026-06-09 bench flagged as unrealistic.
+    """
+    rows: list[dict] = []
+    # Opening state: deck A live, deck B silent, xfader on A.
+    rows.append(_cc(2.0, _CH_DECK_A, _CC_VOL, 110))
+    rows.append(_cc(2.2, _CH_DECK_B, _CC_VOL, 0))
+    rows.append(_cc(2.4, _CH_MIXER, _CC_XFADER, 18))
+
+    for mv in spec.get("moves", []):
+        kind = mv["kind"]
+        t = float(mv["t"])
+        if kind == "transition":
+            dur = float(mv.get("dur", 16.0))
+            src = _DECK_CH[mv["from_deck"]]
+            dst = _DECK_CH[mv["to_deck"]]
+            _ramp(rows, t0=t, t1=t + dur * 0.6, channel=dst, control=_CC_VOL, v0=0, v1=112, steps=12)
+            _ramp(
+                rows,
+                t0=t + dur * 0.2,
+                t1=t + dur * 0.7,
+                channel=_CH_MIXER,
+                control=_CC_XFADER,
+                v0=_XFADER_POS[mv["from_deck"]],
+                v1=_XFADER_POS[mv["to_deck"]],
+                steps=10,
+            )
+            _ramp(rows, t0=t + dur * 0.6, t1=t + dur, channel=src, control=_CC_VOL, v0=110, v1=6, steps=10)
+            if mv.get("bass_swap"):
+                mid = t + dur * 0.45
+                _ramp(rows, t0=mid, t1=mid + 1.5, channel=src, control=_CC_EQ_LOW, v0=64, v1=10, steps=6)
+                _ramp(rows, t0=mid + 0.5, t1=mid + 2.0, channel=dst, control=_CC_EQ_LOW, v0=20, v1=64, steps=6)
+        elif kind == "eq_kill":
+            ch = _DECK_CH[mv["deck"]]
+            cc = _EQ_CC[mv["band"]]
+            depth = int(mv.get("depth", 6))
+            hold = float(mv.get("hold", 5.0))
+            _ramp(rows, t0=t, t1=t + 1.2, channel=ch, control=cc, v0=64, v1=depth)
+            _ramp(rows, t0=t + 1.2 + hold, t1=t + 2.1 + hold, channel=ch, control=cc, v0=depth, v1=64, steps=6)
+        elif kind == "filter_sweep":
+            cc = _FILTER_CC[mv["deck"]]
+            dur = float(mv.get("dur", 6.0))
+            up_to = int(mv.get("up_to", 104))
+            _ramp(rows, t0=t, t1=t + dur / 2, channel=_CH_MIXER, control=cc, v0=64, v1=up_to, steps=10)
+            _ramp(rows, t0=t + dur / 2, t1=t + dur, channel=_CH_MIXER, control=cc, v0=up_to, v1=64, steps=10)
+        elif kind in ("eq_dip", "eq_lift"):
+            ch = _DECK_CH[mv["deck"]]
+            cc = _EQ_CC[mv["band"]]
+            dur = float(mv.get("dur", 1.2))
+            to = int(mv["to"])
+            restore_after = float(mv.get("restore_after", 4.0))
+            _ramp(rows, t0=t, t1=t + dur, channel=ch, control=cc, v0=64, v1=to, steps=6)
+            _ramp(
+                rows,
+                t0=t + dur + restore_after,
+                t1=t + dur + restore_after + 1.0,
+                channel=ch,
+                control=cc,
+                v0=to,
+                v1=64,
+                steps=6,
+            )
+        else:
+            raise SystemExit(f"unknown move kind in spec: {kind!r}")
+
+    rows.sort(key=lambda r: r["ts"])
+    return rows
+
+
+def synthesize(
+    session_dir: Path, out_root: Path, *, suffix: str = "FLX4", spec: dict | None = None
+) -> Path:
     session_dir = session_dir.expanduser().resolve()
     if not (session_dir / "input.wav").exists():
         raise SystemExit(f"not a replayable session (no input.wav): {session_dir}")
@@ -157,12 +256,15 @@ def synthesize(session_dir: Path, out_root: Path, *, suffix: str = "FLX4") -> Pa
             link.unlink()
         link.symlink_to(entry)
 
-    midi_rows = build_move_script()
+    midi_rows = build_move_script() if spec is None else build_move_script_from_spec(spec)
     with (out_session / "midi.jsonl").open("w", encoding="utf-8") as fh:
         for row in midi_rows:
             fh.write(json.dumps(row) + "\n")
 
-    np_rows = build_nowplaying_script()
+    tracks = None
+    if spec is not None:
+        tracks = [(float(ts), str(title), float(dur)) for ts, title, dur in spec["tracks"]]
+    np_rows = build_nowplaying_script(tracks)
     with (out_session / "nowplaying.jsonl").open("w", encoding="utf-8") as fh:
         for row in np_rows:
             fh.write(json.dumps(row) + "\n")
@@ -173,12 +275,19 @@ def synthesize(session_dir: Path, out_root: Path, *, suffix: str = "FLX4") -> Pa
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser = argparse.ArgumentParser(description="synthesize a MIDI+nowplaying replay corpus")
     parser.add_argument("--session", required=True, type=Path)
     parser.add_argument("--out", required=True, type=Path)
     parser.add_argument("--suffix", default="FLX4")
+    parser.add_argument(
+        "--spec",
+        type=Path,
+        default=None,
+        help="per-corpus landmark spec JSON (tracks + gesture-level moves); omit for the legacy 112321 tape",
+    )
     args = parser.parse_args()
-    synthesize(args.session, args.out, suffix=args.suffix)
+    spec = json.loads(args.spec.read_text(encoding="utf-8")) if args.spec else None
+    synthesize(args.session, args.out, suffix=args.suffix, spec=spec)
     return 0
 
 
