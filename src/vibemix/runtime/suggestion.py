@@ -41,6 +41,7 @@ from typing import Any
 from vibemix.intel.feedback import FeedbackEvent, parse_feedback_event
 from vibemix.library.next_suggestion import (
     annotate_transition_selection,
+    nearest_track_id_by_cosine,
     next_suggestion,
     prepared_target_candidate_payload,
     promote_transition_alternative,
@@ -104,6 +105,10 @@ class PreparedTarget:
     reason_prefix: str
     source: str
     strict: bool
+    # Receipt honesty: "exact" = the plan's literal next track; "reanchored" =
+    # the off-plan nearest-unplayed pool pick. Internal only — the wire payload
+    # carries the distinction through ``reason_prefix`` (the pill's why).
+    matched: str = "exact"
 
 
 def resolve_seed_context(state: Any) -> ResolvedSeed | None:
@@ -262,6 +267,11 @@ class SuggestionService:
         self._candidate_vector: Any | None = None
         self._candidate_vectors_by_track_id: dict[str, Any] = {}
         self._prepared_target_track_id: str | None = None
+        # Sticky off-plan re-anchor result, keyed to the seed that produced it.
+        # The refresh/broadcast edge reuses it instead of re-running the
+        # vector ranking (which is full-compute-path-only work).
+        self._reanchored_target: PreparedTarget | None = None
+        self._reanchored_seed_track_id: str | None = None
         self._pinned_candidate_track_id: str | None = None
         self._timing_suppressed_pairs: set[tuple[str, str]] = set()
         self._grade_progress: dict[str, Any] = _empty_grade_progress()
@@ -277,8 +287,18 @@ class SuggestionService:
         with self._lock:
             return self._current
 
-    def _prepared_target_for_seed(self, seed: ResolvedSeed) -> PreparedTarget | None:
-        """Return the strong deck target or soft saved-pool next target."""
+    def _prepared_target_for_seed(
+        self,
+        seed: ResolvedSeed,
+        *,
+        allow_reanchor: bool = False,
+    ) -> PreparedTarget | None:
+        """Return the strong deck target or soft saved-pool next target.
+
+        ``allow_reanchor`` is only set on the full-compute (executor) paths:
+        the off-plan re-anchor ranks pool vectors, and that work is banned on
+        the 0.75s refresh/broadcast edge (which keeps the default).
+        """
         if seed.target_track_id:
             return PreparedTarget(
                 track_id=seed.target_track_id,
@@ -298,7 +318,9 @@ class SuggestionService:
             return None
         target_id = next_track_id_after(pool, seed.track_id)
         if not target_id:
-            return None
+            # Off-plan: the exact plan pointer is dead. Without the re-anchor
+            # this killed the saved pool's influence for the rest of the set.
+            return self._reanchored_pool_target(pool, seed) if allow_reanchor else None
         try:
             if self._library.lookup_by_id(target_id) is None:
                 return None
@@ -311,6 +333,88 @@ class SuggestionService:
             source="prepared_pool",
             strict=False,
         )
+
+    def _reanchored_pool_target(
+        self,
+        pool: PreparedPool,
+        seed: ResolvedSeed,
+    ) -> PreparedTarget | None:
+        """Pick the nearest unplayed saved-pool track once the DJ leaves the plan.
+
+        Re-validates every persisted pool id against the LIVE library before it
+        may steer the grounding set (Invariant #2), then ranks the survivors
+        against the live seed vector in one ``vectors_for_track_ids`` pass. The
+        result rides the SAME soft ``source="prepared_pool"`` shape the exact
+        hit produces, so the engine still demands transition evidence
+        downstream. Exhausted pool / missing vectors → ``None`` (exactly the
+        pre-reanchor behavior).
+        """
+        with self._lock:
+            played = set(self._played)
+        candidate_ids: list[str] = []
+        for track in pool.tracks:
+            track_id = track.track_id
+            if not track_id or track_id == seed.track_id or track_id in played:
+                continue
+            if track_id in candidate_ids:
+                continue
+            try:
+                if self._library.lookup_by_id(track_id) is None:
+                    continue
+            except Exception as e:  # pragma: no cover — defensive
+                logger.warning("[suggestion] pool reanchor lookup failed: %s", e)
+                return None
+            candidate_ids.append(track_id)
+        if not candidate_ids:
+            return None
+        try:
+            vectors = vectors_for_track_ids(self._store, [seed.track_id, *candidate_ids])
+        except Exception as e:  # pragma: no cover — defensive
+            logger.warning("[suggestion] pool reanchor vectors failed: %s", e)
+            return None
+        seed_vector = vectors.get(seed.track_id)
+        if seed_vector is None:
+            return None
+        target_id = nearest_track_id_by_cosine(
+            seed_vector,
+            vectors,
+            ordered_track_ids=candidate_ids,
+        )
+        if target_id is None:
+            return None
+        return PreparedTarget(
+            track_id=target_id,
+            reason_prefix="closest in saved pool",
+            source="prepared_pool",
+            strict=False,
+            matched="reanchored",
+        )
+
+    def _full_compute_prepared_target(self, seed: ResolvedSeed) -> PreparedTarget | None:
+        """Resolve the prepared target with re-anchoring, caching the result.
+
+        Only the full-compute paths call this; the sticky copy lets the
+        refresh edge keep promoting an off-plan re-anchor without redoing its
+        vector ranking.
+        """
+        prepared = self._prepared_target_for_seed(seed, allow_reanchor=True)
+        with self._lock:
+            if prepared is not None and prepared.matched == "reanchored":
+                self._reanchored_target = prepared
+                self._reanchored_seed_track_id = seed.track_id
+            else:
+                self._reanchored_target = None
+                self._reanchored_seed_track_id = None
+        return prepared
+
+    def _sticky_reanchored_target(self, seed_track_id: str | None) -> PreparedTarget | None:
+        with self._lock:
+            if (
+                self._reanchored_target is not None
+                and self._reanchored_seed_track_id == seed_track_id
+            ):
+                return self._reanchored_target
+        return None
 
     def _prepared_target_for_context(self, seed: ResolvedSeed | None) -> str | None:
         if seed is None:
@@ -1126,7 +1230,7 @@ class SuggestionService:
 
     def compute_for_seed(self, seed: ResolvedSeed, timing: LiveTimingHint) -> dict | None:
         """Compute from already-resolved seed/timing facts."""
-        prepared = self._prepared_target_for_seed(seed)
+        prepared = self._full_compute_prepared_target(seed)
         return self.compute(
             seed.track_id,
             seed_camelot=seed.camelot,
@@ -1153,7 +1257,7 @@ class SuggestionService:
         if seed is None:
             return self.current()
         timing = resolve_live_timing(state)
-        prepared = self._prepared_target_for_seed(seed)
+        prepared = self._full_compute_prepared_target(seed)
         return self.compute(
             seed.track_id,
             seed_camelot=seed.camelot,
@@ -1221,6 +1325,8 @@ class SuggestionService:
                     self._candidate_vector = None
                     self._candidate_vectors_by_track_id = {}
                     self._prepared_target_track_id = None
+                    self._reanchored_target = None
+                    self._reanchored_seed_track_id = None
                     self._pinned_candidate_track_id = None
                     self._grade_progress = _empty_grade_progress(
                         _int_range(self._grade_progress.get("total_xp"), 0, 999_999, 0)
@@ -1241,6 +1347,11 @@ class SuggestionService:
 
         timing = resolve_live_timing(state)
         prepared = self._prepared_target_for_seed(seed)
+        if prepared is None:
+            # Off-plan re-anchoring is full-compute-path work; the refresh edge
+            # reuses the sticky result so the pick keeps its promotion without
+            # any vector ranking here.
+            prepared = self._sticky_reanchored_target(seed_track_id)
         prepared_target_track_id = prepared.track_id if prepared is not None else None
         alternatives = _coerce_transition_alternatives(current.get("transition_alternatives"))
         if alternatives:

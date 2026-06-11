@@ -327,6 +327,34 @@ def vectors_for_track_ids(store: LibraryStore, track_ids: list[str]) -> dict[str
     return _vectors_for_track_ids(store, track_ids)
 
 
+def nearest_track_id_by_cosine(
+    seed_vector: np.ndarray,
+    vectors_by_track_id: dict[str, np.ndarray],
+    *,
+    ordered_track_ids: list[str] | tuple[str, ...],
+) -> str | None:
+    """Rank a bounded id set against the seed; nearest grounded id wins.
+
+    This is the saved-pool re-anchor math: same uncentered cosine the
+    prepared-target option already scores with (mean-centering belongs to the
+    store search edge, not bounded prepared-target scoring), seed L2-normed to
+    match the engine's query path. Earlier ``ordered_track_ids`` win ties so a
+    saved plan's own ordering stays the deterministic tie-break; ids without a
+    vector are skipped and ``None`` means nothing was rankable.
+    """
+    qvec = l2_normalize(np.asarray(seed_vector, dtype=np.float32))
+    best_id: str | None = None
+    best_similarity = -2.0  # below any real cosine, so the first rankable id wins
+    for track_id in ordered_track_ids:
+        vector = vectors_by_track_id.get(track_id)
+        if vector is None:
+            continue
+        similarity = _cosine_similarity(qvec, vector)
+        if similarity > best_similarity:
+            best_id, best_similarity = track_id, similarity
+    return best_id
+
+
 def prepared_target_candidate_payload(
     store: LibraryStore,
     library: RekordboxLibrary,
@@ -962,6 +990,7 @@ __all__ = [
     "TRANSITION_ALTERNATIVE_LIMIT",
     "NextSuggestion",
     "annotate_transition_selection",
+    "nearest_track_id_by_cosine",
     "next_suggestion",
     "prepared_target_candidate_payload",
     "promote_transition_alternative",

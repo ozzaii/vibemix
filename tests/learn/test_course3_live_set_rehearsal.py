@@ -247,6 +247,11 @@ def test_course3_rehearsal_treats_off_pool_play_as_graceful_deviation() -> None:
 
     assert second is not None
     assert not second["why"].startswith("next in saved pool")
+    # Graceful deviation now also means the plan survives: the pool re-anchors
+    # to the nearest unplayed saved track (honest "closest in" receipt) instead
+    # of going dark for the rest of the set.
+    assert second["why"].startswith("closest in saved pool")
+    assert second["track_id"] == "b"
     assert envelope is not None
     assert envelope.current["active_track_id"] == "a"
-    assert envelope.current.get("prepared_target_track_id") is None
+    assert envelope.current.get("prepared_target_track_id") == "b"
