@@ -110,13 +110,16 @@ def build_toolset() -> Any:
 
 
 class _ToolTapProxy:
-    """Wrap a LibraryToolset so every handler call the MCP server makes also
-    appends a live tool-tape record (``LibraryToolset._emit_tool_event``).
+    """Route every MCP tool call through ``LibraryToolset.dispatch``.
 
-    The FastMCP tool wrappers in ``build_server`` call handlers DIRECTLY
-    (``toolset.search_vibe(...)``), bypassing ``dispatch()`` where the tape emit
-    lives. So the emit must happen here, the one chokepoint the Codex MCP path
-    actually flows through. Best-effort: a tape failure never breaks a tool call.
+    The FastMCP tool wrappers in ``build_server`` used to call handlers
+    DIRECTLY (``toolset.search_vibe(...)``) — which bypassed everything
+    ``dispatch()`` owns: the per-tool hard timeouts, the Phase-99 starvation
+    counter + terminal short-circuit, the freshness guard, and the live
+    tool-tape emit. The machinery existed but never protected real Codex runs.
+    Now any attribute named in the dispatch registry routes through
+    ``dispatch`` (one tape row per call lands there); non-tool callables
+    (e.g. ``seed_working_set``) pass straight to the toolset.
     """
 
     def __init__(self, inner: Any) -> None:
@@ -127,20 +130,17 @@ class _ToolTapProxy:
         attr = getattr(self._inner, name)
         if name.startswith("_") or not callable(attr):
             return attr
+        registry = getattr(self._inner, "_dispatch_handlers", None)
+        if not callable(registry) or name not in registry():
+            return attr
 
-        def _tapped(*args: Any, **kwargs: Any) -> Any:
-            guard = getattr(self._inner, "_freshness_guard_for_tool", None)
-            result = guard(name) if callable(guard) else None
-            if result is None:
-                result = attr(*args, **kwargs)
-            try:
-                tool_args = args[0] if args and isinstance(args[0], dict) else None
-                self._inner._emit_tool_event(name, result, tool_args)
-            except Exception:
-                pass
-            return result
+        def _dispatched(*args: Any, **kwargs: Any) -> Any:
+            # Every FastMCP wrapper passes exactly one positional dict; accept
+            # kwargs too so a future wrapper style cannot silently skip dispatch.
+            tool_args = args[0] if args and isinstance(args[0], dict) else dict(kwargs)
+            return self._inner.dispatch(name, tool_args)
 
-        return _tapped
+        return _dispatched
 
 
 def build_server(toolset: Any) -> Any:

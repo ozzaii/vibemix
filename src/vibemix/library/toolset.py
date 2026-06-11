@@ -1996,19 +1996,15 @@ class LibraryToolset:
             return not result.get("results")
         return False
 
-    def dispatch(self, name: str, args: dict[str, Any]) -> dict[str, Any]:
-        # ─── PHASE 99 HOOK (Plan 99-03 — terminal short-circuit) ─────────
-        # Once the threshold has tripped (the ``stop_reason`` attr is set),
-        # the run is TERMINAL. Every subsequent ``dispatch()`` call returns
-        # the same idempotent terminal echo WITHOUT invoking any handler —
-        # which is why the counter freezes at threshold (the ``else``
-        # counter-reset branch below is unreachable after a trip). The
-        # shallow copy prevents callers from mutating the internal payload
-        # (RESEARCH.md Open Q2).
-        if self.stop_reason is not None:
-            return {"error": "tool_starvation", "stop_reason": dict(self.stop_reason)}
+    def _dispatch_handlers(self) -> dict[str, Callable[[dict[str, Any]], dict[str, Any]]]:
+        """The single source of truth for dispatchable tools.
 
-        handlers: dict[str, Callable[[dict[str, Any]], dict[str, Any]]] = {
+        ``dispatch()`` resolves handlers here, and ``mcp_server._ToolTapProxy``
+        consults the same registry to decide which attribute accesses route
+        through ``dispatch`` (tools) versus pass straight to the toolset
+        (everything else, e.g. ``seed_working_set``). One registry, zero drift.
+        """
+        return {
             "search_vibe": self.search_vibe,
             "get_track_features": self.get_track_features,
             "get_track_sections": self.get_track_sections,
@@ -2029,7 +2025,20 @@ class LibraryToolset:
             "request_clarification": self.request_clarification,
             "retrieve_dj_knowledge": self.retrieve_dj_knowledge,
         }
-        handler = handlers.get(name)
+
+    def dispatch(self, name: str, args: dict[str, Any]) -> dict[str, Any]:
+        # ─── PHASE 99 HOOK (Plan 99-03 — terminal short-circuit) ─────────
+        # Once the threshold has tripped (the ``stop_reason`` attr is set),
+        # the run is TERMINAL. Every subsequent ``dispatch()`` call returns
+        # the same idempotent terminal echo WITHOUT invoking any handler —
+        # which is why the counter freezes at threshold (the ``else``
+        # counter-reset branch below is unreachable after a trip). The
+        # shallow copy prevents callers from mutating the internal payload
+        # (RESEARCH.md Open Q2).
+        if self.stop_reason is not None:
+            return {"error": "tool_starvation", "stop_reason": dict(self.stop_reason)}
+
+        handler = self._dispatch_handlers().get(name)
         if handler is None:
             return {"error": f"unknown tool {name!r}"}
         freshness_block = self._freshness_guard_for_tool(name)
