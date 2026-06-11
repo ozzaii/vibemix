@@ -846,7 +846,7 @@ const LAYOUT_CSS = `
     content: "";
     width: 32px;
     height: 1px;
-    background: var(--brand-22);
+    background: var(--silk-12);
   }
   .vmx-voice__readout .vmx-read { min-width: 0; }
   .vmx-voice__readout .vmx-read + .vmx-read::before {
@@ -906,6 +906,29 @@ const LAYOUT_CSS = `
   }
   .vmx-now[data-arrived="true"] { animation: vmx-rise 400ms var(--ease-brand); }
   @keyframes vmx-rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+  /* THE TAIL CURSOR — the deck's single sign-of-life while live (DESIGN §6):
+   * a small rose block at the end of the spoken line, an eased fade on the
+   * LED-pulse cadence. Promised by the presence grammar, never rendered on
+   * the product surface until now. Silent mode hands the breath to the foot
+   * meter; fault extinguishes it; reduced motion holds it steady-on. */
+  .vmx-now::after {
+    content: "";
+    display: inline-block;
+    width: 0.24em;
+    height: 0.68em;
+    margin-left: 0.18em;
+    vertical-align: -0.04em;
+    border-radius: 1px;
+    background: var(--brand);
+    box-shadow: 0 0 12px var(--brand-40);
+    animation: vmx-tail var(--motion-led-pulse) var(--ease-brand) infinite;
+  }
+  .vmx-session[data-mode="silent"] .vmx-now::after,
+  .vmx-session[data-mode="fault"] .vmx-now::after { display: none; }
+  @keyframes vmx-tail { 0%, 100% { opacity: 1; } 55% { opacity: 0.22; } }
+  @media (prefers-reduced-motion: reduce) {
+    .vmx-now::after { animation: none; opacity: 0.85; }
+  }
 
   /* THE RECEIPT — rule draws L→R, cite ignites at its terminus [signature] */
   .vmx-receipt {
