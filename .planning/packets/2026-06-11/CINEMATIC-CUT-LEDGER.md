@@ -67,3 +67,32 @@ Captures: `cinematic-cut/` (00/01 = before; 20/21/30/31/40/50/61 = after).
 - **Learn surface** — graded by token sweep only; full pass parked with the Learn
   redesign milestone.
 - **Live-verify lane** — packaged-app eyeball of the new grade (browser-verified only).
+
+
+## ROUND 2 (same session, post-R1)
+
+5 more commits, all gates green at each step (final: suite 1641+1 todo — 8 fewer =
+deleted dead tests; build green):
+
+| Commit | Unit |
+|---|---|
+| `4cd7e855` | **WIZARD INTERIOR joins the stage** — primary-panel card deleted (was re-carded by the 06-10 pass against its own docstring); step titles speak serif at the mid register (clamp 30-40px lowercase); ordinals engraved; hover union de-haloed; skill rows: rest on hairlines, selected is the LIT KEY |
+| `eed60035` | **THE TAIL CURSOR finally breathes** — DESIGN §6's promised single sign-of-life now renders on the product surface: a rose block riding the end of the spoken line on the 1400ms LED pulse; silent hands the breath to the foot meter, fault extinguishes, reduced-motion steady-on. Scene-line rose lead-in demoted to silk in exchange |
+| `7b31e5e9` | **Middle register** — drawer title serif 20px lowercase (rose heartbeat dot died), morning-mirror 20→28px + eyebrow de-rosed; dead mode-picker.{ts,test.ts} deleted (zero consumers) |
+| `d7d60846` | **Tracking-by-case + lips** — 5 uppercase-at-0.04em → 0.08em; wizard statusbar lip → 0.07 chrome standard; DebriefDock proof terms de-rosed |
+
+Final captures: cinematic-9x-final-*.png (intro / skill / armed / live-with-breath / drawer).
+
+## R2 CLOSE — externally gated leftovers
+
+- **Kaan's eye** — the round was driven by his live verdicts; the next correction is his.
+- **Packaged-app live-verify** — all verification was browser/dev-server; the DMG eyeball
+  (grain/blur/vibrancy under WebView) needs a packaged build.
+- **Other session's WIP** — library/index.ts (Viber), mascot/** untouched by contract.
+- **Learn full pass** — parked with the Learn redesign milestone (Kaan's call).
+- **wdth no-op sweep** (74 font-variation-settings no-ops) — pure hygiene, zero visual
+  delta (Geist has no width axis); fold into any future type pass.
+- **panel.ts dead recipe** — still imported by tests/session/components.spec.ts (other
+  sessions touch that spec); delete pair together in a quiet window.
+- **shell.css surfaces** (DesktopShell sidebar/palette) — graded via tokens + wordmark
+  fix only; not the product-mounted surface (shell.html is a dev harness).
