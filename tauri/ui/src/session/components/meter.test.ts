@@ -58,14 +58,13 @@ describe("meter — VIS-03 contract", () => {
     for (let i = 14; i <= 16; i++) expect(byIndex.get(i)).toBe("clip");
   });
 
-  test("3 — amber ladder: safe+warm amber (dim→bright), clip magenta only", () => {
-    // One-Amber restored (2026-05-26 /impeccable critique). The ladder is
-    // a single amber that brightens with level — safe is a dim amber
-    // (--amber-78 → --amber-40), warm is full amber (--amber → --amber-78).
-    // Magenta (--meter-clip-*) is reserved for the clip zone ONLY, so
-    // colour appears exactly when the signal is wrong. Regressing safe
-    // back to a green family (--meter-safe-*) would reintroduce the
-    // polychrome ladder that competed with amber's rare-deck-light meaning.
+  test("3 — hardware VU: level silk, heat gold, clip the fault lamp", () => {
+    // Real-hardware vocabulary (2026-06-11 cinematic cut): LEVEL is neutral
+    // silk light (rose is the sign-of-life, never a level unit), HEAT is
+    // gold (the one sanctioned warm numeric lane, DESIGN Gold-Is-
+    // Quarantined), CLIP is the fault lamp. Regressing safe/warm back to
+    // the rose family would make the most-glanced surface pulse pink on
+    // every beat; the old magenta clip was off-palette entirely.
     const css = _CSS_FOR_TEST;
     const safe = css.match(
       /\.vmx-meter__seg\[data-zone="safe"\]\[data-lit="true"\]\s*\{[^}]*\}/,
@@ -79,22 +78,23 @@ describe("meter — VIS-03 contract", () => {
     expect(safe).not.toBeNull();
     expect(warm).not.toBeNull();
     expect(clip).not.toBeNull();
-    // Safe + warm are both amber (dim vs bright).
-    expect(safe![0]).toMatch(/var\(--amber-78\)/);
-    expect(safe![0]).toMatch(/var\(--amber-40\)/);
-    expect(warm![0]).toMatch(/var\(--amber\)/);
-    expect(warm![0]).toMatch(/var\(--amber-78\)/);
-    // Clip is the only magenta zone.
-    expect(clip![0]).toMatch(/var\(--meter-clip\)/);
-    expect(clip![0]).toMatch(/var\(--meter-clip-deep-85\)/);
-    expect(clip![0]).toMatch(/var\(--meter-clip-glow\)/);
-    // Leak guards — no green family anywhere; magenta confined to clip;
-    // clip stays pure magenta (no amber).
-    expect(safe![0]).not.toMatch(/var\(--meter-safe/);
-    expect(warm![0]).not.toMatch(/var\(--meter-safe/);
-    expect(safe![0]).not.toMatch(/var\(--meter-clip/);
-    expect(warm![0]).not.toMatch(/var\(--meter-clip/);
-    expect(clip![0]).not.toMatch(/var\(--amber/);
+    // Level is neutral silk (dim -> bright).
+    expect(safe![0]).toMatch(/var\(--silk-65\)/);
+    expect(safe![0]).toMatch(/var\(--silk-40\)/);
+    // Heat is gold.
+    expect(warm![0]).toMatch(/var\(--gold\)/);
+    expect(warm![0]).toMatch(/var\(--gold-soft\)/);
+    // Clip is the fault lamp.
+    expect(clip![0]).toMatch(/var\(--led-fault\)/);
+    expect(clip![0]).toMatch(/var\(--danger-58\)/);
+    // Leak guards — no rose in any zone (the deck's rose belongs to the
+    // voice); no green family; no off-palette magenta anywhere.
+    expect(safe![0]).not.toMatch(/var\(--amber|var\(--brand/);
+    expect(warm![0]).not.toMatch(/var\(--amber|var\(--brand/);
+    expect(clip![0]).not.toMatch(/var\(--amber|var\(--brand/);
+    expect(safe![0]).not.toMatch(/var\(--meter-safe|var\(--meter-clip/);
+    expect(warm![0]).not.toMatch(/var\(--meter-safe|var\(--meter-clip/);
+    expect(clip![0]).not.toMatch(/var\(--meter-clip/);
     // No leftover segment-5 zone-boundary hairline — the brightness step
     // between safe and warm is the marker now.
     expect(css).not.toMatch(/\.vmx-meter__seg\[data-index="5"\]::after/);

@@ -105,7 +105,7 @@ const CSS = `
     grid-template-columns: 86px minmax(0, 1fr);
     gap: var(--sp-3);
     padding-top: var(--sp-2);
-    box-shadow: inset 0 1px 0 rgba(255, 222, 242, 0.046);
+    box-shadow: inset 0 1px 0 rgba(246, 243, 245, 0.046);
   }
   .debrief-dock__proof-row dt {
     margin: 0;
@@ -260,7 +260,7 @@ const CSS = `
     padding-top: var(--sp-3);
     /* One machined seam seats the three readouts like a spec line, instead of
      * three boxed cells stacked under the payback pairs. */
-    box-shadow: inset 0 1px 0 rgba(255, 222, 242, 0.06);
+    box-shadow: inset 0 1px 0 rgba(246, 243, 245, 0.06);
   }
   .debrief-dock__readiness-metric {
     min-width: 0;
@@ -402,7 +402,7 @@ const CSS = `
     letter-spacing: 0.18em;
     text-transform: uppercase;
     text-shadow: 0 0 6px var(--brand-22);
-    box-shadow: inset 0 1px 0 rgba(255, 222, 242, 0.10);
+    box-shadow: inset 0 1px 0 rgba(246, 243, 245, 0.10);
   }
   .debrief-dock__open:disabled {
     cursor: not-allowed;

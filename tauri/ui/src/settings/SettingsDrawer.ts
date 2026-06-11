@@ -128,7 +128,7 @@ const CSS = `
      * room's one rose key-light as it floats over the live stage. */
     background:
       linear-gradient(115deg, var(--brand-08), transparent 34%),
-      linear-gradient(180deg, rgba(255, 222, 242, 0.042), transparent 20%, rgba(0, 0, 0, 0.20) 100%),
+      linear-gradient(180deg, rgba(246, 243, 245, 0.042), transparent 20%, rgba(0, 0, 0, 0.20) 100%),
       rgba(34, 29, 32, 0.82);
     backdrop-filter: blur(26px) saturate(1.12);
     -webkit-backdrop-filter: blur(26px) saturate(1.12);
@@ -193,7 +193,7 @@ const CSS = `
      * a darker base, a top lip catching light, a hard floor, and a real ambient
      * drop so the header reads as a raised crown above the scrolling body. */
     background:
-      linear-gradient(180deg, rgba(255, 222, 242, 0.040), transparent 52%),
+      linear-gradient(180deg, rgba(246, 243, 245, 0.040), transparent 52%),
       linear-gradient(180deg, var(--void-12) 0%, var(--void-5) 100%),
       rgba(0, 0, 0, 0.42);
     box-shadow:
@@ -276,7 +276,7 @@ const CSS = `
     border-radius: var(--rad-sm);
     /* Tactile machined key — a milled cap with a top lip + recessed floor. */
     background:
-      linear-gradient(180deg, rgba(255, 222, 242, 0.05), transparent 50%),
+      linear-gradient(180deg, rgba(246, 243, 245, 0.05), transparent 50%),
       linear-gradient(180deg, var(--void-15) 0%, var(--void-5) 100%);
     border: 0;
     color: var(--text-tertiary);
@@ -300,7 +300,7 @@ const CSS = `
     transform: scale(0.94);
     box-shadow:
       inset 0 2px 5px rgba(0, 0, 0, 0.50),
-      inset 0 -1px 0 rgba(255, 222, 242, 0.04);
+      inset 0 -1px 0 rgba(246, 243, 245, 0.04);
   }
   .vmx-settings-drawer__close svg {
     width: 14px;
@@ -363,7 +363,7 @@ const CSS = `
     line-height: 1;
     text-shadow: var(--text-emboss);
     box-shadow:
-      inset 0 1px 0 rgba(255, 222, 242, 0.10),
+      inset 0 1px 0 rgba(246, 243, 245, 0.10),
       inset 0 -1px 0 rgba(0, 0, 0, 0.40),
       inset 0 0 16px var(--brand-06),
       0 1px 0 rgba(255, 255, 255, 0.03),
@@ -396,7 +396,7 @@ const CSS = `
     background: linear-gradient(180deg, var(--brand-22) 0%, var(--brand-06) 100%);
     filter: brightness(1.08);
     box-shadow:
-      inset 0 1px 0 rgba(255, 222, 242, 0.12),
+      inset 0 1px 0 rgba(246, 243, 245, 0.12),
       inset 0 -1px 0 rgba(0, 0, 0, 0.40),
       inset 0 0 16px var(--brand-10),
       var(--glow-soft);
@@ -405,7 +405,7 @@ const CSS = `
     filter: brightness(0.96);
     box-shadow:
       inset 0 2px 5px rgba(0, 0, 0, 0.50),
-      inset 0 -1px 0 rgba(255, 222, 242, 0.04);
+      inset 0 -1px 0 rgba(246, 243, 245, 0.04);
   }
   /* Surface-wide tactility contract — broad interactive union. Hover is
    * INTERIOR light only (the key's face catches the room): the old

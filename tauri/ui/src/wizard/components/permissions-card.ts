@@ -55,7 +55,7 @@ const CSS = `
     inset: 0;
     pointer-events: none;
     background:
-      repeating-linear-gradient(90deg, transparent 0 43px, rgba(255, 222, 242, 0.016) 43px 44px),
+      repeating-linear-gradient(90deg, transparent 0 43px, rgba(246, 243, 245, 0.016) 43px 44px),
       linear-gradient(90deg, transparent, var(--brand-06), transparent);
     opacity: 0.7;
     mask-image: linear-gradient(90deg, black 0%, black 88%, transparent 100%);

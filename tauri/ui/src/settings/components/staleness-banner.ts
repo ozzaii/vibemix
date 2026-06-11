@@ -39,7 +39,7 @@ registerStyle(
       linear-gradient(180deg, var(--brand-08), transparent 60%),
       rgba(0, 0, 0, 0.18);
     box-shadow:
-      inset 0 1px 0 rgba(255, 222, 242, 0.05),
+      inset 0 1px 0 rgba(246, 243, 245, 0.05),
       inset 0 -1px 0 rgba(0, 0, 0, 0.4);
   }
   .vmx-staleness-banner.hidden { display: none; }

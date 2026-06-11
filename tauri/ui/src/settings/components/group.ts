@@ -39,7 +39,7 @@ const CSS = `
     border-radius: var(--rad-sm);
     border: 0;
     background:
-      linear-gradient(180deg, rgba(255, 222, 242, 0.032) 0%, transparent 18%, rgba(0, 0, 0, 0.20) 100%),
+      linear-gradient(180deg, rgba(246, 243, 245, 0.032) 0%, transparent 18%, rgba(0, 0, 0, 0.20) 100%),
       rgba(48, 42, 46, 0.50);
     box-shadow:
       var(--bevel-raised),
@@ -70,7 +70,7 @@ const CSS = `
     line-height: 1;
     text-shadow: var(--text-emboss);
     background:
-      linear-gradient(180deg, rgba(255, 222, 242, 0.016) 0%, transparent 62%),
+      linear-gradient(180deg, rgba(246, 243, 245, 0.016) 0%, transparent 62%),
       rgba(0, 0, 0, 0.13);
     box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.26);
   }
@@ -120,8 +120,8 @@ const CSS = `
     gap: 12px;
     background:
       linear-gradient(180deg, rgba(0, 0, 0, 0.12) 0%, transparent 34%),
-      linear-gradient(90deg, rgba(255, 222, 242, 0.018), transparent 28%);
-    box-shadow: inset 0 1px 0 rgba(255, 222, 242, 0.030);
+      linear-gradient(90deg, rgba(246, 243, 245, 0.018), transparent 28%);
+    box-shadow: inset 0 1px 0 rgba(246, 243, 245, 0.030);
   }
   /* Mono numerics inside any group read in warm ink, tabular — the hardware
    * readout vocabulary (gold stays quarantined to Camelot/heat/energy). */

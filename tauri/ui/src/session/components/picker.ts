@@ -52,7 +52,7 @@ const CSS = `
     height: 42px;
     padding: 0 12px 0 10px;
     background:
-      linear-gradient(180deg, rgba(255, 222, 242, 0.020), transparent 58%),
+      linear-gradient(180deg, rgba(246, 243, 245, 0.020), transparent 58%),
       var(--glass-2);
     backdrop-filter: var(--blur-glass-display);
     -webkit-backdrop-filter: var(--blur-glass-display);

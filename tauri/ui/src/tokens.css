@@ -833,7 +833,7 @@ button[disabled] { cursor: not-allowed; }
   -webkit-backdrop-filter: var(--blur-glass-light);
   border-top: 1px solid var(--glass-edge);
   box-shadow:
-    inset 0 1px 0 rgba(255, 220, 240, 0.045),
+    inset 0 1px 0 rgba(246, 243, 245, 0.045),
     0 -10px 26px rgba(0, 0, 0, 0.24);
 }
 
@@ -901,7 +901,7 @@ button[disabled] { cursor: not-allowed; }
   color: var(--brand);
   background: linear-gradient(180deg, var(--brand-16) 0%, var(--brand-04) 100%);
   box-shadow:
-    inset 0 1px 0 rgba(255, 220, 240, 0.06),
+    inset 0 1px 0 rgba(246, 243, 245, 0.06),
     inset 0 -1px 0 var(--brand-40),
     inset 0 0 14px var(--brand-22),
     0 0 0 1px var(--brand-12);

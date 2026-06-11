@@ -137,7 +137,7 @@ function drawCachedDeck(
     ctx.fillRect(start, 0, Math.max(1, end - start), STRIP_HEIGHT);
   }
 
-  ctx.strokeStyle = "rgba(255, 220, 240, 0.11)";
+  ctx.strokeStyle = "rgba(246, 243, 245, 0.11)";
   ctx.lineWidth = 1;
   const beatCount = Math.floor(deck.duration_s / Math.max(0.001, beatIntervalS));
   for (let beat = 0; beat <= beatCount; beat += 4) {

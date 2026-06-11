@@ -39,7 +39,7 @@ const CSS = `
     align-items: stretch;
     gap: 0;
     background:
-      linear-gradient(180deg, rgba(255, 222, 242, 0.018), transparent 60%),
+      linear-gradient(180deg, rgba(246, 243, 245, 0.018), transparent 60%),
       var(--glass-3);
     border: 1px solid var(--border-subtle);
     border-radius: var(--rad-sm);

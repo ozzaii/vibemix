@@ -268,7 +268,7 @@ const LAYOUT_CSS = `
      * The old double wash (center glow + floor rose) fought --scene-lit and
      * flattened the room back toward grey. */
     background:
-      radial-gradient(72% 56% at 38% 56%, rgba(255, 222, 242, 0.020), transparent 64%);
+      radial-gradient(72% 56% at 38% 56%, rgba(246, 243, 245, 0.020), transparent 64%);
   }
   .vmx-deck {
     position: relative;
@@ -1059,22 +1059,23 @@ const LAYOUT_CSS = `
      * De-carded so only the voice slab is a lit surface (impeccable layout). */
     padding: 12px 2px 2px;
     border-top: 0;
-    box-shadow: inset 0 1px 0 rgba(255, 222, 242, 0.052);
+    box-shadow: inset 0 1px 0 rgba(246, 243, 245, 0.052);
   }
   .vmx-read { display: flex; align-items: baseline; gap: var(--sp-2); min-width: 0; overflow: visible; white-space: nowrap; }
   .vmx-read[hidden] { display: none; }
   .vmx-read[data-readout="bpm"] { min-width: 9ch; }
   .vmx-read[data-readout="key"] { min-width: 6ch; }
-  /* The now-playing read: a real track name is prose, not telemetry — body
-   * face, sentence case, ellipsized; the dim mono "now" key stays the label. */
+  /* The now-playing read is the LEAD TRACK NAME — the contract gives lead
+   * track names the serif voice (the one warm human note), at the mid
+   * register the surface was missing. Ellipsized prose, never telemetry. */
   .vmx-read[data-readout="track"] { min-width: 0; }
   .vmx-read[data-readout="track"] .vmx-read__num {
-    font-family: var(--type-body);
-    font-weight: 500;
-    font-size: 13px;
+    font-family: var(--type-serif);
+    font-weight: 400;
+    font-size: var(--type-step-2);
     letter-spacing: 0;
     text-transform: none;
-    color: var(--text-secondary);
+    color: var(--text-primary);
     min-width: 0;
     max-width: 34ch;
     overflow: hidden;
@@ -1087,8 +1088,9 @@ const LAYOUT_CSS = `
     color: var(--text-disabled);
   }
   /* Scene-line values: one mono scale, tracked like the mock's "130 bpm · 8A".
-   * BPM reads in quiet ink; KEY ignites in brand — the harmonic fact is the
-   * one the co-host acts on, so it carries the single accent (by hue, small). */
+   * BPM reads in quiet ink; KEY reads in GOLD — Camelot/heat numerics are the
+   * one sanctioned warm lane (DESIGN Gold-Is-Quarantined), and rose stays
+   * reserved for the living things. */
   .vmx-read__num {
     font-family: var(--type-mono); font-weight: 700; font-size: 13px; letter-spacing: 0.06em;
     font-variant-numeric: tabular-nums;
@@ -1098,7 +1100,7 @@ const LAYOUT_CSS = `
   }
   .vmx-read__key {
     font-family: var(--type-mono); font-weight: 700; font-size: 13px; letter-spacing: 0.06em;
-    color: var(--brand); transition: color 700ms ease-out;
+    color: var(--gold); transition: color 700ms ease-out;
     display: inline-block; min-width: 4ch; overflow: visible;
     text-shadow: var(--text-emboss);
   }

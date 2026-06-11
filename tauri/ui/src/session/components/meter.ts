@@ -105,23 +105,26 @@ const CSS = `
     opacity: 1;
     box-shadow: none;
   }
+  /* Real-hardware VU vocabulary (2026-06-11): LEVEL is neutral silk light,
+   * HEAT is gold (the sanctioned warm numeric lane), CLIP is the fault
+   * lamp. The old rose body made the most-glanced surface pulse pink on
+   * every beat — rose is the sign-of-life, not a level unit; the magenta
+   * clip was off-palette entirely. */
   .vmx-meter__seg[data-zone="safe"][data-lit="true"] {
-    background: linear-gradient(180deg, var(--amber-78), var(--amber-40));
-    box-shadow:
-      inset 0 0 0 0.5px var(--seg-hi-15),
-      0 0 3px var(--amber-22);
+    background: linear-gradient(180deg, var(--silk-65), var(--silk-40));
+    box-shadow: inset 0 0 0 0.5px var(--seg-hi-15);
   }
   .vmx-meter__seg[data-zone="warm"][data-lit="true"] {
-    background: linear-gradient(180deg, var(--amber), var(--amber-78));
+    background: linear-gradient(180deg, var(--gold), var(--gold-soft));
     box-shadow:
       inset 0 0 0 0.5px var(--seg-hi-12),
-      0 0 4px var(--amber-40);
+      0 0 3px var(--gold-glow);
   }
   .vmx-meter__seg[data-zone="clip"][data-lit="true"] {
-    background: linear-gradient(180deg, var(--meter-clip), var(--meter-clip-deep-85));
+    background: linear-gradient(180deg, var(--led-fault), var(--danger-58));
     box-shadow:
       inset 0 0 0 0.5px var(--seg-hi-18),
-      var(--meter-clip-glow);
+      0 0 4px var(--danger-58);
   }
   /* Faint scale tick on every fourth segment — reads as machined
    * detail on the bezel, never competes with lit segments. VIS-03
