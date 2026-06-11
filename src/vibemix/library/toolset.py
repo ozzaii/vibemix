@@ -185,6 +185,17 @@ class LibraryToolset:
         # reuse the built prototype table.
         self._genre_lookup: Any | None = None
         self._genre_lookup_lock = threading.Lock()
+        # Taste plumb: consent-gated role-pair taste scores from the SAME local
+        # feedback store the live pill reads (app_data_dir()/taste_feedback.jsonl,
+        # mirroring __main__'s _load_live_taste_scores). Loaded lazily on first
+        # transition_slate and cached for the whole run — one disk read per
+        # toolset instance. Consent OFF / empty store / any read failure caches
+        # None, which leaves the scorer's taste component at its flat 0.50
+        # default — byte-identical to the unwired behavior, so receipts never
+        # imply a taste signal that does not exist.
+        self._taste_scores: dict[tuple[str, str], float] | None = None
+        self._taste_scores_loaded = False
+        self._taste_scores_lock = threading.Lock()
 
     def _resolve_knowledge_embedder(self, store: Any) -> tuple[Any | None, str | None]:
         """Return the text embedder for DJ-knowledge retrieval.
@@ -434,6 +445,43 @@ class LibraryToolset:
             out["note"] = f"truncated to first {MAX_INSPECT_CANDIDATES} track_ids"
         return out
 
+    def _taste_scores_for_run(self) -> dict[tuple[str, str], float] | None:
+        """Return cached consent-gated taste scores (the live pill's source).
+
+        Fail-soft on every hop: a consent-read or store-parse failure degrades
+        to None (flat taste) — handlers must return, never raise. The lock
+        keeps "one disk read per run" true even if a concurrent dispatch races
+        the first load (the `_genre_lookup_lock` idiom).
+        """
+        with self._taste_scores_lock:
+            if self._taste_scores_loaded:
+                return self._taste_scores
+            self._taste_scores_loaded = True
+            try:
+                from vibemix.profile import load_consent
+
+                consent = bool(load_consent())
+            except Exception as e:
+                logger.warning("[viber] taste consent read skipped: %s", e)
+                return None
+            if not consent:
+                return None
+            try:
+                from vibemix.intel.taste_model import load_taste_model
+                from vibemix.runtime.config_store import app_data_dir
+
+                model = load_taste_model(
+                    app_data_dir() / "taste_feedback.jsonl",
+                    profile_consent=consent,
+                )
+            except Exception as e:
+                logger.warning("[viber] taste disabled: %s", e)
+                return None
+            # Role-pair keyed weights only — no track ids ride in, so nothing
+            # here can reach the seen-set / grounding spine (Invariant #2).
+            self._taste_scores = model.taste_scores() or None
+            return self._taste_scores
+
     def transition_slate(self, args: dict[str, Any]) -> dict[str, Any]:
         """Issue deterministic section-to-section transition candidates.
 
@@ -514,6 +562,7 @@ class LibraryToolset:
                     else None,
                     live_position=live_position,
                     mode=mode,
+                    taste_scores=self._taste_scores_for_run(),
                 ),
                 max_candidates=max_candidates,
             )
