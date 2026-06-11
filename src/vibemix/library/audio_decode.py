@@ -42,19 +42,46 @@ def _frame_to_float_mono(frame) -> np.ndarray:
     return mono.mean(axis=1).astype(np.float32, copy=False)
 
 
-def load_audio_mono(path: str | Path, *, target_sr: int) -> np.ndarray:
+def load_audio_mono(
+    path: str | Path,
+    *,
+    target_sr: int,
+    offset_s: float = 0.0,
+    duration_s: float | None = None,
+) -> np.ndarray:
     """Decode an audio file to mono float32 at ``target_sr``.
 
     PyAV rides on FFmpeg, so this covers common DJ library files (mp3/m4a/wav/
     flac/aiff) without pulling librosa, numba, llvmlite, or scikit-learn into
     the frozen sidecar.
+
+    ``offset_s``/``duration_s`` slice ``[offset_s, offset_s + duration_s)`` with
+    ffmpeg's accurate ``-ss`` output-seek semantics: a keyframe seek lands at or
+    before the offset, then the first decoded frame's timestamp anchors a
+    sample-precise trim of the overshoot. This is the packaged-app replacement
+    for the retired ffmpeg-binary window slicers (no subprocess, no system
+    ffmpeg). A slice that reaches past end-of-file returns the shorter honest
+    tail; a slice entirely past EOF raises :class:`AudioDecodeError`.
     """
     try:
         import av
     except ImportError as exc:  # pragma: no cover - packaging/runtime drift
         raise AudioDecodeError(f"missing runtime dependency: {exc}") from exc
 
+    offset = max(0.0, float(offset_s))
+    limit_samples: int | None = None
+    if duration_s is not None:
+        limit_samples = int(round(max(0.0, float(duration_s)) * int(target_sr)))
+        if limit_samples == 0:
+            raise AudioDecodeError(f"empty slice requested from {path!s}")
+
     decoded: list[np.ndarray] = []
+    total = 0
+    # Actual decode-start time on the source timeline. 0.0 when reading from
+    # the top; after a seek it is the first decoded frame's timestamp, which
+    # is what makes the post-decode trim precise instead of keyframe-coarse.
+    anchor_s: float | None = 0.0
+    stop_at: int | None = None  # decoded-sample count at which the slice is full
     try:
         resampler = av.audio.resampler.AudioResampler(
             format="flt",
@@ -62,22 +89,76 @@ def load_audio_mono(path: str | Path, *, target_sr: int) -> np.ndarray:
             rate=int(target_sr),
         )
         with av.open(str(Path(path).expanduser())) as container:
+            if offset > 0.0:
+                anchor_s = None  # resolved from the first post-seek frame
+                stream = container.streams.audio[0]
+                try:
+                    if stream.time_base is not None:
+                        container.seek(int(offset / stream.time_base), stream=stream)
+                    else:  # pragma: no cover - container without a time base
+                        container.seek(int(offset / av.time_base))
+                except Exception:
+                    # Unseekable container — decode from the top and trim; the
+                    # result is identical, just slower.
+                    anchor_s = 0.0
             for frame in container.decode(audio=0):
+                if anchor_s is None:
+                    # Degenerate timestamp-less frame after a seek: assume the
+                    # seek landed exactly at the request (best available truth).
+                    anchor_s = float(frame.time) if frame.time is not None else offset
+                if stop_at is None and limit_samples is not None:
+                    skip = max(0, int(round((offset - anchor_s) * int(target_sr))))
+                    stop_at = skip + limit_samples
                 for out in resampler.resample(frame):
                     mono = _frame_to_float_mono(out)
                     if mono.size:
                         decoded.append(mono)
-            for out in resampler.resample(None):
-                mono = _frame_to_float_mono(out)
-                if mono.size:
-                    decoded.append(mono)
+                        total += mono.size
+                if stop_at is not None and total >= stop_at:
+                    break
+            if stop_at is None or total < stop_at:
+                for out in resampler.resample(None):
+                    mono = _frame_to_float_mono(out)
+                    if mono.size:
+                        decoded.append(mono)
     except Exception as exc:  # pragma: no cover - bad file/codec dependent
         raise AudioDecodeError(f"failed to decode audio file {path!s}: {exc}") from exc
 
     if not decoded:
         raise AudioDecodeError(f"no audio frames decoded from {path!s}")
 
-    return np.concatenate(decoded).astype(np.float32, copy=False)
+    samples = np.concatenate(decoded).astype(np.float32, copy=False)
+    if offset > 0.0 or limit_samples is not None:
+        skip = max(0, int(round((offset - float(anchor_s or 0.0)) * int(target_sr))))
+        end = None if limit_samples is None else skip + limit_samples
+        sliced = samples[skip:end]
+        if sliced.size == 0:
+            raise AudioDecodeError(
+                f"slice at {offset:.3f}s is past the end of {path!s}"
+            )
+        return np.ascontiguousarray(sliced)
+    return samples
+
+
+def pcm16_wav_bytes(samples: np.ndarray, *, sr: int) -> bytes:
+    """Encode mono float32 samples as PCM16 WAV bytes (stdlib-only).
+
+    Lets byte-contract embedders (the legacy cloud path, duck-typed fakes)
+    consume a PyAV-decoded slice without any external encoder binary — the
+    replacement for the old ffmpeg libmp3lame re-encode on slicer paths.
+    """
+    import io
+    import wave
+
+    mono = np.asarray(samples, dtype=np.float32).reshape(-1)
+    pcm16 = (np.clip(mono, -1.0, 1.0) * 32767.0).astype("<i2")
+    buf = io.BytesIO()
+    with wave.open(buf, "wb") as fh:
+        fh.setnchannels(1)
+        fh.setsampwidth(2)
+        fh.setframerate(int(sr))
+        fh.writeframes(pcm16.tobytes())
+    return buf.getvalue()
 
 
 def load_audio_stereo(path: str | Path) -> tuple[np.ndarray, int]:

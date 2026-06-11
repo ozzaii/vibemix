@@ -133,6 +133,10 @@ EXCERPT_DURATION = 60
 # ffmpeg subprocess timeout per excerpt — guard against malformed audio.
 FFMPEG_TIMEOUT_SECONDS = 30
 
+# Cue-window WAV slice rate (PyAV path). 48k mono PCM16 keeps the legacy
+# Gemini upload faithful without an external encoder binary.
+_SLICE_WAV_SR = 48000
+
 # Re-export so downstream plans don't have to import from _cosine directly.
 __all__ = [
     "AUDIO_CAP_SECONDS",
@@ -477,14 +481,14 @@ class LibraryEmbedder:
             1. Offline auto-cue detection (``cue_engine.detect_cues_auto``) —
                local DSP/ONNX with heuristic fallback, NO network. Finds the
                mixable structural points.
-            2. For each cue, ffmpeg-slice a <=CUE_WINDOW_SECONDS (80s) window
+            2. For each cue, PyAV-slice a <=CUE_WINDOW_SECONDS (80s) window
                anchored AT the cue (cue = window start), embed it as a single
                audio Part, collect the vectors.
             3. MEAN the cue-region vectors → one EMBEDDING_DIM L2-normalized
                vector (single-vector contract preserved).
 
         Falls back to the mean_excerpt path if cue detection finds nothing
-        usable (e.g. ffmpeg unavailable, or a track with no detectable
+        usable (e.g. an undecodable file, or a track with no detectable
         structure) — never returns a faked vector, never raises on a
         no-structure track.
 
@@ -523,16 +527,16 @@ class LibraryEmbedder:
             # Use the phrase-aligned mixable window the engine sized into the
             # anchor (end_s - start_s, already <=80s) instead of a hardcoded
             # CUE_WINDOW_SECONDS — the engine knows how long the mix region is.
-            # Clamp so we never request audio past the end-of-track (ffmpeg -t
-            # past EOF just yields a short clip, which embeds fine, but clamping
-            # keeps the call honest).
+            # Clamp so we never request audio past the end-of-track (a slice
+            # past EOF just yields a short clip, which embeds fine, but
+            # clamping keeps the call honest).
             window = max(1.0, float(cue.end_s) - start)
             if duration_s > 0:
                 window = min(window, max(1.0, duration_s - start))
             try:
                 clip = self._slice_window(audio_path, start, window)
                 vec = self._call_gemini_audio_single(
-                    clip, mime_type="audio/mpeg"
+                    clip, mime_type="audio/wav"
                 )
                 vecs.append(vec)
             except Exception as e:  # one bad cue must not abort the track
@@ -556,44 +560,22 @@ class LibraryEmbedder:
     def _slice_window(
         self, audio_path: Path, start_s: float, length_s: float
     ) -> bytes:
-        """ffmpeg-slice a single mp3 window [start_s, start_s+length_s).
+        """PyAV-slice a single WAV window [start_s, start_s+length_s).
 
-        Same ffmpeg invocation shape as ``_extract_excerpts`` (libmp3lame,
-        128k, tempfile, cleaned up) but for a single arbitrary-start window.
+        The packaged app ships NO ffmpeg binary, so the slice rides the
+        bundled PyAV decoder; stdlib PCM16 WAV replaces the old lossy 128k mp3
+        re-encode (the slice bytes change, which is why
+        ``CUE_ANCHORED_STRATEGY_VERSION`` carries the pyav bump).
         """
-        ffmpeg = _require_ffmpeg()
-        with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as tmp:
-            tmp_path = Path(tmp.name)
-        try:
-            cmd = [
-                ffmpeg,
-                "-y",
-                "-loglevel",
-                "error",
-                "-ss",
-                f"{start_s:.3f}",
-                "-i",
-                str(audio_path),
-                "-t",
-                f"{length_s:.3f}",
-                "-acodec",
-                "libmp3lame",
-                "-b:a",
-                "128k",
-                str(tmp_path),
-            ]
-            subprocess.run(
-                cmd,
-                check=True,
-                timeout=FFMPEG_TIMEOUT_SECONDS,
-                capture_output=True,
-            )
-            return tmp_path.read_bytes()
-        finally:
-            try:
-                tmp_path.unlink()
-            except FileNotFoundError:
-                pass
+        from vibemix.library.audio_decode import load_audio_mono, pcm16_wav_bytes
+
+        samples = load_audio_mono(
+            audio_path,
+            target_sr=_SLICE_WAV_SR,
+            offset_s=start_s,
+            duration_s=length_s,
+        )
+        return pcm16_wav_bytes(samples, sr=_SLICE_WAV_SR)
 
     @staticmethod
     def _mime_for_path(path: Path) -> str:

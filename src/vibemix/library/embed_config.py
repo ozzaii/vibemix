@@ -9,7 +9,10 @@ DEFAULT_EMBED_STRATEGY = "mean_excerpt"
 
 # Cache-key namespace for cue-anchored vectors. Distinct from legacy excerpt
 # strategy versions so cue rows never collide with plain mean-excerpt rows.
-CUE_ANCHORED_STRATEGY_VERSION = "v1-cueanchored-mean"
+# v2: the cue-window slicer moved from an ffmpeg-binary 128k mp3 re-encode to
+# a direct PyAV decode — slice bytes changed, so v1 cue rows must retire. The
+# mean_excerpt whole-file path never shelled out and keeps its tag untouched.
+CUE_ANCHORED_STRATEGY_VERSION = "v2-cueanchored-mean-pyav"
 
 # Cue windows are capped at 80 seconds for both local CLAP and the legacy path.
 CUE_WINDOW_SECONDS = 80

@@ -41,8 +41,6 @@ import hashlib
 import logging
 import math
 import sqlite3
-import subprocess
-import tempfile
 import urllib.parse
 from collections.abc import Callable, Iterable
 from dataclasses import replace
@@ -58,6 +56,8 @@ from vibemix.library.folder_ingest import IngestReport, _write_library_cache
 from vibemix.library.key_estimator import estimate_key
 from vibemix.library.rekordbox import CuePoint, TrackEntry
 from vibemix.library.section_vectors import (
+    default_section_slicer,
+    embed_window_clip,
     init_section_vector_schema,
     open_default_section_vector_db,
     persist_section_vectors_for_track,
@@ -76,11 +76,10 @@ INGEST_STRATEGY_VERSION = "v1-clap-wholetrack"
 # content-hash cache, so this distinct version is folded into the cache key
 # (T-89-10). v2 is ANLZ-aware: when a caller supplies a matching ANLZ meta we
 # also fold a private-path-safe ANLZ fingerprint into that track's cache key.
-# "cueanchored" in the tag is asserted by the test.
-INGEST_CUE_STRATEGY_VERSION = "v2-clap-cueanchored-anlz"
-
-# ffmpeg window-slice budget (mirrors embed.py's FFMPEG_TIMEOUT_SECONDS posture).
-_FFMPEG_TIMEOUT_SECONDS = 60.0
+# "cueanchored" in the tag is asserted by the test. v3: the window slicer moved
+# from an ffmpeg-binary 128k mp3 re-encode to a direct PyAV float decode — the
+# slice bytes change, so ffmpeg-era cached vectors must retire, not mix.
+INGEST_CUE_STRATEGY_VERSION = "v3-clap-cueanchored-anlz-pyav"
 
 # Read the file in chunks so a multi-hundred-MB lossless file never loads whole.
 _HASH_CHUNK_BYTES = 64 * 1024
@@ -104,7 +103,9 @@ _MATERIALIZED_FALLBACK_SLOTS = (6, 7, 0, 1, 2, 3, 4, 5)
 
 
 class _Embedder(Protocol):  # pragma: no cover - structural typing only
-    # Window path (cue-anchored): embed an ffmpeg-sliced ≤80s clip.
+    # Window path (cue-anchored): embed a PyAV-sliced ≤80s clip. The default
+    # slicer yields a mono float32 array consumed via embed_audio_array when
+    # the embedder exposes it; bytes clips stay on embed_audio_bytes.
     def embed_audio_bytes(self, data: bytes, mime: str) -> np.ndarray: ...
 
     # Whole-track fallback: embed the file when there are no usable windows.
@@ -562,46 +563,15 @@ def _reconcile_store_dim(store: _Store, embedded_dim: int) -> None:
 # --------------------------------------------------------------------------- #
 
 
-def _default_slicer(path: str, start_s: float, length_s: float) -> bytes:
-    """ffmpeg-slice a single mp3 window ``[start_s, start_s+length_s)``.
+def _default_slicer(path: str, start_s: float, length_s: float) -> np.ndarray:
+    """PyAV-slice one mono float32 window ``[start_s, start_s+length_s)``.
 
-    Mirrors :meth:`embed.LibraryEmbedder._slice_window` (libmp3lame, 128k,
-    tempfile, cleaned up). Injectable so tests stub it — NO real ffmpeg runs in
-    the offline suite. ffmpeg is resolved lazily here so importing this module
-    never shells out.
+    The packaged app ships NO ffmpeg binary, so slicing rides the bundled PyAV
+    decoder (shared with :func:`section_vectors.default_section_slicer`) at
+    CLAP's native rate — no subprocess, no lossy mp3 re-encode. Injectable so
+    tests stub it; byte-returning stubs are still honored by the embed dispatch.
     """
-    import shutil
-
-    ffmpeg = shutil.which("ffmpeg")
-    if ffmpeg is None:
-        raise RuntimeError("ffmpeg not found on PATH")
-    with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as tmp:
-        tmp_path = Path(tmp.name)
-    try:
-        cmd = [
-            ffmpeg,
-            "-y",
-            "-loglevel",
-            "error",
-            "-ss",
-            f"{start_s:.3f}",
-            "-i",
-            str(path),
-            "-t",
-            f"{length_s:.3f}",
-            "-acodec",
-            "libmp3lame",
-            "-b:a",
-            "128k",
-            str(tmp_path),
-        ]
-        subprocess.run(cmd, check=True, timeout=_FFMPEG_TIMEOUT_SECONDS, capture_output=True)
-        return tmp_path.read_bytes()
-    finally:
-        try:
-            tmp_path.unlink()
-        except FileNotFoundError:
-            pass
+    return default_section_slicer(path, start_s, length_s)
 
 
 def _embed_track_cue_anchored(
@@ -611,7 +581,7 @@ def _embed_track_cue_anchored(
     *,
     anlz_index: object | None = None,
     precomputed_anchors: list[CueAnchor] | None = None,
-    slicer: Callable[[str, float, float], bytes] | None = None,
+    slicer: Callable[[str, float, float], np.ndarray | bytes] | None = None,
 ) -> np.ndarray:
     """Embed a track over its cue-anchored ≤80s windows, mean-pooled.
 
@@ -619,8 +589,10 @@ def _embed_track_cue_anchored(
         1. ``anchors_for_track`` — DJ-first, caller-injected ANLZ second, auto
            fallback (``[]`` honestly when no structure).
         2. ``cut_windows`` — clamp each anchor to a 1..80s window.
-        3. Per window: ``slicer`` → ``embedder.embed_audio_bytes`` (per-window
-           try/except → skip; one bad window must not abort — T-89-11).
+        3. Per window: ``slicer`` → ``embed_window_clip`` (array clips ride the
+           in-memory ``embed_audio_array`` seam, byte clips keep
+           ``embed_audio_bytes``; per-window try/except → skip; one bad window
+           must not abort — T-89-11).
         4. ``np.mean`` the per-window vectors → ``l2_normalize`` → one vector.
 
     Falls back to ``embedder.embed_audio_file`` (whole-track) when there are no
@@ -658,7 +630,7 @@ def _embed_track_cue_anchored(
         length_s = end_s - start_s
         try:
             clip = slicer(str(local), start_s, length_s)
-            vec = embedder.embed_audio_bytes(clip, "audio/mpeg")
+            vec = embed_window_clip(embedder, clip)
         except Exception as e:
             logger.warning(
                 "[ingest] cue-window embed failed at %.1fs for %s (%s); skipping this window.",
@@ -686,7 +658,7 @@ def _ensure_section_vectors_for_track(
     *,
     track_cache_key: str,
     backend_tag: str,
-    slicer: Callable[[str, float, float], bytes] | None = None,
+    slicer: Callable[[str, float, float], np.ndarray | bytes] | None = None,
 ) -> int:
     """Compatibility wrapper around the public section-vector writer."""
     return persist_section_vectors_for_track(

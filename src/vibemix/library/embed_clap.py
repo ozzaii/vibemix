@@ -131,6 +131,16 @@ class ClapEmbedder:
             np.asarray(self._engine.embed_audio_bytes(data, mime), dtype=np.float32)
         )
 
+    def embed_audio_array(self, samples: np.ndarray, *, sr: int) -> np.ndarray:
+        """Embed already-decoded mono samples → (512,) — the PyAV window path.
+
+        Skips the tempfile + re-decode round trip ``embed_audio_bytes`` pays;
+        the window slicers feed CLAP-rate arrays straight to the engine.
+        """
+        return l2_normalize(
+            np.asarray(self._engine.embed_audio_array(samples, sr=sr), dtype=np.float32)
+        )
+
     def embed_audio_file(self, path: str) -> np.ndarray:
         """Embed a local audio file → (512,), used by cue fallback paths."""
         return l2_normalize(

@@ -19,10 +19,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
-import shutil
 import sqlite3
-import subprocess
-import tempfile
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -35,10 +32,12 @@ from vibemix.library.cache_paths import SECTION_VECTOR_CACHE_DB_PATH
 
 SectionVectorBasis = Literal["section_vector", "track_vector_fallback", "semantic_unknown"]
 
-SECTION_VECTOR_CACHE_VERSION = "v1-clap-section-window"
+# v2: the window slicer moved from an ffmpeg-binary 128k mp3 re-encode to a
+# direct PyAV float decode. The slice BYTES change, so persisted v1 vectors
+# must never mix with v2 ones — the bump retires them cleanly.
+SECTION_VECTOR_CACHE_VERSION = "v2-clap-section-window-pyav"
 SECTION_VECTOR_WINDOW_MAX_SECONDS = 80.0
 SECTION_VECTOR_MIN_SECONDS = 1.0
-_FFMPEG_TIMEOUT_SECONDS = 60.0
 
 logger = logging.getLogger(__name__)
 
@@ -201,38 +200,44 @@ def section_source_hash(
     return h.hexdigest()
 
 
-def default_section_slicer(path: str, start_s: float, length_s: float) -> bytes:
-    """ffmpeg-slice ``[start_s, start_s + length_s)`` to an MP3 byte window."""
-    ffmpeg = shutil.which("ffmpeg")
-    if ffmpeg is None:
-        raise RuntimeError("ffmpeg not found on PATH")
-    with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as tmp:
-        tmp_path = Path(tmp.name)
-    try:
-        cmd = [
-            ffmpeg,
-            "-y",
-            "-loglevel",
-            "error",
-            "-ss",
-            f"{start_s:.3f}",
-            "-i",
-            str(path),
-            "-t",
-            f"{length_s:.3f}",
-            "-acodec",
-            "libmp3lame",
-            "-b:a",
-            "128k",
-            str(tmp_path),
-        ]
-        subprocess.run(cmd, check=True, timeout=_FFMPEG_TIMEOUT_SECONDS, capture_output=True)
-        return tmp_path.read_bytes()
-    finally:
-        try:
-            tmp_path.unlink()
-        except FileNotFoundError:
-            pass
+def default_section_slicer(path: str, start_s: float, length_s: float) -> np.ndarray:
+    """PyAV-slice ``[start_s, start_s + length_s)`` to mono float32 @ CLAP rate.
+
+    The packaged app ships NO ffmpeg binary (and ``open -a`` strips PATH), so
+    slicing rides the bundled PyAV decoder instead of a subprocess. Decoding
+    straight to CLAP's native 48k also drops the old lossy 128k mp3 re-encode
+    plus its tempfile round trip — the embedder consumes the array directly.
+    """
+    from vibemix.library.audio_decode import load_audio_mono
+    from vibemix.library.clap_engine import CLAP_SR
+
+    return load_audio_mono(
+        path, target_sr=CLAP_SR, offset_s=start_s, duration_s=length_s
+    )
+
+
+def embed_window_clip(embedder: Any, clip: np.ndarray | bytes) -> np.ndarray:
+    """Route one sliced window into the embedder without any subprocess.
+
+    Array clips (the default PyAV slicer, mono float32 @ CLAP rate) take the
+    in-memory ``embed_audio_array`` seam; byte clips (legacy/injected slicers)
+    keep the ``embed_audio_bytes`` contract. An array clip against a
+    bytes-only embedder degrades to a stdlib PCM16 WAV round trip so
+    duck-typed embedders keep working.
+    """
+    if isinstance(clip, np.ndarray):
+        from vibemix.library.clap_engine import CLAP_SR
+
+        embed_array = getattr(embedder, "embed_audio_array", None)
+        if callable(embed_array):
+            return np.asarray(embed_array(clip, sr=CLAP_SR), dtype=np.float32)
+        from vibemix.library.audio_decode import pcm16_wav_bytes
+
+        return np.asarray(
+            embedder.embed_audio_bytes(pcm16_wav_bytes(clip, sr=CLAP_SR), "audio/wav"),
+            dtype=np.float32,
+        )
+    return np.asarray(embedder.embed_audio_bytes(clip, "audio/mpeg"), dtype=np.float32)
 
 
 def persist_section_vectors_for_track(
@@ -243,7 +248,7 @@ def persist_section_vectors_for_track(
     *,
     track_cache_key: str,
     backend_tag: str | None = None,
-    slicer: Callable[[str, float, float], bytes] | None = None,
+    slicer: Callable[[str, float, float], np.ndarray | bytes] | None = None,
 ) -> int:
     """Populate per-section CLAP vectors for one local audio track.
 
@@ -277,7 +282,7 @@ def persist_section_vectors_for_track(
 
         try:
             clip = slicer(str(local), start_s, end_s - start_s)
-            vector = l2_normalize(np.asarray(embedder.embed_audio_bytes(clip, "audio/mpeg")))
+            vector = l2_normalize(embed_window_clip(embedder, clip))
             put_section_vector(
                 conn,
                 section_id=section.section_id,
@@ -408,6 +413,7 @@ __all__ = [
     "SectionVectorEmbedder",
     "SectionVectorResult",
     "default_section_slicer",
+    "embed_window_clip",
     "get_cached_section_vector",
     "init_section_vector_schema",
     "open_default_section_vector_db",

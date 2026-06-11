@@ -251,6 +251,7 @@ class ClapEngine:
 
         embed_audio_file(path)        -> (512,) float32, L2-normalized
         embed_audio_bytes(data, mime) -> (512,) float32, L2-normalized
+        embed_audio_array(samples, sr=CLAP_SR) -> (512,) float32, L2-normalized
         embed_query(text)             -> (512,) float32, L2-normalized
     """
 
@@ -340,6 +341,11 @@ class ClapEngine:
             wav = torchaudio.functional.resample(wav, sr, CLAP_SR)
 
         samples = wav.numpy()
+        return self._chunk_samples(samples)
+
+    @staticmethod
+    def _chunk_samples(samples: np.ndarray) -> list[np.ndarray]:
+        """48kHz mono samples → (CHUNK_SAMPLES,) float32 chunks (verbatim rules)."""
         total = len(samples)
 
         if total <= CHUNK_SAMPLES:
@@ -468,6 +474,10 @@ class ClapEngine:
         y = load_audio_mono(path, target_sr=CLAP_SR)
         if len(y) == 0:
             raise ValueError(f"ClapEngine: empty audio from {path!r}")
+        return self._onnx_embed_audio_samples(y, m)
+
+    def _onnx_embed_audio_samples(self, y: np.ndarray, m: dict) -> np.ndarray:
+        """Shared ONNX sample pipeline for the file and in-memory array paths."""
         if len(y) < CHUNK_SAMPLES:  # repeat-pad short clips to one 10s window
             reps = int(np.ceil(CHUNK_SAMPLES / len(y)))
             y = np.tile(y, reps)[:CHUNK_SAMPLES]
@@ -511,6 +521,28 @@ class ClapEngine:
             # unreadable or empty file — surface it honestly.
             raise ValueError(f"ClapEngine: no audio chunks produced from {path!r}")
         return self._embed_chunks(chunks)
+
+    def embed_audio_array(self, samples: np.ndarray, *, sr: int) -> np.ndarray:
+        """Embed mono float32 samples already in memory → (512,) L2-normalized.
+
+        The PyAV window slicers decode straight to ``CLAP_SR`` mono, so this
+        entry point skips the tempfile + re-decode round trip the bytes path
+        pays. Callers own the rate: anything but ``CLAP_SR`` is rejected (no
+        silent in-process resample — the decode seam already resamples).
+        Validation runs BEFORE any model load so bad inputs stay cheap.
+        """
+        if int(sr) != CLAP_SR:
+            raise ValueError(
+                f"ClapEngine.embed_audio_array expects sr={CLAP_SR}, got {sr}"
+            )
+        y = np.asarray(samples, dtype=np.float32).reshape(-1)
+        if y.size == 0:
+            raise ValueError("ClapEngine: empty audio array")
+        if self.backend == "onnx":
+            m = self._ensure_onnx_model()
+            return self._onnx_embed_audio_samples(y, m)
+        self._ensure_model()
+        return self._embed_chunks(self._chunk_samples(y))
 
     def embed_audio_bytes(self, data: bytes, mime: str) -> np.ndarray:
         """Embed raw audio bytes → (512,) float32 — same pipeline as a file.
