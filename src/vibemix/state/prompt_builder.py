@@ -61,7 +61,12 @@ if TYPE_CHECKING:  # pragma: no cover — typing-only, keeps prompt_builder.py i
 # 4 chars/token proxy (cl100k empirical English baseline; project has no
 # tiktoken dep). PROMPT_TOKEN_CAP_FULL is asserted via test on diet=False;
 # the runtime invariant for diet=False is v4 byte-identity, NOT a cap check.
-PROMPT_TOKEN_CAP_ACK = 800
+# 800→850 (2026-06-11, cadence lever U4): the diet MIX_MOVE prompt sat at
+# exactly 800 tokens — zero headroom — and the instruction-led MIX_MOVE lead
+# (the measured fix for the 6-of-14 narrate-first should_NOT class) costs ~40
+# tokens after compression. 850 funds the lever and keeps the diet guard
+# meaningful against PROMPT_TOKEN_CAP_FULL.
+PROMPT_TOKEN_CAP_ACK = 850
 PROMPT_TOKEN_CAP_FULL = 1500
 # Events the compact prompt builder can safely represent. Runtime dispatch is
 # allowed to choose a stricter subset for the short audio window; Sven's live
@@ -827,14 +832,17 @@ class AICoach:
             # material the gate lets through, and without this steer the model
             # voices the deltas instead of the nudge — every line re-judged as
             # pure sound narration (friend 0.33 / should_NOT 100%).
+            # Scope note (2026-06-10): energy receipts also attach on
+            # TRACK_CHANGE and TRANSITION_OPPORTUNITY — the old "on a plain
+            # phase or heartbeat read" wording let the model read the steer
+            # as not-applicable exactly where it was needed.
             energy_hint = (
-                " If energy_read_voice_line is present on a plain phase or "
-                "heartbeat read, its forward nudge IS your point: say that one "
-                "nudge in your own words, friend-at-the-booth register, and "
-                "copy the receipt's citations exactly. The deltas behind it "
-                "are your evidence, not your line — when the nudge doesn't "
-                "match what you're hearing, output a single space to stay "
-                "silent."
+                " If energy_read_voice_line rides this read, its forward "
+                "nudge IS your point: say that one nudge in your own words, "
+                "friend-at-the-booth register, and copy the receipt's "
+                "citations exactly. The deltas behind it are your evidence, "
+                "not your line — when the nudge doesn't match what you're "
+                "hearing, output a single space to stay silent."
                 if "energy_read_voice_line" in receipt_keys
                 else ""
             )
@@ -960,10 +968,20 @@ class AICoach:
                 if bit
             ]
             move_clause = f"{' '.join(context_bits)}. " if context_bits else ""
+            # Cadence lever U4 (2026-06-10): 6 of 14 measured should_NOT lines
+            # were MIX_MOVE narrate-first renders of a move the DJ literally
+            # just made. The old "Hear before→after" / "Ground feedback on
+            # before→after" pair licensed exactly that. Instruction-led now
+            # (the iter6b house pattern that held on PHASE); a claimed sonic
+            # effect needs move_effect_context/audio-delta backing (the
+            # measured move-EFFECT overreach class).
             return (
                 f"A controller move was observed [{mv}]. {move_clause}"
                 "recent_moves[8s] gives seconds ago; that is a CHANGE point. "
-                "Hear before→after: energy, lows, space, tension. "
+                "The DJ made the move and already hears it — name it in "
+                "passing at most, never the line's point. Lead with the "
+                "instruction: what to hold, bring back, leave out, or set up "
+                "over the next bars. "
                 "Use deck_context, deck_reference_context, deck_source_context, "
                 "deck_audio_context, audio_window_context, "
                 "deck_change_context, move_effect_context, live_evidence, and move_context "
@@ -972,10 +990,11 @@ class AICoach:
                 "Use them only with transition_candidate + audio/move support; "
                 "don't grade quality without strong two-deck support. live_evidence categories, "
                 "not causal proof or skill grade. "
-                "Ground feedback on before→after; give a fix if needed. "
-                "Name the EQ, filter, or move if that's worth flagging; "
-                "you're a pro, you decide what matters. If nothing changed, read the "
-                "mix or output a single space to stay silent."
+                "Claim a sonic effect of the move only when move_effect_context "
+                "or the deltas show it. "
+                "Name the EQ, filter, or move if it's worth flagging; "
+                "you're a pro, you decide what matters. If you have no forward "
+                "point, output a single space to stay silent."
             )
         if t == "HEARTBEAT":
             return _with_grounded_receipts(

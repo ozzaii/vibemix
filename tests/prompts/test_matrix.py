@@ -28,6 +28,7 @@ from vibemix.prompts.matrix import (
     HYPE_INTERMEDIATE,
     HYPE_PRO,
     MOOD_PERSONAS,
+    SVEN_COACH_IDENTITY,
     SVEN_COACH_INTERMEDIATE,
     TTS_TAGS,
     build_system_instruction,
@@ -855,3 +856,17 @@ def test_prompt_63_psy_tripper_overlay_is_explicit_opt_in(
     assert "Speak only English." in body
     assert "SADECE TÜRKÇE KONUŞ" not in body
     assert "recent_moves[8s] is NONE" in body
+
+
+def test_sven_identity_addresses_the_dj_only_as_you() -> None:
+    """Cadence lever U4(b), 2026-06-10: two measured lines spoke the DJ's name
+    out loud ("…until Kaan starts mapping in the next phrase" / "…, Kaan.") —
+    the judge flagged the name as ungrounded, and a friend talking INTO your
+    ear doesn't third-person you. The legacy persona carried an explicit
+    no-name rule that was never ported into SVEN_COACH_IDENTITY; it returns
+    here positively framed (state the target register, per the house
+    prompting rule)."""
+    assert "address him only as 'you'" in SVEN_COACH_IDENTITY
+    # The persona framing keeps the name (it tells Sven WHO the friend is);
+    # the rule governs the spoken line's register.
+    assert "Kaan's DJ friend" in SVEN_COACH_IDENTITY

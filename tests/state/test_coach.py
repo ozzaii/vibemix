@@ -691,6 +691,48 @@ def test_task_phase_with_energy_receipt_leads_with_instruction():
     assert receipt in out
 
 
+def test_task_mix_move_leads_instruction_not_before_after_narration():
+    """Cadence lever U4 (2026-06-10): 6 of 14 measured should_NOT lines were
+    MIX_MOVE narrate-first renders ("You pulled those mids back a touch on
+    deck B, keeping that high-pitch grind stable" — pure narration of a
+    completed move, friend 0). The old base licensed it twice: "Hear
+    before→after: energy, lows, space, tension" and "Ground feedback on
+    before→after". The DJ made the move and already hears it — the base now
+    leads with the forward instruction (the iter6b house pattern that held on
+    PHASE), and a claimed sonic effect must be shown by move_effect_context or
+    the audio deltas (the measured move-EFFECT overreach class)."""
+    out = AICoach.task_for_event(
+        _ev("MIX_MOVE", {"moves": ["A_low: cut→killed (big twist)"]})
+    )
+    assert "Hear before→after" not in out
+    assert "Ground feedback on before→after" not in out
+    assert "name it in passing" in out
+    assert "what to hold, bring back, leave out, or set up" in out
+    assert "Claim a sonic effect of the move only when" in out
+    # The narration fallback is gone: silence, not "read the mix".
+    assert "read the mix or output" not in out
+    assert "output a single space to stay silent" in out
+
+
+def test_energy_hint_scope_covers_every_receipt_read():
+    """Render leak (e), 2026-06-10 recon: the energy hint self-scoped to "a
+    plain phase or heartbeat read" while energy receipts also attach on
+    TRACK_CHANGE and TRANSITION_OPPORTUNITY — the model could read the steer
+    as not-applicable exactly where it was needed. The hint now applies to
+    whatever read carries the receipt."""
+    receipt = (
+        "Energy-read receipt: source=master_mix. The master-mix read points "
+        "toward leaving low-end space before the next push. "
+        "Copy these citations exactly: [energy:master_read=x_aaaa]."
+    )
+    out = AICoach.task_for_event(
+        _ev("TRACK_CHANGE", {"energy_read_voice_line": receipt})
+    )
+    assert "plain phase or heartbeat read" not in out
+    assert "rides this read" in out
+    assert receipt in out
+
+
 def test_task_layer_arrival_exact_string():
     out = AICoach.task_for_event(_ev("LAYER_ARRIVAL"))
     assert out == (

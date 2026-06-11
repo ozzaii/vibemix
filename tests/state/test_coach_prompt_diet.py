@@ -6,7 +6,8 @@ pyproject.toml; the 4-chars-per-token ratio is the empirical cl100k baseline
 for English, good enough for cap assertions).
 
 Caps:
-- PROMPT_TOKEN_CAP_ACK  = 800   tokens for diet=True ack-eligible events.
+- PROMPT_TOKEN_CAP_ACK  = 850   tokens for diet=True ack-eligible events
+  (800→850 on 2026-06-11 — cadence lever U4; see test_constants_exported).
 - PROMPT_TOKEN_CAP_FULL = 1500  tokens for diet=False full events.
 
 ACK_ELIGIBLE_EVENTS = {"HEARTBEAT", "MIX_MOVE", "LAYER_ARRIVAL", "KAAN_SPOKE"}.
@@ -86,8 +87,14 @@ def _populated_state() -> MusicState:
 
 
 def test_constants_exported():
-    """ACK_ELIGIBLE_EVENTS frozenset + both token caps importable from coach."""
-    assert PROMPT_TOKEN_CAP_ACK == 800
+    """ACK_ELIGIBLE_EVENTS frozenset + both token caps importable from coach.
+
+    ACK cap 800→850 (2026-06-11, cadence lever U4): the diet MIX_MOVE prompt
+    was saturated at exactly 800 at HEAD, and the instruction-led MIX_MOVE
+    lead (the measured fix for the narrate-first should_NOT class) costs ~40
+    tokens after compression — a documented contract move, not headroom creep.
+    """
+    assert PROMPT_TOKEN_CAP_ACK == 850
     assert PROMPT_TOKEN_CAP_FULL == 1500
     assert isinstance(ACK_ELIGIBLE_EVENTS, frozenset)
     assert ACK_ELIGIBLE_EVENTS == frozenset(
