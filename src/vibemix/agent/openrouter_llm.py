@@ -114,9 +114,18 @@ async def stream_or(
             # Kaan: "thinking minimal". max_tokens (≥512) keeps the visible
             # reply from being starved.
             "reasoning": {"effort": "minimal", "exclude": True},
-            # Pin first-party Google + sort by latency — avoids slow third-party
-            # routes, biggest TTFT lever after thinking level.
-            "provider": {"only": ["google-ai-studio"], "sort": "latency"},
+            # First-party Google ONLY + sort by latency — avoids slow
+            # third-party routes, biggest TTFT lever after thinking level.
+            # BOTH first-party pools are allowed (2026-06-11): with AI Studio
+            # alone in the list, its peak-hour 429 saturation ("temporarily
+            # rate-limited upstream") killed every live call with no fallback
+            # and the co-host went fully silent mid-set. Latency sort still
+            # prefers the fast pool; Vertex serves the same model when AI
+            # Studio is drowning.
+            "provider": {
+                "only": ["google-ai-studio", "google-vertex"],
+                "sort": "latency",
+            },
         },
     )
     async for event in stream:
