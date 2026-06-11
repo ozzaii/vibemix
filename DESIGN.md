@@ -2,14 +2,14 @@
 name: vibemix
 description: AI DJ co-host. Forged Obsidian Chrome (tozpembe) visual system, warm rose-shifted void + one soft-rose sign-of-life per panel, gold quarantined to heat numerics
 colors:
-  void-0: "#1A1618"
-  void-5: "#221D20"
-  void-8: "#282326"
-  void-10: "#302A2E"
-  void-12: "#352F33"
-  void-15: "#3D373A"
-  void-20: "#474144"
-  void-25: "#524C4F"
+  void-0: "#141113"
+  void-5: "#1A1719"
+  void-8: "#1F1B1E"
+  void-10: "#262225"
+  void-12: "#2B262A"
+  void-15: "#322D31"
+  void-20: "#3C373B"
+  void-25: "#474146"
   ink-100: "#F2EFF1"
   ink-80: "#D8D4D7"
   ink-60: "#C5C0C3"
@@ -28,16 +28,16 @@ colors:
   gold: "#e8c47a"
   gold-soft: "rgba(232, 196, 122, 0.55)"
   gold-glow: "rgba(232, 196, 122, 0.30)"
-  glass-1: "rgba(40, 35, 38, 0.80)"
-  glass-2: "rgba(48, 42, 46, 0.62)"
-  glass-3: "rgba(26, 22, 24, 0.88)"
-  border-subtle: "rgba(255, 220, 240, 0.08)"
-  border-default: "rgba(255, 220, 240, 0.12)"
-  border-strong: "rgba(255, 220, 240, 0.18)"
-  surface-void: "#1A1618"
-  surface-base: "#221D20"
-  surface-raised: "#302A2E"
-  surface-float: "#474144"
+  glass-1: "rgba(31, 27, 30, 0.82)"
+  glass-2: "rgba(38, 34, 37, 0.64)"
+  glass-3: "rgba(20, 17, 19, 0.90)"
+  border-subtle: "rgba(243, 239, 242, 0.09)"
+  border-default: "rgba(243, 239, 242, 0.15)"
+  border-strong: "rgba(243, 239, 242, 0.25)"
+  surface-void: "#141113"
+  surface-base: "#1A1719"
+  surface-raised: "#262225"
+  surface-float: "#3C373B"
   led-ok: "#6dd44a"
   led-warn: "#f4c542"
   led-fault: "#d4413a"
@@ -147,10 +147,10 @@ What the rebuild adds beyond the re-skin: a **cohesive DesktopShell** (fixed sid
 The system rejects the same AI-tool defaults v5 did, plus the ones the rose palette could newly invite: no neon glow on black, no glassmorphism stack of floating cards, no gradient-text headlines, no hero-metric layouts, no chatbot bubble UI, no lucide-icon-on-card patterns, no music-app cliché (gradient waveform hero, album-art bloom, Spotify-green CTAs). Rose must never drift toward "cute pink SaaS"; gold must never drift toward "navy-and-gold finance dashboard." The reference is forged hardware, not Spotify and not OpenAI.
 
 **Key characteristics:**
-- Warm rose-shifted near-black void ladder (`#1A1618` → `#524C4F`), not cold blue-black
+- Warm near-black void ladder (`#141113` → `#474146`), obsidian-deep, warmth a whisper not a tint
 - One soft-rose sign-of-life per panel, spent as a low-alpha wash via an explicit alpha ladder, never a fill
 - Gold (`#e8c47a`) quarantined to Camelot / heat / energy-delta numerics: the one allowed second hue
-- Hairline borders are warm-white at very low alpha; tactility from inset bezels + a 0.5px chrome highlight, never faux-3D
+- Hairline borders are NEUTRAL warm-white at very low alpha (never rose-tinted: pink edges everywhere graded the whole app mauve); tactility from inset bezels + a 0.5px neutral chrome highlight, never faux-3D
 - Saira variable display + JetBrains Mono numerics today; Geist + Geist Mono + Instrument Serif is the locked target (Phase 1b)
 - Restrained motion: 22s border sweep, 1.4s LED pulse, BPM-locked beats, eased (no spring, no square flash)
 - Multi-layer film grain (overlay-blended, ~2.5% opacity) gives every surface a physical feel
@@ -171,14 +171,14 @@ The palette is a warm void stack carrying one rose, with gold held back for heat
 
 ### Neutral
 
-- **Void-0 → Void-25** (`#1A1618` → `#524C4F`): the warm rose-shifted near-black ladder. Void-0 is the floor; the body vignette fades over it. `--surface-void/base/raised/float` map to void-0/5/10/20 as the four-level elevation.
+- **Void-0 → Void-25** (`#141113` → `#474146`): the warm near-black ladder, re-graded deep (2026-06-11). Void-0 is the floor; the body vignette fades over it. `--surface-void/base/raised/float` map to void-0/5/10/20 as the four-level elevation.
 - **Glass-1 / Glass-2 / Glass-3** (rgba `0.80` / `0.62` / `0.88`, warm-tinted): the three glass intensities. Glass-1 primary panel, Glass-2 secondary tiles, Glass-3 recessed display windows. Dark and sealing, not floating-translucent.
 - **Ink-100 → Ink-20** (`#F2EFF1` → `#8A858A`): the warm off-white text ladder, named semantically as `--text-primary/secondary/tertiary/muted/disabled`. Replaces v5 silk.
-- **Borders** (`--border-subtle/default/strong`, warm-white rgba `0.08` / `0.12` / `0.18`): hairlines and bezel highlights, quieter than brand. Never used as fills.
+- **Borders** (`--border-subtle/default/strong`, NEUTRAL warm-white rgba `0.09` / `0.15` / `0.25`): hairlines and bezel highlights, quieter than brand, never rose-tinted. Never used as fills.
 
 ### Material
 
-- **Chrome highlight** (`--chrome-highlight`: `inset 0 0.5px 0 rgba(255,200,235,0.07)`): the signature "light catching a machined lip", a half-pixel warm-rose top edge on chrome and slabs.
+- **Chrome highlight** (`--chrome-highlight`: `inset 0 0.5px 0 rgba(246,243,245,0.12)`): the signature "light catching a machined lip", a half-pixel NEUTRAL top edge on chrome and slabs. Machined metal catches white light; only brand objects carry rose.
 - **Specular / rim / shadows**: `--grad-specular`, `--rim-brand`, `--shadow-inset/-pressed/-float`, `--text-3d/-emboss`. Depth is bezel and rim, not a drop-shadow stack.
 
 ### Atmospheric (opt-in only)

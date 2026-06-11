@@ -114,17 +114,16 @@ const CSS = `
     gap: 0;
     filter: drop-shadow(0 16px 22px rgba(0, 0, 0, 0.58));
   }
-  /* The trademark, hero-scale: "VIBE" in ink, "MIX" lit in rose — the same
-   * logic the shell sidebar carries, so the brand reads as one thing from the
-   * first paint. The lit syllable keeps a single 12px halo (DESIGN.md §4
-   * reserves the larger halo for primary-action hover/press; no second halo). */
+  /* The trademark, hero-scale, single-tone ink (2026-06-11 re-grade): the
+   * same quiet lockup the shell sidebar carries. The intro's one rose object
+   * is the armed CTA below — a permanently lit syllable would compete with
+   * it and read as a startup-logo sticker. */
   .wizard-intro__wordmark-vibe {
     color: var(--silk);
   }
   .wizard-intro__wordmark-mix {
-    color: var(--amber);
+    color: var(--silk);
     font-variation-settings: "wdth" 82, "wght" 800;
-    text-shadow: 0 0 12px var(--amber-40);
   }
   /* The category line speaks in the co-host's serif voice, lowercase — the
    * same warm human face as the deck hero, not a shouting condensed banner.

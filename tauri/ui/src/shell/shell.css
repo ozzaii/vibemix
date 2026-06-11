@@ -336,11 +336,13 @@ html[data-runtime="tauri"] .shell-main {
   color: var(--text-primary);
   white-space: nowrap;
 }
-/* "vibe" is the feeling (ink); "mix" is the act, lit in the identity rose — the
- * one decisive brand-color moment in the chrome, the same full --brand the ear
- * and active glyph carry. Solid color per syllable, never a gradient (banned). */
+/* Single-tone trademark (2026-06-11 cinematic re-grade): the permanently lit
+ * rose syllable read as a startup-logo sticker and spent the panel's rose
+ * budget on a letter. The ear beside the wordmark is the brand's one living
+ * mark; the word itself is quiet ink. (Spans stay split — the lockup is DOM
+ * contract, see tests/shell/sidebar-brand.spec.ts.) */
 .sb-brand .wm-vibe { color: var(--text-primary); }
-.sb-brand .wm-mix { color: var(--brand); }
+.sb-brand .wm-mix { color: inherit; }
 
 /* The monogram lives inside the brand tile at every width — at the collapsed
  * 72px rail the tile alone carries the identity (wordmark hides). */
