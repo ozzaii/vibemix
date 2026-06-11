@@ -116,6 +116,7 @@ def test_is_silenced_guard_substitution_detects_all_held_replies() -> None:
         dc.LIVE_AUDIO_SOURCE_DETAIL_HELD_REPLY,
         dc.LIVE_TRACK_IDENTITY_HELD_REPLY,
         dc.LIVE_JUDGE_OVERPRAISE_HELD_REPLY,
+        dc.LIVE_SPECTRAL_CLAIM_HELD_REPLY,
     ]
     assert judge.SILENCED_GUARD_SUBSTITUTIONS == frozenset(held)
     for reply in held:
