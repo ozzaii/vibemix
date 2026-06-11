@@ -480,24 +480,69 @@ def _promote_arg_paths_to_env() -> None:
 
     Codex spawns this server with an explicit argv but does NOT forward the
     parent's process env to MCP children (boot-probe verified). So the live
-    tool tape's path arrives as ``--vibemix-tool-events <path>`` and is promoted
-    here, before the toolset is built, so ``LibraryToolset.dispatch``'s env-gated
-    tape writer fires. ``setdefault`` lets a real env var (if one ever crosses)
-    win. Unknown extra args are ignored — FastMCP never parses argv."""
+    tool tape's path arrives as ``--vibemix-tool-events <path>`` and the
+    cross-turn ground ledger's path as ``--vibemix-ground-ledger <path>``;
+    both are promoted here, before the toolset is built, so the env-gated
+    consumers (``LibraryToolset.dispatch``'s tape writer, the working-set
+    seeding in ``main``) fire. ``setdefault`` lets a real env var (if one
+    ever crosses) win. Unknown extra args are ignored — FastMCP never parses
+    argv."""
     import os
 
     argv = sys.argv[1:]
-    for flag, key in (("--vibemix-tool-events", "VIBEMIX_TOOL_EVENTS_FILE"),):
+    for flag, key in (
+        ("--vibemix-tool-events", "VIBEMIX_TOOL_EVENTS_FILE"),
+        ("--vibemix-ground-ledger", "VIBEMIX_GROUND_LEDGER_FILE"),
+    ):
         if flag in argv:
             i = argv.index(flag)
             if i + 1 < len(argv):
                 os.environ.setdefault(key, argv[i + 1])
 
 
+def _seed_working_set_from_env(toolset: Any) -> None:
+    """Seed the prior-turn working set (the ground ledger) into the toolset.
+
+    The chat wrapper passes the ledger path as ``--vibemix-ground-ledger``
+    (promoted to ``VIBEMIX_GROUND_LEDGER_FILE`` above) only when a continuing
+    conversation has a validated working set. Persisted ids are HINTS:
+    ``LibraryToolset.seed_working_set`` re-validates each one against the
+    live library in THIS process and drops dead ids silently, so the seeded
+    grounding surface can never be wider than the live store (Cardinal
+    Invariant #2). Best-effort — continuity plumbing must never block the
+    grounded tool surface from booting.
+    """
+    import os
+
+    path = os.environ.get("VIBEMIX_GROUND_LEDGER_FILE", "").strip()
+    if not path:
+        return
+    try:
+        from vibemix.library.ground_ledger import load_working_set
+
+        ids = load_working_set(path)
+        seed = getattr(toolset, "seed_working_set", None)
+        if not ids or not callable(seed):
+            return
+        survivors = seed(ids)
+        if survivors:
+            print(
+                f"[viber-mcp] ground ledger seeded {len(survivors)}/{len(ids)} "
+                "working-set ids (re-validated against the live library)",
+                file=sys.stderr,
+                flush=True,
+            )
+    except Exception:
+        # A torn ledger or a surprise toolset shape degrades to "no memory",
+        # never to a failed MCP boot.
+        pass
+
+
 def main() -> None:
     logging.basicConfig(level=logging.WARNING, stream=sys.stderr)
     _promote_arg_paths_to_env()
     toolset = build_toolset()
+    _seed_working_set_from_env(toolset)
     server = build_server(toolset)
     server.run()  # STDIO transport
 

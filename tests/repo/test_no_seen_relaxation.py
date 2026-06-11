@@ -158,7 +158,17 @@ TOOLSET = SRC_ROOT / "library" / "toolset.py"
 # ("`self.seen.add` = 2 (UNCHANGED — Plan 99-05 baseline)"). If a future PR
 # legitimately changes this number, bump the constant AND justify the
 # Invariant-#2 change in the PR description. Do NOT bump silently.
-BASELINE_SEEN_ADD_COUNT = 2
+#
+# 2026-06-11 (ground-ledger lane) — bumped 2 → 3. The third write site is
+# `LibraryToolset.seed_working_set` (cross-turn Viber chat continuity): it
+# adds an id to `seen` ONLY after `self._library.lookup_by_id(tid)` just
+# re-resolved it in the live library THIS process, so the write is exactly
+# as grounded as a discovery return (search_vibe/discover_pool). Dead or
+# foreign ids from the persisted ledger drop silently — the hallucination
+# surface does not widen; the model merely keeps tracks it already
+# discovered+validated in earlier turns of the SAME conversation. Pinned by
+# tests/library/test_ground_ledger.py (revalidation + dead-id-drop tests).
+BASELINE_SEEN_ADD_COUNT = 3
 
 # Files allowed to mention `stop_reason` in `src/vibemix/`. See the
 # whitelist tables in this module's docstring for the rationale per file.

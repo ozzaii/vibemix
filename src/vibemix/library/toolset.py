@@ -162,6 +162,10 @@ class LibraryToolset:
         # Grounding spine for external research: fetch_url may only read URLs
         # issued by web_search in this run, mirroring the track-id seen gate.
         self.seen_urls: set[str] = set()
+        # Cross-turn working-set title map (ground ledger). Populated ONLY by
+        # seed_working_set after each id re-validated against the live library
+        # THIS process — display meta for seeded ids, never an evidence source.
+        self.seeded_working_set: dict[str, dict[str, str]] = {}
         self.created: PlaylistResult | None = None
         # BL-02: the successful set-prep export (mirrors ``created``). Set by the
         # export_set handler; the agent loop reads it to break with a terminal
@@ -283,6 +287,36 @@ class LibraryToolset:
             "blocked_by": "library_freshness",
             "library_freshness": payload,
         }
+
+    def seed_working_set(self, track_ids: list[str]) -> list[str]:
+        """Seed prior-turn working-set ids into this run's grounding spine.
+
+        Cross-turn continuity for Viber chat (the ground ledger): ids a
+        previous turn of THIS conversation discovered and validated are
+        accepted ONLY after each one re-resolves in the live library in THIS
+        process — a dead/foreign id drops silently, so the seeded surface is
+        exactly as grounded as a fresh discovery return and the model can
+        reference earlier finds (sequence/export/drop) without re-searching.
+        The downstream write gates (create_playlist / export_set library
+        re-validation) stay untouched: belt and braces. Returns the
+        survivors, order-preserving.
+        """
+        survivors: list[str] = []
+        for tid in track_ids:
+            if not isinstance(tid, str) or not tid or tid in survivors:
+                continue
+            entry = self._library.lookup_by_id(tid)
+            if entry is None:
+                continue
+            # Invariant-#2-justified write: the id just re-resolved in the
+            # live library above, making this seed equivalent to a discovery
+            # return. Counted by the seen-write gates in tests/repo/
+            # test_no_seen_relaxation.py + tests/library/
+            # test_request_clarification_no_track_surface.py (baseline 3).
+            self.seen.add(tid)
+            self.seeded_working_set[tid] = {"title": entry.title, "artist": entry.artist}
+            survivors.append(tid)
+        return survivors
 
     # -- tool handlers (RETURN error strings, never raise) ------------------ #
 

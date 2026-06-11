@@ -49,6 +49,7 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from vibemix.library import ground_ledger
 from vibemix.library.rekordbox import RekordboxLibrary
 from vibemix.runtime.ai_observability import append_global_ai_message
 from vibemix.state.deck_context import (
@@ -707,6 +708,32 @@ def _validate_against_library(track_ids: list[str], library: RekordboxLibrary) -
             out.append(tid)
             seen.add(tid)
     return out
+
+
+def _harvest_working_set(
+    ledger_path: str,
+    *,
+    library: RekordboxLibrary,
+    prior_ids: list[str],
+    run_ids: list[str],
+    fresh: bool,
+) -> None:
+    """Persist the conversation's grounded working set (the ground ledger).
+
+    Called at the chat result boundary with ids that already passed
+    ``_validate_against_library`` THIS process — the ledger never stores an
+    id the live library did not just confirm. Continuity heuristic: a fresh
+    conversation (empty history) OVERWRITES so a previous conversation's set
+    can't leak forward; a continuing one merges, prior still-live ids first,
+    this run's appended. Best-effort — ``save_working_set`` never raises.
+    """
+    merged = run_ids if fresh else _dedupe_ordered([*prior_ids, *run_ids])
+    meta: dict[str, dict[str, str]] = {}
+    for tid in merged:
+        entry = library.lookup_by_id(tid)
+        if entry is not None:
+            meta[tid] = {"title": entry.title, "artist": entry.artist}
+    ground_ledger.save_working_set(ledger_path, merged, meta)
 
 
 def _drain_tool_tape(events_path: str, printed: int) -> int:
@@ -1997,7 +2024,10 @@ _CHAT_RULES_BLOCK = (
     f"{_NUCLEAR_MCP_RULES}"
     "RULES (non-negotiable):\n"
     "1. Only name a track that a search_vibe / discover_pool call returned THIS "
-    "run. Never invent a track, title, artist, BPM, or key.\n"
+    "run. Never invent a track, title, artist, BPM, or key. Tracks listed in a "
+    "GROUNDED WORKING SET block (when present) were validated in earlier turns "
+    "of this conversation and re-validated against the library — they count as "
+    "grounded too.\n"
     "2. Keys / BPM / energy come from the tools (get_track_features / "
     "get_track_energy), never your memory. If a tool returns bpm/camelot as "
     "null, or returns metadata_warnings, say the library metadata is missing "
@@ -4120,11 +4150,41 @@ def verify_live_reply_for_viber(
     }
 
 
+def _render_working_set_block(working_set: list[dict[str, Any]] | None) -> str:
+    """Render the cross-turn GROUNDED WORKING SET block (ground ledger).
+
+    Only entries the caller already re-validated against the live library
+    THIS process may appear here (chat_with_codex builds them from
+    ``_validate_against_library`` survivors) — the block licenses the model
+    to reuse earlier finds without re-searching, never to widen grounding.
+    """
+    lines: list[str] = []
+    for entry in working_set or []:
+        if not isinstance(entry, dict):
+            continue
+        track_id = str(entry.get("track_id") or "").strip()
+        if not track_id:
+            continue
+        title = str(entry.get("title") or "").strip() or "unknown title"
+        artist = str(entry.get("artist") or "").strip() or "unknown artist"
+        lines.append(f"{track_id} — {title} — {artist}")
+    if not lines:
+        return ""
+    return (
+        "GROUNDED WORKING SET (cross-turn continuity): these tracks were "
+        "discovered and validated in your previous turns of THIS conversation "
+        "and are re-validated against the library; you may reference and use "
+        "them directly (e.g. sequence/export/drop) without re-searching:\n"
+        + "\n".join(lines)
+    )
+
+
 def chat_prompt(
     message: str,
     history: list[dict[str, Any]] | None = None,
     *,
     live_context: dict[str, Any] | None = None,
+    working_set: list[dict[str, Any]] | None = None,
 ) -> str:
     """Render the chat system prompt + the conversation so far + the new turn."""
     convo = ""
@@ -4155,6 +4215,9 @@ def chat_prompt(
         )
     if history_block:
         context_parts.append(history_block)
+    working_set_block = _render_working_set_block(working_set)
+    if working_set_block:
+        context_parts.append(working_set_block)
     context_block = "\n\n" + "\n\n".join(context_parts) if context_parts else ""
     return (
         f"{_chat_system_prompt()}{context_block}\n\nConversation so far:\n{convo}\n\n"
@@ -4658,6 +4721,28 @@ def chat_with_codex(
     command = mcp_command or sys.executable
     args = mcp_args if mcp_args is not None else ["-m", "vibemix.library.mcp_server"]
 
+    # Cross-turn ground ledger (kill-switch VIBEMIX_VIBER_WORKING_SET=0).
+    # SEED only a continuing conversation (non-empty history): a fresh
+    # conversation must never inherit the previous one's working set — the
+    # harvest at the result boundary overwrites instead. Persisted ids are
+    # hints; each must re-resolve in the live library THIS process before it
+    # can reach the prompt or the MCP child (Invariant #2 at load).
+    ledger_path: str | None = (
+        str(ground_ledger.default_ledger_path()) if ground_ledger.working_set_enabled() else None
+    )
+    prior_working_ids: list[str] = []
+    working_set_entries: list[dict[str, str]] = []
+    if ledger_path is not None and history:
+        prior_working_ids = _validate_against_library(
+            ground_ledger.load_working_set(ledger_path), library
+        )
+        for tid in prior_working_ids:
+            entry = library.lookup_by_id(tid)
+            if entry is not None:
+                working_set_entries.append(
+                    {"track_id": tid, "title": entry.title, "artist": entry.artist}
+                )
+
     with tempfile.TemporaryDirectory(prefix="viber-codex-chat-") as td:
         schema_path = str(Path(td) / "schema.json")
         out_path = str(Path(td) / "out.json")
@@ -4669,11 +4754,21 @@ def chat_with_codex(
         tool_events_path = str(Path(td) / "tool_events.jsonl")
         Path(schema_path).write_text(json.dumps(_CHAT_SCHEMA), encoding="utf-8")
 
-        prompt_text = chat_prompt(message, history, live_context=live_context)
+        prompt_text = chat_prompt(
+            message,
+            history,
+            live_context=live_context,
+            working_set=working_set_entries or None,
+        )
+        # The ledger path rides the same arg side-channel as the tool tape
+        # (env does not cross into MCP children), and ONLY when validated
+        # entries exist — the prompt block and the child's seeded seen-set
+        # always describe the same grounded surface.
+        seed_args = ("--vibemix-ground-ledger", ledger_path) if working_set_entries else ()
         argv = build_argv(
             codex,
             mcp_command=command,
-            mcp_args=[*args, "--vibemix-tool-events", tool_events_path],
+            mcp_args=[*args, "--vibemix-tool-events", tool_events_path, *seed_args],
             schema_path=schema_path,
             out_path=out_path,
             prompt=prompt_text,
@@ -4826,6 +4921,16 @@ def chat_with_codex(
         raw_ids.extend(playlist["track_ids"])
     # Grounding at the result boundary: keep only ids that resolve in the library.
     track_ids = _validate_against_library(_dedupe_ordered(raw_ids), library)
+    # HARVEST the ground ledger here — every id below already passed the live
+    # library check this process, so persistence can never out-ground the run.
+    if ledger_path is not None:
+        _harvest_working_set(
+            ledger_path,
+            library=library,
+            prior_ids=prior_working_ids,
+            run_ids=track_ids,
+            fresh=not history,
+        )
 
     live_context_mode = _live_context_use_mode(message) if live_context else "none"
     library_context_request = _is_library_context_request(message)

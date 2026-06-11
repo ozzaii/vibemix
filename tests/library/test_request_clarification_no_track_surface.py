@@ -348,10 +348,16 @@ def test_baseline_seen_add_count_unchanged_post_phase_100() -> None:
             continue
         if "self.seen.add(" in line:
             count += 1
-    assert count == 2, (
-        f"Phase 100 promised BASELINE_SEEN_ADD_COUNT stays at 2. "
-        f"Current count: {count}. If you intentionally added a "
-        f"self.seen.add site in Phase 100 or later, this is a Cardinal "
+    # 2026-06-11 (ground-ledger lane): 2 → 3. The added site is
+    # `seed_working_set` — each seeded id re-resolves in the live library
+    # THIS process before the write, so grounding does not widen. See the
+    # justification block above BASELINE_SEEN_ADD_COUNT in
+    # tests/repo/test_no_seen_relaxation.py and the revalidation tests in
+    # tests/library/test_ground_ledger.py.
+    assert count == 3, (
+        f"Seen-write baseline is 3 (2 discovery sites + the ground-ledger "
+        f"seed_working_set site, 2026-06-11). Current count: {count}. If you "
+        f"intentionally added/removed a self.seen.add site, this is a Cardinal "
         f"Invariant #2 modification — see tests/repo/test_no_seen_relaxation.py "
         f"for the bump recipe (update BOTH this gate and the tests/repo gate)."
     )
