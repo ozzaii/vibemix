@@ -39,7 +39,7 @@ const SIDECAR_TERM_GRACE_MS: u64 = 1500;
 /// Tauri shell with BYO direct/proxy credentials. Library one-shot commands
 /// share this relay for auth and Codex home/binary discovery; the
 /// Library/Viber reasoning backend is pinned to local Codex by the bridge.
-pub(crate) const FORWARDED_ENV_KEYS: [&str; 16] = [
+pub(crate) const FORWARDED_ENV_KEYS: [&str; 26] = [
     "VIBEMIX_LLM_MODE",
     "GEMINI_API_KEY",
     "OPENROUTER_API_KEY",
@@ -56,6 +56,19 @@ pub(crate) const FORWARDED_ENV_KEYS: [&str; 16] = [
     "CODEX_BIN",
     "VIBEMIX_NODE_BIN",
     "NODE_BIN",
+    // Viber companion-MCP gates + working-set kill switch: the library one-shot
+    // commands receive ONLY this allow-list, so an env gate absent here is dark
+    // for the in-app Viber even when set on the launching shell.
+    "VIBEMIX_REKORDBOX_MCP",
+    "VIBEMIX_REKORDBOX_MCP_ENABLED",
+    "VIBEMIX_REKORDBOX_MCP_COMMAND",
+    "VIBEMIX_REKORDBOX_MCP_ARGS",
+    "VIBEMIX_REKORDBOX_MCP_CWD",
+    "VIBEMIX_NUCLEAR_MCP",
+    "VIBEMIX_NUCLEAR_MCP_ENABLED",
+    "VIBEMIX_NUCLEAR_MCP_URL",
+    "VIBEMIX_VIBER_WORKING_SET",
+    "VIBEMIX_VIBER_WORKING_SET_PATH",
 ];
 
 fn sidecar_audio_env_defaults<F>(env: &F) -> Vec<(&'static str, String)>
