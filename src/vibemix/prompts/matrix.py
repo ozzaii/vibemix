@@ -875,6 +875,32 @@ _CELLS: dict[tuple[str, str], str] = {
 _VALID_SKILLS = frozenset({"beginner", "intermediate", "pro"})
 _VALID_MODES = frozenset({"hype", "coach"})
 
+# Steer register (2026-06-11) — the per-turn task tails in
+# state/prompt_builder.py carry a register alongside the cell. Fleet-measured
+# 2026-06-10 (dj-sim-wave-20260610): the coach-register steers ("Lead with the
+# instruction…") override the HYPE cells by recency — hype users heard
+# patronizing coaching (would-use-again 2.2/10) while the per-line judge
+# scored those same lines best (friend 2.26). 'peer' re-voices the SAME
+# grounded receipt as a peer call; the grounding contracts are identical.
+# ("intermediate", "hype") IS SVEN_COACH_IDENTITY (pinned verbatim), so it
+# keeps the coach register.
+_PEER_STEER_CELLS: frozenset[tuple[str, str]] = frozenset(
+    {("beginner", "hype"), ("pro", "hype")}
+)
+
+
+def steer_register(skill: str, mode: str) -> str:
+    """Per-turn steer register for a (skill, mode) cell: 'peer' or 'coach'.
+
+    Normalizes exactly like build_system_instruction (lower+strip) so a
+    config that selects the HYPE_PRO cell can never keep the coach steers.
+    A foreign (skill, mode) falls back to 'coach' rather than raising —
+    the register only flavors the task tail; cell selection itself still
+    fails loud in build_system_instruction.
+    """
+    cell = (skill.lower().strip(), mode.lower().strip())
+    return "peer" if cell in _PEER_STEER_CELLS else "coach"
+
 
 # 2026-05-26 (Kaan live tuning) — legacy persona overlay.
 # Appended LAST in build_system_instruction (strongest recency) so it OVERRIDES

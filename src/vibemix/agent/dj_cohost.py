@@ -1579,6 +1579,35 @@ def _resolve_prompt_cell(mood: str | None = None, learn_progress: Any | None = N
     )
 
 
+def _resolve_steer_register() -> str:
+    """Resolve the per-turn steer register for the active persona cell.
+
+    Mirrors ``_resolve_prompt_cell``'s skill/lens/mode resolution (keep in
+    lockstep): skill from env; the persisted lens — the user's EXPLICIT
+    persona choice — wins over the ``VIBEMIX_MODE`` env; any lens-read
+    failure falls back to the env path. Returns
+    ``matrix.steer_register(skill, mode)`` — ``'peer'`` only for the hype
+    cells with a distinct hype identity (fleet-measured 2026-06-10: the
+    coach-register task tails were overriding HYPE_PRO by recency).
+    """
+    from vibemix.prompts.matrix import LENS_TO_MODE_MOOD, steer_register
+
+    skill = os.environ.get(ENV_SKILL_LEVEL, DEFAULT_SKILL_LEVEL)
+    mode: str | None = None
+    try:
+        from vibemix.runtime.config_store import load_config
+        from vibemix.runtime.settings import read_shared_lens
+
+        lens = read_shared_lens(load_config())
+    except Exception:  # pragma: no cover — guard: any read fail = env path
+        lens = None
+    if lens is not None and lens in LENS_TO_MODE_MOOD:
+        mode = LENS_TO_MODE_MOOD[lens][0]
+    if mode is None:
+        mode = os.environ.get(ENV_MODE, DEFAULT_MODE)
+    return steer_register(skill, mode)
+
+
 class DJCoHostAgent(Agent):
     """Hijacks llm_node to bypass LiveKit's text-only cascade and call
     google.genai directly with the last 10s of audio + the latest screen
@@ -1735,6 +1764,9 @@ class DJCoHostAgent(Agent):
         self._or_client = or_client
         self._or_model = or_model
         self._prompt_body = prompt_body
+        # Resolved alongside the cell (same skill/lens/mode inputs) so the
+        # per-turn task tails speak the cell's register, not the coach default.
+        self._steer_register = _resolve_steer_register()
         self._clean_audio_buf = clean_audio_buf
         self._screen_buf = screen_buf
         self._state = state
@@ -1953,6 +1985,9 @@ class DJCoHostAgent(Agent):
             return False
 
         self._prompt_body = prompt_body
+        # The register rides the same resolution inputs as the cell — refresh
+        # it on every cell rebuild so a lens/mode swap re-registers the steers.
+        self._steer_register = _resolve_steer_register()
         self._gen_cfg = types.GenerateContentConfig(
             system_instruction=prompt_body,
             thinking_config=types.ThinkingConfig(thinking_level="minimal"),
@@ -3017,6 +3052,12 @@ class DJCoHostAgent(Agent):
             # only when hot, so MIX_MOVE can use historical move->sound memory
             # without expanding to the full prompt.
             _bp_kwargs: dict[str, Any] = {"registry_snapshot": snapshot, "diet": diet}
+            # Pass the steer register ONLY when it differs from the default —
+            # same omit-when-default contract as recall_moments above, so the
+            # coach path (and every pinned-kwargs call-shape test) stays
+            # byte-identical.
+            if getattr(self, "_steer_register", "coach") == "peer":
+                _bp_kwargs["steer_register"] = "peer"
             if recall_moments:
                 _bp_kwargs["recall_moments"] = recall_moments
             if prompt_audio_capture_context is not None:

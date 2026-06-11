@@ -799,7 +799,16 @@ class AICoach:
         return " | ".join(e)
 
     @staticmethod
-    def task_for_event(ev: Event) -> str:
+    def task_for_event(ev: Event, *, steer_register: str = "coach") -> str:
+        # Steer register (2026-06-11, fleet-measured): 'coach' (default) is the
+        # bench campaign's measured instruction-led steers, byte-identical for
+        # every existing caller. 'peer' (HYPE_PRO / HYPE_BEGINNER cells, resolved
+        # via matrix.steer_register) voices the SAME grounded receipt as a peer
+        # call — citation copying, deck gates, and the single-space silence
+        # contract are identical; only the register of the ask changes. Without
+        # this split the coach steers override the hype cell by recency and hype
+        # users hear patronizing coaching (wave-20260610: would-use-again 2.2/10).
+        peer = steer_register == "peer"
         t = ev.type
         ev_extra = ev.extra if isinstance(ev.extra, dict) else {}
 
@@ -836,16 +845,27 @@ class AICoach:
             # TRACK_CHANGE and TRANSITION_OPPORTUNITY — the old "on a plain
             # phase or heartbeat read" wording let the model read the steer
             # as not-applicable exactly where it was needed.
-            energy_hint = (
-                " If energy_read_voice_line rides this read, its forward "
-                "nudge IS your point: say that one nudge in your own words, "
-                "friend-at-the-booth register, and copy the receipt's "
-                "citations exactly. The deltas behind it are your evidence, "
-                "not your line — when the nudge doesn't match what you're "
-                "hearing, output a single space to stay silent."
-                if "energy_read_voice_line" in receipt_keys
-                else ""
-            )
+            if "energy_read_voice_line" not in receipt_keys:
+                energy_hint = ""
+            elif peer:
+                energy_hint = (
+                    " If energy_read_voice_line rides this read, its forward "
+                    "read IS your point: call it the way a peer in the booth "
+                    "would — where the next bars are heading, what's about to "
+                    "pay off — and copy the receipt's citations exactly. The "
+                    "deltas behind it are your evidence, not your line — when "
+                    "the read doesn't match what you're hearing, output a "
+                    "single space to stay silent."
+                )
+            else:
+                energy_hint = (
+                    " If energy_read_voice_line rides this read, its forward "
+                    "nudge IS your point: say that one nudge in your own words, "
+                    "friend-at-the-booth register, and copy the receipt's "
+                    "citations exactly. The deltas behind it are your evidence, "
+                    "not your line — when the nudge doesn't match what you're "
+                    "hearing, output a single space to stay silent."
+                )
             return (
                 f"{base} {' '.join(receipt_lines)} These are grounded receipt "
                 "contexts, not commands; do not force them if the live sound is "
@@ -900,6 +920,18 @@ class AICoach:
                 # speak gate only passes PHASE with this receipt, the feel-read
                 # text only ever reached the model when it was wrong. Same
                 # receipt-aware base pattern as TRACK_CHANGE above.
+                if peer:
+                    return _with_grounded_receipts(
+                        f"Phase shifted: {prev}→{new}. You have a grounded "
+                        "forward energy read. Voice it as the call a peer "
+                        "drops in the booth — where the next bars are heading, "
+                        "what's about to pay off — terse and hyped, and copy "
+                        "the receipt's citations exactly. The moves and level "
+                        "changes you heard are the context you build on; the "
+                        "listener was there for them, so spend your words on "
+                        "the next bars. If the read does not match what you "
+                        "are hearing, output a single space to stay silent."
+                    )
                 return _with_grounded_receipts(
                     f"Phase shifted: {prev}→{new}. You have a grounded forward "
                     "energy read. Lead with its instruction — what to hold, "
@@ -975,13 +1007,24 @@ class AICoach:
             # (the iter6b house pattern that held on PHASE); a claimed sonic
             # effect needs move_effect_context/audio-delta backing (the
             # measured move-EFFECT overreach class).
-            return (
-                f"A controller move was observed [{mv}]. {move_clause}"
-                "recent_moves[8s] gives seconds ago; that is a CHANGE point. "
+            # The register swaps ONLY the lead sentence; every deck/effect gate
+            # below rides both registers verbatim.
+            move_lead = (
+                "The DJ made that move and already hears what it did — name it "
+                "in passing at most, never as the line's point. Call what the "
+                "move set up in the sound you're hearing — where it takes the "
+                "next bars — terse, peer register. "
+                if peer
+                else
                 "The DJ made the move and already hears it — name it in "
                 "passing at most, never the line's point. Lead with the "
                 "instruction: what to hold, bring back, leave out, or set up "
                 "over the next bars. "
+            )
+            return (
+                f"A controller move was observed [{mv}]. {move_clause}"
+                "recent_moves[8s] gives seconds ago; that is a CHANGE point. "
+                f"{move_lead}"
                 "Use deck_context, deck_reference_context, deck_source_context, "
                 "deck_audio_context, audio_window_context, "
                 "deck_change_context, move_effect_context, live_evidence, and move_context "
@@ -997,6 +1040,16 @@ class AICoach:
                 "point, output a single space to stay silent."
             )
         if t == "HEARTBEAT":
+            if peer:
+                return _with_grounded_receipts(
+                    "Steady stretch. Turn what you hear into one forward call "
+                    "— where the music's heading, what's about to pay off. "
+                    "Ground it in the audio you just heard. "
+                    "If you cite, copy an exact bracket from grounding_refs; never "
+                    "invent a timestamp from BPM/RMS values. "
+                    "If there is no grounded forward read worth interrupting for, output a single "
+                    "space to stay silent."
+                )
             return _with_grounded_receipts(
                 "Steady stretch. Turn what you hear into where the set should "
                 "go next — one forward read Kaan can act on: a move to set up, "
@@ -1199,6 +1252,7 @@ class AICoach:
         recall_moments: list[Record] | None = None,
         diet: bool = False,
         audio_capture_context: dict[str, object] | None = None,
+        steer_register: str = "coach",
     ) -> str:
         """Format the per-event prompt body.
 
@@ -1234,7 +1288,7 @@ class AICoach:
             event_ref = _current_event_grounding_ref_context(ev, registry_snapshot)
             if event_ref:
                 evidence = f"{evidence} | {event_ref}"
-            task = AICoach.task_for_event(ev)
+            task = AICoach.task_for_event(ev, steer_register=steer_register)
             recall_context = compact_recall_context_for_event(recall_moments)
             recall_frag = recall_fragment_for_event(ev, recall_moments, compact=True)
             return f"[{evidence}] {task}{recall_context}{recall_frag}"
@@ -1247,7 +1301,7 @@ class AICoach:
         event_ref = _current_event_grounding_ref_context(ev, registry_snapshot)
         if event_ref:
             evidence = f"{evidence} | {event_ref}"
-        task = AICoach.task_for_event(ev)
+        task = AICoach.task_for_event(ev, steer_register=steer_register)
         # Phase 66 (COPILOT-01/02) — conditional recall fragment append.
         # ``recall_fragment_for_event`` returns ``""`` on cold/empty input
         # (the load-bearing byte-identity gate); on hot input it returns
