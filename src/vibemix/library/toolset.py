@@ -1057,6 +1057,7 @@ class LibraryToolset:
                 n_slots=n_slots,
                 weights=weights,
                 surprise=surprise,
+                section_io=self._section_io_for_pool([p.track_id for p in pool]),
             )
         except KeyError as e:  # unknown curve preset → actionable error
             return {"error": f"sequence_set: unknown curve preset {e}"}
@@ -1067,6 +1068,10 @@ class LibraryToolset:
             "candidates": [
                 {
                     "track_ids": c.track_ids,
+                    # Total beam objective — lets the model rank candidates the
+                    # same way the optimizer did instead of guessing from the
+                    # component receipts (lower = better).
+                    "cost": c.cost,
                     "energy_fit": c.energy_fit,
                     "avg_coherence": c.avg_coherence,
                     "relaxed_transitions": c.relaxed_transitions,
@@ -2355,6 +2360,36 @@ class LibraryToolset:
             section.section_id,
             fallback_vector=self._track_vector(section.track_id),
         )
+
+    def _section_io_for_pool(self, track_ids: list[str]) -> dict[str, tuple[Any, Any]] | None:
+        """Per-track (mix_out, mix_in) section vectors for the sequencer's eta term.
+
+        CACHE-ONLY by contract: no fallback to the whole-track vector (that
+        would double-count the beta coherence term) and never an on-demand
+        embed — the beam must stay decode-free. Sections come from the same
+        deterministic builder get_track_sections uses; mix_out prefers an
+        outro-role section (else the last), mix_in an intro-role one (else
+        the first). Tracks with no cached section vectors simply stay absent
+        — the sequencer scores those edges zero (honest degrade).
+        """
+        io: dict[str, tuple[Any, Any]] = {}
+        for tid in track_ids:
+            entry = self._library.lookup_by_id(tid)
+            if entry is None:
+                continue
+            sections = sections_for_entry(entry)
+            if not sections:
+                continue
+            out_sec = next(
+                (s for s in reversed(sections) if "outro" in str(s.role or "")), sections[-1]
+            )
+            in_sec = next((s for s in sections if "intro" in str(s.role or "")), sections[0])
+            out_vec = resolve_section_vector(self._store, out_sec.section_id).vector
+            in_vec = resolve_section_vector(self._store, in_sec.section_id).vector
+            if out_vec is None and in_vec is None:
+                continue
+            io[tid] = (out_vec, in_vec)
+        return io or None
 
 
 def _normalize_ingest_source_name(raw: Any) -> str | None:

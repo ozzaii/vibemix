@@ -79,6 +79,11 @@ _DEFAULT_WEIGHTS: dict[str, float] = {
     "alpha": 1.0,  # energy-curve adherence (the primary objective)
     "beta": 0.6,  # sonic coherence between consecutive tracks
     "zeta": 0.10,  # graded Camelot-adjacency edge tiebreak (S1, small by design)
+    # Section-continuity edge term: how the SOURCE's mix-out section flows
+    # into the DEST's mix-in section (persisted section vectors, cache-only).
+    # Slightly above zeta (section audio beats key adjacency as a blend
+    # signal) but far under beta — it re-ranks, never dominates the curve.
+    "eta": 0.12,
     "gamma": 0.0,  # surprise reward (set surprise dict to enable)
     "delta": 0.0,  # recency penalty
     "epsilon": 0.0,  # library-bias nudge
@@ -301,6 +306,7 @@ def sequence_set(
     surprise: dict[str, float] | None = None,
     recency: dict[str, float] | None = None,
     library_bias: dict[str, float] | None = None,
+    section_io: dict[str, tuple[Any, Any]] | None = None,
 ) -> list[SetCandidate]:
     """Order ``pool`` into an ``n_slots`` set tracking ``curve`` via beam search.
 
@@ -312,7 +318,11 @@ def sequence_set(
     ``energy`` optionally overrides per-track energy by track_id (else
     ``PoolTrack.energy`` -> BPM-proxy -> 0). ``surprise`` / ``recency`` /
     ``library_bias`` are optional per-track-id dicts feeding the (default-off)
-    taste terms.
+    taste terms. ``section_io`` optionally maps track_id ->
+    (mix_out_vector, mix_in_vector) from the PERSISTED section-vector cache;
+    the eta edge term scores how a source's mix-out flows into a dest's
+    mix-in. Either side None -> the pair contributes ZERO cost (absence of
+    section evidence never penalizes an edge — the honest-degrade contract).
     """
     if not pool:
         return []
@@ -355,6 +365,32 @@ def sequence_set(
                 score = harmonic_score(ca, cb)[0]
                 _harm_cache[(ca, cb)] = score
             harm[i, j] = score
+
+    # --- Precompute the M x M section-continuity matrix (mirrors the S1 harm
+    # pattern). secm[i, j] = cosine(mix_out(i), mix_in(j)) from the persisted
+    # section-vector cache the caller resolved — NEVER decoded here (the beam
+    # stays decode-free). Missing vectors on either side leave 1.0 (zero added
+    # cost): a cue-less / never-ingested track is never ranked a worse blend
+    # than a known-rough one. ---
+    secm = np.ones((m, m), dtype=float)
+    if section_io:
+        outs: list[np.ndarray | None] = []
+        ins: list[np.ndarray | None] = []
+        for p in pool:
+            out_vec, in_vec = section_io.get(p.track_id, (None, None))
+            outs.append(
+                l2_normalize(np.asarray(out_vec, dtype=np.float32)) if out_vec is not None else None
+            )
+            ins.append(
+                l2_normalize(np.asarray(in_vec, dtype=np.float32)) if in_vec is not None else None
+            )
+        for i in range(m):
+            if outs[i] is None:
+                continue
+            for j in range(m):
+                if i == j or ins[j] is None:
+                    continue
+                secm[i, j] = float(np.clip(np.dot(outs[i], ins[j]), -1.0, 1.0))
 
     # Pre-dedupe near-identical tracks, then operate on the survivors.
     survivors = _predecupe(pool, coh)
@@ -405,10 +441,16 @@ def sequence_set(
     node_cost = w["alpha"] * sq_err + taste[:, None]  # (M, n_slots)
 
     def edge_cost(a: int, b: int) -> float:
-        # 1 - cosine (CLAP vibe) + the graded harmonic tiebreak (S1). The binary
-        # Camelot/BPM gates already admitted this edge; harm[a, b] only re-ranks
-        # among valid mixes (unknown key -> harm 1.0 -> zero added cost).
-        return w["beta"] * (1.0 - coh[a, b]) + w["zeta"] * (1.0 - harm[a, b])
+        # 1 - cosine (CLAP vibe) + the graded harmonic tiebreak (S1) + the
+        # section-continuity term (mix-out -> mix-in, cache-only). The binary
+        # Camelot/BPM gates already admitted this edge; harm[a, b] and
+        # secm[a, b] only re-rank among valid mixes (unknown key / missing
+        # section vectors -> 1.0 -> zero added cost).
+        return (
+            w["beta"] * (1.0 - coh[a, b])
+            + w["zeta"] * (1.0 - harm[a, b])
+            + w["eta"] * (1.0 - secm[a, b])
+        )
 
     # --- Beam search over the depth-n_slots trellis. ---
     width = min(beam_width, max(8, m))

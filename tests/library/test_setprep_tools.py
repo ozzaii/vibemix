@@ -401,6 +401,7 @@ def test_sequence_set_dedupes_obvious_file_copies_before_ordering(monkeypatch):
         return [
             SimpleNamespace(
                 track_ids=[p.track_id for p in pool],
+                cost=0.0,
                 energy_fit=0.0,
                 avg_coherence=1.0,
                 relaxed_transitions=[],
@@ -432,6 +433,7 @@ def test_sequence_set_novelty_uses_discovery_similarity_as_surprise(toolset, mon
         return [
             SimpleNamespace(
                 track_ids=[p.track_id for p in pool],
+                cost=0.0,
                 energy_fit=0.0,
                 avg_coherence=1.0,
                 relaxed_transitions=[],
