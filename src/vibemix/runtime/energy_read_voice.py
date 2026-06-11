@@ -43,37 +43,78 @@ _TEXT_ESCAPE = str.maketrans({"[": "(", "]": ")", "\n": " ", "\r": " ", "|": "/"
 # "rose 25% (clear)" while the mids are still inaudible — the judge refuted
 # every such line ("new mids" voiced at mid=0.05: the 0-for-3 cold-start
 # class, 2026-06-10 cadence lever). A ROSE band delta is voiceable only when
-# its band's post level clears this floor. FELL reads are exempt by design:
-# a low post level IS the read ("leave low-end space"). Keeper calibration
-# from the measured runs: killers at band 0.01-0.05, survivors at 0.10-0.16.
+# its band's post level clears this floor. A FELL band delta (2026-06-11
+# filler-cut panel) is voiceable only when its reconstructed PRE level
+# clears it: "high energy fell 50%" at 0.02→0.01 is a relative fall on a
+# band that was never audible — that one receipt minted "keeping the
+# top-end space intentional" 7 times across lever+baseline runs, judged
+# should_NOT 6 of 7. Keeper calibration: killers at band 0.01-0.05,
+# survivors at 0.10-0.16 (rose post) / pre 0.15-0.44 (fell).
 BAND_AUDIBILITY_FLOOR = 0.10
 
-# Delta-string keyword → the state.bands key whose post level must be audible
-# for a ROSE claim. "brightness" keys on the HIGH band: the brightness share
-# sums mid+high, so a mid-driven rise must not voice top-end vocabulary
-# (the measured "added brightness" fabrication).
+# Delta-string keyword → the state.bands key(s) backing the claim. ROSE
+# "brightness" keys on the HIGH band alone: the brightness share sums
+# mid+high, so a mid-driven rise must not voice top-end vocabulary (the
+# measured "added brightness" fabrication). FELL "brightness" reconstructs
+# the mid+high SUM brightness actually measures — high alone would falsely
+# kill every brightness read in a dark-topped mix (high 0.01 / mid 0.30: an
+# order of magnitude wrong, 2026-06-11 panel).
 _ROSE_BAND_KEYWORDS = (
-    ("sub energy", "sub"),
-    ("low energy", "low"),
-    ("mid energy", "mid"),
-    ("high energy", "high"),
-    ("brightness", "high"),
+    ("sub energy", ("sub",)),
+    ("low energy", ("low",)),
+    ("mid energy", ("mid",)),
+    ("high energy", ("high",)),
+    ("brightness", ("high",)),
 )
+_FELL_BAND_KEYWORDS = (
+    ("sub energy", ("sub",)),
+    ("low energy", ("low",)),
+    ("mid energy", ("mid",)),
+    ("high energy", ("high",)),
+    ("brightness", ("mid", "high")),
+)
+_FELL_PCT_RE = re.compile(r"fell (\d+)% ")
 
 
-def _rose_band_level(text: str, state: MusicState) -> float | None:
-    """Post level of the band a ROSE delta names; None for fell/non-band deltas."""
-    if "rose" not in text:
-        return None
+def _band_claim_level(text: str, state: MusicState) -> float | None:
+    """Audibility level backing a band-delta claim; None = abstain.
+
+    ROSE → the named band's POST level (a rise must be audible NOW).
+    FELL → the PRE level reconstructed as post/(1 - pct): a fall must have
+    been audible BEFORE. Abstains (None) on non-band deltas (onset/LUFS/RMS),
+    a non-canonical fell string (no "fell NN% " magnitude to reconstruct
+    from), and pct >= 90 — post ~ 0 divides the true pre-level away, and a
+    full band kill (EQ kill / breakdown drop) is the most audible fell
+    gesture there is, so it stays voiceable."""
     bands = getattr(state, "bands", {}) or {}
     if not isinstance(bands, dict):
         return None
-    for keyword, key in _ROSE_BAND_KEYWORDS:
-        if keyword in text:
+
+    def _level(keys: tuple[str, ...]) -> float:
+        total = 0.0
+        for key in keys:
             try:
-                return float(bands.get(key, 0.0) or 0.0)
+                total += float(bands.get(key, 0.0) or 0.0)
             except (TypeError, ValueError):
-                return 0.0
+                pass
+        return total
+
+    if "rose" in text:
+        for keyword, keys in _ROSE_BAND_KEYWORDS:
+            if keyword in text:
+                return _level(keys)
+        return None
+    if "fell" in text:
+        m = _FELL_PCT_RE.search(text)
+        if m is None:
+            return None
+        pct = int(m.group(1))
+        if pct >= 90:
+            return None
+        for keyword, keys in _FELL_BAND_KEYWORDS:
+            if keyword in text:
+                return _level(keys) / (1.0 - pct / 100.0)
+        return None
     return None
 
 
@@ -91,7 +132,7 @@ def _voiced_deltas(deltas: Sequence[str], state: MusicState) -> list[str]:
         text = str(raw).casefold()
         if has_non_slight and "(slight)" in text:
             continue
-        level = _rose_band_level(text, state)
+        level = _band_claim_level(text, state)
         if level is not None and level < BAND_AUDIBILITY_FLOOR:
             continue
         out.append(raw)
@@ -342,11 +383,13 @@ def _forward_body(
         # ("That brightness share just ticked up…") the judge's ears refuted.
         if "(slight)" in text:
             continue
-        # Rose claims must be audible NOW (BAND_AUDIBILITY_FLOOR): a relative
-        # rise from near-silence is a blip, not a read — the measured
-        # cold-start "new mids at mid=0.05" class. Fell claims pass: a low
-        # post level is the read itself.
-        level = _rose_band_level(text, state)
+        # Band claims must be audible (BAND_AUDIBILITY_FLOOR): a rose claim
+        # checks its POST level (a relative rise from near-silence is a blip,
+        # not a read — the measured cold-start "new mids at mid=0.05" class),
+        # a fell claim checks its reconstructed PRE level (a relative fall on
+        # a never-audible band minted the "top-end space intentional" filler
+        # family, 6-of-7 should_NOT, 2026-06-11).
+        level = _band_claim_level(text, state)
         if level is not None and level < BAND_AUDIBILITY_FLOOR:
             continue
         if ("sub energy" in text or "low energy" in text or "rms" in text) and "fell" in text:
@@ -365,7 +408,15 @@ def _forward_body(
             return "leaving the mids open before the next layer"
         if ("high energy" in text or "brightness" in text) and "fell" in text:
             return "keeping the top-end space intentional"
-    if "lifting" in arc or "building" in arc:
+    # The arc-only mint needs a delta witness (2026-06-11 filler-cut panel):
+    # a lifting slope with NOTHING measured in the window — no band move, no
+    # onset change — measured 2 should_NOT ("Generic energy coaching",
+    # friend 1-2) against 1 friend-2 keeper. Any delta qualifies, slight
+    # included: it never picks the body (skipped above), it just anchors the
+    # arc in something the ear saw. Zero-delta lifting falls through to the
+    # phase bodies — a conscious morph, not a receipt abort (an iter7
+    # friend-3 keeper survives at phase=groove via exactly this path).
+    if ("lifting" in arc or "building" in arc) and deltas:
         return "lifting the next phrase without rushing it"
     if "settling" in arc or "settled" in arc:
         return "holding the groove steady"

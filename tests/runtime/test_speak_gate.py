@@ -562,14 +562,19 @@ def test_nudge_atom_round_trips_real_producer_output() -> None:
     state.audible = True
     state.phase = "build"
     state.energy_curve = [0.30, 0.30, 0.45, 0.50]  # lifting arc → change nudge
+    state.bands = {"sub": 0.0, "low": 0.16, "mid": 0.0, "high": 0.0}
     # (a settling arc no longer yields a receipt at all — iter5 holds the
-    # steady/no-info bodies from the voice path entirely)
+    # steady/no-info bodies from the voice path entirely; since 2026-06-11 a
+    # lifting arc also needs ≥1 measured delta witness, so this fixture rides
+    # a slight low-rose at an audible level — it anchors the arc without
+    # picking the body, the measured surviving keeper shape)
 
     line = build_energy_read_voice_line(
         None,
         event_type="PHASE",
         evidence_registry=EvidenceRegistry(),
         state=state,
+        audio_delta_items=["low energy rose 14% (slight)"],
     )
     assert isinstance(line, str) and "points toward" in line
 

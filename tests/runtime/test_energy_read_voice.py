@@ -81,19 +81,56 @@ def test_pure_fallback_reads_yield_no_receipt() -> None:
     assert line is None
 
 
-def test_lifting_read_still_yields_receipt() -> None:
-    """A CHANGE read keeps its receipt — 'lifting the next phrase' carries a
-    real directive and is the register the judge passes."""
+def test_lifting_read_with_delta_witness_still_yields_receipt() -> None:
+    """A CHANGE read keeps its receipt when ANY measured delta rides the
+    window — the witness can be slight (it never picks the body, but it
+    anchors the arc in something the ear saw). This is the measured surviving
+    keeper shape: lever audio-r3 'lifting' read with 'low rose 14% (slight)'
+    at low=0.16, judged friend 3 (2026-06-11 filler-cut panel)."""
     reg = EvidenceRegistry()
     line = build_energy_read_voice_line(
         None,
         event_type="PHASE",
         evidence_registry=reg,
-        state=_state(curve=[0.30, 0.30, 0.45, 0.50]),  # lifting arc
+        state=_state(curve=[0.30, 0.30, 0.45, 0.50], bands={"low": 0.16}),
+        audio_delta_items=["low energy rose 14% (slight)"],
     )
     assert isinstance(line, str)
     assert "lifting the next phrase without rushing it" in line
     assert "energy" in reg.snapshot()  # citation key registered at build time
+
+
+def test_zero_delta_lifting_arc_yields_no_receipt() -> None:
+    """Documented contract change (2026-06-11 filler-cut panel): the arc-only
+    lifting mint — zero deltas, nothing the ear can anchor — measured 2 NOT
+    ('Generic energy coaching', friend 1-2: lever audio-r1 0003, midi-r1
+    0004) against 1 friend-2 keeper (midi-r3 0004). The windowed slope alone
+    no longer earns a voice receipt; with no phase read either, the receipt
+    falls to the no-info bodies and stays silent."""
+    line = build_energy_read_voice_line(
+        None,
+        event_type="PHASE",
+        evidence_registry=EvidenceRegistry(),
+        state=_state(curve=[0.30, 0.30, 0.45, 0.50], phase=""),
+    )
+    assert line is None
+
+
+def test_zero_delta_lifting_arc_morphs_to_phase_body_at_groove() -> None:
+    """The zero-delta arc cut is a body veto, not a receipt abort: at a
+    phase the producer can still read (groove), the receipt morphs to the
+    phase body instead of going silent — the conscious fall-through pinned
+    by the 2026-06-11 panel (an iter7 friend-3 keeper survives via exactly
+    this morph)."""
+    line = build_energy_read_voice_line(
+        None,
+        event_type="PHASE",
+        evidence_registry=EvidenceRegistry(),
+        state=_state(curve=[0.30, 0.30, 0.45, 0.50], phase="groove"),
+    )
+    assert isinstance(line, str)
+    assert "letting the current space breathe" in line
+    assert "lifting the next phrase" not in line
 
 
 def test_breathing_space_read_still_yields_receipt() -> None:
@@ -121,8 +158,12 @@ def test_settling_arc_with_sub_fell_delta_yields_earned_receipt() -> None:
         None,
         event_type="PHASE",
         evidence_registry=reg,
-        state=_state(curve=[0.50, 0.50, 0.40, 0.40]),  # settling arc
-        audio_delta_items=["sub energy fell 0.21 -> 0.09"],
+        # Canonical render_delta format (2026-06-11 re-fixture: the old
+        # "fell 0.21 -> 0.09" string is a shape render_delta never emits and
+        # bypassed the fell-audibility parse): sub fell 57% from an audible
+        # level — pre reconstructs to 0.09/(1-0.57)=0.21 >= the floor.
+        state=_state(curve=[0.50, 0.50, 0.40, 0.40], bands={"sub": 0.09}),  # settling arc
+        audio_delta_items=["sub energy fell 57% (strong)"],
     )
     assert isinstance(line, str)
     assert "leaving low-end space before the next push" in line
@@ -257,12 +298,15 @@ def test_slight_deltas_dropped_from_voiced_clause_when_non_slight_rides() -> Non
 def test_mid_fell_speaks_mid_language_not_top_end() -> None:
     """The rise-bug's twin (auditor residual, 2026-06-10): "mid energy fell"
     rendered "keeping the top-end space intentional" — top-end vocabulary for
-    a mid move. Each band speaks its own vocabulary on the fall side too."""
+    a mid move. Each band speaks its own vocabulary on the fall side too.
+    (2026-06-11 re-fixture: bands carry an audible mid — the fall is from
+    pre=0.14/(1-0.30)=0.20. The pin's intent is per-band VOCABULARY; the
+    audibility of the fall is the separate fell-floor contract below.)"""
     line = build_energy_read_voice_line(
         None,
         event_type="PHASE",
         evidence_registry=EvidenceRegistry(),
-        state=_state(phase=""),
+        state=_state(phase="", bands={"mid": 0.14}),
         audio_delta_items=["mid energy fell 30% (clear)"],
     )
     assert isinstance(line, str)
@@ -272,16 +316,123 @@ def test_mid_fell_speaks_mid_language_not_top_end() -> None:
 
 def test_high_fell_keeps_top_end_vocabulary() -> None:
     """A genuine high/brightness fall keeps the top-end body — the vocabulary
-    split is per-band, not a ban."""
+    split is per-band, not a ban. (2026-06-11 re-fixture: high=0.15 makes
+    the fall audible, pre=0.23 — see the fell-floor pins below for the
+    inaudible twin.)"""
     line = build_energy_read_voice_line(
         None,
         event_type="PHASE",
         evidence_registry=EvidenceRegistry(),
-        state=_state(phase=""),
+        state=_state(phase="", bands={"high": 0.15}),
         audio_delta_items=["high energy fell 35% (clear)"],
     )
     assert isinstance(line, str)
     assert "keeping the top-end space intentional" in line
+
+
+def test_inaudible_fell_yields_no_receipt() -> None:
+    """Fell-audibility floor (2026-06-11 filler-cut panel, D1): "high energy
+    fell 50% (strong)" at high=0.01 reconstructs pre=0.02 — a relative fall
+    on a band that was never audible. That exact receipt minted "keeping the
+    top-end space intentional" 7 times across lever+baseline runs and was
+    judged should_NOT 6 of 7 ("filler; silence was better"). The 7th was a
+    friend-3 keeper on byte-identical evidence — the judge is inconsistent on
+    this shape, a deterministic rule cannot split it, and the cut buys 6 NOT
+    for 1 OK (acknowledged trade). With nothing else to say the read falls to
+    the no-info bodies and stays silent."""
+    line = build_energy_read_voice_line(
+        None,
+        event_type="PHASE",
+        evidence_registry=EvidenceRegistry(),
+        state=_state(phase="", bands={"sub": 0.74, "low": 0.17, "mid": 0.08, "high": 0.01}),
+        audio_delta_items=["high energy fell 50% (strong)"],
+    )
+    assert line is None
+
+
+def test_audible_fell_keeps_low_space_keeper() -> None:
+    """The fell-floor keeper twin: "sub energy fell 43% (strong)" at
+    sub=0.25 reconstructs pre=0.44 — a real drop from an audible level, the
+    corpus's 3-for-4 TRUE low-space family (lever audio-r1/midi-r1/midi-r3,
+    friend 2-3)."""
+    line = build_energy_read_voice_line(
+        None,
+        event_type="PHASE",
+        evidence_registry=EvidenceRegistry(),
+        state=_state(phase="", bands={"sub": 0.25, "low": 0.32, "mid": 0.41, "high": 0.01}),
+        audio_delta_items=["sub energy fell 43% (strong)"],
+    )
+    assert isinstance(line, str)
+    assert "leaving low-end space before the next push" in line
+
+
+def test_brightness_fell_reconstructs_from_mid_plus_high_sum() -> None:
+    """Brightness is the mid+high SUM (deck_context._render_brightness_delta)
+    — reconstructing a brightness fall from the high band alone would falsely
+    kill every brightness read in a dark-topped mix (high 0.01, mid 0.30:
+    an order of magnitude wrong, 2026-06-11 panel). Sum pre = 0.31/0.70 =
+    0.44 — audible, the top-end body mints."""
+    line = build_energy_read_voice_line(
+        None,
+        event_type="PHASE",
+        evidence_registry=EvidenceRegistry(),
+        state=_state(phase="", bands={"sub": 0.50, "low": 0.19, "mid": 0.30, "high": 0.01}),
+        audio_delta_items=["brightness share fell 30% (clear)"],
+    )
+    assert isinstance(line, str)
+    assert "keeping the top-end space intentional" in line
+
+
+def test_fell_to_near_zero_abstains_from_the_floor() -> None:
+    """pct >= 90 makes the pre reconstruction meaningless (post ~ 0 divides
+    away the true pre-level) — and a full band kill is the most audible fell
+    gesture in DJing (EQ kill / breakdown drop), so the floor ABSTAINS and
+    the read stays voiceable."""
+    line = build_energy_read_voice_line(
+        None,
+        event_type="PHASE",
+        evidence_registry=EvidenceRegistry(),
+        state=_state(phase="", bands={"sub": 0.0, "low": 0.2, "mid": 0.3, "high": 0.02}),
+        audio_delta_items=["sub energy fell 100% (strong)"],
+    )
+    assert isinstance(line, str)
+    assert "leaving low-end space before the next push" in line
+
+
+def test_non_canonical_fell_string_abstains() -> None:
+    """A fell string without the canonical "fell NN% " magnitude cannot
+    reconstruct its pre-level — the floor abstains (mirrors the rose-side
+    None path) instead of guessing."""
+    line = build_energy_read_voice_line(
+        None,
+        event_type="PHASE",
+        evidence_registry=EvidenceRegistry(),
+        state=_state(phase="", bands={"sub": 0.01}),
+        audio_delta_items=["sub energy fell 0.21 -> 0.09"],
+    )
+    assert isinstance(line, str)
+    assert "leaving low-end space before the next push" in line
+
+
+def test_inaudible_fell_dropped_from_voiced_clause() -> None:
+    """The voiced-clause mirror of the fell floor: an inaudible high-fall
+    co-riding an audible sub-fall stays in the digest but leaves the
+    "Live deltas:" clause — the brain must not be offered it as sayable
+    material (same mechanism as the inaudible-rose cut, 16b1e1b4)."""
+    line = build_energy_read_voice_line(
+        None,
+        event_type="PHASE",
+        evidence_registry=EvidenceRegistry(),
+        state=_state(phase="", bands={"sub": 0.25, "low": 0.32, "mid": 0.41, "high": 0.01}),
+        audio_delta_items=[
+            "sub energy fell 43% (strong)",
+            "high energy fell 50% (strong)",
+        ],
+    )
+    assert isinstance(line, str)
+    assert "leaving low-end space before the next push" in line
+    assert "sub energy fell 43%" in line
+    assert "high energy fell" not in line
 
 
 def test_unmatched_deltas_fall_to_no_info_body_and_stay_silent() -> None:
