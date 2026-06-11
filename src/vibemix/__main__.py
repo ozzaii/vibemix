@@ -4325,6 +4325,34 @@ def _build_library_subparsers(parser: argparse.ArgumentParser) -> None:
     sp_doctor.add_argument("--json", action="store_true")
     sp_doctor.set_defaults(func=_cmd_library_doctor)
 
+    sp_gig_check = sub.add_parser(
+        "gig-check",
+        help="Read-only preflight verdict over a Rekordbox XML: take it / fix first / do not take",
+        description=(
+            "Audit a collection.xml without touching it: missing files, cue "
+            "debt (no DJ hot cues, unlabeled cues, no mix-out anchor, no "
+            "beatgrid), duplicate suspects, crate bloat — then a single "
+            "verdict with receipts and a Tonight crate of the tracks that "
+            "earned trust. Exit code is the verdict: 0 take_it, 1 fix_first, "
+            "2 do_not_take."
+        ),
+    )
+    sp_gig_check.add_argument("xml", help="path to a Rekordbox collection XML export")
+    sp_gig_check.add_argument("--json", action="store_true")
+    sp_gig_check.add_argument(
+        "--bloat-threshold",
+        type=int,
+        default=80,
+        help="playlist size above which a crate is flagged too fat to use live (default 80)",
+    )
+    sp_gig_check.add_argument(
+        "--tonight-cap",
+        type=int,
+        default=40,
+        help="max tracks in the Tonight crate (default 40)",
+    )
+    sp_gig_check.set_defaults(func=_cmd_library_gig_check)
+
     # Phase 89 Plan 01 — ingest: auto-detect a DJ library + embed it on-device.
     sp_ingest = sub.add_parser(
         "ingest",
@@ -8724,6 +8752,32 @@ def _cmd_library_doctor(args: argparse.Namespace) -> int:
     else:
         print(format_report(report), file=sys.stderr)
     return 0 if report["all_ok"] else 1
+
+
+def _cmd_library_gig_check(args: argparse.Namespace) -> int:
+    """Read-only preflight verdict over a Rekordbox collection XML.
+
+    Exit code IS the verdict, so a prep script can gate on it:
+    0 = take_it, 1 = fix_first (or unreadable input), 2 = do_not_take.
+    """
+    import json as _json
+
+    from vibemix.library.gig_check import format_report, run_gig_check
+
+    try:
+        report = run_gig_check(
+            args.xml,
+            bloat_threshold=args.bloat_threshold,
+            tonight_cap=args.tonight_cap,
+        )
+    except FileNotFoundError:
+        print(f"[gig-check err] collection XML not found: {args.xml}", file=sys.stderr)
+        return 1
+    if getattr(args, "json", False):
+        print(_json.dumps(report, indent=2))
+    else:
+        print(format_report(report))
+    return {"take_it": 0, "fix_first": 1, "do_not_take": 2}[report["verdict"]]
 
 
 def _cmd_library_stats(args: argparse.Namespace) -> int:
