@@ -129,6 +129,38 @@ matrices deliberately not audited (no verified fact base yet).
    not need more music. You needed fewer lies." etc. Avoid: "AI DJ",
    "seamless", "magic".
 
+## Final ingest pass (2026-06-12, second session) — coverage now 8/8 files
+
+The library-doctor insane-data MD (1504 lines) + JSON turned out to be a
+container: lines 174+ embed the pain-scan, cue-crafter blueprint, and
+gold-radar verbatim (sha256-stamped in the JSON's `archive_files`); the JSON
+mirrors the MD machine-readably. `...(1).json` is byte-identical to the
+non-(1) copy. The hand-of-god raw_corpus (8.3M) is evidence backing for
+claims already extracted — mined selectively (USB/export lanes), deliberately
+not re-chewed.
+
+Items the final pass surfaced that were NOT yet in the queue:
+
+- **Migration preflight — "what dies in transit"** (pain #7, g32): loss
+  accounting BEFORE a Rekordbox↔Serato conversion (cue colors lost, loops
+  dropped, AAC unsupported). Lexicon owns "convert"; the open emotion is
+  "will I lose what I built?". Distinct wedge, same verdict pattern.
+- **Duplicate-winner ranking** (g13/g14): "which duplicate has my cues?"
+  beats generic dupe lists — rank by cue presence, format, bitrate, history.
+  Cheap upgrade to gig-check's existing duplicate groups.
+- **Crate pivot index** (g19): score a crate by safe exits (BPM/energy/vocal
+  density bridges), not just size.
+- **Wedding/client-playlist triage** (g20, pain #8): 300-request list →
+  dinner/singalong/bridge/floor-rescue/do-not-play crates. `auto_crate.py`
+  adjacency.
+- **Set Autopsy** (cue-crafter §3): planned-vs-played from DJ-software
+  history files; retention loop ("DJs come back after gigs").
+- **Trust surface copy** (g30, g11, g12): the first screen should show what
+  Viber will NOT touch; audit logs/checksums/reversibility are core, not
+  polish; zero dark patterns.
+- **Inbox-to-Ready pipeline** (pain #3): staged prep flow (downloads →
+  quick-listen → cue candidate → gig-ready → archived).
+
 ## Where the raw data lives
 
 - `~/Downloads/2026-06-11-vibemix-hand-of-god-adversarial-ingest{-pack.zip,.json}`
