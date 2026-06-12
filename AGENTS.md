@@ -20,6 +20,10 @@ sidecar bridge. Supporting material lives in
 - `npm --prefix tauri/ui run build`: type-check and build the webview.
 - `cargo check --manifest-path tauri/src-tauri/Cargo.toml`: validate Rust changes.
 - `uv run python -m vibemix`: run the local co-host session loop.
+- `uv run python -m vibemix library gig-check <path>` / `library export-guard
+  <usb> --rig <id>`: the read-only preflight verdict CLIs (2026-06-12 wedge;
+  public noun is "Gig Check", never "Library Doctor"). Contracts + commit list:
+  `.planning/handoffs/2026-06-12-HANDOFF-GIG-CHECK-EXPORT-GUARD.md`.
 
 ## Coding Style & Naming Conventions
 
