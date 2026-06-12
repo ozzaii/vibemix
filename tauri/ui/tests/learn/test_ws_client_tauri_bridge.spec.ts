@@ -27,6 +27,23 @@ type LearnEnvelope = {
   payload: Record<string, unknown>;
 };
 
+const EXPECTED_TAURI_SUBSCRIPTIONS = [
+  "ipc.learn.controller_detected",
+  "ipc.learn.midi_position",
+  "ipc.learn.lesson_loaded",
+  "ipc.learn.highlight",
+  "ipc.learn.advance",
+  "ipc.learn.complete_lesson",
+  "ipc.learn.tutor_speak",
+  "ipc.learn.live_grade",
+  "ipc.learn.waveform_ready",
+  "ipc.learn.playhead_tick",
+  "ipc.learn.exemplar_play",
+  "ipc.learn.exemplar_stop",
+  "ipc.learn.progress_state",
+  "ipc.status.tick",
+].sort();
+
 function installTauriEventBridge(): void {
   Object.defineProperty(window, "__TAURI_INTERNALS__", {
     value: {},
@@ -131,7 +148,7 @@ describe("LearnWsClient Tauri bridge selection", () => {
     try {
       client.connect();
       await vi.waitFor(() => {
-        expect(mocks.subscribeIpc).toHaveBeenCalledTimes(12);
+        expect([...callbacks.keys()].sort()).toEqual(EXPECTED_TAURI_SUBSCRIPTIONS);
       });
       await vi.waitFor(() => {
         expect(openSpy).toHaveBeenCalledTimes(1);

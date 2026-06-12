@@ -149,15 +149,18 @@ describe("SHIP-WIRE START-gate", () => {
     expect(css).toContain('[data-runstate="running"] .vmx-deck__controls button[data-action="stop"]');
   });
 
-  it("running voice well uses material depth instead of a 1px outer frame", () => {
+  it("running voice well is frameless — glows on the open void, no slab frame or bevel", () => {
     const css = layoutStyle();
     const voice = cssBlock(css, ".vmx-voice");
     const voiceFrame = cssBlock(css, ".vmx-voice::before");
     const foot = cssBlock(css, ".vmx-deck__foot");
 
+    // BOLD REDESIGN (2026-06-08, "go bold"): the glass slab + engraved bevel are
+    // gone; the voice reads off the raw obsidian, lit only by one rose key-light.
     expect(voice).toContain("border: 0");
-    expect(voice).toContain("var(--bevel-raised)");
-    expect(voiceFrame).not.toContain("border: 1px");
+    expect(voice).toContain("radial-gradient");
+    expect(voice).not.toContain("var(--bevel-raised)");
+    expect(voiceFrame).toContain("display: none");
     expect(foot).toContain("border-top: 0");
     expect(foot).toContain("box-shadow: inset 0 1px 0");
   });

@@ -95,12 +95,15 @@ describe("beginner Learn path contract", () => {
     _resetSessionStateForTests();
   });
 
-  it("opens Learn from the main app and advances the first booth action", async () => {
+  it("Learn stays parked from the main app (no window auto-open); the booth engine still advances when mounted directly", async () => {
     _internals.modeChangeHandler("learn");
     await Promise.resolve();
 
     expect(getSessionState().mode).toBe("learn");
-    expect(mocks.invoke).toHaveBeenCalledWith("open_learn_window");
+    // Learn is PARKED for launch (coming-soon tease): selecting the mode flips
+    // state + emits set_mode, but no longer auto-opens the Learn window. The booth
+    // engine below still works when mounted directly (engine built, surface parked).
+    expect(mocks.invoke).not.toHaveBeenCalledWith("open_learn_window");
     expect(mocks.emitIpc).toHaveBeenCalledWith("ipc.session.set_mode", {
       mode: "learn",
     });
