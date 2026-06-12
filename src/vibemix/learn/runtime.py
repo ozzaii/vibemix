@@ -1269,6 +1269,12 @@ class LessonRuntime(StateMachine):
         completion, or tutor credit. The FSM can still ignore the ack later.
         """
 
+        if str(midi.get("control") or "") in {"wreck_round", "wreck_stop"}:
+            # Booth round controls are director commands for the wreck handler
+            # (next in the ack chain), never deck gestures. Grading the stale
+            # pre-round deck here voiced a generic verdict moments before the
+            # round's own groove_open bark at every stop->restart boundary.
+            return
         if not self._lesson_engaged():
             self._start_practice_sandbox_player()
             self._apply_beatmatch_practice_action(midi)

@@ -428,6 +428,35 @@ def test_booth_revives_after_a_completed_lesson(tmp_path: Path) -> None:
     assert _payloads(ipc, "ipc.learn.live_grade")
 
 
+def test_booth_controls_are_not_free_practice_gestures(tmp_path: Path) -> None:
+    """The ack chain runs handle_practice_audio_ack BEFORE the wreck handler.
+
+    A restart press with stale-shoved decks (the last round's break still on
+    deck B) must not voice the generic grade line moments before the round's
+    own groove_open bark — live-verified seam, 2026-06-12: "tempo is far out"
+    spoke 5ms before the bark at every stop->restart boundary. Booth round
+    controls are director commands, never free-practice deck gestures.
+    """
+
+    clock = [0.0]
+    holder = {"snap": _snap(rate_b=1.08)}  # stale shove from the last round
+    runtime, ipc, _player, wreck, _ = _runtime_with_round(
+        tmp_path, clock=clock, loader=lambda: holder["snap"]
+    )
+    # dispatch order exactly as ipc_handlers.register_learn_handlers
+    runtime.handle_practice_audio_ack(_wreck_ack())
+    assert runtime.handle_wreck_round_ack(_wreck_ack()) is True
+    assert wreck.active
+    speaks = _payloads(ipc, "ipc.learn.tutor_speak")
+    grade_speaks = [s for s in speaks if s["tts_marker"].endswith(".grade")]
+    assert not grade_speaks, (
+        "booth control ack double-voiced the round boundary: "
+        f"{[s['text'] for s in grade_speaks]!r}"
+    )
+    # the press is not a practice move either: no boundary meter frame rides it
+    assert not _payloads(ipc, "ipc.learn.live_grade")
+
+
 def test_wreck_round_ack_voices_busy_when_set_is_live(tmp_path: Path) -> None:
     clock = [0.0]
     runtime, ipc, player, wreck, _ = _runtime_with_round(

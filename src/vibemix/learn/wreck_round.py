@@ -508,6 +508,30 @@ class WreckRound:
             return None
 
 
+def wreck_bark_texts() -> tuple[str, ...]:
+    """The fixed bark bank, warm-priority order (sequential pre-synth).
+
+    Hunt-critical banks lead: the break bark is needed ~8-15s into round one,
+    while groove_open already played live as the warm trigger. Landed lines
+    are deliberately absent — they carry MEASURED ``{time_to_lock}`` slots and
+    pre-baking a number that has not been measured yet fabricates a receipt.
+    """
+
+    ordered = (
+        *_BARKS_BREAK_TEMPO,
+        *_BARKS_BREAK_PHASE,
+        *_BARKS_MISSED,
+        *_BARKS_SLIPPED,
+        *_BARKS_HELD,
+        *_BARKS_HELD_CAP,
+        *_BARKS_GROOVE_BACK,
+        *_BARKS_GROOVE_OPEN,
+        BARK_BOOTH_BUSY,
+        BARK_NO_DECK,
+    )
+    return tuple(dict.fromkeys(ordered))
+
+
 __all__ = [
     "BARK_BOOTH_BUSY",
     "BARK_NO_DECK",
@@ -515,4 +539,5 @@ __all__ = [
     "WreckDriverLike",
     "WreckRound",
     "WreckTick",
+    "wreck_bark_texts",
 ]

@@ -480,8 +480,17 @@ def _build_learn_tutor_speak_audio(
     playback: PlaybackQueue,
     muted: Callable[[], bool],
     event_logger: Callable[[str, dict[str, Any]], None] | None = None,
+    bark_cache: Any | None = None,
+    bark_warm_texts: Callable[[], tuple[str, ...]] | None = None,
 ) -> Callable[[str, str], None]:
-    """Build a mute-aware Learn tutor voice sink using the product voice."""
+    """Build a mute-aware Learn tutor voice sink using the product voice.
+
+    With ``bark_cache`` wired, fixed authored lines play from pre-synthesized
+    PCM (one synchronous push — the Wreck Room <500ms bark gate) and the
+    first wreck-marked utterance triggers a one-time background warm of
+    ``bark_warm_texts``. Landed barks carry measured slots and always synth
+    live; the cache never bakes an unmeasured number.
+    """
 
     def _log(kind: str, **fields: Any) -> None:
         if event_logger is None:
@@ -491,18 +500,101 @@ def _build_learn_tutor_speak_audio(
         except Exception:
             pass
 
+    def _resolve_tts() -> Any | None:
+        if voice_tts is not None:
+            return voice_tts
+        if voice_tts_provider is not None:
+            return voice_tts_provider()
+        return None
+
+    # idle -> running -> done; errors fall back to idle so a later round
+    # retries only the still-missing texts (cache hits skip for free).
+    warm_state = {"status": "idle"}
+    warm_lock = threading.Lock()
+
+    def _warm_run() -> None:
+        try:
+            tts = _resolve_tts()
+            if tts is None:
+                _log("learn_tutor_bark_warm_skipped", reason="unavailable")
+                with warm_lock:
+                    warm_state["status"] = "idle"
+                return
+            texts = tuple(bark_warm_texts()) if bark_warm_texts is not None else ()
+            _log("learn_tutor_bark_warm_started", count=len(texts))
+            source_sr = int(getattr(tts, "sample_rate", OUTPUT_SR) or OUTPUT_SR)
+            cached = errors = total = 0
+            for bark_text in texts:
+                if bark_cache.get(bark_text) is not None:
+                    continue
+                chunks = bytearray()
+
+                def _collect(pcm: bytes, _chunks: bytearray = chunks) -> None:
+                    out = _resample_pcm16_mono_bytes(
+                        pcm, source_sr=source_sr, target_sr=OUTPUT_SR
+                    )
+                    if out:
+                        _chunks.extend(out)
+
+                try:
+                    tts.synthesize_pcm(bark_text, _collect)
+                except Exception:
+                    errors += 1
+                    continue
+                if chunks:
+                    bark_cache.put(bark_text, bytes(chunks), pinned=True)
+                    cached += 1
+                    total += len(chunks)
+            _log(
+                "learn_tutor_bark_warm_done",
+                cached=cached,
+                bytes=total,
+                errors=errors,
+            )
+            with warm_lock:
+                warm_state["status"] = "done" if errors == 0 else "idle"
+        except Exception as exc:  # pragma: no cover - defensive runtime path
+            with warm_lock:
+                warm_state["status"] = "idle"
+            print(f"[learn] bark warm failed: {exc!r}", file=sys.stderr)
+
+    def _maybe_start_bark_warm() -> None:
+        if bark_cache is None or bark_warm_texts is None:
+            return
+        with warm_lock:
+            if warm_state["status"] != "idle":
+                return
+            warm_state["status"] = "running"
+        threading.Thread(target=_warm_run, name="learn-bark-warm", daemon=True).start()
+
+    # Refusal barks fire when a LIVE SET owns the decks (busy) or no deck
+    # answered: warming ~27 synths on the shared live voice engine there
+    # would make Sven late mid-set. Warm waits for a round that engaged.
+    refusal_markers = ("wreck_round.busy", "wreck_round.no_deck")
+
     def speak(text: str, tts_marker: str) -> None:
         if muted():
             _log("learn_tutor_voice_skipped", reason="muted", tts_marker=tts_marker)
             return
+        if tts_marker.startswith("wreck_round") and tts_marker not in refusal_markers:
+            _maybe_start_bark_warm()
+        if bark_cache is not None:
+            hit = bark_cache.get(text)
+            if hit is not None:
+                playback.push(hit)
+                _log(
+                    "learn_tutor_voice_cache_hit",
+                    tts_marker=tts_marker,
+                    bytes=len(hit),
+                )
+                return
         _log("learn_tutor_voice_queued", tts_marker=tts_marker, chars=len(text))
 
         def _run() -> None:
             pushed_bytes = 0
+            spoken_chunks = bytearray()
             try:
-                tts = voice_tts
-                if tts is None and voice_tts_provider is not None:
-                    tts = voice_tts_provider()
+                tts = _resolve_tts()
                 if tts is None:
                     _log("learn_tutor_voice_skipped", reason="unavailable", tts_marker=tts_marker)
                     return
@@ -520,8 +612,13 @@ def _build_learn_tutor_speak_audio(
                     if out:
                         playback.push(out)
                         pushed_bytes += len(out)
+                        spoken_chunks.extend(out)
 
                 tts.synthesize_pcm(text, _on_pcm)
+                if bark_cache is not None and spoken_chunks:
+                    # Opportunistic store: repeated fixed lines (grade copy,
+                    # round 2 barks before warm finishes) go instant next time.
+                    bark_cache.put(text, bytes(spoken_chunks))
                 _log(
                     "learn_tutor_voice_complete",
                     tts_marker=tts_marker,
@@ -3358,11 +3455,16 @@ async def main() -> None:
         )
         cue_placement_practice_driver = None
 
+    from vibemix.learn.bark_cache import BarkPcmCache
+    from vibemix.learn.wreck_round import wreck_bark_texts
+
     learn_tutor_speak_audio = _build_learn_tutor_speak_audio(
         voice_tts_provider=_learn_tutor_voice_provider,
         playback=playback,
         muted=lambda: bool(_session_ipc is not None and _session_ipc.muted),
         event_logger=_learn_session_event,
+        bark_cache=BarkPcmCache(),
+        bark_warm_texts=wreck_bark_texts,
     )
 
     lesson_runtime = LessonRuntime(
