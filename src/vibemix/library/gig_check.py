@@ -109,6 +109,44 @@ def _track_ref(track: TrackEntry) -> dict[str, Any]:
     }
 
 
+def _prep_key(track: TrackEntry) -> tuple[int, int, int, int]:
+    """How much DJ prep a copy carries — the duplicate-winner ranking."""
+    dj_hot = sum(1 for c in track.cues if c.source == "dj" and c.number >= 1)
+    return (dj_hot, 1 if track.beatgrid else 0, track.rating, track.play_count)
+
+
+def _duplicate_group(group: list[TrackEntry]) -> dict[str, Any]:
+    """One duplicate cluster with the keeper named, when one earns it.
+
+    The winner must STRICTLY beat the runner-up on prep; equally naked (or
+    equally prepped) copies get ``keep: None`` — an arbitrary pick would be
+    a guess dressed as advice.
+    """
+    ranked = sorted(group, key=_prep_key, reverse=True)
+    keep: str | None = None
+    reason: str | None = None
+    if _prep_key(ranked[0]) > _prep_key(ranked[1]):
+        winner = ranked[0]
+        dj_hot, has_grid, rating, plays = _prep_key(winner)
+        bits = [f"{dj_hot} DJ hot cue(s)"]
+        if has_grid:
+            bits.append("a beatgrid")
+        if rating:
+            bits.append(f"rating {rating}")
+        if plays:
+            bits.append(f"{plays} plays")
+        keep = winner.track_id
+        reason = (
+            f"this copy carries the prep ({', '.join(bits)}); "
+            f"the other copies carry less"
+        )
+    return {
+        "tracks": [_track_ref(t) for t in group],
+        "keep": keep,
+        "reason": reason,
+    }
+
+
 def audit_library(
     tracks: dict[str, TrackEntry],
     playlists: tuple[PlaylistRef, ...] | list[PlaylistRef] = (),
@@ -142,14 +180,15 @@ def audit_library(
                     {**_track_ref(track), "issues": cue_issues, "status": status}
                 )
 
-    # Duplicates: normalized (title, artist) collisions.
+    # Duplicates: normalized (title, artist) collisions, plus the g13/g14
+    # winner call — "which duplicate has my cues?" beats a bare dupe list.
     groups: dict[tuple[str, str], list[TrackEntry]] = {}
     for track in ordered:
         key = _dedup_key(track)
         if key is not None:
             groups.setdefault(key, []).append(track)
     duplicates = [
-        [_track_ref(t) for t in group] for group in groups.values() if len(group) > 1
+        _duplicate_group(group) for group in groups.values() if len(group) > 1
     ]
 
     crate_bloat = [
@@ -228,6 +267,99 @@ def _verdict(
 
 # --- loader ------------------------------------------------------------------ #
 
+SOURCE_KINDS = ("rekordbox", "serato", "traktor", "virtualdj", "engine")
+
+
+def detect_source_kind(path: str | Path) -> str:
+    """Sniff which DJ-software catalog a path points at, by shape.
+
+    Raises ValueError (with the supported shapes) instead of guessing —
+    a wrong parse would produce a confidently wrong verdict.
+    """
+    p = Path(path)
+    if p.is_dir():
+        if p.name == "_Serato_" or (p / "_Serato_").is_dir():
+            return "serato"
+        raise ValueError(
+            f"cannot detect a DJ library in directory {p} — expected a "
+            f"_Serato_ folder (or pass a catalog file: collection.xml, "
+            f"collection.nml, database.xml, m.db)"
+        )
+    name = p.name.lower()
+    if name == "database v2":
+        return "serato"
+    if p.suffix.lower() == ".nml":
+        return "traktor"
+    if name == "m.db":
+        return "engine"
+    if p.suffix.lower() == ".xml":
+        # Sniff the root element from the head only — substring check, no
+        # XML parse of untrusted input at detection time.
+        with open(p, encoding="utf-8", errors="replace") as fh:
+            head = fh.read(4096)
+        if "<VirtualDJ_Database" in head:
+            return "virtualdj"
+        if "<DJ_PLAYLISTS" in head:
+            return "rekordbox"
+        raise ValueError(
+            f"{p} is XML but neither a Rekordbox DJ_PLAYLISTS export nor a "
+            f"VirtualDJ database"
+        )
+    raise ValueError(
+        f"unrecognized library shape: {p} — supported: Rekordbox "
+        f"collection.xml, Traktor collection.nml, VirtualDJ database.xml, "
+        f"Engine m.db, a _Serato_ folder"
+    )
+
+
+def _serato_root(p: Path) -> Path | None:
+    if p.is_file() and p.name.lower() == "database v2":
+        return p.parent
+    if p.is_dir() and p.name == "_Serato_":
+        return p
+    if p.is_dir() and (p / "_Serato_").is_dir():
+        return p / "_Serato_"
+    return None
+
+
+def load_serato_crates(serato_root: Path) -> tuple[PlaylistRef, ...]:
+    """Map ``_Serato_/Subcrates/*.crate`` onto PlaylistRef for crate bloat.
+
+    Members are filepaths (Serato's native reference); the bloat layer only
+    counts them, so no track-id join is needed.
+    """
+    from vibemix.library.sources.serato import iter_crates
+
+    return tuple(
+        PlaylistRef(name=name, track_ids=members)
+        for name, members in iter_crates(serato_root)
+    )
+
+
+def _iter_source_tracks(kind: str, path: Path):
+    """Build the matching LibrarySource pinned to ``path`` and yield tracks."""
+    if kind == "serato":
+        from vibemix.library.sources.serato import SeratoSource
+
+        # Pin to the resolved _Serato_ dir — the natural CLI input is the
+        # drive root CONTAINING it, which SeratoSource won't probe into.
+        source = SeratoSource(library_path=str(_serato_root(path) or path))
+    elif kind == "traktor":
+        from vibemix.library.sources.traktor import TraktorSource
+
+        source = TraktorSource(nml_path=str(path))
+    elif kind == "virtualdj":
+        from vibemix.library.sources.virtualdj import VirtualDJSource
+
+        source = VirtualDJSource(database_path=str(path))
+    elif kind == "engine":
+        from vibemix.library.sources.engine import EngineDJSource
+
+        source = EngineDJSource(database_path=str(path))
+    else:  # pragma: no cover - guarded by SOURCE_KINDS check upstream
+        raise ValueError(f"unknown source kind: {kind}")
+    return source.iter_tracks()
+
 
 def load_playlists(xml_path: str | Path) -> tuple[PlaylistRef, ...]:
     """Read playlist leaf nodes from a Rekordbox collection XML.
@@ -256,25 +388,49 @@ def load_playlists(xml_path: str | Path) -> tuple[PlaylistRef, ...]:
 def run_gig_check(
     xml_path: str | Path,
     *,
+    source: str = "auto",
     bloat_threshold: int = DEFAULT_BLOAT_THRESHOLD,
     tonight_cap: int = DEFAULT_TONIGHT_CAP,
 ) -> dict[str, Any]:
-    """Parse ``collection.xml`` and audit it. Raises FileNotFoundError when the
-    XML itself is absent — a missing input is the caller's bug, not a verdict."""
+    """Parse any supported DJ catalog and audit it.
+
+    ``source`` is one of SOURCE_KINDS or "auto" (sniff by shape). Raises
+    FileNotFoundError when the input itself is absent and ValueError when
+    the shape cannot be recognized — a missing/unknown input is the
+    caller's bug, not a verdict.
+    """
     path = Path(xml_path)
     if not path.exists():
         raise FileNotFoundError(path)
+    kind = detect_source_kind(path) if source == "auto" else source
+    if kind not in SOURCE_KINDS:
+        raise ValueError(
+            f"unknown source '{kind}' — supported: {', '.join(SOURCE_KINDS)}"
+        )
 
-    from vibemix.library.rekordbox import RekordboxLibrary
+    playlists: tuple[PlaylistRef, ...] = ()
+    if kind == "rekordbox":
+        from vibemix.library.rekordbox import RekordboxLibrary
 
-    library = RekordboxLibrary()
-    library.load_xml(path)
-    return audit_library(
-        library.tracks,
-        load_playlists(path),
+        library = RekordboxLibrary()
+        library.load_xml(path)
+        tracks = library.tracks
+        playlists = load_playlists(path)
+    else:
+        tracks = {t.track_id: t for t in _iter_source_tracks(kind, path)}
+        if kind == "serato":
+            root = _serato_root(path)
+            if root is not None:
+                playlists = load_serato_crates(root)
+
+    report = audit_library(
+        tracks,
+        playlists,
         bloat_threshold=bloat_threshold,
         tonight_cap=tonight_cap,
     )
+    report["source"] = kind
+    return report
 
 
 # --- human report -------------------------------------------------------------- #
@@ -312,8 +468,12 @@ def format_report(report: dict[str, Any]) -> str:
     if report["duplicates"]:
         lines.append("duplicate suspects:")
         for group in report["duplicates"]:
-            names = " / ".join(f"{t['title']} ({t['track_id']})" for t in group)
+            names = " / ".join(
+                f"{t['title']} ({t['track_id']})" for t in group["tracks"]
+            )
             lines.append(f"  [!] {names}")
+            if group["keep"]:
+                lines.append(f"      keep {group['keep']} — {group['reason']}")
     if report["crate_bloat"]:
         lines.append("crate bloat:")
         for b in report["crate_bloat"]:

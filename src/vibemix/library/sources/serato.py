@@ -197,21 +197,24 @@ def _database_rows(path: Path) -> list[_SeratoRow]:
     return rows
 
 
-def _crate_paths(root: Path) -> list[str]:
+def iter_crates(root: Path) -> Iterator[tuple[str, tuple[str, ...]]]:
+    """Yield ``(crate_name, member filepaths)`` read-only from Subcrates.
+
+    Public seam for crate-level consumers (gig-check's crate-bloat layer);
+    per-file read errors are logged and skipped, never fatal.
+    """
     subcrates = root / _SUBCRATES_DIR
     try:
         crate_files = sorted(subcrates.glob("*.crate"), key=lambda item: item.name.lower())
     except OSError:
-        return []
-
-    paths: list[str] = []
-    seen: set[str] = set()
+        return
     for crate in crate_files:
         try:
             data = crate.read_bytes()
         except OSError as exc:
             logger.warning("SeratoSource: could not read crate %s: %s", crate, exc)
             continue
+        members: list[str] = []
         for tag, body in _tagged_chunks(data):
             if tag != "otrk":
                 continue
@@ -219,7 +222,17 @@ def _crate_paths(root: Path) -> list[str]:
             filepath = _first_field(fields, "ptrk", *_PATH_TAGS)
             if not filepath:
                 filepath = _text_from_body(body)
-            if not filepath or filepath in seen:
+            if filepath:
+                members.append(filepath)
+        yield crate.stem, tuple(members)
+
+
+def _crate_paths(root: Path) -> list[str]:
+    paths: list[str] = []
+    seen: set[str] = set()
+    for _name, members in iter_crates(root):
+        for filepath in members:
+            if filepath in seen:
                 continue
             seen.add(filepath)
             paths.append(filepath)

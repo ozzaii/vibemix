@@ -4327,17 +4327,32 @@ def _build_library_subparsers(parser: argparse.ArgumentParser) -> None:
 
     sp_gig_check = sub.add_parser(
         "gig-check",
-        help="Read-only preflight verdict over a Rekordbox XML: take it / fix first / do not take",
+        help="Read-only preflight verdict over any DJ library: take it / fix first / do not take",
         description=(
-            "Audit a collection.xml without touching it: missing files, cue "
+            "Audit a DJ catalog without touching it: missing files, cue "
             "debt (no DJ hot cues, unlabeled cues, no mix-out anchor, no "
             "beatgrid), duplicate suspects, crate bloat — then a single "
             "verdict with receipts and a Tonight crate of the tracks that "
-            "earned trust. Exit code is the verdict: 0 take_it, 1 fix_first, "
-            "2 do_not_take."
+            "earned trust. Accepts a Rekordbox collection.xml, Traktor "
+            "collection.nml, VirtualDJ database.xml, Engine m.db, or a "
+            "_Serato_ folder (auto-detected by shape). Exit code is the "
+            "verdict: 0 take_it, 1 fix_first, 2 do_not_take."
         ),
     )
-    sp_gig_check.add_argument("xml", help="path to a Rekordbox collection XML export")
+    sp_gig_check.add_argument(
+        "path",
+        help=(
+            "path to a DJ library: Rekordbox collection.xml, Traktor "
+            "collection.nml, VirtualDJ database.xml, Engine m.db, or a "
+            "_Serato_ folder"
+        ),
+    )
+    sp_gig_check.add_argument(
+        "--source",
+        choices=("auto", "rekordbox", "serato", "traktor", "virtualdj", "engine"),
+        default="auto",
+        help="catalog type (default: auto-detect by shape)",
+    )
     sp_gig_check.add_argument("--json", action="store_true")
     sp_gig_check.add_argument(
         "--bloat-threshold",
@@ -8781,7 +8796,7 @@ def _cmd_library_doctor(args: argparse.Namespace) -> int:
 
 
 def _cmd_library_gig_check(args: argparse.Namespace) -> int:
-    """Read-only preflight verdict over a Rekordbox collection XML.
+    """Read-only preflight verdict over any supported DJ catalog.
 
     Exit code IS the verdict, so a prep script can gate on it:
     0 = take_it, 1 = fix_first (or unreadable input), 2 = do_not_take.
@@ -8792,12 +8807,16 @@ def _cmd_library_gig_check(args: argparse.Namespace) -> int:
 
     try:
         report = run_gig_check(
-            args.xml,
+            args.path,
+            source=getattr(args, "source", "auto"),
             bloat_threshold=args.bloat_threshold,
             tonight_cap=args.tonight_cap,
         )
     except FileNotFoundError:
-        print(f"[gig-check err] collection XML not found: {args.xml}", file=sys.stderr)
+        print(f"[gig-check err] library not found: {args.path}", file=sys.stderr)
+        return 1
+    except ValueError as exc:
+        print(f"[gig-check err] {exc}", file=sys.stderr)
         return 1
     if getattr(args, "json", False):
         print(_json.dumps(report, indent=2))

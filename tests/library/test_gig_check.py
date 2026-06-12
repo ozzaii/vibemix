@@ -146,8 +146,36 @@ def test_duplicates_grouped(tmp_path):
     }
     report = audit_library(tracks)
     assert len(report["duplicates"]) == 1
-    ids = sorted(t["track_id"] for t in report["duplicates"][0])
+    ids = sorted(t["track_id"] for t in report["duplicates"][0]["tracks"])
     assert ids == ["1", "2"]
+
+
+def test_duplicate_winner_is_the_copy_with_the_prep(tmp_path):
+    # g13/g14: "which duplicate has my cues?" beats a bare dupe list — the
+    # copy carrying DJ prep (cues, beatgrid, rating) is the keeper.
+    tracks = {
+        "naked": _track(
+            tmp_path, "naked", title="Strobe", artist="deadmau5", cues=(), beatgrid=()
+        ),
+        "prepped": _track(
+            tmp_path, "prepped", title="Strobe", artist="deadmau5", rating=4
+        ),
+    }
+    report = audit_library(tracks)
+    group = report["duplicates"][0]
+    assert group["keep"] == "prepped"
+    assert "cue" in group["reason"].lower()
+
+
+def test_duplicate_winner_none_when_no_copy_has_prep(tmp_path):
+    # Honest absence: two equally naked copies → no winner is declared.
+    tracks = {
+        "a": _track(tmp_path, "a", title="Strobe", artist="deadmau5", cues=(), beatgrid=()),
+        "b": _track(tmp_path, "b", title="Strobe", artist="deadmau5", cues=(), beatgrid=()),
+    }
+    report = audit_library(tracks)
+    group = report["duplicates"][0]
+    assert group["keep"] is None
 
 
 def test_crate_bloat_flagged(tmp_path):
@@ -262,7 +290,7 @@ def test_cli_exit_codes_follow_verdict(tmp_path, monkeypatch, capsys):
     monkeypatch.setattr(RekordboxLibrary, "CACHE_PATH", tmp_path / "library.pkl")
     xml = _write_collection_xml(tmp_path)
     args = argparse.Namespace(
-        xml=str(xml), json=False, bloat_threshold=80, tonight_cap=40
+        path=str(xml), source="auto", json=False, bloat_threshold=80, tonight_cap=40
     )
     # the loader fixture has 1 of 2 tracks broken → 50% blocked → do_not_take (2)
     assert m._cmd_library_gig_check(args) == 2
@@ -279,12 +307,13 @@ def test_cli_json_output_is_machine_readable(tmp_path, monkeypatch, capsys):
     monkeypatch.setattr(RekordboxLibrary, "CACHE_PATH", tmp_path / "library.pkl")
     xml = _write_collection_xml(tmp_path)
     args = argparse.Namespace(
-        xml=str(xml), json=True, bloat_threshold=80, tonight_cap=40
+        path=str(xml), source="auto", json=True, bloat_threshold=80, tonight_cap=40
     )
     m._cmd_library_gig_check(args)
     payload = json.loads(capsys.readouterr().out)
     assert payload["schema"].startswith("vibemix.gig-check.")
     assert payload["verdict"] == "do_not_take"
+    assert payload["source"] == "rekordbox"
 
 
 def test_cli_missing_xml_exits_1(tmp_path, capsys):
@@ -293,10 +322,28 @@ def test_cli_missing_xml_exits_1(tmp_path, capsys):
     import vibemix.__main__ as m
 
     args = argparse.Namespace(
-        xml=str(tmp_path / "nope.xml"), json=False, bloat_threshold=80, tonight_cap=40
+        path=str(tmp_path / "nope.xml"),
+        source="auto",
+        json=False,
+        bloat_threshold=80,
+        tonight_cap=40,
     )
     assert m._cmd_library_gig_check(args) == 1
     assert "not found" in capsys.readouterr().err.lower()
+
+
+def test_cli_unrecognized_shape_exits_1(tmp_path, capsys):
+    import argparse
+
+    import vibemix.__main__ as m
+
+    weird = tmp_path / "notes.txt"
+    weird.write_text("hello")
+    args = argparse.Namespace(
+        path=str(weird), source="auto", json=False, bloat_threshold=80, tonight_cap=40
+    )
+    assert m._cmd_library_gig_check(args) == 1
+    assert "unrecognized" in capsys.readouterr().err.lower()
 
 
 def test_format_report_carries_verdict_and_counts(tmp_path):

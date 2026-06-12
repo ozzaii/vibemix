@@ -116,9 +116,15 @@ matrices deliberately not audited (no verified fact base yet).
 ## Queue (in pack-priority order)
 
 1. ~~**Export Guard / USB Will-It-Show**~~ — SHIPPED 2026-06-12 (above).
-2. **Serato input** — partially pre-existing: `library/sources/serato.py`
-   (binary crate + Markers2 cue decoder) already implements the parse layer
-   (Phase 89). Remaining: route SeratoSource through gig-check's audit.
+2. ~~**Serato input**~~ — SHIPPED 2026-06-12, generalized: `gig-check` now
+   accepts ALL FIVE ecosystems (`--source auto` sniffs by shape — Rekordbox
+   collection.xml, Traktor collection.nml, VirtualDJ database.xml, Engine
+   m.db, or a `_Serato_` folder / its parent drive root). Serato Subcrates
+   feed the crate-bloat layer via the new public `serato.iter_crates`.
+   Bonus in the same pass — **duplicate-winner ranking** (g13/g14): each
+   duplicate group now names the keeper ("which copy has my cues?") ranked
+   by DJ hot cues → beatgrid → rating → plays; ties and all-naked groups
+   honestly decline to pick (`keep: null`).
 3. **Public panic utility** — `/dj/gig-check` web page emitting shareable
    receipts; SEO on panic phrases ("serato crates no music", "cue points
    disappeared").
