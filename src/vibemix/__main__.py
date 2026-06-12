@@ -3398,6 +3398,20 @@ async def main() -> None:
     )
     print("-> lesson_runtime wired", file=sys.stderr)
 
+    if beatmatch_practice_driver is not None:
+        try:
+            from vibemix.learn.wreck_round import WreckRound
+
+            lesson_runtime.set_wreck_round(
+                WreckRound(lambda: beatmatch_practice_driver)
+            )
+            print("-> learn wreck room wired", file=sys.stderr)
+        except Exception as _wreck_exc:  # pragma: no cover - defensive boot path
+            print(
+                f"[learn boot] wreck room disabled: {_wreck_exc!r}",
+                file=sys.stderr,
+            )
+
     class _NoopLearnExemplarPlayer:
         """Fallback player when no output device can be resolved at boot."""
 

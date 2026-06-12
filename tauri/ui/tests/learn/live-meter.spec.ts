@@ -174,16 +174,20 @@ describe("LiveGradeMeter", () => {
 
     const save = meter.root.querySelector<HTMLElement>(".learn-live-meter__save");
     expect(save?.hidden).toBe(false);
-    expect(save?.textContent).toContain("L2");
+    // Streak/difficulty surface as plain words, never xN / L-number chips
+    // (the anti-gamification law); difficulty stays machine-readable in data-*.
+    expect(save?.textContent).toContain("save window");
     expect(save?.textContent).toContain("8.5s");
-    expect(save?.textContent).toContain("x1");
+    expect(save?.textContent).toContain("one clean save");
+    expect(save?.textContent).not.toMatch(/x\d|L\d/);
     expect(meter.root.dataset.saveActive).toBe("true");
     expect(meter.root.dataset.saveLevel).toBe("2");
     expect(meter.root.dataset.saveRemaining).toBe("8.5");
     expect(meter.root.querySelector(".learn-live-meter__receipt")?.textContent).toBe(
       "save window",
     );
-    expect(meter.root.getAttribute("aria-label")).toContain("save level 2");
+    expect(meter.root.getAttribute("aria-label")).toContain("save window");
+    expect(meter.root.getAttribute("aria-label")).toContain("one clean save");
 
     meter.update({
       verdict: "trainwreck",
@@ -200,7 +204,7 @@ describe("LiveGradeMeter", () => {
     expect(meter.root.dataset.saveExpired).toBe("true");
     expect(meter.root.dataset.saveRemaining).toBe("0.0");
     expect(save?.textContent).toContain("00.0s");
-    expect(save?.textContent).toContain("x0");
+    expect(save?.textContent).toContain("no saves yet");
     expect(meter.root.querySelector(".learn-live-meter__receipt")?.textContent).toBe(
       "floor dropped",
     );
@@ -219,9 +223,8 @@ describe("LiveGradeMeter", () => {
     expect(meter.root.dataset.saveLanded).toBe("true");
     expect(meter.root.dataset.saveLevel).toBe("3");
     expect(meter.root.dataset.saveStreak).toBe("2");
-    expect(save?.textContent).toContain("L3");
     expect(save?.textContent).toContain("landed");
-    expect(save?.textContent).toContain("x2");
+    expect(save?.textContent).toContain("2 clean saves");
     expect(meter.root.querySelector(".learn-live-meter__receipt")?.textContent).toBe(
       "save landed",
     );

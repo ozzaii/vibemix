@@ -93,6 +93,14 @@ function saveSecondsText(value: number | null | undefined): string {
   return `${Math.max(0, seconds).toFixed(1)}s`;
 }
 
+/** Streaks reach the user as plain words, never an xN counter chip — measured
+ *  receipts are fine, gamification chips are banned. */
+function saveStreakWords(streak: number): string {
+  if (streak <= 0) return "no saves yet";
+  if (streak === 1) return "one clean save";
+  return `${streak} clean saves`;
+}
+
 function saveHudVisible(payload: LiveGradePayload): boolean {
   return Boolean(
     payload.save_attempt_active ||
@@ -394,9 +402,8 @@ export function LiveGradeMeter(host: HTMLElement): LiveGradeMeterHandle {
     const showSaveHud = saveHudVisible(payload);
     save.hidden = !showSaveHud;
     if (showSaveHud) {
-      const level = boundedLevel(payload.save_difficulty_level);
       const streak = boundedStreak(payload.save_streak);
-      saveLevel.textContent = `L${level}`;
+      saveLevel.textContent = "save window";
       if (payload.save_landed) {
         saveTimer.textContent = "landed";
       } else if (payload.save_floor_expired) {
@@ -404,7 +411,7 @@ export function LiveGradeMeter(host: HTMLElement): LiveGradeMeterHandle {
       } else {
         saveTimer.textContent = saveSecondsText(payload.save_floor_seconds_remaining);
       }
-      saveStreak.textContent = streak > 0 ? `x${streak}` : "x0";
+      saveStreak.textContent = saveStreakWords(streak);
     }
     if (enteredSaveLanded) {
       triggerSavePulse();
@@ -427,7 +434,6 @@ export function LiveGradeMeter(host: HTMLElement): LiveGradeMeterHandle {
       `beatmatch ${payload.verdict.replace("_", " ")}, ${formatPhase(phase)}, ${receiptLine}`,
     );
     if (showSaveHud) {
-      const level = boundedLevel(payload.save_difficulty_level);
       const streak = boundedStreak(payload.save_streak);
       let remainingText = saveSecondsText(payload.save_floor_seconds_remaining);
       if (payload.save_landed) {
@@ -437,7 +443,7 @@ export function LiveGradeMeter(host: HTMLElement): LiveGradeMeterHandle {
       }
       root.setAttribute(
         "aria-label",
-        `beatmatch ${payload.verdict.replace("_", " ")}, ${formatPhase(phase)}, save level ${level}, ${remainingText}, streak ${streak}, ${receiptLine}`,
+        `beatmatch ${payload.verdict.replace("_", " ")}, ${formatPhase(phase)}, save window ${remainingText}, ${saveStreakWords(streak)}, ${receiptLine}`,
       );
     }
     scheduleDraw();

@@ -823,11 +823,17 @@ describe("practice booth shell", () => {
       expect(waveformHost?.style.getPropertyValue("--gallop-shift")).toBe("24px");
       expect(meter?.dataset.saveActive).toBe("true");
       expect(meter?.dataset.saveRemaining).toBe("8.5");
-      expect(meter?.querySelector(".learn-live-meter__save")?.textContent).toContain("L2");
+      // Plain words, never xN / L-number chips (the anti-gamification law);
+      // difficulty stays machine-readable in data-* only.
+      expect(meter?.querySelector(".learn-live-meter__save")?.textContent).toContain(
+        "save window",
+      );
       expect(meter?.querySelector(".learn-live-meter__save")?.textContent).toContain(
         "8.5s",
       );
-      expect(meter?.querySelector(".learn-live-meter__save")?.textContent).toContain("x1");
+      expect(meter?.querySelector(".learn-live-meter__save")?.textContent).toContain(
+        "one clean save",
+      );
       expect(Number(meter?.dataset.needlePct)).toBeGreaterThan(50);
       const hint = root.querySelector<HTMLElement>(".learn-status-hint")!;
       expect(hint.textContent).toBe("save 9s");

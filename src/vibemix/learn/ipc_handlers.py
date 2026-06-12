@@ -425,6 +425,8 @@ def register_learn_handlers(
             "source": payload.get("source", ""),
         }
         lesson_runtime.handle_practice_audio_ack(midi)
+        if lesson_runtime.handle_wreck_round_ack(midi):
+            return
         if lesson_runtime.handle_observer_ack(midi):
             return
         if lesson_runtime.handle_recovery_drill_ack(midi):

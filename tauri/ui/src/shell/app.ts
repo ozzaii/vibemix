@@ -60,72 +60,19 @@ const appDeps: SurfaceMountDeps = {
     mount.innerHTML = extractSurfaceMarkup(libraryHtmlRaw, ".vmx-lib-app");
     mountLibrary(mount);
   },
+  // Learn is the Wreck Room booth: Sven wrecks the practice mix, the learner
+  // saves it by ear. Lean components only (waveforms + meter + on-screen deck
+  // controls) — never the full standalone learn-window (it brings its own
+  // titlebar/status chrome and re-creates the cluttered-fold regression).
   mountLearn: async (mount) => {
-    mountLearnTease(mount);
+    const { mountWreckBooth } = await import("../learn/booth/wreck-booth.js");
+    mountWreckBooth(mount);
   },
   mountDebrief: async (mount) => {
     const { mountDebriefDock } = await import("./DebriefDock.js");
     mountDebriefDock(mount, { autoRefresh: false });
   },
 };
-
-function appendLearnTeaseRow(list: HTMLDListElement, label: string, value: string): void {
-  const row = document.createElement("div");
-  row.className = "learn-tease__row";
-  const dt = document.createElement("dt");
-  dt.textContent = label;
-  const dd = document.createElement("dd");
-  dd.textContent = value;
-  row.append(dt, dd);
-  list.append(row);
-}
-
-function mountLearnTease(mount: HTMLElement): void {
-  mount.replaceChildren();
-
-  const root = document.createElement("section");
-  root.className = "learn-tease";
-  root.setAttribute("aria-labelledby", "learn-tease-title");
-
-  const plate = document.createElement("div");
-  plate.className = "learn-tease__plate";
-
-  const led = document.createElement("span");
-  led.className = "learn-tease__led";
-  led.setAttribute("aria-hidden", "true");
-
-  // The tease speaks in the co-host's first person (the surfaces.ts empty-state
-  // contract), never internal sprint vocabulary — "Premium v2" and "preserved
-  // in git" were a roadmap memo shipping as product copy.
-  const kicker = document.createElement("p");
-  kicker.className = "learn-tease__kicker";
-  kicker.textContent = "Lessons";
-
-  const title = document.createElement("h2");
-  title.id = "learn-tease-title";
-  title.className = "learn-tease__title";
-  title.textContent = "I'll teach when I can hear you.";
-
-  const body = document.createElement("p");
-  body.className = "learn-tease__body";
-  body.textContent =
-    "Lessons open when your practice audio and your controller give me real proof: the same bar my live calls meet.";
-
-  const proof = document.createElement("dl");
-  proof.className = "learn-tease__proof";
-  appendLearnTeaseRow(proof, "Now", "I coach your live sets");
-  appendLearnTeaseRow(proof, "Next", "hands-on lessons, graded by ear");
-  appendLearnTeaseRow(proof, "Rule", "no fake lessons");
-
-  const note = document.createElement("p");
-  note.className = "learn-tease__note";
-  note.textContent =
-    "Debrief and Viber are open now. Lessons join when they can teach without pretending.";
-
-  plate.append(led, kicker, title, body, proof, note);
-  root.append(plate);
-  mount.append(root);
-}
 
 /**
  * Mount the shell as the app and fold the real surfaces in. Idempotent at the

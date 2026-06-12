@@ -467,6 +467,53 @@ class BeatmatchPracticeDriver:
             self._deck.offset_playhead(deck, self._beat_frames_for(deck) * phase_shove)
         self._armed = True
 
+    def wreck(self, kind: str, level: int) -> None:
+        """Shove deck B off for a Wreck Room round (sandbox lane).
+
+        Same authored shove math as the L3.05 recovery drill, but it arms the
+        SANDBOX snapshot, never a graded lesson snapshot — wreck rounds are
+        feedback-only and write no evidence.
+        """
+
+        bounded = max(1, min(5, int(level)))
+        self._deck.set_rates(rate_a=1.0, rate_b=self._rate_b_for_lock(), smooth=False)
+        if kind == "phase":
+            phase_shove = min(0.38, 0.20 + (bounded * 0.05))
+            self._deck.offset_playhead("B", self._beat_frames_for("B") * phase_shove)
+        else:
+            rate_shove = min(0.12, 0.065 + (bounded * 0.015))
+            self._deck.set_rates(
+                rate_a=1.0,
+                rate_b=self._rate_b_for_lock() * (1.0 + rate_shove),
+                smooth=False,
+            )
+        self._armed = False
+        self._sandbox_active = True
+
+    def lock_b(self) -> None:
+        """Lock deck B to deck A in both tempo and phase (the groove state)."""
+
+        state = self._deck.state()
+        self._deck.set_rates(rate_a=1.0, rate_b=self._rate_b_for_lock(), smooth=False)
+        phase_a = self._grid_a.beat_index(state.a_frame) % 1.0
+        phase_b = self._grid_b.beat_index(state.b_frame) % 1.0
+        err = (phase_a - phase_b + 0.5) % 1.0 - 0.5
+        if abs(err) > 1e-6:
+            self._deck.offset_playhead("B", self._beat_frames_for("B") * err)
+        self._sandbox_active = True
+
+    def yank_b(self) -> None:
+        """Cut deck B's channel fader (the missed-window theater)."""
+
+        self._deck.set_volume("B", 0)
+        self._sandbox_active = True
+
+    def restore_b(self) -> None:
+        """Bring deck B's channel fader back for the next groove."""
+
+        self._deck.set_volume("B", 127)
+        self._sandbox_active = True
+
     def snapshot(self) -> BeatmatchPracticeSnapshot | None:
         """Return the latest owned practice state, if a practice action armed it."""
 

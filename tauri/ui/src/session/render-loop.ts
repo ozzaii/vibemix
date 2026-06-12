@@ -132,7 +132,9 @@ function statusRecheckHandler(
 }
 
 function openModeSurface(mode: "cohost" | "learn" | "build" | "debrief"): Promise<unknown> {
-  if (mode === "learn") return Promise.resolve("learn-tease");
+  // Learn lives folded inside the shell (the Wreck Room booth surface), never
+  // a standalone window; the resolved marker keeps this path a no-op.
+  if (mode === "learn") return Promise.resolve("learn-booth");
   if (mode === "build") return invoke("open_library_window");
   if (mode === "debrief") return invoke("open_debrief_window", { sessionDir: "" });
   return Promise.resolve();

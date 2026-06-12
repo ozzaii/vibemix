@@ -803,6 +803,11 @@ class LessonRuntime(StateMachine):
         self._beatmatch_practice_ack_prehandled = False
         self._beatmatch_practice_player: Any | None = None
         self._beatmatch_practice_player_active = False
+        self._wreck_round: Any | None = None
+        # One-shot mute: a wreck bark claims the NEXT generic grade edge (the
+        # shove/lock it announced lands in the measured grade one tick later),
+        # so two voices never describe one moment.
+        self._wreck_swallow_next_grade_text = False
         self._free_practice_receipts: dict[tuple[str, str, str], set[tuple[str, int]]] = {}
         self._waveform_ready_lesson_id: str | None = None
         self._active_harmonic_pair: HarmonicPracticePair | None = None
@@ -940,6 +945,24 @@ class LessonRuntime(StateMachine):
         ):
             self._start_beatmatch_practice_player()
 
+    def set_wreck_round(self, wreck_round: Any | None) -> None:
+        """Install or clear the sandbox-lane Wreck Room round director."""
+        self._wreck_round = wreck_round
+
+    def _lesson_engaged(self) -> bool:
+        """True while a lesson is actually RUNNING (loaded → advancing).
+
+        ``current_lesson_id`` stays set in ``completed`` because the
+        post-completion relaunch flow reads it, so the free-practice/booth
+        lane must also consult the FSM state — gating on the id alone left
+        the whole sandbox lane dead for the rest of the session after the
+        first completed lesson.
+        """
+
+        if self._learn.current_lesson_id is None:
+            return False
+        return self.current_state.id != "completed"
+
     def _is_beatmatch_practice_audio_lesson(self) -> bool:
         lesson_id = self._learn.current_lesson_id
         if lesson_id is None:
@@ -1069,8 +1092,7 @@ class LessonRuntime(StateMachine):
             and self.current_state.id in _BEATMATCH_PRACTICE_GRADE_STATES
         )
         sandbox_playing = (
-            self._learn.current_lesson_id is None
-            and self._beatmatch_practice_player_active
+            not self._lesson_engaged() and self._beatmatch_practice_player_active
         )
         if not lesson_playing and not sandbox_playing:
             return
@@ -1247,16 +1269,118 @@ class LessonRuntime(StateMachine):
         completion, or tutor credit. The FSM can still ignore the ack later.
         """
 
-        if self._learn.current_lesson_id is None:
+        if not self._lesson_engaged():
             self._start_practice_sandbox_player()
             self._apply_beatmatch_practice_action(midi)
             if self._beatmatch_practice_player_active:
-                self._emit_live_beatmatch_grade(self._grade_beatmatch_sandbox_tick())
+                self._emit_live_beatmatch_grade(
+                    self._apply_wreck_round(self._grade_beatmatch_sandbox_tick())
+                )
             self._record_free_practice_receipt(midi)
             return
         if not self._is_beatmatch_practice_audio_lesson():
             return
         self._apply_beatmatch_practice_action(midi)
+
+    def handle_wreck_round_ack(self, midi: dict[str, Any]) -> bool:
+        """Consume the booth's round controls (``wreck_round`` / ``wreck_stop``).
+
+        The Wreck Room surface rides the existing ``ipc.learn.ack`` wire with
+        a dedicated control head instead of a new envelope type. Round start
+        is gated on the practice player's ``can_play`` so a live set never
+        gets practice audio AND never gets a silent dead button: the refusal
+        is voiced as an honest authored line (idle ≠ fault, never a fake
+        start).
+        """
+
+        control = str(midi.get("control") or "")
+        if control not in {"wreck_round", "wreck_stop"}:
+            return False
+        if self._wreck_round is None:
+            return True
+        if self._lesson_engaged():
+            return True
+        if control == "wreck_stop":
+            self._wreck_round.stop()
+            self._wreck_swallow_next_grade_text = False
+            self._stop_beatmatch_practice_player()
+            return True
+        from vibemix.learn.wreck_round import BARK_BOOTH_BUSY, BARK_NO_DECK
+
+        player = self._beatmatch_practice_player
+        can_play = getattr(player, "can_play", None)
+        if callable(can_play) and not can_play():
+            self._emit_wreck_bark(text=BARK_BOOTH_BUSY, marker="wreck_round.busy")
+            return True
+        self._start_practice_sandbox_player()
+        if not self._beatmatch_practice_player_active:
+            # The press raised nothing — say so. A live set surfaces as the
+            # busy line; a missing/refusing deck gets the honest no-deck line
+            # (the docstring's no-silent-dead-button promise).
+            player = self._beatmatch_practice_player
+            can_play = getattr(player, "can_play", None)
+            if callable(can_play) and not can_play():
+                self._emit_wreck_bark(
+                    text=BARK_BOOTH_BUSY, marker="wreck_round.busy"
+                )
+            else:
+                self._emit_wreck_bark(
+                    text=BARK_NO_DECK, marker="wreck_round.no_deck"
+                )
+            return True
+        bark = self._wreck_round.start()
+        if bark is not None:
+            self._emit_wreck_bark(text=bark.text, marker=bark.marker)
+        return True
+
+    def _emit_wreck_bark(self, *, text: str, marker: str) -> None:
+        """Voice one authored, uncited Wreck Room line (sandbox = no evidence)."""
+
+        wreck_round = self._wreck_round
+        if wreck_round is not None and getattr(wreck_round, "active", False):
+            self._wreck_swallow_next_grade_text = True
+        try:
+            speak = LearnTutorSpeak.make(
+                text=text,
+                tts_marker=marker,
+                citations=(),
+                data_state="hint",
+            ).to_dict()
+            self._emit_tutor_speak(speak)
+        except Exception as exc:  # pragma: no cover - defensive
+            import sys
+
+            print(
+                f"[learn.runtime] wreck bark emit failed: {exc!r}",
+                file=sys.stderr,
+            )
+
+    def _apply_wreck_round(self, result: Any) -> Any:
+        """Merge active wreck-round state onto a sandbox grade result.
+
+        The round director owns the save-window fields outside lessons; its
+        barks ride the tutor channel. When a bark fires on a verdict edge the
+        generic sandbox grade text for that same edge is suppressed so two
+        voices never describe one moment.
+        """
+
+        wreck_round = self._wreck_round
+        if wreck_round is None or result is None or not wreck_round.active:
+            return result
+        try:
+            tick = wreck_round.tick(result.grade, result.t_session)
+        except Exception as exc:  # pragma: no cover - defensive
+            import sys
+
+            print(
+                f"[learn.runtime] wreck round tick failed: {exc!r}",
+                file=sys.stderr,
+            )
+            return result
+        for bark in tick.barks:
+            self._last_beatmatch_live_grade_verdict = result.grade.verdict
+            self._emit_wreck_bark(text=bark.text, marker=bark.marker)
+        return replace(result, **tick.fields)
 
     def _start_practice_sandbox_player(self) -> None:
         """Start the Learn-owned deck for free practice outside a lesson."""
@@ -1266,6 +1390,12 @@ class LessonRuntime(StateMachine):
         try:
             self._prepare_beatmatch_practice_audio()
             if self._beatmatch_practice_player is None:
+                return
+            can_play = getattr(self._beatmatch_practice_player, "can_play", None)
+            if callable(can_play) and not can_play():
+                # A live, audible set owns the speakers (Invariant #3). Refusing
+                # here keeps the active flag honest so the surface can say so
+                # instead of pretending audio started (idle ≠ fault).
                 return
             self._emit_waveform_ready("sandbox")
             self._beatmatch_practice_player.start()
@@ -3487,6 +3617,11 @@ class LessonRuntime(StateMachine):
             if verdict == self._last_beatmatch_live_grade_verdict:
                 return
             self._last_beatmatch_live_grade_verdict = verdict
+            if self._wreck_swallow_next_grade_text:
+                # A wreck bark already voiced this moment (the shove/lock it
+                # announced reaches the measured grade one tick late).
+                self._wreck_swallow_next_grade_text = False
+                return
 
             speak = LearnTutorSpeak.make(
                 text=text,
@@ -3510,6 +3645,9 @@ class LessonRuntime(StateMachine):
         if verdict == "locked":
             if result.event is not None:
                 return "that's the pocket - tempo and phase are sitting together."
+            if not self._lesson_engaged():
+                # Sandbox has no credit lane; promising "proof" would be a lie.
+                return "pocket is centered - hold it there."
             return "pocket is centered - keep it there until proof lands."
         if verdict == "drifting":
             try:
@@ -3620,15 +3758,16 @@ class LessonRuntime(StateMachine):
             and self.current_state.id in _BEATMATCH_PRACTICE_GRADE_STATES
         )
         sandbox_playing = (
-            self._learn.current_lesson_id is None
-            and self._beatmatch_practice_player_active
+            not self._lesson_engaged() and self._beatmatch_practice_player_active
         )
         if lesson_playing:
             self._emit_live_beatmatch_grade(self._grade_beatmatch_practice_tick())
             return
         if sandbox_playing:
             self._beatmatch_practice_lock_active = False
-            self._emit_live_beatmatch_grade(self._grade_beatmatch_sandbox_tick())
+            self._emit_live_beatmatch_grade(
+                self._apply_wreck_round(self._grade_beatmatch_sandbox_tick())
+            )
             return
         self._beatmatch_practice_lock_active = False
         self._last_beatmatch_live_grade_verdict = None

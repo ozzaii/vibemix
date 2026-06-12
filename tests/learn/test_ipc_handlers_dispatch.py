@@ -799,6 +799,7 @@ def test_lesson_continue_walks_authored_tutor_beats_before_completion() -> None:
 def test_ack_dispatch_lets_recovery_drill_consume_bailout_move() -> None:
     """Recovery-drill moves get a claim before generic step/mismatch gates."""
     runtime = MagicMock(name="lesson_runtime")
+    runtime.handle_wreck_round_ack.return_value = False
     runtime.handle_observer_ack.return_value = False
     runtime.handle_recovery_drill_ack.return_value = True
     runtime.handle_step_ack.return_value = False

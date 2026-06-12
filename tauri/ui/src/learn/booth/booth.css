@@ -1,0 +1,174 @@
+/* SPDX-License-Identifier: Apache-2.0 */
+/* Wreck Room booth — Forged Obsidian Chrome. Mostly void; the save countdown
+ * is the one breathing element while a window is open (One-Rose). */
+
+.wreck-booth {
+  display: grid;
+  grid-template-rows: auto minmax(0, auto) minmax(0, 1fr) auto;
+  gap: var(--sp-4, 16px);
+  width: 100%;
+  height: 100%;
+  padding: clamp(var(--sp-4, 16px), 4vw, var(--sp-7, 40px));
+  background: var(--surface-void);
+  color: var(--text-primary);
+  overflow: hidden;
+}
+
+/* ---- Sven line: the co-host speaking on this surface ---- */
+.wreck-booth__sven {
+  margin: 0;
+  font-family: var(--type-serif);
+  font-size: clamp(20px, 2.6vw, 30px);
+  line-height: 1.25;
+  color: var(--text-primary);
+  max-width: 64ch;
+}
+
+/* ---- waveforms ---- */
+.wreck-booth__waves {
+  min-height: 0;
+}
+.wreck-booth__waves[data-ready="false"] {
+  display: none;
+}
+
+/* ---- meter + controls ---- */
+.wreck-booth__row {
+  display: grid;
+  grid-template-columns: minmax(220px, 320px) minmax(0, 1fr);
+  align-items: center;
+  gap: var(--sp-5, 24px);
+  min-height: 0;
+}
+
+.wreck-booth__meter {
+  display: flex;
+  justify-content: center;
+}
+
+.wreck-booth__controls svg {
+  width: min(300px, 100%);
+  height: auto;
+  display: block;
+  margin-inline: auto;
+}
+
+.wreck-booth__fader-track {
+  fill: var(--void-15);
+  stroke: var(--border-subtle);
+  stroke-width: 1;
+}
+.wreck-booth__fader-center {
+  stroke: var(--border-default);
+  stroke-width: 1;
+}
+.wreck-booth__fader-cap {
+  fill: var(--void-25);
+  stroke: var(--border-strong);
+  stroke-width: 1;
+  cursor: grab;
+}
+.wreck-booth__fader:focus-visible .wreck-booth__fader-cap,
+.wreck-booth__jog:focus-visible .wreck-booth__jog-body {
+  stroke: var(--border-focus);
+  stroke-width: 2;
+}
+.wreck-booth__fader[data-dragging="true"] .wreck-booth__fader-cap {
+  fill: var(--void-20);
+  stroke: var(--brand-40);
+  cursor: grabbing;
+}
+
+.wreck-booth__jog-body {
+  fill: var(--void-10);
+  stroke: var(--border-default);
+  stroke-width: 1;
+  cursor: grab;
+}
+.wreck-booth__jog-inner {
+  fill: var(--void-5);
+  stroke: var(--border-subtle);
+  stroke-width: 1;
+}
+.wreck-booth__jog-marker {
+  stroke: var(--ink-60);
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+.wreck-booth__jog[data-dragging="true"] .wreck-booth__jog-body {
+  stroke: var(--brand-40);
+  cursor: grabbing;
+}
+
+.wreck-booth__control-label {
+  fill: var(--text-muted);
+  font-family: var(--type-display);
+  font-size: 9px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  text-anchor: middle;
+}
+
+/* ---- actions + receipt ---- */
+.wreck-booth__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4, 16px);
+}
+
+.wreck-booth__go {
+  appearance: none;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  background: var(--surface-raised);
+  box-shadow: var(--chrome-highlight, none);
+  color: var(--text-primary);
+  font-family: var(--type-display);
+  font-size: 12px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  padding: 12px 22px;
+  cursor: pointer;
+}
+.wreck-booth__go:hover {
+  background: var(--void-15);
+  border-color: var(--brand-30);
+}
+.wreck-booth__go:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 2px;
+}
+.wreck-booth__go:active {
+  box-shadow: var(--shadow-pressed, none);
+}
+
+.wreck-booth__receipt {
+  margin: 0;
+  font-family: var(--type-mono);
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+
+/* The hunt countdown is the single breath on this surface. */
+.wreck-booth[data-round="hunt"] .wreck-booth__receipt {
+  color: var(--brand-65);
+  animation: wreck-booth-breath 1.4s ease-in-out infinite;
+}
+.wreck-booth[data-round="missed"] .wreck-booth__receipt {
+  color: var(--text-secondary);
+}
+.wreck-booth[data-round="landed"] .wreck-booth__receipt {
+  color: var(--brand-78);
+}
+
+@keyframes wreck-booth-breath {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wreck-booth[data-round="hunt"] .wreck-booth__receipt {
+    animation: none;
+    opacity: 1;
+  }
+}
