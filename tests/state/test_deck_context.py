@@ -3560,31 +3560,32 @@ def test_event_witness_holds_fake_shift() -> None:
     assert result.reason == "shift_event_without_witness"
 
 
-def test_event_witness_band_absence_needs_a_witness() -> None:
+def test_event_witness_band_absence_is_soft_tier_observation() -> None:
     """iter7-midi-r2: 'That sub energy just dropped out' at sub=0.57 with only
-    a slight 15% dip — a slight tier rendered as total disappearance. The
-    keeper absence register passes via EITHER witness route: post level
-    <= 0.30, or an offered clear/strong fall."""
-    held = apply_live_claim_guard(
+    a slight 15% dip — an overstatement on REAL audio, not a fabrication.
+    E.1 (free Sven) demotes R1 to telemetry: the line SPEAKS and the
+    detection rides as an observation; witnessed registers stay clean."""
+    spoken = apply_live_claim_guard(
         "That sub energy just dropped out of the mix.",
         _ew_state(sub=0.57),
         event_type="PHASE",
         audio_delta_items=["sub energy fell 15% (slight)"],
     )
-    assert held.reason == "band_absence_without_witness"
+    assert spoken.corrected is False
+    assert "event_witness:band_absence_without_witness" in spoken.observations
     by_level = apply_live_claim_guard(
         "The low-end energy just dropped out; plenty of space in the floor now.",
         _ew_state(sub=0.28, low=0.22),
         event_type="PHASE",
     )
-    assert by_level.policy != "event_witness_not_offered"
+    assert not any("band_absence" in obs for obs in by_level.observations)
     by_delta = apply_live_claim_guard(
         "That sub energy just dropped out of the mix.",
         _ew_state(sub=0.40),
         event_type="PHASE",
         audio_delta_items=["sub energy fell 43% (strong)"],
     )
-    assert by_delta.policy != "event_witness_not_offered"
+    assert not any("band_absence" in obs for obs in by_delta.observations)
 
 
 def test_event_witness_vocative_name_needs_a_witness() -> None:
@@ -3611,17 +3612,17 @@ def test_event_witness_vocative_name_needs_a_witness() -> None:
     assert color.policy != "event_witness_not_offered"
 
 
-def test_event_witness_mix_move_requires_forward_directive() -> None:
-    """All 15 judge-praised MIX_MOVE keepers carry a clause-initial
-    imperative; the f=0-1 narrate-only renders carry none. This deliberately
-    OVERRIDES the licensed move-effect pass for directive-free narration —
-    the judge data (7 narrate-only kills) wins over the engineered pass."""
-    held = apply_live_claim_guard(
+def test_event_witness_mix_move_directive_lint_is_telemetry() -> None:
+    """R5 (E.1, free Sven): the MIX_MOVE forward-directive contract moved
+    into the evidence-license prompt block — narrate-only renders SPEAK and
+    ride telemetry; directive-carrying keepers stay observation-free."""
+    spoken = apply_live_claim_guard(
         "You slid that crossfader back toward center, keeping the kick out front.",
         _ew_state(),
         event_type="MIX_MOVE",
     )
-    assert held.reason == "mix_move_narration_without_directive"
+    assert spoken.corrected is False
+    assert "event_witness:mix_move_narration_without_directive" in spoken.observations
     for line in (
         "You slid that crossfader back to center, so let this driving kick ride out.",
         "You cut those mids hard. Don't touch a thing while this kick rides out.",
@@ -3629,27 +3630,29 @@ def test_event_witness_mix_move_requires_forward_directive() -> None:
         "Nudge those highs back in on the next phrase.",
     ):
         result = apply_live_claim_guard(line, _ew_state(), event_type="MIX_MOVE")
-        assert result.reason != "mix_move_narration_without_directive", line
+        assert not any("mix_move_narration" in obs for obs in result.observations), line
     phase = apply_live_claim_guard(
         "You slid that crossfader back toward center, keeping the kick out front.",
         _ew_state(),
         event_type="PHASE",
     )
-    assert phase.reason != "mix_move_narration_without_directive"
+    assert not any("mix_move_narration" in obs for obs in phase.observations)
 
 
-def test_event_witness_move_effect_direction_contradiction() -> None:
+def test_event_witness_move_effect_contradiction_is_soft_tier() -> None:
     """lever2-midi-r2: 'carved out massive room' while the move's own
-    measured deltas read 'mid energy rose' and nothing fell. Absent
-    measurements pass (keeper fx={} protected); an agreeing 'fell' passes."""
+    measured deltas read 'mid energy rose' — a direction overstatement on a
+    real measured move. E.1 (free Sven) demotes R3 to telemetry: speaks +
+    observation; agreeing or measurement-free reads stay observation-free."""
     state = _ew_state()
     state.move_audio_delta = ["mid energy rose 12% (slight)", "onset density rose 19% (clear)"]
-    held = apply_live_claim_guard(
+    spoken = apply_live_claim_guard(
         "That mid cut carved out massive room; let the kick punch through.",
         state,
         event_type="MIX_MOVE",
     )
-    assert held.reason == "move_effect_direction_contradiction"
+    assert spoken.corrected is False
+    assert "event_witness:move_effect_direction_contradiction" in spoken.observations
     agreeing = _ew_state()
     agreeing.move_audio_delta = ["onset density fell 40% (strong)"]
     passed = apply_live_claim_guard(
@@ -3657,13 +3660,13 @@ def test_event_witness_move_effect_direction_contradiction() -> None:
         agreeing,
         event_type="MIX_MOVE",
     )
-    assert passed.policy != "event_witness_not_offered"
+    assert not any("direction_contradiction" in obs for obs in passed.observations)
     no_fx = apply_live_claim_guard(
         "You carved out that mid space nicely; now let the low end ride.",
         _ew_state(),
         event_type="MIX_MOVE",
     )
-    assert no_fx.policy != "event_witness_not_offered"
+    assert not any("direction_contradiction" in obs for obs in no_fx.observations)
 
 
 def test_event_witness_render_artifacts() -> None:

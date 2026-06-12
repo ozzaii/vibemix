@@ -15,7 +15,10 @@ from collections.abc import Mapping, Sequence
 from typing import TYPE_CHECKING, Any
 
 from vibemix.intel.transition_scorer import LIVE_SELECT_CONFIDENCE_FLOOR
-from vibemix.state.deck_context import render_audio_delta_items
+from vibemix.state.deck_context import (
+    SPECTRAL_CLAIM_BAND_FLOOR,
+    render_audio_delta_items,
+)
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from vibemix.state import MusicState
@@ -50,7 +53,11 @@ _TEXT_ESCAPE = str.maketrans({"[": "(", "]": ")", "\n": " ", "\r": " ", "|": "/"
 # top-end space intentional" 7 times across lever+baseline runs, judged
 # should_NOT 6 of 7. Keeper calibration: killers at band 0.01-0.05,
 # survivors at 0.10-0.16 (rose post) / pre 0.15-0.44 (fell).
-BAND_AUDIBILITY_FLOOR = 0.10
+# Bound by reference to the guard layer (C.6, free Sven): the producer, the
+# spectral guard, and the evidence-license block must agree on what
+# "audible" means — a drifted local copy would voice reads the guard then
+# refuses to license.
+BAND_AUDIBILITY_FLOOR = SPECTRAL_CLAIM_BAND_FLOOR
 
 # Delta-string keyword → the state.bands key(s) backing the claim. ROSE
 # "brightness" keys on the HIGH band alone: the brightness share sums

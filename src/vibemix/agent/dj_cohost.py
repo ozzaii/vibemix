@@ -96,6 +96,7 @@ from vibemix.state.deck_context import (
     GEMINI_AUDIO_TOKENS_PER_SECOND,
     LiveClaimGuardResult,
     apply_live_claim_guard,
+    extract_offered_evidence_text,
     has_unsupported_audio_source_detail_claim,
     has_unsupported_audio_source_detail_mention,
     has_unsupported_no_move_coaching_advice,
@@ -116,6 +117,7 @@ from vibemix.state.deck_context import (
     render_deck_lane_context,
     render_deck_reference_context,
     render_deck_source_context,
+    render_evidence_license,
     render_live_evidence_context,
     render_mixer_context,
     render_move_context,
@@ -1047,6 +1049,21 @@ def _build_attached_audio_context_clause(
     else:
         policy_fields.append("rule=multi_deck_outcome_requires_live_support")
     context_lines.append("claim_policy[" + " ".join(policy_fields) + "]")
+    # C.2 (free Sven): the evidence LICENSE rides directly after the
+    # claim_policy token — the model is told up front what the evidence
+    # licenses (deck words, live bands, vocal naming, hands) instead of
+    # being silenced at the boundary for rules it could never see. The
+    # claim_policy token itself is kept verbatim (the replay oracle and the
+    # pool reconstructor parse it).
+    license_text = render_evidence_license(
+        state,
+        move_items,
+        policy=policy,
+        reason=reason,
+        audio_delta_items=audio_delta_items,
+    )
+    if license_text:
+        context_lines.append(license_text)
 
     deck_audio_part_contract = "deck_audio_parts=not_attached."
     deck_separation_contract = "structured_text_only"
@@ -3760,7 +3777,7 @@ class DJCoHostAgent(Agent):
                             deck_audio_parts_attached=deck_audio_parts_attached,
                             judge_evidence_line=judge_evidence_line,
                             event_type=ev_tag,
-                            offered_evidence_text=full_text_prompt,
+                            offered_evidence_text=extract_offered_evidence_text(full_text_prompt),
                         )
                     )
                     if (
@@ -4130,7 +4147,7 @@ class DJCoHostAgent(Agent):
                         deck_audio_parts_attached=deck_audio_parts_attached,
                         judge_evidence_line=judge_evidence_line,
                         event_type=ev_tag,
-                        offered_evidence_text=full_text_prompt,
+                        offered_evidence_text=extract_offered_evidence_text(full_text_prompt),
                     )
                     # A.3 (free Sven): band-intensity is telemetry-only — pool
                     # replay measured it 100% false-positive (2 keeper holds

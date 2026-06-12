@@ -12,7 +12,7 @@ from __future__ import annotations
 import math
 import re
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, replace as dataclass_replace
 from typing import TYPE_CHECKING, Any
 
 from vibemix.audio.xfade import xfade_gains
@@ -91,6 +91,7 @@ _LIVE_PUBLIC_DIAGNOSTIC_RE = re.compile(
     r"\b("
     r"i need to correct (?:the|that) live read|resolved decks=|"
     r"live evidence gate:|transition_block=|claim_policy=|"
+    r"evidence_license\[|bands_live=|bands_open=|"
     r"proof_not_ready|unsupported_live_outcome_claim|guard_violations|"
     r"my bad(?: on| with)? (?:the )?live|"
     r"my mistake(?: on| with)? (?:the )?live|"
@@ -995,28 +996,84 @@ def _unsupported_event_witness_reason(
     event_type: str | None = None,
     offered_evidence_text: str | None = None,
 ) -> str | None:
-    """Reason string when the text asserts an event the packet never offered."""
+    """Reason string when the text asserts an event the packet never offered.
+
+    E.1 tiering (free Sven): only the HARD fabrication rules hold — R2
+    (arrangement events: vocal/hiss/shift), R4 (person names), R6 (render
+    artifacts/all-caps). R1 (band-absence overstatement) and R3 (move-effect
+    direction contradiction) are soft-tier overstatements on real audio —
+    they speak and ride telemetry via ``event_witness_observations``; R5's
+    MIX_MOVE directive contract moved into the evidence-license prompt block.
+    """
     if not str(text or "").strip():
         return None
     offered = _ew_offered_text(offered_evidence_text)
-    deltas = tuple(str(d) for d in (audio_delta_items or ()))
-    reason = (
+    return (
         _ew_render_artifact_reason(text)
         or _ew_allcaps_reason(text)
         or _ew_arrangement_reason(text, state, offered)
-        or _ew_absence_reason(text, state, deltas)
         or _ew_name_reason(text, state, offered)
     )
-    if reason is not None:
-        return reason
-    event = str(event_type or "").strip().upper()
-    if event == "MIX_MOVE":
-        reason = _ew_move_effect_contradiction(text, state)
-        if reason is not None:
-            return reason
-        if not _ew_has_forward_directive(text):
-            return "mix_move_narration_without_directive"
-    return None
+
+
+# C.3 (free Sven): the event-witness rules match witness tokens ("vocal",
+# names) against the OFFERED evidence. Handing them the whole rendered prompt
+# defangs them — instruction prose, the persona text, and especially the
+# evidence-license block ("name them as vocals the moment…") all contain the
+# witness tokens. Only the machine evidence sections may license a claim.
+_OFFERED_EVIDENCE_SECTION_RES: tuple[re.Pattern[str], ...] = (
+    re.compile(r"hearing\[[^\]]*\]"),
+    re.compile(r"mixer_context\[[^\]]*\]"),
+    re.compile(r"deck_source_context\[[^\]]*\]"),
+    re.compile(r"move_effect_context\[[^\]]*\]"),
+    re.compile(r"audio_window_context\[[^\]]*\]"),
+    re.compile(r"audio_capture_context\[[^\]]*\]"),
+    re.compile(r"recent_moves\[8s\]:[^\n]*"),
+    re.compile(r"Live deltas:[^\n]*"),
+    re.compile(r"track='[^']*'"),
+    re.compile(r"\bdeck=(?:A|B|mix)\b"),
+    re.compile(r"\bjudge[^\n]*blend score[^\n]*", re.IGNORECASE),
+    re.compile(r"\bvocal_(?:active|detector)=[^\s|\n\]]*", re.IGNORECASE),
+)
+
+
+def extract_offered_evidence_text(prompt_text: str | None) -> str:
+    """Reduce a rendered prompt to its machine evidence sections."""
+    raw = str(prompt_text or "")
+    if not raw:
+        return ""
+    sections: list[str] = []
+    for pattern in _OFFERED_EVIDENCE_SECTION_RES:
+        sections.extend(pattern.findall(raw))
+    return "\n".join(sections)
+
+
+def event_witness_observations(
+    text: str,
+    state: MusicState,
+    *,
+    audio_delta_items: list[str] | tuple[str, ...] | None = None,
+    event_type: str | None = None,
+) -> tuple[str, ...]:
+    """Soft-tier event-witness findings on a line that SPEAKS (E.1).
+
+    Demotions are a measured bet: a >20% judge-flag rate on these spoken
+    observations re-arms the rule as a hold.
+    """
+    if not str(text or "").strip():
+        return ()
+    found: list[str] = []
+    deltas = tuple(str(d) for d in (audio_delta_items or ()))
+    absence = _ew_absence_reason(text, state, deltas)
+    if absence is not None:
+        found.append(f"event_witness:{absence}")
+    if str(event_type or "").strip().upper() == "MIX_MOVE":
+        contradiction = _ew_move_effect_contradiction(text, state)
+        if contradiction is not None:
+            found.append(f"event_witness:{contradiction}")
+        elif not _ew_has_forward_directive(text):
+            found.append("event_witness:mix_move_narration_without_directive")
+    return tuple(found)
 
 
 def _ew_text_monotonic_reason(
@@ -3413,6 +3470,129 @@ def _strip_unsafe_disclaimer_claim_sentences(text: str) -> str:
     return ""
 
 
+_LICENSE_BAND_ORDER: tuple[str, ...] = ("sub", "low", "mid", "high")
+
+
+def render_evidence_license(
+    state: MusicState,
+    moves: list[str] | tuple[str, ...] = (),
+    *,
+    policy: str,
+    reason: str | None = None,
+    audio_delta_items: list[str] | tuple[str, ...] | None = None,
+    compact: bool = False,
+) -> str:
+    """C.1 (free Sven): the per-turn evidence LICENSE block.
+
+    Configure-at-source: every fact the result-boundary guards check is told
+    to the model UP FRONT, positively framed — what the evidence licenses,
+    not what is banned. Computed from the SAME constants the guards read
+    (``SPECTRAL_CLAIM_BAND_FLOOR``, ``live_claim_policy``, ``vocal_active``)
+    so prompt and boundary structurally cannot drift.
+    """
+    bands = getattr(state, "bands", {}) or {}
+
+    def _level(key: str) -> float:
+        try:
+            return float(bands.get(key, 0.0) or 0.0)
+        except (TypeError, ValueError):
+            return 0.0
+
+    bands_live = [k for k in _LICENSE_BAND_ORDER if _level(k) >= SPECTRAL_CLAIM_BAND_FLOOR]
+    bands_open = [k for k in _LICENSE_BAND_ORDER if k not in bands_live]
+    vocal_confirmed = bool(getattr(state, "vocal_active", False))
+    move_items = [str(m) for m in moves if str(m).strip()]
+    deck_state = (
+        "resolved" if policy in {"candidate_not_verdict", "supported_verdict"} else "unresolved"
+    )
+    token = (
+        f"evidence_license[decks={deck_state}"
+        f" deck_words={'open' if policy == 'supported_verdict' else 'reserved'}"
+        f" bands_live={','.join(bands_live) or 'none'}"
+        f" bands_open={','.join(bands_open) or 'none'}"
+        f" vocal={'confirmed' if vocal_confirmed else 'unconfirmed'}"
+        f" hands={len(move_items) or 'none'}]"
+    )
+    if compact:
+        return (
+            f"{token} Speak to the live bands and the next move; deck-pairing "
+            "words and vocal naming unlock when the packet confirms them."
+        )
+
+    sentences: list[str] = []
+    if policy == "supported_verdict":
+        sentences.append(
+            "Both decks are confirmed with measured proof — the blend verdict "
+            "is yours, sized to the Judge read in this packet."
+        )
+    elif policy == "candidate_not_verdict":
+        sentences.append(
+            "Both decks are confirmed but per-deck proof is thin this window, "
+            "so blend grades stay out of reach by design — your strongest "
+            "lines are the master-mix read and the next-move nudge; spend "
+            "every turn there."
+        )
+    else:
+        sentences.append(
+            "Two decks aren't confirmed yet, so keep this read in pure sound "
+            "terms — weight, space, motion, energy. The deck-pairing words "
+            "(transition, blend, swap, handoff) unlock the moment the packet "
+            "confirms both decks; future directives using them are always "
+            "yours — 'when you transition…' costs nothing."
+        )
+    if bands_live:
+        live_list = ", ".join(bands_live)
+        if bands_open:
+            sentences.append(
+                f"The mix is carrying {live_list} right now; "
+                f"{', '.join(bands_open)} sit near-silent — treat those as "
+                "open space to fill, and keep content talk on the bands the "
+                "meters show."
+            )
+        else:
+            sentences.append(
+                f"The mix is carrying {live_list} across the spectrum — the "
+                "full read is yours."
+            )
+    else:
+        sentences.append(
+            "The meters sit near-silent across the spectrum — speak to the "
+            "space itself and the next move that fills it."
+        )
+    for band in bands_open:
+        if band in ("mid", "high") and _spectral_rose_delta_offered(band, audio_delta_items):
+            sentences.append(
+                f"The {band} rise the deltas show is yours to call — say it "
+                "as the rise it is."
+            )
+    if vocal_confirmed:
+        sentences.append("A vocal is confirmed live in the mix; name it freely.")
+    else:
+        sentences.append(
+            "Voices you hear ride as texture for now — call them a top line "
+            "or a layer, and name them as vocals the moment the packet "
+            "confirms one."
+        )
+    if move_items:
+        sentences.append(
+            "A listed move is yours to name and tie to its deltas the way "
+            "they point."
+        )
+    else:
+        sentences.append(
+            "With nothing listed in recent_moves, your material is the sound "
+            "itself and the next move you'd suggest."
+        )
+    sentences.append(
+        "Forward nudges are always yours — what to set up, hold, or leave "
+        "alone over the next bars. The moment you say something happened (a "
+        "band cut out, a vocal landed, a shift hit), rest it on a delta, "
+        "level, or move shown above; when the packet is quiet about it, keep "
+        "it as texture."
+    )
+    return token + " " + " ".join(sentences)
+
+
 def live_claim_policy(
     state: MusicState,
     moves: list[str] | tuple[str, ...] = (),
@@ -3661,6 +3841,14 @@ def apply_live_claim_guard(
             reason=witness_reason,
             summary=_live_guard_summary(state, moves),
         )
+    soft = event_witness_observations(
+        result.text,
+        state,
+        audio_delta_items=audio_delta_items,
+        event_type=event_type,
+    )
+    if soft:
+        result = dataclass_replace(result, observations=result.observations + soft)
     return result
 
 

@@ -168,6 +168,15 @@ The ack events are short, frequent, and structurally compressible -- a HEARTBEAT
 
 The `ValueError` at `src/vibemix/state/coach.py:828-830` is the dispatch-bug guard: a caller that accidentally passes `diet=True` on TRACK_CHANGE (an event that needs the full payload) does NOT silently degrade to a compressed prompt -- it raises immediately, surfacing the bug at the call site instead of producing a quietly-worse reaction.
 
+## Evidence-License Block (free Sven, 2026-06-12)
+
+`render_evidence_license` (`src/vibemix/state/deck_context.py`, defined directly above `live_claim_policy`) composes a per-turn LICENSE rider appended immediately after the `claim_policy[...]` token inside `_build_attached_audio_context_clause` (`src/vibemix/agent/dj_cohost.py`). It is the configure-at-source half of the guard architecture: every fact the result-boundary guards check is stated to the model up front, positively framed — what the evidence licenses, never a ban list.
+
+- Machine token: `evidence_license[decks=… deck_words=… bands_live=… bands_open=… vocal=… hands=…]`. The token is a public-diagnostic leak trigger (`_LIVE_PUBLIC_DIAGNOSTIC_RE`) — a model echoing it is held.
+- Computed from the SAME constants the guards read: `SPECTRAL_CLAIM_BAND_FLOOR` splits `bands_live`/`bands_open` (also bound by reference into `runtime/energy_read_voice.py::BAND_AUDIBILITY_FLOOR`), `live_claim_policy` picks the deck-words sentence, `state.vocal_active` the vocal sentence, `recent_moves` the hands sentence. Structural no-drift: prompt and boundary cannot disagree.
+- The block is EXCLUDED from the event-witness guard's offered-evidence text by construction: the boundary passes `extract_offered_evidence_text(full_text_prompt)` (machine evidence sections only) as `offered_evidence_text`, so the license prose's own "vocals" token can never license a fabricated vocal event. Pinned by `tests/state/test_evidence_license.py::test_license_block_cannot_defang_the_vocal_witness_rule`.
+- Telemetry counterpart: lines that SPEAK may carry guard `observations` (demoted soft-tier detections — band-intensity, EW R1/R3/R5, coaching advice, the broad multi-deck vocabulary net). The boundary logs them as `live_claim_observation` events in `events.jsonl`; a >20% judge-flag rate on a demoted class re-arms it as a hold. Hold-class guard results route on `LiveClaimGuardResult.speakable` — the canned `*_HELD_REPLY` strings survive as artifact/debrief vocabulary only and are never voiced in any mode (probe included).
+
 ## Per-Event-Type Cooldowns
 
 Reproduces `MIN_EVENT_GAP_PER_TYPE` from `src/vibemix/audio/constants.py:77` one row per dict key. The third column quotes the inline-comment rationale preserved alongside the value in source.
