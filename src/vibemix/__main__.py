@@ -4353,6 +4353,32 @@ def _build_library_subparsers(parser: argparse.ArgumentParser) -> None:
     )
     sp_gig_check.set_defaults(func=_cmd_library_gig_check)
 
+    sp_export_guard = sub.add_parser(
+        "export-guard",
+        help="Read-only USB preflight: will this stick show up on tonight's rig?",
+        description=(
+            "Walk a mounted USB export without touching it: which library "
+            "formats it carries (classic Device Library vs OneLibrary — the "
+            "AlphaTheta dual-format trap), filesystem vs the rig's rules, "
+            "audio formats the rig can actually play, missing USBANLZ "
+            "analysis. Ends in one verdict with receipts. Exit code is the "
+            "verdict: 0 take_it, 1 fix_first, 2 do_not_take."
+        ),
+    )
+    sp_export_guard.add_argument("usb", help="path to the mounted USB stick")
+    sp_export_guard.add_argument(
+        "--rig",
+        required=True,
+        help="target rig id (e.g. cdj-3000x, cdj-3000, cdj-2000nxs2, xdj-xz)",
+    )
+    sp_export_guard.add_argument("--json", action="store_true")
+    sp_export_guard.add_argument(
+        "--filesystem",
+        default=None,
+        help="override filesystem detection (fat32/exfat/hfsplus/ntfs/...)",
+    )
+    sp_export_guard.set_defaults(func=_cmd_library_export_guard)
+
     # Phase 89 Plan 01 — ingest: auto-detect a DJ library + embed it on-device.
     sp_ingest = sub.add_parser(
         "ingest",
@@ -8772,6 +8798,41 @@ def _cmd_library_gig_check(args: argparse.Namespace) -> int:
         )
     except FileNotFoundError:
         print(f"[gig-check err] collection XML not found: {args.xml}", file=sys.stderr)
+        return 1
+    if getattr(args, "json", False):
+        print(_json.dumps(report, indent=2))
+    else:
+        print(format_report(report))
+    return {"take_it": 0, "fix_first": 1, "do_not_take": 2}[report["verdict"]]
+
+
+def _cmd_library_export_guard(args: argparse.Namespace) -> int:
+    """Read-only USB preflight: will this stick show up on tonight's rig?
+
+    Exit code IS the verdict, so a prep script can gate on it:
+    0 = take_it, 1 = fix_first (or unreadable input), 2 = do_not_take.
+    """
+    import json as _json
+
+    from vibemix.library.export_guard import (
+        RIG_PROFILES,
+        format_report,
+        run_export_guard,
+    )
+
+    try:
+        report = run_export_guard(
+            args.usb, args.rig, filesystem=getattr(args, "filesystem", None)
+        )
+    except FileNotFoundError:
+        print(f"[export-guard err] USB path not found: {args.usb}", file=sys.stderr)
+        return 1
+    except KeyError:
+        rigs = ", ".join(sorted(RIG_PROFILES))
+        print(
+            f"[export-guard err] unknown rig '{args.rig}' — available: {rigs}",
+            file=sys.stderr,
+        )
         return 1
     if getattr(args, "json", False):
         print(_json.dumps(report, indent=2))

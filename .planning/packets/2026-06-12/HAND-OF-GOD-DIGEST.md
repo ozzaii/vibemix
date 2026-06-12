@@ -78,14 +78,47 @@ Suite state: 18/18 new tests green; `tests/library` + `tests/repo` green except
 two inherited reds (persona-seam expectation vs HEAD's debrief persona, and the
 2026-06-10 `debrief-mock-after.png` >1MB LFS scrub) — both pre-date this work.
 
-## Queue (in pack-priority order, none started)
+## Shipped 2026-06-12 (second wedge): `vibemix library export-guard`
 
-1. **Export Guard / USB Will-It-Show** — point gig-check at a mounted USB:
-   detect Device Library vs OneLibrary presence, Engine DB, filesystem,
-   target-rig profile (CDJ-3000X/3000/XDJ-XZ/2000NXS2). The pack calls this
-   the sharpest wedge; needs format research on the exported USB tree.
-2. **Serato input** — `_Serato_/Subcrates/*.crate` parse (Mixxx documents the
-   format; `serato-tools` exists). Same audit, second ecosystem.
+`src/vibemix/library/export_guard.py` + `tests/library/test_export_guard.py`
+(25 tests) + CLI wiring in `__main__.py`.
+
+```
+uv run python -m vibemix library export-guard <usb_path> --rig cdj-3000x [--json] [--filesystem fat32]
+```
+
+Read-only walk of a mounted USB ending in the same verdict ladder as
+gig-check (exit code = verdict). What it audits, every hardware fact
+verified against official AlphaTheta notices/manuals by a 4-agent research
+workflow (wf_c61ce5aa-807; 23/24 claims survived adversarial verification):
+
+- **The dual-format trap**: classic Device Library
+  (`PIONEER/rekordbox/export.pdb`) vs OneLibrary
+  (`PIONEER/rekordbox/exportLibrary.db`). CDJ-3000X/OPUS-QUAD read
+  OneLibrary; CDJ-3000/XDJ-XZ/RX3/NXS2 and older read Device Library.
+  Wrong-format-only stick = do_not_take with the re-export instruction
+  (rekordbox 7.2.11+ writes both). This is the XDJ-AZ horror story and the
+  withdrawn CDJ-3000 fw 3.30, predicted in the kitchen.
+- **Filesystem vs rig**: NTFS/APFS = blocked everywhere; exFAT blocked on
+  NXS2 (manual: FAT16/FAT32/HFS+ only), warn on CDJ-3000/XDJ-XZ
+  (firmware-added), native on RX3/3000X/OPUS-QUAD. Unknown fs = honest
+  absence, never a penalty.
+- **Audio formats vs rig**: FLAC/ALAC start at NXS2; XZ/RX3 list no ALAC;
+  pre-NXS2 = MP3 universal, AAC/WAV/AIFF patchy (warn). `.m4a` ambiguity
+  (AAC or ALAC) warns instead of guessing.
+- **Missing USBANLZ** (no waveforms/beatgrids), Engine-stick-on-Pioneer-rig,
+  raw-files-no-export, Serato `_Serato_` presence, empty stick.
+
+9 rig profiles: cdj-3000x, cdj-3000, cdj-2000nxs2, cdj-2000nxs (pre-NXS2),
+xdj-xz, xdj-rx3, opus-quad, engine-os, serato-laptop. Engine OS format/fs
+matrices deliberately not audited (no verified fact base yet).
+
+## Queue (in pack-priority order)
+
+1. ~~**Export Guard / USB Will-It-Show**~~ — SHIPPED 2026-06-12 (above).
+2. **Serato input** — partially pre-existing: `library/sources/serato.py`
+   (binary crate + Markers2 cue decoder) already implements the parse layer
+   (Phase 89). Remaining: route SeratoSource through gig-check's audit.
 3. **Public panic utility** — `/dj/gig-check` web page emitting shareable
    receipts; SEO on panic phrases ("serato crates no music", "cue points
    disappeared").
