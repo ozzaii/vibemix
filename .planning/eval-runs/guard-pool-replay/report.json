@@ -22,7 +22,7 @@
   "event_witness_not_offered": {
    "keeperHolds": 0,
    "keeperExamples": [],
-   "fabricationHolds": 10,
+   "fabricationHolds": 9,
    "fabricationExamples": [
     "This vocal build is really pushing hard now\u2014hold the tension right there, then let the next phrase explode. [energy:master_read=audio_peak_40_9c390035]",
     "[energy:master_read=audio_peak_110_f3108ffa].",
@@ -31,12 +31,12 @@
    "nullHolds": 0,
    "lowConfidence": 0,
    "emitCorrected": 0,
-   "strip": 10
+   "strip": 9
   },
   "spectral_claim_not_audible": {
    "keeperHolds": 0,
    "keeperExamples": [],
-   "fabricationHolds": 6,
+   "fabricationHolds": 7,
    "fabricationExamples": [
     "Hold back on adding more weight right here; let this new brightness settle in before you pull any heavy moves. [energy:master_read=audio_peak_110_b63b8f61]",
     "Keep this added brightness in check over the next phrase to let that heavy kick bounce. [energy:master_read=audio_peak_19_266606fc]",
@@ -45,7 +45,7 @@
    "nullHolds": 0,
    "lowConfidence": 0,
    "emitCorrected": 0,
-   "strip": 6
+   "strip": 7
   }
  },
  "totals": {
@@ -1731,8 +1731,8 @@
    "id": "0004_033021_PHASE",
    "ok": false,
    "held": true,
-   "policy": "event_witness_not_offered",
-   "reason": "person_name_without_witness",
+   "policy": "spectral_claim_not_audible",
+   "reason": "high_presence_claim_at_inaudible_high",
    "action": "strip",
    "observations": [],
    "low_conf": false,

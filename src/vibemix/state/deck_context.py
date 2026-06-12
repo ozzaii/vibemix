@@ -92,6 +92,8 @@ _LIVE_PUBLIC_DIAGNOSTIC_RE = re.compile(
     r"i need to correct (?:the|that) live read|resolved decks=|"
     r"live evidence gate:|transition_block=|claim_policy=|"
     r"evidence_license\[|bands_live=|bands_open=|"
+    r"deck_words=|decks=(?:resolved|unresolved)|"
+    r"vocal=(?:confirmed|unconfirmed)|hands=(?:none|\d)|"
     r"proof_not_ready|unsupported_live_outcome_claim|guard_violations|"
     r"my bad(?: on| with)? (?:the )?live|"
     r"my mistake(?: on| with)? (?:the )?live|"
@@ -112,10 +114,20 @@ _LIVE_PUBLIC_DIAGNOSTIC_RE = re.compile(
 )
 _MULTI_DECK_VERDICT_RE = re.compile(
     r"\b("
-    r"great|nice|good|clean|cleanly|smooth|smoothly|solid|perfect|perfectly|"
-    r"successful|tight|tightly|seamless|seamlessly|beautiful|beautifully|"
-    r"flawless|flawlessly|nailed|worked|landed|bad|rough|messy|weak"
+    r"great(?:est)?|nice|nicest|good|clean(?:est|ly)?|smooth(?:est|ly)?|"
+    r"solid|perfect(?:ly)?|successful|tight(?:est|ly)?|seamless(?:ly)?|"
+    r"beautiful(?:ly)?|flawless(?:ly)?|textbook|masterclass|butter(?:y)?|"
+    r"chef'?s kiss|crushed|smashed|nailed|worked|landed|"
+    r"bad|rough(?:est)?|messy|messiest|weak(?:est)?|sloppy|sloppiest"
     r")\b",
+    re.IGNORECASE,
+)
+# Nominal exclamatives carry the verdict without a verdict word: "What a
+# transition!", "Transition of the night." (slop-audit probe class).
+_MULTI_DECK_EXCLAMATIVE_RE = re.compile(
+    r"\bwhat\s+a\s+(?:transition|blend|crossfade|swap|segue|handoff|bridge)\b"
+    r"|\b(?:transition|blend|crossfade|swap|segue|handoff|bridge)\s+of\s+the\s+"
+    r"(?:night|set|year|week)\b",
     re.IGNORECASE,
 )
 # A.2 (2026-06-12 "free Sven"): clause-grammar separators for the precise
@@ -126,8 +138,12 @@ _MULTI_DECK_VERDICT_RE = re.compile(
 # HAPPENED; the evaluative frame grades it; a directive or future clause
 # carries no claim and always passes.
 _MULTI_DECK_PERFECTIVE_RE = re.compile(
-    r"\b(?:transitioned|blended|crossfaded|swapped|switched|segued|bridged|"
-    r"layered|layering)\b",
+    # Perfective AND progressive deck-pairing verbs assert the event — the
+    # progressive forms ("you're transitioning right now") are the
+    # slop-audit probe class; directive/future clauses are exempted upstream.
+    r"\b(?:transition(?:ed|ing)|blend(?:ed|ing)|crossfad(?:ed|ing)|"
+    r"swapp(?:ed|ing)|switch(?:ed|ing)|segue(?:d|ing)|bridg(?:ed|ing)|"
+    r"layer(?:ed|ing))\b",
     re.IGNORECASE,
 )
 # The graded-vocabulary rule: a verdict word next to ANY deck-pairing word in
@@ -159,7 +175,8 @@ _MULTI_DECK_DROP_OBJECT_RE = re.compile(
     re.IGNORECASE,
 )
 _FUTURE_CLAUSE_HEAD_RE = re.compile(
-    r"^(?:when|before|after|until|once|as|if)\s+(?:you|we|it|the|that|this)\b",
+    r"^(?:when|whenever|while|before|after|until|once|as|if)\s+"
+    r"(?:you|we|it|the|that|this)\b",
     re.IGNORECASE,
 )
 _JUDGE_BLEND_SCORE_RE = re.compile(
@@ -728,6 +745,25 @@ def _spectral_rose_delta_offered(
     return any(pattern.search(str(item)) for item in audio_delta_items)
 
 
+# The escape needs BOTH a clear/strong offered rise AND a post level within
+# reach of the floor. Tiers are RELATIVE (|cur-prev|/prev): high 0.02→0.03
+# renders "rose 50% (strong)" — jitter is largest exactly where the band is
+# quietest, and trusting the tier alone re-opened the lever2 "added
+# brightness" class in slop-audit probes. Half the floor is the measured
+# twin-class line: the judged keeper and its evidence-twins sat at 0.05-0.08.
+_SPECTRAL_ROSE_ESCAPE_LEVEL_FLOOR = 0.5
+
+
+def _spectral_rose_escape(
+    band: str,
+    level: float | None,
+    audio_delta_items: list[str] | tuple[str, ...] | None,
+) -> bool:
+    if level is None or level < SPECTRAL_CLAIM_BAND_FLOOR * _SPECTRAL_ROSE_ESCAPE_LEVEL_FLOOR:
+        return False
+    return _spectral_rose_delta_offered(band, audio_delta_items)
+
+
 def _unsupported_spectral_presence_claim(
     text: str,
     state: MusicState,
@@ -740,7 +776,7 @@ def _unsupported_spectral_presence_claim(
         if (
             level is not None
             and level < SPECTRAL_CLAIM_BAND_FLOOR
-            and not _spectral_rose_delta_offered("high", audio_delta_items)
+            and not _spectral_rose_escape("high", level, audio_delta_items)
         ):
             return "high_presence_claim_at_inaudible_high"
     if _SPECTRAL_MID_CLAIM_RE.search(text):
@@ -748,7 +784,7 @@ def _unsupported_spectral_presence_claim(
         if (
             level is not None
             and level < SPECTRAL_CLAIM_BAND_FLOOR
-            and not _spectral_rose_delta_offered("mid", audio_delta_items)
+            and not _spectral_rose_escape("mid", level, audio_delta_items)
         ):
             return "mid_presence_claim_at_inaudible_mid"
     return None
@@ -3394,33 +3430,40 @@ def _has_multi_deck_outcome_assertion(text: str) -> bool:
     public_text = _CITATION_ATOM_RE.sub(" ", str(text or ""))
     if _MULTI_DECK_PHRASE_RE.search(public_text):
         return True
-    for raw_clause in re.split(r"[,;.!?—]|--", public_text):
-        words = raw_clause.strip().split()
-        while words and words[0].casefold().strip("'\"") in _EW_CLAUSE_CONNECTIVES:
-            words = words[1:]
-        if not words:
-            continue
-        clause = " ".join(words)
-        head = words[0].casefold().strip("'\"")
-        if head in _EW_DIRECTIVE_VERBS or _EW_NEGATIVE_IMPERATIVE_RE.match(clause):
-            continue
-        if _FUTURE_CLAUSE_HEAD_RE.match(clause):
-            continue
-        if _MULTI_DECK_PERFECTIVE_RE.search(clause):
-            return True
-        verdict = _MULTI_DECK_VERDICT_RE.search(clause)
-        frame = _MULTI_DECK_EVAL_FRAME_RE.search(clause)
-        # "the mix is …" is everyday vocabulary ("the mix is carrying sub");
-        # only graded mentions of it count. The dedicated pairing nouns
-        # (transition/blend/handoff/…) assert on the frame alone.
-        if frame and (frame.group("noun").casefold() != "mix" or verdict):
-            return True
-        if verdict and _MULTI_DECK_GRADED_WORD_RE.search(clause):
-            return True
-        if _MULTI_DECK_DROP_OBJECT_RE.search(clause):
-            return True
-        if verdict and _MULTI_DECK_DROP_VERB_RE.search(clause):
-            return True
+    if _MULTI_DECK_EXCLAMATIVE_RE.search(public_text):
+        return True
+    for sentence in _split_live_sentences(public_text):
+        # Verdict scope is the SENTENCE: "Seamless, that transition." carries
+        # the verdict and the pairing noun in different clauses (the
+        # slop-audit dislocation probes) — only the directive/future
+        # exemption stays clause-scoped, on the clause holding the noun.
+        sentence_verdict = _MULTI_DECK_VERDICT_RE.search(sentence)
+        for raw_clause in re.split(r"[,;—]|--", sentence):
+            words = raw_clause.strip().split()
+            while words and words[0].casefold().strip("'\"") in _EW_CLAUSE_CONNECTIVES:
+                words = words[1:]
+            if not words:
+                continue
+            clause = " ".join(words)
+            head = words[0].casefold().strip("'\"")
+            if head in _EW_DIRECTIVE_VERBS or _EW_NEGATIVE_IMPERATIVE_RE.match(clause):
+                continue
+            if _FUTURE_CLAUSE_HEAD_RE.match(clause):
+                continue
+            if _MULTI_DECK_PERFECTIVE_RE.search(clause):
+                return True
+            frame = _MULTI_DECK_EVAL_FRAME_RE.search(clause)
+            # "the mix is …" is everyday vocabulary ("the mix is carrying
+            # sub"); only graded mentions of it count. The dedicated pairing
+            # nouns (transition/blend/handoff/…) assert on the frame alone.
+            if frame and (frame.group("noun").casefold() != "mix" or sentence_verdict):
+                return True
+            if sentence_verdict and _MULTI_DECK_GRADED_WORD_RE.search(clause):
+                return True
+            if _MULTI_DECK_DROP_OBJECT_RE.search(clause):
+                return True
+            if sentence_verdict and _MULTI_DECK_DROP_VERB_RE.search(clause):
+                return True
     return False
 
 
@@ -3560,7 +3603,9 @@ def render_evidence_license(
             "space itself and the next move that fills it."
         )
     for band in bands_open:
-        if band in ("mid", "high") and _spectral_rose_delta_offered(band, audio_delta_items):
+        if band in ("mid", "high") and _spectral_rose_escape(
+            band, _level(band), audio_delta_items
+        ):
             sentences.append(
                 f"The {band} rise the deltas show is yours to call — say it "
                 "as the rise it is."

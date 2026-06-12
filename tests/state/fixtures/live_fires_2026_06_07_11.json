@@ -143,6 +143,14 @@
     {"id": "tp05", "raw_text": "You dropped the next track in perfectly. [ev:MANUAL@14.0]", "event": "MANUAL", "why": "adverb-only verdict (the pre-A.1 leak shape)"},
     {"id": "tp06", "raw_text": "You transitioned smoothly into it. [ev:MANUAL@15.0]", "event": "MANUAL", "why": "bare perfective multi-deck verb + adverb verdict"},
     {"id": "tp07", "raw_text": "The vocals just cut out, big open space now. [ev:PHASE@16.0]", "event": "PHASE", "why": "vocal-disappearance fabrication at vocal_active=False"},
-    {"id": "tp08", "raw_text": "Those kicks are clashing, tighten the sync before the phrase turns. [ev:PHASE@17.0]", "event": "PHASE", "why": "presence-diagnosis fabrication at cold state (requires_more_evidence)"}
+    {"id": "tp08", "raw_text": "Those kicks are clashing, tighten the sync before the phrase turns. [ev:PHASE@17.0]", "event": "PHASE", "why": "presence-diagnosis fabrication at cold state (requires_more_evidence)"},
+    {"id": "tp09", "raw_text": "Seamless, that transition. [ev:MANUAL@18.0]", "event": "MANUAL", "why": "slop-audit dislocation probe: verdict and pairing noun in different clauses"},
+    {"id": "tp10", "raw_text": "Smoothest blend I've heard all night. [ev:MANUAL@19.0]", "event": "MANUAL", "why": "slop-audit superlative probe"},
+    {"id": "tp11", "raw_text": "What a transition! [ev:MANUAL@20.0]", "event": "MANUAL", "why": "slop-audit nominal exclamative probe"},
+    {"id": "tp12", "raw_text": "You crushed that swap. [ev:MANUAL@21.0]", "event": "MANUAL", "why": "slop-audit unlisted-praise-verb probe"},
+    {"id": "tp13", "raw_text": "You're transitioning right now and it shows. [ev:MANUAL@22.0]", "event": "MANUAL", "why": "slop-audit progressive-assertion probe"},
+    {"id": "tp14", "raw_text": "Textbook transition right there. [ev:MANUAL@23.0]", "event": "MANUAL", "why": "slop-audit nominal-praise probe"},
+    {"id": "tp15", "raw_text": "Clean as hell, that transition. [ev:MANUAL@24.0]", "event": "MANUAL", "why": "slop-audit dislocation probe, profane register"},
+    {"id": "tp16", "raw_text": "That blend — chef's kiss. [ev:MANUAL@25.0]", "event": "MANUAL", "why": "slop-audit dash-dislocated idiom-praise probe"}
   ]
 }
