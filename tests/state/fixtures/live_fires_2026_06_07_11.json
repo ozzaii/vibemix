@@ -1,0 +1,148 @@
+{
+  "_comment": "The 11 live_claim_guard fires from real sessions 2026-06-07..11 (events.jsonl, sessions >= 20260607). raw_text is verbatim what the model wanted to say; policy_was/reason_was/action_was are what the shipped guard did. target encodes the configure-at-source contract: speaks (false positive - the guard misread a good coach line), trims (keep the model's own words, drop the unsupported clause), holds (true positive - fabricated/unwitnessed claim; result must be speakable=false and the canned text must never reach speech). state is the minimal reconstruction that reproduces the recorded policy (bands from the session's hearing line where the invocation was recoverable).",
+  "fires": [
+    {
+      "id": "fire01",
+      "session": "20260607-123559",
+      "event": "MANUAL",
+      "policy_was": "blocked",
+      "reason_was": "no_resolved_decks",
+      "action_was": "strip",
+      "raw_text": "You nudged deck B to line up the grids; now bring the low EQ back to flat when you transition. [ev:MANUAL@85.4]",
+      "why": "future directive ('when you transition'), zero outcome claim",
+      "state": {"rms": 0.05, "bands": {"sub": 0.6, "low": 0.3, "mid": 0.2, "high": 0.1}, "moves": ["B jog nudge small"]},
+      "target": "speaks"
+    },
+    {
+      "id": "fire02",
+      "session": "20260607-123559",
+      "event": "TRACK_CHANGE",
+      "policy_was": "blocked",
+      "reason_was": "no_resolved_decks",
+      "action_was": "strip",
+      "raw_text": "This new record has a heavy, metallic sub weight that just dropped in; hold it steady before trying any big moves. [ev:TRACK_CHANGE@136.1]",
+      "why": "musical-drop sense ('sub weight dropped in') is an ear read, not a deck-pairing verdict",
+      "state": {"rms": 0.05, "bands": {"sub": 0.7, "low": 0.25, "mid": 0.15, "high": 0.08}, "moves": ["A vol fade up"]},
+      "target": "speaks"
+    },
+    {
+      "id": "fire03",
+      "session": "20260607-125005",
+      "event": "MANUAL",
+      "policy_was": "blocked",
+      "reason_was": "no_resolved_decks",
+      "action_was": "emit_corrected",
+      "raw_text": "This groove's got a really steady energy now, so let this low section build before you slide the next layer in. [ev:MANUAL@40.2]",
+      "why": "the spoken canned non-sequitur case: model never claimed a transition, user heard the transition disclaimer",
+      "state": {"rms": 0.06, "bands": {"sub": 0.55, "low": 0.35, "mid": 0.2, "high": 0.1}, "moves": ["B eq mid twist small"]},
+      "target": "speaks"
+    },
+    {
+      "id": "fire04",
+      "session": "20260607-131909",
+      "event": "TRACK_CHANGE",
+      "policy_was": "audio_source_detail_not_proof",
+      "reason_was": "source_detail_without_grounded_detector",
+      "action_was": "emit_corrected",
+      "raw_text": "That vocal loop got heavily chopped when you pushed deck A's volume up just now. The whole groove feels much leaner. [ev:TRACK_CHANGE@9.4]",
+      "why": "the proven-good trim pattern: keep the model's own words, drop the unsupported source-detail clause",
+      "state": {"rms": 0.055, "bands": {"sub": 0.71, "low": 0.19, "mid": 0.09, "high": 0.02}, "moves": ["A vol push up"]},
+      "target": "trims"
+    },
+    {
+      "id": "fire05",
+      "session": "20260607-131909",
+      "event": "MANUAL",
+      "policy_was": "blocked",
+      "reason_was": "no_resolved_decks",
+      "action_was": "emit_corrected",
+      "raw_text": "That sub drop hit cleanly, but those nudges on deck A suggest you're trying to line up a fresh element. [ev:MANUAL@77.0]",
+      "why": "'sub drop hit cleanly' is a musical-drop ear read (noun drop, no deck/track object); 'line up' is future intent",
+      "state": {"rms": 0.06, "bands": {"sub": 0.65, "low": 0.3, "mid": 0.12, "high": 0.05}, "moves": ["A jog nudge small"]},
+      "target": "speaks"
+    },
+    {
+      "id": "fire06",
+      "session": "20260607-133635",
+      "event": "MANUAL",
+      "policy_was": "band_intensity_not_grounded",
+      "reason_was": "mid_band_below_claim_floor",
+      "action_was": "strip",
+      "raw_text": "That sub weight has been building heavy, so let it ride before you bring any mid-range in. [ev:MANUAL@298.4]",
+      "why": "direction-blind FP: the line says mids are ABSENT and to add them; guard read 'mid-range' as a presence claim",
+      "state": {"rms": 0.05, "bands": {"sub": 0.62, "low": 0.31, "mid": 0.07, "high": 0.01}, "moves": []},
+      "target": "speaks"
+    },
+    {
+      "id": "fire07",
+      "session": "20260607-135051",
+      "event": "MANUAL",
+      "policy_was": "single_deck_control_not_grounded",
+      "reason_was": "control_causality_without_moves",
+      "action_was": "emit_corrected",
+      "raw_text": "You killed those mids and highs on deck A, leaving just that thick sub drone rolling. [ev:MANUAL@302.7]",
+      "why": "true positive: control-causality claim with zero move evidence",
+      "state": {"rms": 0.05, "bands": {"sub": 0.6, "low": 0.3, "mid": 0.05, "high": 0.02}, "moves": []},
+      "target": "holds"
+    },
+    {
+      "id": "fire08",
+      "session": "20260607-165648",
+      "event": "MANUAL",
+      "policy_was": "single_deck_control_not_grounded",
+      "reason_was": "control_causality_without_moves",
+      "action_was": "emit_corrected",
+      "raw_text": "You boosted that low end relative to everything else. [ev:MANUAL@904.7] Use this hollow space to preview a track in your headphones.",
+      "why": "causality claim without move evidence, but the advice tail is separable: trim keeps the model's words",
+      "state": {"rms": 0.06, "bands": {"sub": 0.7, "low": 0.4, "mid": 0.1, "high": 0.04}, "moves": []},
+      "target": "trims"
+    },
+    {
+      "id": "fire09",
+      "session": "20260607-174135",
+      "event": "MANUAL",
+      "policy_was": "band_intensity_not_grounded",
+      "reason_was": "high_band_below_claim_floor",
+      "action_was": "strip",
+      "raw_text": "That sub heavy drone just kept building up, so find some crisp high-end texture to cut through it. [ev:MANUAL@358.0]",
+      "why": "direction-blind FP: directive to ADD highs because there are none",
+      "state": {"rms": 0.069, "bands": {"sub": 0.75, "low": 0.16, "mid": 0.08, "high": 0.01}, "moves": []},
+      "target": "speaks"
+    },
+    {
+      "id": "fire10",
+      "session": "20260611-224152",
+      "event": "PHASE",
+      "policy_was": "blocked",
+      "reason_was": "no_resolved_decks",
+      "action_was": "strip",
+      "raw_text": "The bassline has settled, so keep this low weight steady before you introduce another high-end layer. [energy:master_read=audio_low_42_aa00cc11]",
+      "why": "zero transition claim; 'layer' as a bare noun in a directive clause",
+      "state": {"rms": 0.05, "bands": {"sub": 0.5, "low": 0.4, "mid": 0.15, "high": 0.06}, "moves": ["B eq low twist small"]},
+      "target": "speaks"
+    },
+    {
+      "id": "fire11",
+      "session": "20260611-225443",
+      "event": "PHASE",
+      "policy_was": "spectral_claim_not_audible",
+      "reason_was": "mid_presence_claim_at_inaudible_mid",
+      "action_was": "strip",
+      "raw_text": "Let those new mids sit a moment before you push anything else over them. [energy:master_read=audio_low_84_ac67]",
+      "why": "true positive at mid<0.10 with no rose delta; must pass when a clear mid rose delta is offered",
+      "state": {"rms": 0.05, "bands": {"sub": 0.6, "low": 0.3, "mid": 0.05, "high": 0.04}, "moves": []},
+      "target": "holds",
+      "passes_with_delta": "mid energy rose 44% (clear)"
+    }
+  ],
+  "tp_controls": [
+    {"id": "tp01", "raw_text": "Great transition, that blend was so clean. [ev:MANUAL@10.0]", "event": "MANUAL", "why": "classic outcome praise at zero deck evidence"},
+    {"id": "tp02", "raw_text": "You crossfaded into the new track and it worked perfectly. [ev:MANUAL@11.0]", "event": "MANUAL", "why": "perfective crossfade + verdict"},
+    {"id": "tp03", "raw_text": "That handoff between the two tracks was seamless. [ev:PHASE@12.0]", "event": "PHASE", "why": "evaluative NP frame on a deck-pairing noun"},
+    {"id": "tp04", "raw_text": "Nice swap, the incoming deck sat right in the pocket. [ev:MANUAL@13.0]", "event": "MANUAL", "why": "verdict + multi-deck phrase"},
+    {"id": "tp05", "raw_text": "You dropped the next track in perfectly. [ev:MANUAL@14.0]", "event": "MANUAL", "why": "adverb-only verdict (the pre-A.1 leak shape)"},
+    {"id": "tp06", "raw_text": "You transitioned smoothly into it. [ev:MANUAL@15.0]", "event": "MANUAL", "why": "bare perfective multi-deck verb + adverb verdict"},
+    {"id": "tp07", "raw_text": "The vocals just cut out, big open space now. [ev:PHASE@16.0]", "event": "PHASE", "why": "vocal-disappearance fabrication at vocal_active=False"},
+    {"id": "tp08", "raw_text": "Those kicks are clashing, tighten the sync before the phrase turns. [ev:PHASE@17.0]", "event": "PHASE", "why": "presence-diagnosis fabrication at cold state (requires_more_evidence)"}
+  ]
+}

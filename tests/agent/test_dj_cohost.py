@@ -278,7 +278,7 @@ def test_llm_node_logs_ai_message_observability_with_moves(mocker, tmp_path) -> 
     mocker.patch("vibemix.agent.dj_cohost.snapshot_wav", return_value=b"FAKEWAV")
     mocker.patch.object(AICoach, "build_prompt", return_value="EVIDENCE: x")
     gen_client.aio.models.generate_content_stream = mocker.AsyncMock(
-        return_value=_async_iter(["that low cut reads clearly"])
+        return_value=_async_iter(["that low cut reads clearly, keep it rolling"])
     )
 
     ev = Event(type="MIX_MOVE", state=state, extra={"moves": [(0.2, "A_low: flat->cut")]})
@@ -290,7 +290,7 @@ def test_llm_node_logs_ai_message_observability_with_moves(mocker, tmp_path) -> 
     row = rows[0]
     assert row["engine"] == "live_coach"
     assert row["event"] == "MIX_MOVE"
-    assert row["message"] == "that low cut reads clearly"
+    assert row["message"] == "that low cut reads clearly, keep it rolling"
     assert row["moves"]["recent_moves"] == [{"label": "A_low: flat->cut", "age_s": 0.3}]
     assert row["moves"]["event_moves"] == [{"label": "A_low: flat->cut", "age_s": 0.2}]
     assert row["moves"]["deck_mixer"]["A"]["eq_low"] == 20
@@ -299,7 +299,7 @@ def test_llm_node_logs_ai_message_observability_with_moves(mocker, tmp_path) -> 
     assert "AUDIO CONTEXT MAP FOR ATTACHED P1" in prompt_text
     assert (
         Path(row["artifacts"]["session_response_path"]).read_text(encoding="utf-8")
-        == "that low cut reads clearly"
+        == "that low cut reads clearly, keep it rolling"
     )
 
 
@@ -1237,7 +1237,7 @@ def test_llm_node_07_history_truncation_to_140_chars(mocker, tmp_path) -> None:
     mocker.patch("vibemix.agent.dj_cohost.snapshot_wav", return_value=b"FAKEWAV")
     mocker.patch.object(AICoach, "build_prompt", return_value="x")
 
-    long_chunk = "A" * 300
+    long_chunk = "a" * 300  # lowercase: an ALL-CAPS render is held by the event-witness guard
     gen_client.aio.models.generate_content_stream = mocker.AsyncMock(
         return_value=_async_iter([long_chunk])
     )
@@ -1248,7 +1248,7 @@ def test_llm_node_07_history_truncation_to_140_chars(mocker, tmp_path) -> None:
 
     assert len(agent._ai_text_history) == 1
     # Text portion capped at 140 chars; the [M:SS] prefix adds a few more.
-    assert agent._ai_text_history[0].count("A") == 140
+    assert agent._ai_text_history[0].count("a") == 140
     assert agent._ai_text_history[0].startswith("[")
 
 

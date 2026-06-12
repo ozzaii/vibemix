@@ -111,9 +111,54 @@ _LIVE_PUBLIC_DIAGNOSTIC_RE = re.compile(
 )
 _MULTI_DECK_VERDICT_RE = re.compile(
     r"\b("
-    r"great|nice|good|clean|smooth|solid|perfect|successful|tight|seamless|"
-    r"nailed|worked|landed|bad|rough|messy|weak"
+    r"great|nice|good|clean|cleanly|smooth|smoothly|solid|perfect|perfectly|"
+    r"successful|tight|tightly|seamless|seamlessly|beautiful|beautifully|"
+    r"flawless|flawlessly|nailed|worked|landed|bad|rough|messy|weak"
     r")\b",
+    re.IGNORECASE,
+)
+# A.2 (2026-06-12 "free Sven"): clause-grammar separators for the precise
+# outcome-assertion check. The old word-list above is tense- and mood-blind —
+# it held future directives ("when you transition", "before you slide the
+# next layer in"): 5 of the 11 real live guard fires of Jun 7-11 were this
+# false-positive class. Perfective deck-pairing verbs assert the event
+# HAPPENED; the evaluative frame grades it; a directive or future clause
+# carries no claim and always passes.
+_MULTI_DECK_PERFECTIVE_RE = re.compile(
+    r"\b(?:transitioned|blended|crossfaded|swapped|switched|segued|bridged|"
+    r"layered|layering)\b",
+    re.IGNORECASE,
+)
+# The graded-vocabulary rule: a verdict word next to ANY deck-pairing word in
+# an asserting clause is outcome praise ("that was a great transition",
+# "great blend into the drop"). Bare 'drop' is excluded — its musical sense
+# ("that sub drop hit cleanly") is an ear read handled by the object rule —
+# and bare 'layer' stays a plain noun.
+_MULTI_DECK_GRADED_WORD_RE = re.compile(
+    r"\b(?:"
+    r"transition(?:ed|ing|s)?|blend(?:ed|ing|s)?|mix(?:ed|ing)?|"
+    r"crossfade(?:d|s|ing)?|swap(?:ped|ping|s)?|switch(?:ed|ing)?|"
+    r"segue(?:d|ing)?|handoff|bridge(?:d|ing)?"
+    r")\b",
+    re.IGNORECASE,
+)
+_MULTI_DECK_EVAL_FRAME_RE = re.compile(
+    r"\b(?:that|this|the|your)\s+"
+    r"(?P<noun>transition|blend|mix|crossfade|swap|switch|segue|handoff|bridge)\b"
+    r"[^.!?]{0,40}?\b(?:was|is|felt|hit|landed|sounded|came)\b",
+    re.IGNORECASE,
+)
+_MULTI_DECK_DROP_VERB_RE = re.compile(r"\bdropped\b", re.IGNORECASE)
+# 'drop' is the polysemous one: 'the sub drop hit cleanly' is an ear read
+# (invariant #3 — trust the audio); 'you dropped the next track in' pairs
+# decks. The deck/track object is the separator.
+_MULTI_DECK_DROP_OBJECT_RE = re.compile(
+    r"\bdropp(?:ed|ing)?\b[^.!?]{0,40}?\b(?:track|record|tune|song|deck)\b"
+    r"|\b(?:track|record|tune|song|deck)\b[^.!?]{0,40}?\bdropp(?:ed|ing)?\b",
+    re.IGNORECASE,
+)
+_FUTURE_CLAUSE_HEAD_RE = re.compile(
+    r"^(?:when|before|after|until|once|as|if)\s+(?:you|we|it|the|that|this)\b",
     re.IGNORECASE,
 )
 _JUDGE_BLEND_SCORE_RE = re.compile(
@@ -203,7 +248,11 @@ _LIVE_AUDIO_SOURCE_DETAIL_CLAIM_RE = re.compile(
     r"hear|heard|hearing|sounds?|feels?|opened(?:\s+up)?|opening|"
     r"tight(?:ened|er|ening)?|clean(?:ed|er)?|clear(?:ed|er)?|brighter|"
     r"darker|wider|punch(?:y|ier)|muddy|muddier|landed|came in|sits?|"
-    r"cut(?:s|ting)? through|present|up front|flood(?:ed|ing)?"
+    r"cut(?:s|ting)? through|present|up front|flood(?:ed|ing)?|"
+    # A.7: disappearance verbs — a fabricated "the vocals just cut out" must
+    # be caught here at the source-detail layer, not only by the
+    # event-witness guard (the verified coverage gap).
+    r"cut(?:s)?\s+out|dropped\s+out|fell\s+away"
     r")\b",
     re.IGNORECASE,
 )
@@ -299,15 +348,25 @@ _NO_MOVE_COACHING_ADVICE_RE = re.compile(
     r")\b",
     re.IGNORECASE,
 )
-_UNSUPPORTED_TRANSITION_COACHING_RE = re.compile(
+# A.5 split (free Sven): the old single regex mixed two registers. The
+# DIAGNOSIS half asserts a present, measured problem ("kicks are clashing",
+# "half-bar off") — that needs evidence and keeps holding. The ADVICE half is
+# a forward prescription ("tighten the sync before the next one") — directives
+# are the product; they speak and ride telemetry only.
+_TRANSITION_COACHING_DIAGNOSIS_RE = re.compile(
     r"\b("
     r"kicks?\b[^.?!]{0,56}\b(?:step(?:ped|ping)?|clash(?:ed|ing)?|collid(?:ed|ing)|"
     r"fight(?:ing)?|flam(?:med|ming)?|phase(?:d)?|double(?:d)?)|"
-    r"(?:tighten|clean|fix|lock|line)\b[^.?!]{0,48}\b(?:sync|beatmatch|beat match|phase)|"
-    r"(?:sync|beatmatch|beat match|phase)\b[^.?!]{0,48}\b(?:before|next time|tighter|"
-    r"off|late|early|mismatch|matched|lock)|"
+    r"(?:sync|beatmatch|beat match|phase)\b[^.?!]{0,48}\b(?:off|late|early|mismatch|matched)|"
     r"(?:half[- ]?bar|one[- ]?beat|1[- ]?beat|phrase)\b[^.?!]{0,40}\b(?:off|late|early|"
     r"mismatch)"
+    r")\b",
+    re.IGNORECASE,
+)
+_TRANSITION_COACHING_ADVICE_RE = re.compile(
+    r"\b("
+    r"(?:tighten|clean|fix|lock|line)\b[^.?!]{0,48}\b(?:sync|beatmatch|beat match|phase)|"
+    r"(?:sync|beatmatch|beat match|phase)\b[^.?!]{0,48}\b(?:before|next time|tighter|lock)"
     r")\b",
     re.IGNORECASE,
 )
@@ -318,6 +377,10 @@ _HARMONIC_DECK_CLAIM_RE = re.compile(
     r"keys?\b[^.?!]{0,48}\b(?:clash(?:ed|ing)?|compatible|incompatible|fight(?:ing)?)|"
     r"harmonic\b[^.?!]{0,48}\b(?:clash(?:ed|ing)?|compatible|incompatible)"
     r")\b",
+    re.IGNORECASE,
+)
+_HARMONIC_SPECULATIVE_RE = re.compile(
+    r"\b(?:would|could|might|may|if|unless|in case|risk(?:s)?\s+of)\b",
     re.IGNORECASE,
 )
 _MIXER_LOW_KILL_CLAIM_RE = re.compile(
@@ -528,6 +591,23 @@ class LiveClaimGuardResult:
     policy: str = "requires_more_evidence"
     reason: str | None = None
     summary: str = ""
+    tier: str = "hard"
+    # Telemetry-only findings on lines that SPEAK (the configure-at-source
+    # contract): demoted soft-tier detections ride here as reason strings so
+    # the boundary can log a live_claim_observation without touching speech.
+    observations: tuple[str, ...] = ()
+
+    @property
+    def speakable(self) -> bool:
+        """False only for hold-class results.
+
+        A hold's .text is the canned HELD_REPLY — telemetry/debrief
+        vocabulary, kept for artifact and bench-key stability. The boundary
+        routes on this flag and must never voice a non-speakable text in any
+        mode (probe included). Trims (emit_corrected=True) keep the model's
+        own words and stay speakable.
+        """
+        return not (self.corrected and not self.emit_corrected)
 
 
 @dataclass(frozen=True, slots=True)
@@ -616,17 +696,337 @@ def _spectral_band_level(state: MusicState, keys: tuple[str, ...]) -> float | No
     return total
 
 
-def _unsupported_spectral_presence_claim(text: str, state: MusicState) -> str | None:
+# A.6 escape (pool-validated): an offered clear/strong RISE on the claimed
+# band licenses the presence claim even while the band still sits below the
+# audibility floor — the delta IS the witness ("those new mids" voiced on a
+# packet that measured "mid energy rose 44% (clear)"). None of the 10
+# fabrication holds in the judged pool carried a matching rose delta; the one
+# keeper collateral did. Detection grammar above stays byte-identical.
+_SPECTRAL_ROSE_TIER_RES: dict[str, re.Pattern[str]] = {
+    # high licenses on "high energy" ONLY — brightness_share measures the
+    # mid+high SUM (see the floor comment above), so a brightness-share rise
+    # can witness nothing about treble presence; accepting it re-opened 7 of
+    # the 10 measured spectral fabrications in pool replay.
+    "high": re.compile(
+        r"\bhigh energy\s+rose\s+\d+%\s+\((?:clear|strong)\)",
+        re.IGNORECASE,
+    ),
+    "mid": re.compile(
+        r"\bmid energy\s+rose\s+\d+%\s+\((?:clear|strong)\)",
+        re.IGNORECASE,
+    ),
+}
+
+
+def _spectral_rose_delta_offered(
+    band: str, audio_delta_items: list[str] | tuple[str, ...] | None
+) -> bool:
+    if not audio_delta_items:
+        return False
+    pattern = _SPECTRAL_ROSE_TIER_RES[band]
+    return any(pattern.search(str(item)) for item in audio_delta_items)
+
+
+def _unsupported_spectral_presence_claim(
+    text: str,
+    state: MusicState,
+    *,
+    audio_delta_items: list[str] | tuple[str, ...] | None = None,
+) -> str | None:
     """Reason string when the text asserts band content at an inaudible level."""
     if _SPECTRAL_HIGH_CLAIM_RE.search(text):
         level = _spectral_band_level(state, ("high",))
-        if level is not None and level < SPECTRAL_CLAIM_BAND_FLOOR:
+        if (
+            level is not None
+            and level < SPECTRAL_CLAIM_BAND_FLOOR
+            and not _spectral_rose_delta_offered("high", audio_delta_items)
+        ):
             return "high_presence_claim_at_inaudible_high"
     if _SPECTRAL_MID_CLAIM_RE.search(text):
         level = _spectral_band_level(state, ("mid",))
-        if level is not None and level < SPECTRAL_CLAIM_BAND_FLOOR:
+        if (
+            level is not None
+            and level < SPECTRAL_CLAIM_BAND_FLOOR
+            and not _spectral_rose_delta_offered("mid", audio_delta_items)
+        ):
             return "mid_presence_claim_at_inaudible_mid"
     return None
+
+
+LIVE_EVENT_WITNESS_HELD_REPLY = (
+    "I can't back that read with what I'm hearing, so I'll hold it."
+)
+
+# Event-witness guard (2026-06-11, the round-3 generalization): the brain may
+# only assert a discrete musical EVENT (a band disappearing, a vocal cutting
+# out, hiss arriving, a shift) or address a PERSON if something the packet
+# offered witnesses it — frozen delta items, band levels, move-effect
+# measurements, or names present in the offered evidence. Color on audible
+# audio ("glitchy mids", "metallic groove"), directives, futures, and
+# witnessed narration all pass by grammar. Designed and adversarially
+# verified against all 123 judged campaign lines (19 holds, 0 keeper
+# collateral, 103 untouched — wf_067832a7); every regex below is
+# corpus-tuned, and every trim (the 'before you' truncation scope, the
+# hiss level gate, the comma-vocative scope, the widened directive verb
+# set, negative imperatives) was mechanically verified zero-kill-cost.
+# Hold, never strip — same contract as the spectral guard above.
+from vibemix.state.evidence_registry import _SOURCE_ALT as _EW_SOURCE_ALT
+
+_EW_CITE_RE = re.compile(rf"\[(?:{_EW_SOURCE_ALT}):[^\]]*\]")
+# The recent-says block quotes the model's own prior lines — it is memory,
+# not evidence, and must never license a fabrication (a spoken "vocal build"
+# echoing through later packets would self-license the vocal rule).
+_EW_RECENT_SAYS_RE = re.compile(r"\n\nRECENT THINGS YOU JUST SAID.*?(?=\n\n|$)", re.DOTALL)
+
+# R1 — band-absence overstatement: "X just dropped out" is a real keeper
+# register when the band IS quiet (post level <= 0.30) or the packet offered
+# a clear/strong fall; at sub=0.57 with only a slight 15% dip it is a slight
+# tier rendered as total disappearance.
+_EW_ABSENCE_RE = re.compile(
+    r"\b(?P<band>sub(?:-bass)?|bass(?:line)?|low[- ]end|lows?|mids?|highs?|top[- ]end|brightness)\b"
+    r"(?:\s+\w+){0,3}?\s+(?:just\s+)?"
+    r"(?:dropped\s+(?:right\s+)?(?:out|off)|cut\s+out|disappeared|vanished|(?:is|are)\s+gone)\b",
+    re.IGNORECASE,
+)
+_EW_ABSENCE_LEVEL_CEILING = 0.30
+_EW_FELL_TIER_RE = re.compile(r"fell\s+\d+%\s+\((?:clear|strong)\)", re.IGNORECASE)
+
+# R2 — arrangement-event fabrication: perfective/progressive transition
+# assertions on elements with no evidence channel. 'lands' (future scaffold
+# "until the next vocal hook lands") deliberately absent — only the
+# perfective 'landed' asserts a happened event.
+_EW_VOCAL_EVENT_RE = re.compile(
+    r"\b(?:vocals?|vox)\b(?:\s+\w+){0,3}?\s+(?:just\s+)?(?:cut\s+out|dropped\s+out|came\s+in|landed)\b",
+    re.IGNORECASE,
+)
+_EW_VOCAL_BUILD_RE = re.compile(
+    r"\bvocal\s+build\b[^.!?]{0,40}?\b(?:is|'s)\b[^.!?]{0,30}?\bpush", re.IGNORECASE
+)
+_EW_VOCAL_TOKEN_RE = re.compile(r"\bvocals?\b|\bvox\b", re.IGNORECASE)
+_EW_HISS_RE = re.compile(r"\bhiss\w*\b", re.IGNORECASE)
+_EW_SHIFT_RE = re.compile(
+    r"\bshift\b[^.!?]{0,40}?\bpushed\b[^.!?]{0,40}?\bforward\b", re.IGNORECASE
+)
+
+# R3 — move-effect direction contradiction: a reduction-causal claim
+# ("carved out room") while the move's OWN measured deltas say the claimed
+# band ROSE and nothing fell. Gated on state.move_audio_delta being
+# non-empty — absent measurements pass (keeper-protected).
+_EW_CARVE_CLAIM_RE = re.compile(
+    r"\b(?:carved?\s*(?:out)?|cleared|cleaned\s*(?:up)?|opened\s+up|made\s+room)\b",
+    re.IGNORECASE,
+)
+
+# R4 — person-name fabrication, scoped to address/actor grammar (both
+# corpus fabrications): a comma-vocative "..., Kaan." or an actor clause
+# "until Kaan starts". Bare TitleCase color ("Detroit groove") passes.
+_EW_VOCATIVE_RE = re.compile(r",\s*([A-Z][a-z]{2,})\s*(?:[.!?]|$)")
+_EW_ACTOR_RE = re.compile(
+    r"\b(?:until|while|before|after)\s+([A-Z][a-z]{2,})\s+"
+    r"(?:starts|gets|comes|drops|plays|takes|jumps)\b"
+)
+_EW_NAME_STOP = frozenset({"sven", "deck"})
+
+# R5 — MIX_MOVE forward-directive lint: all 15 judge-praised MIX_MOVE
+# keepers carry a clause-initial imperative; the f=0-1 narrate-only renders
+# carry none. Generous verb set + negative imperatives — extra verbs only
+# add pass routes (kill heads are 'You/That/keeping/leaving', verified).
+_EW_DIRECTIVE_VERBS = frozenset(
+    """let keep hold ride slide drop pull push bring ease lean leave give cut
+    kill open close roll swap flip nudge turn snap back ramp start send take
+    go run crank boost tease blend layer drive carve twist manage lift add
+    stack sit stay trust watch wait breathe feed work lock settle park dial
+    tuck widen sweep fill pop drown get grab make try use find throw mute
+    fade""".split()
+)
+_EW_CLAUSE_CONNECTIVES = frozenset({"so", "now", "then", "but", "and", "just", "or"})
+_EW_NEGATIVE_IMPERATIVE_RE = re.compile(r"^(?:don'?t|do\s+not|never|let'?s)\b", re.IGNORECASE)
+
+# R6 — render-artifact lint, corpus-exercised scope ONLY: empty after
+# citation strip, or the amputated 'before you.' tail. Wider dangling-word
+# lists were probed keeper-fatal ('a bar or so.', 'on deck A.') and add
+# zero kills.
+_EW_TRUNCATED_TAIL_RE = re.compile(r"\bbefore\s+you[\s.!?]*$", re.IGNORECASE)
+
+
+def _ew_strip_citations(text: str) -> str:
+    return _EW_CITE_RE.sub("", text or "").strip()
+
+
+def _ew_offered_text(offered_evidence_text: str | None) -> str:
+    if not offered_evidence_text:
+        return ""
+    return _EW_RECENT_SAYS_RE.sub("", offered_evidence_text).casefold()
+
+
+def _ew_absence_lanes(band_word: str) -> tuple[str, ...]:
+    word = band_word.casefold()
+    if word.startswith("sub") or "bass" in word:
+        return ("sub",) if word.startswith("sub") else ("sub", "low")
+    if "low" in word:
+        return ("sub", "low")
+    if "mid" in word:
+        return ("mid",)
+    return ("high",)
+
+
+def _ew_absence_reason(
+    text: str, state: MusicState, deltas: tuple[str, ...]
+) -> str | None:
+    m = _EW_ABSENCE_RE.search(text)
+    if m is None:
+        return None
+    lanes = _ew_absence_lanes(m.group("band"))
+    for lane in lanes:
+        level = _spectral_band_level(state, (lane,))
+        if level is not None and level <= _EW_ABSENCE_LEVEL_CEILING:
+            return None  # the low level IS the absence witness
+    lane_words = {"sub": ("sub",), "low": ("low",), "mid": ("mid",), "high": ("high", "brightness")}
+    for raw in deltas:
+        item = str(raw).casefold()
+        if not _EW_FELL_TIER_RE.search(item):
+            continue
+        for lane in lanes:
+            if any(w in item for w in lane_words.get(lane, (lane,))):
+                return None  # an offered clear/strong fall witnesses the drop
+    return "band_absence_without_witness"
+
+
+def _ew_arrangement_reason(
+    text: str, state: MusicState, offered: str
+) -> str | None:
+    # vocal_active is a LIVE vocal witness — when the detector hears vocals,
+    # vocal assertions are ear-adjacent and licensed (mirrors the pinned
+    # source-detail contract: 'The vocal came in up front.' passes when the
+    # detector is active).
+    vocal_witnessed = bool(getattr(state, "vocal_active", False)) or bool(
+        _EW_VOCAL_TOKEN_RE.search(offered)
+    )
+    if _EW_VOCAL_EVENT_RE.search(text) and not vocal_witnessed:
+        return "vocal_event_without_witness"
+    if _EW_VOCAL_BUILD_RE.search(text) and not vocal_witnessed:
+        return "vocal_build_without_witness"
+    if _EW_HISS_RE.search(text) and "hiss" not in offered:
+        level = _spectral_band_level(state, ("high",))
+        if level is not None and level < SPECTRAL_CLAIM_BAND_FLOOR:
+            return "hiss_claim_at_inaudible_high"
+    if _EW_SHIFT_RE.search(text):
+        return "shift_event_without_witness"
+    return None
+
+
+def _ew_move_effect_contradiction(text: str, state: MusicState) -> str | None:
+    move_deltas = getattr(state, "move_audio_delta", None) or []
+    if not move_deltas:
+        return None
+    if not _EW_CARVE_CLAIM_RE.search(text):
+        return None
+    items = [str(d).casefold() for d in move_deltas]
+    if any("fell" in item for item in items):
+        return None  # something measured fell — the carve has a witness
+    text_cf = text.casefold()
+    for band in ("sub", "low", "mid", "high"):
+        if band in text_cf and any(band in item and "rose" in item for item in items):
+            return "move_effect_direction_contradiction"
+    return None
+
+
+def _ew_name_reason(text: str, state: MusicState, offered: str) -> str | None:
+    stripped = _ew_strip_citations(text)
+    candidates = [m.group(1) for m in _EW_VOCATIVE_RE.finditer(stripped)]
+    candidates += [m.group(1) for m in _EW_ACTOR_RE.finditer(stripped)]
+    if not candidates:
+        return None
+    allow: set[str] = set(_EW_NAME_STOP)
+    for source in (
+        getattr(state, "audible_track", None),
+        getattr(state, "last_audible_track", None),
+    ):
+        if source:
+            allow.update(str(source).casefold().split())
+    for entry in getattr(state, "track_history", None) or []:
+        allow.update(str(entry).casefold().split())
+    for name in candidates:
+        token = name.casefold()
+        if token in allow or token in offered:
+            continue
+        return "person_name_without_witness"
+    return None
+
+
+def _ew_has_forward_directive(text: str) -> bool:
+    stripped = _ew_strip_citations(text)
+    for raw_clause in re.split(r"[,;.!?—]|--", stripped):
+        words = raw_clause.strip().split()
+        while words and words[0].casefold().strip("'\"") in _EW_CLAUSE_CONNECTIVES:
+            words = words[1:]
+        if not words:
+            continue
+        head = words[0].casefold().strip("'\"")
+        if head in _EW_DIRECTIVE_VERBS:
+            return True
+        if _EW_NEGATIVE_IMPERATIVE_RE.match(" ".join(words[:2])):
+            return True
+    return False
+
+
+def _ew_render_artifact_reason(text: str) -> str | None:
+    stripped = _ew_strip_citations(text)
+    if not re.search(r"[A-Za-z0-9]", stripped):
+        return "empty_after_citation_strip"
+    if _EW_TRUNCATED_TAIL_RE.search(stripped):
+        return "truncated_render_tail"
+    return None
+
+
+def _ew_allcaps_reason(text: str) -> str | None:
+    stripped = _ew_strip_citations(text)
+    alpha = [c for c in stripped if c.isalpha()]
+    if len(alpha) >= 12 and sum(1 for c in alpha if c.isupper()) / len(alpha) >= 0.90:
+        return "all_caps_register"
+    return None
+
+
+def _unsupported_event_witness_reason(
+    text: str,
+    state: MusicState,
+    *,
+    audio_delta_items: list[str] | tuple[str, ...] | None = None,
+    event_type: str | None = None,
+    offered_evidence_text: str | None = None,
+) -> str | None:
+    """Reason string when the text asserts an event the packet never offered."""
+    if not str(text or "").strip():
+        return None
+    offered = _ew_offered_text(offered_evidence_text)
+    deltas = tuple(str(d) for d in (audio_delta_items or ()))
+    reason = (
+        _ew_render_artifact_reason(text)
+        or _ew_allcaps_reason(text)
+        or _ew_arrangement_reason(text, state, offered)
+        or _ew_absence_reason(text, state, deltas)
+        or _ew_name_reason(text, state, offered)
+    )
+    if reason is not None:
+        return reason
+    event = str(event_type or "").strip().upper()
+    if event == "MIX_MOVE":
+        reason = _ew_move_effect_contradiction(text, state)
+        if reason is not None:
+            return reason
+        if not _ew_has_forward_directive(text):
+            return "mix_move_narration_without_directive"
+    return None
+
+
+def _ew_text_monotonic_reason(
+    text: str, state: MusicState, *, offered_evidence_text: str | None = None
+) -> str | None:
+    """The defer-safe subset: verdicts no later text can un-trigger."""
+    offered = _ew_offered_text(offered_evidence_text)
+    return _ew_arrangement_reason(text, state, offered) or _ew_name_reason(
+        text, state, offered
+    )
 
 
 def normalize_audio_window_context_text(raw: object, *, max_len: int = 900) -> str | None:
@@ -2922,6 +3322,51 @@ def has_multi_deck_outcome_claim(text: str) -> bool:
     )
 
 
+def _has_multi_deck_outcome_assertion(text: str) -> bool:
+    """True only for clauses that ASSERT a multi-deck outcome happened or grade it.
+
+    `has_multi_deck_outcome_claim` is the broad vocabulary net (kept for
+    telemetry and the verdict-gated checks); this is the precise per-clause
+    check the blocked/watch hold routes on. A clause headed by a directive
+    verb or a future/conditional scaffold never counts — "when you
+    transition…" and "before you slide the next layer in" cost nothing.
+    Bare perfective deck-pairing verbs hold even without a verdict word:
+    asserting the event happened at zero deck evidence is itself the
+    violation (blocked stays stricter than candidate).
+    """
+    public_text = _CITATION_ATOM_RE.sub(" ", str(text or ""))
+    if _MULTI_DECK_PHRASE_RE.search(public_text):
+        return True
+    for raw_clause in re.split(r"[,;.!?—]|--", public_text):
+        words = raw_clause.strip().split()
+        while words and words[0].casefold().strip("'\"") in _EW_CLAUSE_CONNECTIVES:
+            words = words[1:]
+        if not words:
+            continue
+        clause = " ".join(words)
+        head = words[0].casefold().strip("'\"")
+        if head in _EW_DIRECTIVE_VERBS or _EW_NEGATIVE_IMPERATIVE_RE.match(clause):
+            continue
+        if _FUTURE_CLAUSE_HEAD_RE.match(clause):
+            continue
+        if _MULTI_DECK_PERFECTIVE_RE.search(clause):
+            return True
+        verdict = _MULTI_DECK_VERDICT_RE.search(clause)
+        frame = _MULTI_DECK_EVAL_FRAME_RE.search(clause)
+        # "the mix is …" is everyday vocabulary ("the mix is carrying sub");
+        # only graded mentions of it count. The dedicated pairing nouns
+        # (transition/blend/handoff/…) assert on the frame alone.
+        if frame and (frame.group("noun").casefold() != "mix" or verdict):
+            return True
+        if verdict and _MULTI_DECK_GRADED_WORD_RE.search(clause):
+            return True
+        if _MULTI_DECK_DROP_OBJECT_RE.search(clause):
+            return True
+        if verdict and _MULTI_DECK_DROP_VERB_RE.search(clause):
+            return True
+    return False
+
+
 def _is_grounded_single_event_audio_observation(text: str, event_type: str | None) -> bool:
     """Return True for broad detector-event audio reads that are not transition grades."""
     raw = str(text or "").strip()
@@ -2943,9 +3388,29 @@ def has_unsafe_multi_deck_disclaimer_claim(text: str) -> bool:
     """Return True when a self-correction also sneaks in a fresh outcome claim."""
     clauses = re.split(r"[.;:]|\b(?:but|however|though|still)\b", text, flags=re.IGNORECASE)
     for clause in clauses:
-        if has_multi_deck_outcome_claim(clause) and not has_multi_deck_outcome_disclaimer(clause):
+        if _has_multi_deck_outcome_assertion(clause) and not has_multi_deck_outcome_disclaimer(
+            clause
+        ):
             return True
     return False
+
+
+def _strip_unsafe_disclaimer_claim_sentences(text: str) -> str:
+    """Drop sentences that assert a fresh outcome alongside a self-hedge."""
+    sentences = _split_live_sentences(str(text or "").strip())
+    kept = [
+        sentence.strip()
+        for sentence in sentences
+        if sentence.strip()
+        and not (
+            _has_multi_deck_outcome_assertion(sentence)
+            and not has_multi_deck_outcome_disclaimer(sentence)
+        )
+    ]
+    if kept and len(kept) < len(sentences):
+        out = " ".join(kept).strip()
+        return out if out.endswith((".", "!", "?")) else f"{out}."
+    return ""
 
 
 def live_claim_policy(
@@ -3086,10 +3551,21 @@ def should_defer_live_claim_text(
     deck_audio_parts_attached: bool | None = None,
     judge_evidence_line: str | None = None,
     event_type: str | None = None,
+    offered_evidence_text: str | None = None,
 ) -> bool:
     """Return True once streamed text matches a claim guard that may strip."""
     if not str(text or "").strip():
         return False
+    # Text-monotonic event-witness rules: an unwitnessed arrangement event or
+    # person-name address is complete the moment it streams — later text
+    # cannot un-fabricate it, so the speculative head must not speak it.
+    if (
+        _ew_text_monotonic_reason(
+            text, state, offered_evidence_text=offered_evidence_text
+        )
+        is not None
+    ):
+        return True
     policy, _reason = live_claim_policy(
         state,
         moves,
@@ -3114,15 +3590,81 @@ def should_defer_live_claim_text(
             _unsupported_audio_source_detail_reason(text, state, event_type=event_type)
             is not None
         )
-        or (not moves and event == "PHASE" and _has_unsupported_no_move_coaching_advice(text))
         or (
             policy in {"blocked", "watch_not_claim", "candidate_not_verdict", "requires_more_evidence"}
-            and _has_unsupported_transition_coaching_advice(text)
+            and _has_transition_coaching_diagnosis(text)
         )
     )
 
 
 def apply_live_claim_guard(
+    text: str,
+    state: MusicState,
+    moves: list[str] | tuple[str, ...] = (),
+    *,
+    audio_delta_items: list[str] | tuple[str, ...] | None = None,
+    audio_capture_context: dict[str, object] | None = None,
+    deck_audio_parts_attached: bool | None = None,
+    judge_evidence_line: str | None = None,
+    event_type: str | None = None,
+    offered_evidence_text: str | None = None,
+) -> LiveClaimGuardResult:
+    """Run the policy ladder, then the event-witness filter on whatever passes.
+
+    The witness filter sits ON TOP of the ladder's pass results (including
+    the licensed move-effect passes) rather than inside it: every existing
+    policy/reason keeps winning for lines the ladder already holds, while a
+    line no existing guard touches still has to witness its event claims.
+    Hold, never strip — the fabricated event is usually the line's spine.
+    """
+    result = _apply_live_claim_policy_ladder(
+        text,
+        state,
+        moves,
+        audio_delta_items=audio_delta_items,
+        audio_capture_context=audio_capture_context,
+        deck_audio_parts_attached=deck_audio_parts_attached,
+        judge_evidence_line=judge_evidence_line,
+        event_type=event_type,
+    )
+    if result.corrected and not result.emit_corrected:
+        return result
+    # B.3 (free Sven): a trim survivor (emit_corrected=True — the model's own
+    # words minus a clause) must clear the same witness screen as a clean
+    # pass. Without this, the trim path is an unscreened speech route: a
+    # salvage that collapses to a bare citation atom, or keeps a fabricated
+    # event in the surviving sentence, would speak.
+    witness_reason = _unsupported_event_witness_reason(
+        result.text,
+        state,
+        audio_delta_items=audio_delta_items,
+        event_type=event_type,
+        offered_evidence_text=offered_evidence_text,
+    )
+    if witness_reason is None and result.emit_corrected:
+        spectral_reason = _unsupported_spectral_presence_claim(
+            result.text, state, audio_delta_items=audio_delta_items
+        )
+        if spectral_reason is not None:
+            return LiveClaimGuardResult(
+                text=LIVE_SPECTRAL_CLAIM_HELD_REPLY,
+                corrected=True,
+                policy="spectral_claim_not_audible",
+                reason=spectral_reason,
+                summary=_live_guard_summary(state, moves),
+            )
+    if witness_reason is not None:
+        return LiveClaimGuardResult(
+            text=LIVE_EVENT_WITNESS_HELD_REPLY,
+            corrected=True,
+            policy="event_witness_not_offered",
+            reason=witness_reason,
+            summary=_live_guard_summary(state, moves),
+        )
+    return result
+
+
+def _apply_live_claim_policy_ladder(
     text: str,
     state: MusicState,
     moves: list[str] | tuple[str, ...] = (),
@@ -3167,6 +3709,10 @@ def apply_live_claim_guard(
     pending_corrected_policy: str | None = None
     pending_corrected_reason: str | None = None
     pending_corrected_summary = ""
+    # Soft-tier detections on speaking lines (the configure-at-source
+    # contract): collected here, logged by the boundary as
+    # live_claim_observation events, never converted into holds.
+    observations: list[str] = []
 
     def _mark_emit_correction(*, policy: str, reason: str | None, summary: str) -> None:
         nonlocal pending_corrected_policy, pending_corrected_reason, pending_corrected_summary
@@ -3188,8 +3734,15 @@ def apply_live_claim_guard(
                 policy=pending_corrected_policy,
                 reason=pending_corrected_reason,
                 summary=pending_corrected_summary,
+                observations=tuple(observations),
             )
-        return LiveClaimGuardResult(text=text, policy=policy, reason=reason, summary=summary)
+        return LiveClaimGuardResult(
+            text=text,
+            policy=policy,
+            reason=reason,
+            summary=summary,
+            observations=tuple(observations),
+        )
 
     if _has_uncited_track_identity_claim(text, state):
         summary = _live_guard_summary(state, moves)
@@ -3247,7 +3800,9 @@ def apply_live_claim_guard(
             reason="low_kill_not_in_mixer_state",
             summary=summary + (f"; mixer_lows={mixer_summary}" if mixer_summary else ""),
         )
-    spectral_reason = _unsupported_spectral_presence_claim(text, state)
+    spectral_reason = _unsupported_spectral_presence_claim(
+        text, state, audio_delta_items=audio_delta_items
+    )
     if spectral_reason is not None:
         # Hold, never strip: the fabricated band claim is usually the line's
         # spine, and a stripped residue is the measured truncation-fragment
@@ -3285,26 +3840,31 @@ def apply_live_claim_guard(
         and event == "PHASE"
         and _has_unsupported_no_move_coaching_advice(text)
     ):
-        summary = _live_guard_summary(state, moves)
-        return LiveClaimGuardResult(
-            text=LIVE_COACHING_ADVICE_HELD_REPLY,
-            corrected=True,
-            policy="coaching_advice_not_grounded",
-            reason="advice_without_recent_move_proof",
-            summary=summary,
-        )
+        # A.5 (free Sven): directive coaching is the product, not a violation —
+        # retired to telemetry. The line speaks; the detection survives as an
+        # observation so a >20% judge-flag rate can re-arm it as a hold.
+        observations.append("coaching_advice_without_move_proof")
     if (
         policy in {"blocked", "watch_not_claim", "candidate_not_verdict", "requires_more_evidence"}
-        and _has_unsupported_transition_coaching_advice(text)
+        and _has_transition_coaching_diagnosis(text)
     ):
+        # The presence-diagnosis half ("kicks are clashing", "half-bar off")
+        # asserts a measured problem the evidence cannot back — it keeps
+        # holding at every unsupported policy INCLUDING the cold fresh-user
+        # state (requires_more_evidence). Future-advice-only lines pass below.
         summary = _live_guard_summary(state, moves)
         return LiveClaimGuardResult(
             text=LIVE_COACHING_ADVICE_HELD_REPLY,
             corrected=True,
             policy="transition_coaching_not_grounded",
-            reason=reason or "transition_advice_without_supported_verdict",
+            reason=reason or "transition_diagnosis_without_supported_verdict",
             summary=summary,
         )
+    if (
+        policy in {"blocked", "watch_not_claim", "candidate_not_verdict", "requires_more_evidence"}
+        and _has_transition_coaching_advice(text)
+    ):
+        observations.append("transition_advice_without_supported_verdict")
     effect_claim = bool(
         moves
         and effect_signals
@@ -3412,26 +3972,37 @@ def apply_live_claim_guard(
             summary=summary,
         )
     has_disclaimer = bool(outcome_claim and has_multi_deck_outcome_disclaimer(text))
-    if has_disclaimer and not has_unsafe_multi_deck_disclaimer_claim(text):
-        if policy == "candidate_not_verdict":
-            summary = _live_guard_summary(state, moves)
-            return LiveClaimGuardResult(
-                text=LIVE_CANDIDATE_HELD_REPLY,
-                corrected=True,
-                policy=policy,
-                reason=reason,
+    if has_disclaimer:
+        # A.8 (free Sven): self-hedging IS the target register — a model that
+        # says "can't grade the blend yet, but the energy is sitting right"
+        # already applied the rule. Whole-line replacement retired: a safe
+        # hedge passes; an unsafe one (fresh claim smuggled alongside) trims
+        # the asserting sentences and keeps the grounded remainder.
+        if not has_unsafe_multi_deck_disclaimer_claim(text):
+            observations.append("self_hedged_outcome_claim")
+            return _pass_result()
+        summary = _live_guard_summary(state, moves)
+        trimmed = _strip_unsafe_disclaimer_claim_sentences(text)
+        if trimmed:
+            text = trimmed
+            outcome_claim, public_diagnostic, source_detail_reason = _text_claim_flags(text)
+            _mark_emit_correction(
+                policy=policy if policy != "supported_verdict" else "candidate_not_verdict",
+                reason=reason or "fresh_claim_beside_disclaimer",
                 summary=summary,
             )
-        if policy in {"blocked", "watch_not_claim", "requires_more_evidence"}:
-            summary = _live_guard_summary(state, moves)
+        else:
             return LiveClaimGuardResult(
-                text=LIVE_TRANSITION_HELD_REPLY,
+                text=(
+                    LIVE_CANDIDATE_HELD_REPLY
+                    if policy == "candidate_not_verdict"
+                    else LIVE_TRANSITION_HELD_REPLY
+                ),
                 corrected=True,
                 policy=policy,
-                reason=reason,
+                reason=reason or "fresh_claim_beside_disclaimer",
                 summary=summary,
             )
-        return _pass_result()
     if policy == "candidate_not_verdict" and outcome_claim and _MULTI_DECK_VERDICT_RE.search(text):
         summary = _live_guard_summary(state, moves)
         return LiveClaimGuardResult(
@@ -3461,7 +4032,7 @@ def apply_live_claim_guard(
         and moves
         and _MOVE_EFFECT_CONTROL_RE.search(text)
         and _has_current_observed_eq_move(state, moves)
-        and not _has_unsupported_transition_coaching_advice(text)
+        and not _has_transition_coaching_diagnosis(text)
     ):
         return _pass_result(
             policy="observed_move_ai_coaching_allowed",
@@ -3477,7 +4048,13 @@ def apply_live_claim_guard(
             reason=f"{event.lower()}_detector",
             summary=_live_guard_summary(state, moves),
         )
-    if not text.strip() or not outcome_claim:
+    if not text.strip() or not _has_multi_deck_outcome_assertion(text):
+        # A.2 (free Sven): the hold routes on the precise per-clause assertion
+        # check; deck-pairing VOCABULARY in a directive/future clause speaks.
+        # The broad word-list survives as telemetry so the demotion stays
+        # measurable against judged sessions.
+        if outcome_claim:
+            observations.append("multi_deck_vocabulary_at_blocked")
         return _pass_result()
 
     summary = _live_guard_summary(state, moves)
@@ -3653,8 +4230,10 @@ def _unsupported_audio_source_detail_reason(
         and _LIVE_AUDIO_SOURCE_DETAIL_CLAIM_RE.search(public_text)
     )
     has_source_tail = bool(_LIVE_AUDIO_SOURCE_DETAIL_TAIL_RE.search(public_text))
-    has_source_advice = bool(_LIVE_AUDIO_SOURCE_DETAIL_ADVICE_RE.search(public_text))
-    if not (has_source_claim or has_source_tail or has_source_advice):
+    # A.7 (free Sven): the add-advice route ("bring those vocals in") is a
+    # directive, not a presence claim — it no longer triggers a hold on its
+    # own; the boundary rides it as telemetry.
+    if not (has_source_claim or has_source_tail):
         return None
 
     unsupported = [
@@ -3812,6 +4391,21 @@ def _source_detail_noun_key(noun: str) -> str:
     return " ".join(str(noun or "").lower().replace("-", " ").split())
 
 
+_SOURCE_DETAIL_BAND_WITNESS: dict[str, tuple[str, ...]] = {
+    # A.7 band-derived witnesses: a hats/bass/synth mention is ear-adjacent
+    # color when its band is audibly present — these share the spectral
+    # guard's floor so prompt, guard, and license can never disagree on what
+    # "audible" means. vocal (detector) and kick (event types) stay strict.
+    "hats": ("high",),
+    "hat": ("high",),
+    "hi hat": ("high",),
+    "bassline": ("sub", "low"),
+    "synth": ("mid",),
+    "pad": ("mid",),
+    "lead": ("mid",),
+}
+
+
 def _source_detail_noun_supported(
     noun: str,
     state: MusicState,
@@ -3823,6 +4417,12 @@ def _source_detail_noun_supported(
         return bool(getattr(state, "vocal_active", False))
     if key in _LIVE_AUDIO_KICK_NOUNS:
         return str(event_type or "").strip().upper() in _LIVE_AUDIO_KICK_EVENT_TYPES
+    band_keys = _SOURCE_DETAIL_BAND_WITNESS.get(key)
+    if band_keys:
+        for band in band_keys:
+            level = _spectral_band_level(state, (band,))
+            if level is not None and level >= SPECTRAL_CLAIM_BAND_FLOOR:
+                return True
     return False
 
 
@@ -3857,10 +4457,13 @@ def _has_unsupported_no_move_control_claim(text: str) -> bool:
 
 
 def _has_unsupported_no_move_control_text(text: str) -> bool:
+    # A.4 (free Sven): _NO_MOVE_CONTROL_INSTRUCTION_RE removed from the
+    # trigger — an imperative ("bring the low EQ back to flat") prescribes a
+    # move, it does not CLAIM one happened. ACTION/NOUN/ABSENCE stay hard:
+    # past-tense causality at zero move evidence is the real violation.
     return bool(
         _NO_MOVE_CONTROL_ACTION_RE.search(text)
         or _NO_MOVE_CONTROL_NOUN_RE.search(text)
-        or _NO_MOVE_CONTROL_INSTRUCTION_RE.search(text)
         or _NO_MOVE_CONTROL_ABSENCE_RE.search(text)
     )
 
@@ -3875,14 +4478,24 @@ def _has_unsupported_no_move_coaching_advice(text: str) -> bool:
     return bool(_NO_MOVE_COACHING_ADVICE_RE.search(raw))
 
 
-def _has_unsupported_transition_coaching_advice(text: str) -> bool:
-    """Return True for sync/transition prescriptions that need supported two-deck proof."""
+def _has_transition_coaching_diagnosis(text: str) -> bool:
+    """Return True when text asserts a present sync/clash problem as measured fact."""
     raw = str(text or "").strip()
     if not raw:
         return False
     if _LIVE_AUDIO_SOURCE_DETAIL_BOUNDARY_RE.search(raw) or _MOVE_EFFECT_DISCLAIMER_RE.search(raw):
         return False
-    return bool(_UNSUPPORTED_TRANSITION_COACHING_RE.search(raw))
+    return bool(_TRANSITION_COACHING_DIAGNOSIS_RE.search(raw))
+
+
+def _has_transition_coaching_advice(text: str) -> bool:
+    """Return True for forward sync prescriptions (telemetry-only since A.5)."""
+    raw = str(text or "").strip()
+    if not raw:
+        return False
+    if _LIVE_AUDIO_SOURCE_DETAIL_BOUNDARY_RE.search(raw) or _MOVE_EFFECT_DISCLAIMER_RE.search(raw):
+        return False
+    return bool(_TRANSITION_COACHING_ADVICE_RE.search(raw))
 
 
 def _has_unsupported_harmonic_deck_claim(
@@ -3897,6 +4510,16 @@ def _has_unsupported_harmonic_deck_claim(
     """Return True when a key/harmonic verdict lacks citable deck-pair proof."""
     raw = str(text or "").strip()
     if not raw or not _HARMONIC_DECK_CLAIM_RE.search(raw):
+        return False
+    # A.9 (free Sven): future/conditional speculation ("the keys would clash
+    # if you bring it in now") is a planning read, not an assertion about
+    # measured harmony — it speaks. Present/past key assertions without
+    # camelot proof stay hard below.
+    if all(
+        _HARMONIC_SPECULATIVE_RE.search(sentence)
+        for sentence in _split_live_sentences(raw)
+        if _HARMONIC_DECK_CLAIM_RE.search(sentence)
+    ):
         return False
     event = str(event_type or "").strip().upper()
     if event in {"KEY_CLASH", "TRANSITION_OPPORTUNITY"}:
@@ -3958,7 +4581,10 @@ def _split_live_sentences(text: str) -> list[str]:
     stripped = text.strip()
     if not stripped:
         return []
-    return [part for part in re.split(r"(?<=[.!?])\s+(?=[A-Z])", stripped) if part]
+    # A leading citation atom also opens a sentence ("…else. [ev:…] Use this
+    # space…") — without the `[` lookahead the whole text reads as one
+    # sentence and every sentence-drop trimmer degrades to all-or-nothing.
+    return [part for part in re.split(r"(?<=[.!?])\s+(?=[A-Z\[])", stripped) if part]
 
 
 def _resolved_decks(decks: dict[str, DeckTrack]) -> dict[str, DeckTrack]:

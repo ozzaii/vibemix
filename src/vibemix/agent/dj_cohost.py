@@ -3760,6 +3760,7 @@ class DJCoHostAgent(Agent):
                             deck_audio_parts_attached=deck_audio_parts_attached,
                             judge_evidence_line=judge_evidence_line,
                             event_type=ev_tag,
+                            offered_evidence_text=full_text_prompt,
                         )
                     )
                     if (
@@ -4129,24 +4130,42 @@ class DJCoHostAgent(Agent):
                         deck_audio_parts_attached=deck_audio_parts_attached,
                         judge_evidence_line=judge_evidence_line,
                         event_type=ev_tag,
+                        offered_evidence_text=full_text_prompt,
                     )
+                    # A.3 (free Sven): band-intensity is telemetry-only — pool
+                    # replay measured it 100% false-positive (2 keeper holds
+                    # incl. an f=3 line, 0 fabrications; spectral owns the
+                    # fabrication class at the 0.10 floor). The line SPEAKS;
+                    # a >20% judge-flag rate on these observations re-arms it.
                     band_intensity_reason = _unsupported_band_intensity_reason(
                         live_claim_guard.text if live_claim_guard.corrected else full_text,
                         live_claim_state,
                         live_claim_moves,
                         event_type=ev_tag,
                     )
+                    observation_reasons = list(live_claim_guard.observations)
                     if band_intensity_reason is not None:
-                        live_claim_guard = LiveClaimGuardResult(
-                            text="",
-                            corrected=True,
-                            policy="band_intensity_not_grounded",
-                            reason=band_intensity_reason,
-                            summary=_band_intensity_guard_summary(
-                                live_claim_state,
-                                event_type=ev_tag,
-                            ),
-                        )
+                        observation_reasons.append(f"band_intensity:{band_intensity_reason}")
+                    if observation_reasons:
+                        try:
+                            self._recorder.log_event(
+                                "live_claim_observation",
+                                event=ev_tag,
+                                reasons=observation_reasons,
+                                text=(
+                                    live_claim_guard.text
+                                    if live_claim_guard.corrected
+                                    else full_text
+                                ),
+                                summary=_band_intensity_guard_summary(
+                                    live_claim_state,
+                                    event_type=ev_tag,
+                                )
+                                if band_intensity_reason is not None
+                                else live_claim_guard.summary,
+                            )
+                        except Exception:
+                            pass
                 except Exception as _e:
                     live_claim_guard = None
                     print(f"[live-claim guard err] {_e}", file=sys.stderr)
@@ -4154,15 +4173,12 @@ class DJCoHostAgent(Agent):
                     raw_live_claim_text = full_text
                     full_text = live_claim_guard.text
                     stripped = full_text.strip()
-                    if _sven_probe_mode_enabled() and full_text:
-                        live_claim_guard = LiveClaimGuardResult(
-                            text=full_text,
-                            corrected=True,
-                            emit_corrected=True,
-                            policy=live_claim_guard.policy,
-                            reason=live_claim_guard.reason,
-                            summary=live_claim_guard.summary,
-                        )
+                    # B.2 (free Sven): the probe-mode flip is gone. It used to
+                    # force-voice hold-class canned HELD replies during by-ear
+                    # QA — the literal "Sven is always blocked" experience.
+                    # Probe mode now follows production semantics: holds are
+                    # silent + artifact-only; trims (the model's own words)
+                    # already emit on both paths.
                     if live_claim_guard.emit_corrected and not re.search(
                         r"[A-Za-z0-9]",
                         model_text_for_tts(full_text),

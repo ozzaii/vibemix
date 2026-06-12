@@ -316,18 +316,16 @@ def test_live_claim_guard_strips_cited_phase_advice_without_move_proof(mocker, t
     )
     chunks = _drive(agent)
 
-    assert chunks == []
+    # A.5 (free Sven): directive coaching speaks; the detection rides as a
+    # live_claim_observation so judged sessions can re-arm the hold.
+    assert len(chunks) == 1
+    assert "try the 1 next time" in chunks[0]
     kinds = [kind for kind, _ in recorder.events]
-    assert "ai_text" not in kinds
-    assert "citation_strip" not in kinds
-    guard_log = next(fields for kind, fields in recorder.events if kind == "live_claim_guard")
-    assert guard_log["action"] == "strip"
-    assert guard_log["policy"] == "coaching_advice_not_grounded"
-    assert guard_log["reason"] == "advice_without_recent_move_proof"
-    assert "try the 1 next time" in guard_log["raw_text"]
-    assert "try the 1" not in guard_log["corrected_text"].lower()
-    assert tracker.rate() == 1.0
-    playback.push.assert_not_called()
+    assert "live_claim_guard" not in kinds
+    observation = next(
+        fields for kind, fields in recorder.events if kind == "live_claim_observation"
+    )
+    assert "coaching_advice_without_move_proof" in observation["reasons"]
 
 
 def test_live_claim_guard_emits_salvaged_audio_read_before_harmonic_advice(
@@ -557,7 +555,7 @@ def test_licensed_move_effect_still_requires_citation(mocker, tmp_path) -> None:
     mocker.patch("vibemix.agent.dj_cohost.snapshot_wav", return_value=b"FAKEWAV")
     mocker.patch.object(AICoach, "build_prompt", return_value="EVIDENCE: x")
     gen.aio.models.generate_content_stream = mocker.AsyncMock(
-        return_value=_async_iter(["Your low cut cleaned the mix."])
+        return_value=_async_iter(["Your low cut cleaned the mix; keep it rolling."])
     )
 
     agent.set_next_event(
@@ -708,7 +706,7 @@ def test_live_claim_guard_allows_broad_audio_listener_read_before_tts(mocker, tm
     mocker.patch("vibemix.agent.dj_cohost.snapshot_wav", return_value=b"FAKEWAV")
     mocker.patch.object(AICoach, "build_prompt", return_value="EVIDENCE: x")
     gen.aio.models.generate_content_stream = mocker.AsyncMock(
-        return_value=_async_iter(["The low end got hollow for a moment [ev:BAND_SHIFT_LOW@12.3]"])
+        return_value=_async_iter(["The low end got hollow for a moment, let it breathe. [ev:BAND_SHIFT_LOW@12.3]"])
     )
 
     agent.set_next_event(
@@ -723,17 +721,17 @@ def test_live_claim_guard_allows_broad_audio_listener_read_before_tts(mocker, tm
     )
     chunks = _drive(agent)
 
-    assert chunks == ["The low end got hollow for a moment "]
+    assert chunks == ["The low end got hollow for a moment, let it breathe. "]
     kinds = [kind for kind, _ in recorder.events]
     assert "ai_text" in kinds
     assert next(f for kind, f in recorder.events if kind == "ai_text")["text"] == (
-        "The low end got hollow for a moment "
+        "The low end got hollow for a moment, let it breathe. "
     )
     ai_row = next(f for kind, f in recorder.events if kind == "ai_message")
-    assert ai_row["message"] == "The low end got hollow for a moment "
+    assert ai_row["message"] == "The low end got hollow for a moment, let it breathe. "
     assert (
         Path(ai_row["artifacts"]["session_response_path"]).read_text(encoding="utf-8")
-        == "The low end got hollow for a moment [ev:BAND_SHIFT_LOW@12.3]"
+        == "The low end got hollow for a moment, let it breathe. [ev:BAND_SHIFT_LOW@12.3]"
     )
     assert "live_claim_guard" not in kinds
     assert "citation_strip" not in kinds
@@ -744,6 +742,7 @@ def test_live_claim_guard_allows_broad_audio_listener_read_before_tts(mocker, tm
 def test_live_claim_guard_strips_unsupported_high_band_abundance(mocker, tmp_path) -> None:
     """Move-less abundance claims must agree with the measured band shares."""
     registry = EvidenceRegistry()
+    registry.write("ev", "MANUAL", 30.0)
     agent, gen, recorder, state, _, tracker, playback = _build_agent_wired(
         mocker, tmp_path, registry
     )
@@ -758,7 +757,7 @@ def test_live_claim_guard_strips_unsupported_high_band_abundance(mocker, tmp_pat
             [
                 (
                     "That high end is getting busy with that loop; "
-                    "let it roll before you stack anything else."
+                    "let it roll before you stack anything else [ev:MANUAL@30.0]."
                 )
             ]
         )
@@ -767,18 +766,19 @@ def test_live_claim_guard_strips_unsupported_high_band_abundance(mocker, tmp_pat
     agent.set_next_event(Event(type="MANUAL", state=state, extra={}))
     chunks = _drive(agent)
 
-    assert chunks == []
+    # A.3 (free Sven): band-intensity is telemetry-only — pool replay measured
+    # it 100% false-positive (2 keeper holds, 0 fabrications). The line speaks
+    # and the detection lands as a live_claim_observation with the band
+    # summary, keeping the >20% judge-flag re-arm tripwire measurable.
+    assert len(chunks) == 1
+    assert "high end is getting busy" in chunks[0]
     kinds = [kind for kind, _ in recorder.events]
-    assert "ai_text" not in kinds
-    guard_log = next(fields for kind, fields in recorder.events if kind == "live_claim_guard")
-    assert guard_log["action"] == "strip"
-    assert guard_log["policy"] == "band_intensity_not_grounded"
-    assert guard_log["reason"] == "high_band_below_claim_floor"
-    assert "high end is getting busy" in guard_log["raw_text"]
-    assert guard_log["corrected_text"] == ""
-    assert "high=0.01" in guard_log["summary"]
-    assert tracker.rate() == 1.0
-    playback.push.assert_not_called()
+    assert "live_claim_guard" not in kinds
+    observation = next(
+        fields for kind, fields in recorder.events if kind == "live_claim_observation"
+    )
+    assert "band_intensity:high_band_below_claim_floor" in observation["reasons"]
+    assert "high=0.01" in observation["summary"]
 
 
 def test_live_claim_guard_allows_supported_high_band_abundance(mocker, tmp_path) -> None:

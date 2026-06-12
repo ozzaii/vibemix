@@ -2732,7 +2732,6 @@ def test_live_claim_guard_allows_low_kill_when_mixer_agrees() -> None:
         "that low cut cleaned the mix",
         "that EQ move cleaned up the low end",
         "that filter sweep paid off",
-        "Bring the high-pass filter back down to 12 o'clock",
         "You pulled the faders up and it got muddy.",
         "That high-frequency rise on Deck A got a bit too piercing before you pulled it back.",
     ],
@@ -2747,6 +2746,18 @@ def test_live_claim_guard_corrects_no_move_control_causality(reply: str) -> None
     assert result.reason == "control_causality_without_moves"
     assert "faders" not in result.text.lower()
     assert "high-pass" not in result.text.lower()
+
+
+def test_live_claim_guard_passes_control_instruction_without_moves() -> None:
+    """A.4 (free Sven): an imperative ("bring the filter back down") PRESCRIBES
+    a move — it claims nothing happened, so it speaks even with zero moves."""
+    state = MusicState(controller_connected=True)
+
+    result = apply_live_claim_guard(
+        "Bring the high-pass filter back down to 12 o'clock", state, []
+    )
+
+    assert result.corrected is False
 
 
 def test_live_claim_guard_salvages_sound_clause_before_no_move_control_claim() -> None:
@@ -2783,7 +2794,10 @@ def test_live_claim_guard_strips_no_move_controller_absence_claim() -> None:
     assert "controller" not in result.text.lower()
 
 
-def test_live_claim_guard_strips_no_move_coaching_advice() -> None:
+def test_live_claim_guard_speaks_no_move_coaching_advice_with_observation() -> None:
+    """A.5 (free Sven): directive coaching is the product — retired to
+    telemetry. The line speaks; the detection rides as an observation so a
+    judged regression can re-arm the hold."""
     state = MusicState(audible=True, controller_connected=True, audible_deck="none")
 
     result = apply_live_claim_guard(
@@ -2794,11 +2808,9 @@ def test_live_claim_guard_strips_no_move_coaching_advice() -> None:
     )
 
     assert should_defer_live_claim_stream(state, [], event_type="PHASE") is True
-    assert result.corrected is True
-    assert result.policy == "coaching_advice_not_grounded"
-    assert result.reason == "advice_without_recent_move_proof"
-    assert "try the 1" not in result.text.lower()
-    assert "next time" not in result.text.lower()
+    assert result.corrected is False
+    assert "try the 1 next time" in result.text.lower()
+    assert "coaching_advice_without_move_proof" in result.observations
 
 
 def test_live_claim_stream_defers_no_move_auto_audio_events_only() -> None:
@@ -3278,15 +3290,19 @@ def test_manual_silent_trigger_defers_stream_until_linter() -> None:
     assert should_defer_live_claim_stream(state, [], event_type="MANUAL") is True
 
 
-def test_live_claim_guard_normalizes_public_self_correction() -> None:
+def test_live_claim_guard_passes_self_hedged_correction() -> None:
+    """A.8 (free Sven): a model-authored hedge IS the rule applied — the old
+    whole-line canned replacement is retired; the honest line speaks and the
+    hedge rides telemetry."""
     state = MusicState(audible_deck="A")
     state.deck_state = DeckState(decks={"A": _deck("Strobe")})
     reply = "I can't call that a transition; this is only one deck."
 
     result = apply_live_claim_guard(reply, state)
 
-    assert result.corrected is True
-    assert result.text == "I can't call that a transition until I have clear two-deck proof."
+    assert result.corrected is False
+    assert result.text == reply
+    assert "self_hedged_outcome_claim" in result.observations
 
 
 @pytest.mark.parametrize(
@@ -3437,3 +3453,282 @@ def test_live_claim_guard_spares_presence_claims_at_audible_levels() -> None:
     ):
         result = apply_live_claim_guard(line, state, event_type="PHASE")
         assert result.policy != "spectral_claim_not_audible", line
+
+
+# ---------------------------------------------------------------------------
+# Event-witness guard (2026-06-11 round-3 generalization, wf_067832a7):
+# a render may only assert a discrete musical EVENT or address a PERSON if
+# the packet offered a witness. Designed + adversarially verified against
+# all 123 judged campaign lines (19 holds, 0 keeper collateral).
+# ---------------------------------------------------------------------------
+
+
+def _ew_state(**bands: float) -> MusicState:
+    state = MusicState(audible=True)
+    state.bands = {"sub": 0.55, "low": 0.30, "mid": 0.16, "high": 0.20, **bands}
+    return state
+
+
+def test_event_witness_holds_unwitnessed_vocal_cut() -> None:
+    """The lever2/lever3 'vocal phrase just cut out' class — no packet ever
+    offered a vocal channel; the cut is invented (judged F1/G1 twice).
+    Since A.7 widened the source-detail claim verbs ('cut out'), this
+    fabrication dies at the source-detail layer before the event-witness
+    filter even runs — either policy is a correct hold; speech is the pin."""
+    result = apply_live_claim_guard(
+        "That vocal phrase just cut out; let this groove breathe.",
+        _ew_state(),
+        event_type="PHASE",
+    )
+    assert result.corrected is True
+    assert result.emit_corrected is False
+    assert result.speakable is False
+    assert result.policy in {"audio_source_detail_not_proof", "event_witness_not_offered"}
+
+
+def test_event_witness_vocal_passes_with_offered_witness_or_safe_grammar() -> None:
+    """Keeper protections: an offered vocal token licenses the event; the
+    7 praised vocal keepers pass by grammar (directive 'slide a vocal in',
+    future scaffold 'until the next vocal hook lands' — 'lands' is not the
+    perfective 'landed')."""
+    state = _ew_state()
+    witnessed = apply_live_claim_guard(
+        "That vocal phrase just cut out; let this groove breathe.",
+        state,
+        event_type="PHASE",
+        offered_evidence_text="Live deltas: vocal presence fell 40% (clear)",
+    )
+    assert witnessed.policy != "event_witness_not_offered"
+    for line in (
+        "Slide a high vocal in to fill out those mids now.",
+        "Hold this groove until the next vocal hook lands.",
+        "That glitchy vocal chop got space; keep the floor moving.",
+    ):
+        result = apply_live_claim_guard(line, state, event_type="PHASE")
+        assert result.policy != "event_witness_not_offered", line
+
+
+def test_event_witness_recent_says_never_licenses() -> None:
+    """The contamination loop: the model's own prior 'vocal' line echoing
+    through RECENT THINGS YOU JUST SAID is memory, not evidence."""
+    offered = (
+        "Evidence packet: low energy rose 20% (clear)."
+        "\n\nRECENT THINGS YOU JUST SAID (each tagged): \"That vocal build is pushing\""
+    )
+    result = apply_live_claim_guard(
+        "That vocal phrase just cut out; let this groove breathe.",
+        _ew_state(),
+        event_type="PHASE",
+        offered_evidence_text=offered,
+    )
+    assert result.corrected is True
+    assert result.speakable is False
+    assert result.policy in {"audio_source_detail_not_proof", "event_witness_not_offered"}
+
+
+def test_event_witness_vocal_build_respects_vocal_active() -> None:
+    """state.vocal_active is the one real vocal witness the state carries —
+    a REAL audible vocal build must not be held (verify-mandated exemption)."""
+    line = "This vocal build is really pushing hard right now."
+    held = apply_live_claim_guard(line, _ew_state(), event_type="PHASE")
+    assert held.reason == "vocal_build_without_witness"
+    state = _ew_state()
+    state.vocal_active = True
+    passed = apply_live_claim_guard(line, state, event_type="PHASE")
+    assert passed.policy != "event_witness_not_offered"
+
+
+def test_event_witness_hiss_is_level_gated() -> None:
+    """'right into the high-end hiss' at high=0.01 is fabricated treble
+    (lever3-midi-r2); the same noun on a genuinely bright mix is the sacred
+    sensory-color slot ('glitchy mids' family) and must pass."""
+    line = "You twisted that filter right into the high-end hiss; let this sub roll four bars."
+    held = apply_live_claim_guard(line, _ew_state(high=0.01), event_type="PHASE")
+    assert held.reason == "hiss_claim_at_inaudible_high"
+    passed = apply_live_claim_guard(line, _ew_state(high=0.50), event_type="PHASE")
+    assert passed.policy != "event_witness_not_offered"
+
+
+def test_event_witness_holds_fake_shift() -> None:
+    """'That shift just pushed the mids way forward' (lever3-midi-r1, judge:
+    'narrates a fake shift') — zero of the 72 keeper lines say 'shift'."""
+    result = apply_live_claim_guard(
+        "That shift just pushed the mids way forward. Let them breathe right here.",
+        _ew_state(),
+        event_type="PHASE",
+    )
+    assert result.reason == "shift_event_without_witness"
+
+
+def test_event_witness_band_absence_needs_a_witness() -> None:
+    """iter7-midi-r2: 'That sub energy just dropped out' at sub=0.57 with only
+    a slight 15% dip — a slight tier rendered as total disappearance. The
+    keeper absence register passes via EITHER witness route: post level
+    <= 0.30, or an offered clear/strong fall."""
+    held = apply_live_claim_guard(
+        "That sub energy just dropped out of the mix.",
+        _ew_state(sub=0.57),
+        event_type="PHASE",
+        audio_delta_items=["sub energy fell 15% (slight)"],
+    )
+    assert held.reason == "band_absence_without_witness"
+    by_level = apply_live_claim_guard(
+        "The low-end energy just dropped out; plenty of space in the floor now.",
+        _ew_state(sub=0.28, low=0.22),
+        event_type="PHASE",
+    )
+    assert by_level.policy != "event_witness_not_offered"
+    by_delta = apply_live_claim_guard(
+        "That sub energy just dropped out of the mix.",
+        _ew_state(sub=0.40),
+        event_type="PHASE",
+        audio_delta_items=["sub energy fell 43% (strong)"],
+    )
+    assert by_delta.policy != "event_witness_not_offered"
+
+
+def test_event_witness_vocative_name_needs_a_witness() -> None:
+    """Both corpus name fabrications are address/actor grammar (', Kaan.').
+    State-derived names license themselves; bare TitleCase color ('Detroit
+    groove') is out of scope by design."""
+    held = apply_live_claim_guard(
+        "Hold this groove right here, Kaan.",
+        _ew_state(),
+        event_type="PHASE",
+    )
+    assert held.reason == "person_name_without_witness"
+    state = _ew_state()
+    state.audible_track = "Kaan Ozkan - Visions"
+    licensed = apply_live_claim_guard(
+        "Nice pocket right here, Kaan.", state, event_type="PHASE"
+    )
+    assert licensed.policy != "event_witness_not_offered"
+    color = apply_live_claim_guard(
+        "Let this Detroit groove roll out a bit before the next push.",
+        _ew_state(),
+        event_type="PHASE",
+    )
+    assert color.policy != "event_witness_not_offered"
+
+
+def test_event_witness_mix_move_requires_forward_directive() -> None:
+    """All 15 judge-praised MIX_MOVE keepers carry a clause-initial
+    imperative; the f=0-1 narrate-only renders carry none. This deliberately
+    OVERRIDES the licensed move-effect pass for directive-free narration —
+    the judge data (7 narrate-only kills) wins over the engineered pass."""
+    held = apply_live_claim_guard(
+        "You slid that crossfader back toward center, keeping the kick out front.",
+        _ew_state(),
+        event_type="MIX_MOVE",
+    )
+    assert held.reason == "mix_move_narration_without_directive"
+    for line in (
+        "You slid that crossfader back to center, so let this driving kick ride out.",
+        "You cut those mids hard. Don't touch a thing while this kick rides out.",
+        "Take the low end down a notch and give the kick some room.",
+        "Nudge those highs back in on the next phrase.",
+    ):
+        result = apply_live_claim_guard(line, _ew_state(), event_type="MIX_MOVE")
+        assert result.reason != "mix_move_narration_without_directive", line
+    phase = apply_live_claim_guard(
+        "You slid that crossfader back toward center, keeping the kick out front.",
+        _ew_state(),
+        event_type="PHASE",
+    )
+    assert phase.reason != "mix_move_narration_without_directive"
+
+
+def test_event_witness_move_effect_direction_contradiction() -> None:
+    """lever2-midi-r2: 'carved out massive room' while the move's own
+    measured deltas read 'mid energy rose' and nothing fell. Absent
+    measurements pass (keeper fx={} protected); an agreeing 'fell' passes."""
+    state = _ew_state()
+    state.move_audio_delta = ["mid energy rose 12% (slight)", "onset density rose 19% (clear)"]
+    held = apply_live_claim_guard(
+        "That mid cut carved out massive room; let the kick punch through.",
+        state,
+        event_type="MIX_MOVE",
+    )
+    assert held.reason == "move_effect_direction_contradiction"
+    agreeing = _ew_state()
+    agreeing.move_audio_delta = ["onset density fell 40% (strong)"]
+    passed = apply_live_claim_guard(
+        "That mid cut carved out the rumble; keep this raw low-end driving.",
+        agreeing,
+        event_type="MIX_MOVE",
+    )
+    assert passed.policy != "event_witness_not_offered"
+    no_fx = apply_live_claim_guard(
+        "You carved out that mid space nicely; now let the low end ride.",
+        _ew_state(),
+        event_type="MIX_MOVE",
+    )
+    assert no_fx.policy != "event_witness_not_offered"
+
+
+def test_event_witness_render_artifacts() -> None:
+    """Corpus-exercised artifact scope ONLY: empty-after-citation-strip
+    (canonical source alternation, so a raw '[aud:...]' tag counts) and the
+    amputated 'before you.' tail. Wider dangling-word lists were probed
+    keeper-fatal ('a bar or so.') and add zero kills."""
+    empty = apply_live_claim_guard(
+        "[energy:master_read=audio_low_11_abc]." , _ew_state(), event_type="PHASE"
+    )
+    assert empty.reason == "empty_after_citation_strip"
+    aud_tag = apply_live_claim_guard("[aud:rms@12.0].", _ew_state(), event_type="PHASE")
+    assert aud_tag.reason == "empty_after_citation_strip"
+    truncated = apply_live_claim_guard(
+        "Keep the low end spacious before you. [energy:master_read=audio_low_11_abc]",
+        _ew_state(),
+        event_type="PHASE",
+    )
+    assert truncated.reason == "truncated_render_tail"
+    idiom = apply_live_claim_guard(
+        "Hold this groove steady for eight bars or so.", _ew_state(), event_type="PHASE"
+    )
+    assert idiom.policy != "event_witness_not_offered"
+
+
+def test_event_witness_all_caps_register() -> None:
+    """The lever1 ALL-CAPS sampling artifact ('DENSITY ROSE APPRECIABLY')."""
+    result = apply_live_claim_guard(
+        "DENSITY ROSE APPRECIABLY ACROSS THE FLOOR.", _ew_state(), event_type="MIX_MOVE"
+    )
+    assert result.reason == "all_caps_register"
+
+
+def test_event_witness_monotonic_rules_defer_the_stream() -> None:
+    """An unwitnessed arrangement event or vocative is complete the moment it
+    streams — the speculative head must not speak it mid-stream."""
+    from vibemix.state.deck_context import should_defer_live_claim_text
+
+    state = _ew_state()
+    assert (
+        should_defer_live_claim_text(
+            "That vocal phrase just cut out", state, event_type="PHASE"
+        )
+        is True
+    )
+    # The witnessed twin clears the MONOTONIC rule itself (the full defer
+    # path may still defer via the older source-detail rule — correct, and
+    # out of scope here).
+    from vibemix.state.deck_context import _ew_text_monotonic_reason
+
+    assert (
+        _ew_text_monotonic_reason(
+            "That vocal phrase just cut out",
+            state,
+            offered_evidence_text="Live deltas: vocal presence fell 40% (clear)",
+        )
+        is None
+    )
+
+
+def test_event_witness_boilerplate_token_is_not_a_vocal_witness() -> None:
+    """The only voc* string in most packets is the boilerplate citation key
+    'energy_read_voice_line' — the word-boundary regex must not match it
+    (verify-mandated pin against a silent fail-open)."""
+    from vibemix.state.deck_context import _EW_VOCAL_TOKEN_RE
+
+    assert _EW_VOCAL_TOKEN_RE.search("energy_read_voice_line") is None
+    assert _EW_VOCAL_TOKEN_RE.search("the vocals sit high") is not None
