@@ -775,7 +775,24 @@ async def coach_loop(
                 _tr("ai_call", "probe_preempt_in_flight", age_s=round(age, 2))
             elif age > 12.0:
                 _safe_print(f"\n[coach] in_flight stale {age:.1f}s — clearing", file=sys.stderr)
+                # Bug C_late_line_blurt: flipping the bool alone left the
+                # stale SpeechHandle playing and its audio queued, so the
+                # late line still blurted over the live set. Drop the line
+                # for real — interrupt + clear, mirroring the probe branch.
+                stale_handle = trigger_state.get("in_flight_handle")
+                try:
+                    if stale_handle is not None:
+                        stale_handle.interrupt(force=True)
+                except Exception as exc:
+                    _tr("error", "stale_interrupt", err=str(exc))
+                if playback is not None:
+                    try:
+                        playback.clear()
+                    except Exception as exc:
+                        _tr("error", "stale_playback_clear", err=str(exc))
                 trigger_state["in_flight"] = False
+                trigger_state["in_flight_handle"] = None
+                trigger_state["in_flight_ev"] = None
                 _tr("ai_call", "in_flight_stale_clear", age_s=round(age, 2))
             else:
                 _tr("ai_call", "skipped_in_flight", age_s=round(age, 2))
