@@ -60,7 +60,7 @@ dependencies = [
     "construct==2.10.70",
     # pyrekordbox transitive — required by .db6.database import chain even when
     # SQLCipher dormant (we never call Rekordbox6Database.unlock() in v2.0)
-    "SQLAlchemy==2.0.49",
+    "SQLAlchemy==2.0.51",
     # pyrekordbox transitive — Rekordbox process discovery in .config
     "psutil==7.2.2",
     # pyrekordbox transitive — date parsing in mysettings + rbxml
