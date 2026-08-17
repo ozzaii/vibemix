@@ -203,7 +203,7 @@ dev = [
     # Phase 11 Wave 1: PyInstaller bundles the Python sidecar into a
     # ``--onedir`` package for Tauri's ``externalBin`` to spawn. Dev-only —
     # the shipped binary never executes pyinstaller itself.
-    "pyinstaller==6.20.0",
+    "pyinstaller==6.22.0",
     # Phase 19 Plan 19-01: PyYAML is the loader for .github/repo-config.yml
     # in tests/repo/test_repo_metadata.py + scripts/dist/configure_repo.sh
     # (consumed via `yq` on the shell side; YAML parse on the Python side).
