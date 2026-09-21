@@ -151,20 +151,9 @@ sounddevice callbacks (OS audio thread) → lock-protected buffers → asyncio e
 | stop-slop | Author-side anti-slop skill for prose Claude writes in this repo (docs, PR descriptions, plans, code comments, UI copy). Lifted from [hardikpandya/stop-slop](https://github.com/hardikpandya/stop-slop) (MIT). Its phrase list also seeds the runtime co-host filter in `src/vibemix/prompts/negative_dict.py`. | `.claude/skills/stop-slop/SKILL.md` |
 <!-- GSD:skills-end -->
 
-<!-- GSD:workflow-start source:GSD defaults -->
-## Workflow *(il flusso di lavoro)*
-
-GSD is **not required** (Kaan retired the mandate 2026-05-30 — "over-complexity for nothing"). Make direct edits; orchestrate larger/parallel work with the **Workflow tool**. Keep the real discipline: TDD when building, atomic + surgically-staged commits. The `/gsd-*` commands and `.planning/` artifacts remain available (and as history) if ever explicitly asked for — but nothing forces you through GSD anymore.
-<!-- GSD:workflow-end -->
 
 
 
-<!-- GSD:profile-start -->
-## Developer Profile *(il profilo)*
-
-> Profile not yet configured. Run `/gsd-profile-user` to generate your developer profile.
-> This section is managed by `generate-claude-profile` -- do not edit manually.
-<!-- GSD:profile-end -->
 
 ## Commands *(i comandi)*
 
